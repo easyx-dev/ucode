@@ -150,7 +150,7 @@ describe("sdk 经 HTTP + SSE", () => {
 
     // 原壳重连：带游标续传
     const resumed = await connect({
-      transport: createHttpClient({ baseUrl, clientId: "sdk-test" }),
+      transport: createHttpClient({ baseUrl, clientId: "sdk-test", reconnectDelayMs: 100 }),
       clientId: "sdk-test",
       clientKind: "web",
       capabilities: ["sessions.read", "sessions.write", "prompt.run", "interaction.respond"],
