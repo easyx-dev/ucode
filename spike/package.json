@@ -6,9 +6,16 @@
   "scripts": {
     "v2": "node v2-persistence.ts",
     "v1": "node v1-append-only.ts",
-    "v3": "node v3-tolerance.ts"
+    "v3": "node v3-tolerance.ts",
+    "v4": "node v4-plugin-runtime.ts",
+    "v6": "node v6-workspace-query.ts",
+    "v7": "node v7-pty.ts",
+    "v8": "node v8-pending-interaction.ts",
+    "v9": "node v9-subprocess-hook.ts",
+    "v10": "node v10-reader.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.87.1"
+    "@earendil-works/pi-coding-agent": "^0.87.1",
+    "node-pty": "^1.1.0"
   }
 }
