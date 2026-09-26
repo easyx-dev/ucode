@@ -219,7 +219,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         (candidate) =>
           candidate.type === "custom" &&
           candidate.customType === "ui.pending" &&
-          (candidate.data as { interactionId?: string } | undefined)?.interactionId === interactionId,
+          (candidate.data as { interactionId?: string } | undefined)?.interactionId ===
+            interactionId,
       );
     if (pending === undefined) return false;
     const alreadyResolved = [...entries]
@@ -228,7 +229,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         (candidate) =>
           candidate.type === "custom" &&
           candidate.customType === "ui.resolved" &&
-          (candidate.data as { interactionId?: string } | undefined)?.interactionId === interactionId,
+          (candidate.data as { interactionId?: string } | undefined)?.interactionId ===
+            interactionId,
       );
     if (alreadyResolved) return false;
 
@@ -251,8 +253,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     const text =
       `此前有一个待决交互（${gate?.method ?? "交互"}）当时无人应答，现在有了答复：${decision}。` +
       `请据此继续：若已允许，请重试该操作；若已拒绝或取消，请调整方案。`;
-    writable(entry).runtime
-      .startPrompt(text)
+    writable(entry)
+      .runtime.startPrompt(text)
       .catch((error: unknown) => {
         // 转达失败必须可见（否则用户以为应答生效了，agent 却毫无动静）
         bus.broadcastToSession(sessionId, {

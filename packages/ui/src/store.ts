@@ -26,7 +26,12 @@ export type AgentStoreState = {
   compact(sessionId: string): Promise<void>;
   renameSession(sessionId: string, name: string): Promise<void>;
   respond(interactionId: string, value: string | boolean | null, cancelled?: boolean): void;
-  resolveInteraction(sessionId: string, interactionId: string, value: string | boolean | null, cancelled?: boolean): Promise<void>;
+  resolveInteraction(
+    sessionId: string,
+    interactionId: string,
+    value: string | boolean | null,
+    cancelled?: boolean,
+  ): Promise<void>;
   forkSession(sessionId: string): Promise<string>;
   refresh(): Promise<void>;
 };

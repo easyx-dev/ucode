@@ -72,7 +72,12 @@ export type AgentSdk = {
   setAutonomy(sessionId: string, level: AutonomyLevel): Promise<void>;
   archiveSession(sessionId: string, archived: boolean): Promise<void>;
   /** 解决一个持久化待决交互（无人值守场景：当时无人应答，已落盘）。 */
-  resolveInteraction(sessionId: string, interactionId: string, value: string | boolean | null, cancelled?: boolean): Promise<void>;
+  resolveInteraction(
+    sessionId: string,
+    interactionId: string,
+    value: string | boolean | null,
+    cancelled?: boolean,
+  ): Promise<void>;
 
   // 驱动
   prompt(sessionId: string, text: string, references?: Reference[]): Promise<void>;

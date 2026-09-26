@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Capability } from "./trust.ts";
 import { ReferenceSchema } from "./session.ts";
+import type { Capability } from "./trust.ts";
 import { AutonomyLevelSchema } from "./trust.ts";
 
 /**

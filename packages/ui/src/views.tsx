@@ -284,7 +284,9 @@ function PendingRow({
   onResolve: (value: string | boolean | null) => void;
 }): ReactNode {
   const [resolved, setResolved] = useState<string | null>(null);
-  const params = item.params as { title?: string; message?: string; options?: string[] } | undefined;
+  const params = item.params as
+    | { title?: string; message?: string; options?: string[] }
+    | undefined;
 
   if (resolved !== null) {
     return <NoticeRow text={`待决交互已处理（${resolved}）`} />;
@@ -295,32 +297,48 @@ function PendingRow({
         ⏸ 待决交互（当时无人应答，已持久化）
       </p>
       {params?.title !== undefined && <p className="mt-1 text-[13px]">{params.title}</p>}
-      {params?.message !== undefined && <p className="text-[12px] text-[var(--color-content-muted)]">{params.message}</p>}
+      {params?.message !== undefined && (
+        <p className="text-[12px] text-[var(--color-content-muted)]">{params.message}</p>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {params?.options !== undefined
-          ? params.options.map((option) => (
-              <Button
-                key={option}
-                size="sm"
-                variant={option === "拒绝" ? "danger" : "ghost"}
-                onClick={() => {
-                  setResolved(option);
-                  onResolve(option);
-                }}
-              >
-                {option}
-              </Button>
-            ))
-          : (
-            <>
-              <Button size="sm" variant="primary" onClick={() => { setResolved("允许"); onResolve(true); }}>
-                允许
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => { setResolved("拒绝"); onResolve(false); }}>
-                拒绝
-              </Button>
-            </>
-          )}
+        {params?.options !== undefined ? (
+          params.options.map((option) => (
+            <Button
+              key={option}
+              size="sm"
+              variant={option === "拒绝" ? "danger" : "ghost"}
+              onClick={() => {
+                setResolved(option);
+                onResolve(option);
+              }}
+            >
+              {option}
+            </Button>
+          ))
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                setResolved("允许");
+                onResolve(true);
+              }}
+            >
+              允许
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                setResolved("拒绝");
+                onResolve(false);
+              }}
+            >
+              拒绝
+            </Button>
+          </>
+        )}
       </div>
       <p className="mt-1.5 text-[10px] text-[var(--color-content-muted)]">
         应答后会作为新的消息转达给 agent（agent 据此重试或调整方案）。
