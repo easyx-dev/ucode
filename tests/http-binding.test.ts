@@ -256,13 +256,13 @@ describe("HTTP + SSE 绑定", () => {
     await harness.command("prompt", { text: "写个文件" }, sessionId);
 
     const request = await harness.waitFor((message) => message.type === "ui.request", 20_000);
-    expect(request.method).toBe("confirm");
+    expect(request.method).toBe("select");
     // 上行提交应答（纯请求-应答传输必须配对）
     expect(
       await harness.post({
         type: "ui.response",
         id: request.id,
-        value: true,
+        value: "允许一次",
         responderId: "wire-test",
       }),
     ).toBe(202);
