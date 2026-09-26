@@ -1,0 +1,14 @@
+{
+  "name": "ucode-spike",
+  "private": true,
+  "type": "module",
+  "description": "ucode 承重假设的验证脚本（V-2 / V-1 / V-3），可重跑",
+  "scripts": {
+    "v2": "node v2-persistence.ts",
+    "v1": "node v1-append-only.ts",
+    "v3": "node v3-tolerance.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.87.1"
+  }
+}
