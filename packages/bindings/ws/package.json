@@ -5,12 +5,15 @@
   "type": "module",
   "description": "绑定层 WebSocket：一帧一消息",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@hono/node-ws": "catalog:",
     "@ucode/protocol": "workspace:*",
     "hono": "catalog:"
   }

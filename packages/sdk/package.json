@@ -5,7 +5,11 @@
   "type": "module",
   "description": "headless 控制层 SDK：建连、命令封装、事件折叠、断线续传",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./stdio": "./src/transports/stdio.ts",
+    "./rpc": "./src/transports/rpc.ts",
+    "./http": "./src/transports/http.ts",
+    "./ws": "./src/transports/ws.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

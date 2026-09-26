@@ -19,8 +19,17 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@types/node": "catalog:",
+    "@ucode/binding-http": "workspace:*",
+    "@ucode/binding-rpc": "workspace:*",
+    "@ucode/binding-stdio": "workspace:*",
+    "@ucode/binding-ws": "workspace:*",
     "@ucode/branding": "workspace:*",
     "@ucode/cli": "workspace:*",
+    "@ucode/core": "workspace:*",
+    "@ucode/data-layer-spec": "workspace:*",
+    "@ucode/protocol": "workspace:*",
+    "@ucode/sdk": "workspace:*",
+    "@ucode/store": "workspace:*",
     "oxc-parser": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

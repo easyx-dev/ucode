@@ -5,13 +5,18 @@
   "type": "module",
   "description": "TUI 壳（Ink；只复用 SDK，不复用 UI）",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@ucode/branding": "workspace:*",
-    "@ucode/sdk": "workspace:*"
+    "@ucode/sdk": "workspace:*",
+    "ink": "catalog:",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:"
   }
 }

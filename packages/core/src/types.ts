@@ -1,8 +1,10 @@
 import type { Store } from "@ucode/data-layer-spec";
 import type {
   AutonomyLevel,
+  BindingConnection,
   Capability,
   ClientKind,
+  CoreServer,
   Identity,
   ServerMessage,
   SessionStatus,
@@ -35,20 +37,7 @@ export type CoreBus = {
   notifyStatus(sessionId: string, status: SessionStatus, pendingInteractions: number): void;
 };
 
-export type ConnectionHandle = {
-  readonly id: string;
-  readonly trustLevel: TrustLevel;
-  readonly grantedCapabilities: Capability[];
-  /**
-   * 绑定层把收到的原始消息（已反序列化为 JSON 值）交给核心层。
-   *
-   * **核心层自己解析**：解析失败必须能被识别，且要能区分"不是 JSON"与"不符合协议"——
-   * 这两件事都在核心层统一处置，绑定层不必重复协议知识（它只做序列化与寻址）。
-   */
-  receive(raw: unknown): Promise<void>;
-  /** 连接断开：卸载它的全部 attachment。 */
-  close(): Promise<void>;
-};
+export type ConnectionHandle = BindingConnection;
 
 export type AttachConnectionOptions = {
   /** 绑定名，仅用于诊断（stdio / unix / http / ws）。 */
@@ -81,12 +70,9 @@ export type CoreConfig = {
   };
 };
 
-export type Core = {
-  readonly coreId: string;
+export type Core = CoreServer & {
   readonly dataDir: string;
   readonly store: Store;
-  /** 绑定层接受一条新连接。 */
-  attachConnection(options: AttachConnectionOptions): ConnectionHandle;
   /** 核心层自身的能力全集（welcome 里回告）。 */
   capabilities(): Capability[];
   /** 关闭：释放 owner 租约、dispose 所有会话运行时。 */

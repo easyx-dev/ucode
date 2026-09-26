@@ -5,7 +5,8 @@
   "type": "module",
   "description": "绑定层 JSON-RPC：unix socket / TCP，4 字节大端长度前缀",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

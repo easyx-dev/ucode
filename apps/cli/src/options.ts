@@ -1,0 +1,198 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { parseArgs } from "node:util";
+import { envVar, getBrand } from "@ucode/branding";
+
+/**
+ * CLI 参数解析。
+ *
+ * 两条规矩：
+ * 1. **数据层默认目录来自品牌配置**（ADR-023），代码里不出现目录名字面量；
+ * 2. **stdout 归协议通道**：stdio 绑定下 stdout 是协议 C 的线，因此所有日志都走 stderr。
+ */
+
+export type GlobalOptions = {
+  dataDir: string;
+  cwd: string;
+  /** 显式给出的数据层目录（供提示"来自哪里"用）。 */
+  dataDirSource: "flag" | "env" | "default";
+};
+
+export const COMMANDS = [
+  { name: "core start", summary: "启动核心层（headless，可脱离控制层单独运行）" },
+  { name: "web", summary: "启动内置 Web 壳（核心层 + HTTP/SSE + 静态资源，同一端口）" },
+  { name: "tui", summary: "启动内置 TUI 壳（复用 sdk；默认自己拉起一个核心层）" },
+] as const;
+
+export type ParsedCli =
+  | { kind: "help" }
+  | { kind: "version" }
+  | { kind: "core.start"; options: CoreStartOptions }
+  | { kind: "web"; options: WebOptions }
+  | { kind: "tui"; options: TuiOptions }
+  | { kind: "error"; message: string; code: number };
+
+export type BindingName = "stdio" | "rpc" | "http" | "ws";
+
+export type CoreStartOptions = GlobalOptions & {
+  binding: BindingName;
+  socketPath?: string;
+  host: string;
+  port?: number;
+  /** 启动时就把默认自主级别定下来（新建会话用）。 */
+  autonomy: "confirm" | "auto-edit" | "plan" | "full-access";
+  /** 显式允许非环回监听（信任级别会降为 untrusted）。 */
+  allowNonLoopback: boolean;
+};
+
+export type WebOptions = GlobalOptions & {
+  host: string;
+  port: number;
+  allowNonLoopback: boolean;
+};
+
+export type TuiOptions = GlobalOptions & {
+  /** 连一个已经在跑的核心层；省略则自己 spawn 一个（stdio）。 */
+  coreEndpoint?:
+    | { kind: "rpc"; socketPath?: string; host?: string; port?: number }
+    | { kind: "http"; baseUrl: string };
+};
+
+const SHARED_OPTIONS = {
+  "data-dir": { type: "string" },
+  cwd: { type: "string" },
+  help: { type: "boolean", short: "h" },
+  version: { type: "boolean", short: "v" },
+} as const;
+
+export function defaultDataDir(): { dataDir: string; source: "env" | "default" } {
+  const fromEnv = process.env[envVar("DATA_DIR")];
+  if (fromEnv !== undefined && fromEnv !== "") return { dataDir: fromEnv, source: "env" };
+  return { dataDir: join(homedir(), getBrand().dataDirName), source: "default" };
+}
+
+function resolveDataDir(value: string | undefined): GlobalOptions {
+  if (value !== undefined && value !== "") {
+    return { dataDir: value, cwd: process.cwd(), dataDirSource: "flag" };
+  }
+  const fallback = defaultDataDir();
+  return { dataDir: fallback.dataDir, cwd: process.cwd(), dataDirSource: fallback.source };
+}
+
+export function parseCli(argv: string[]): ParsedCli {
+  const [first, second, ...rest] = argv;
+  const isCoreStart = first === "core" && second === "start";
+
+  try {
+    if (isCoreStart) {
+      const parsed = parseArgs({
+        args: rest,
+        options: {
+          ...SHARED_OPTIONS,
+          binding: { type: "string", default: "stdio" },
+          socket: { type: "string" },
+          host: { type: "string", default: "127.0.0.1" },
+          port: { type: "string" },
+          autonomy: { type: "string", default: "confirm" },
+          "allow-non-loopback": { type: "boolean", default: false },
+        },
+        allowPositionals: true,
+      });
+      if (parsed.values.help === true) return { kind: "help" };
+      if (parsed.values.version === true) return { kind: "version" };
+      const binding = parsed.values.binding as BindingName;
+      if (!["stdio", "rpc", "http", "ws"].includes(binding)) {
+        return { kind: "error", message: `未知的绑定：${binding}`, code: 2 };
+      }
+      const base = resolveDataDir(parsed.values["data-dir"]);
+      return {
+        kind: "core.start",
+        options: {
+          ...base,
+          cwd: parsed.values.cwd ?? base.cwd,
+          binding,
+          ...(parsed.values.socket === undefined ? {} : { socketPath: parsed.values.socket }),
+          host: parsed.values.host,
+          ...(parsed.values.port === undefined ? {} : { port: Number(parsed.values.port) }),
+          autonomy: parsed.values.autonomy as CoreStartOptions["autonomy"],
+          allowNonLoopback: parsed.values["allow-non-loopback"] === true,
+        },
+      };
+    }
+
+    if (first === "web") {
+      const parsed = parseArgs({
+        args: [second, ...rest].filter((value) => value !== undefined),
+        options: {
+          ...SHARED_OPTIONS,
+          host: { type: "string", default: "127.0.0.1" },
+          port: { type: "string", default: "3000" },
+          "allow-non-loopback": { type: "boolean", default: false },
+        },
+        allowPositionals: false,
+      });
+      if (parsed.values.help === true) return { kind: "help" };
+      const base = resolveDataDir(parsed.values["data-dir"]);
+      return {
+        kind: "web",
+        options: {
+          ...base,
+          cwd: parsed.values.cwd ?? base.cwd,
+          host: parsed.values.host,
+          port: Number(parsed.values.port ?? "3000"),
+          allowNonLoopback: parsed.values["allow-non-loopback"] === true,
+        },
+      };
+    }
+
+    if (first === "tui") {
+      const parsed = parseArgs({
+        args: [second, ...rest].filter((value) => value !== undefined),
+        options: {
+          ...SHARED_OPTIONS,
+          core: { type: "string" },
+        },
+        allowPositionals: false,
+      });
+      if (parsed.values.help === true) return { kind: "help" };
+      const base = resolveDataDir(parsed.values["data-dir"]);
+      const core = parsed.values.core;
+      return {
+        kind: "tui",
+        options: {
+          ...base,
+          cwd: parsed.values.cwd ?? base.cwd,
+          ...(core === undefined ? {} : { coreEndpoint: parseCoreEndpoint(core) }),
+        },
+      };
+    }
+
+    if (first === undefined || first === "--help" || first === "-h") return { kind: "help" };
+    if (first === "--version" || first === "-v") return { kind: "version" };
+    return {
+      kind: "error",
+      message: `未知命令：「${[first, second].filter(Boolean).join(" ")}」。`,
+      code: 2,
+    };
+  } catch (error) {
+    return {
+      kind: "error",
+      message: error instanceof Error ? error.message : String(error),
+      code: 2,
+    };
+  }
+}
+
+export function parseCoreEndpoint(
+  value: string,
+):
+  | { kind: "rpc"; socketPath?: string; host?: string; port?: number }
+  | { kind: "http"; baseUrl: string } {
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return { kind: "http", baseUrl: value.replace(/\/$/, "") };
+  }
+  if (value.startsWith("unix:")) return { kind: "rpc", socketPath: value.slice(5) };
+  const match = /^(?:tcp:\/\/)?([^:]+):(\d+)$/.exec(value);
+  if (match !== null) return { kind: "rpc", host: match[1], port: Number(match[2]) };
+  return { kind: "rpc", socketPath: value };
+}

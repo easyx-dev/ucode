@@ -9,12 +9,14 @@
  * 2. 版本双向校验、从不静默降级（rejected + isVersionSupported）；
  * 3. 交互面方向与命令面相反（ClientMessage / ServerMessage 分开定义）。
  */
+export * from "./binding-client.ts";
 export * from "./channels.ts";
 export * from "./commands.ts";
 export * from "./envelope.ts";
 export * from "./events.ts";
 export * from "./handshake.ts";
 export * from "./responses.ts";
+export * from "./server.ts";
 export * from "./session.ts";
 export * from "./trust.ts";
 export * from "./ui.ts";

@@ -60,3 +60,14 @@ export type AutonomyLevel = z.infer<typeof AutonomyLevelSchema>;
 export function requiresTrustToDrive(level: AutonomyLevel): boolean {
   return level === "auto-edit" || level === "full-access";
 }
+
+/**
+ * 监听地址是否只对本机可见。
+ *
+ * 放在协议包里，是因为它是**信任判断的输入**（"只监听环回"本身就等价于
+ * "对端是同一 OS 用户的进程"），而不是某个绑定的私有细节——
+ * 否则 http 与 ws 两个绑定就得互相 import，而绑定之间是禁止依赖的（spec §7.2）。
+ */
+export function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "::1" || host === "localhost";
+}

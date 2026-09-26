@@ -20,6 +20,7 @@
     "@ucode/binding-ws": "workspace:*",
     "@ucode/branding": "workspace:*",
     "@ucode/core": "workspace:*",
+    "@ucode/protocol": "workspace:*",
     "@ucode/tui": "workspace:*",
     "@ucode/web": "workspace:*"
   }

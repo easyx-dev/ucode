@@ -23,18 +23,19 @@
     ],
     "@ucode/ui": ["@ucode/protocol", "@ucode/sdk", "@ucode/branding"],
     "@ucode/cli": [
-      "@ucode/core",
-      "@ucode/binding-stdio",
-      "@ucode/binding-rpc",
       "@ucode/binding-http",
+      "@ucode/binding-rpc",
+      "@ucode/binding-stdio",
       "@ucode/binding-ws",
-      "@ucode/web",
+      "@ucode/branding",
+      "@ucode/core",
+      "@ucode/protocol",
       "@ucode/tui",
-      "@ucode/branding"
+      "@ucode/web"
     ],
-    "@ucode/web": ["@ucode/ui", "@ucode/branding"],
-    "@ucode/desktop": ["@ucode/ui", "@ucode/branding"],
-    "@ucode/tui": ["@ucode/sdk", "@ucode/branding"],
+    "@ucode/web": ["@ucode/branding", "@ucode/sdk", "@ucode/ui"],
+    "@ucode/desktop": ["@ucode/branding", "@ucode/sdk", "@ucode/ui"],
+    "@ucode/tui": ["@ucode/branding", "@ucode/sdk"],
     "@ucode/hub": ["@ucode/protocol", "@ucode/branding"]
   },
   "forbiddenTransitive": {

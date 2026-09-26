@@ -1,27 +1,19 @@
 #!/usr/bin/env node
-import { parseArgs } from "node:util";
 import { envVar, getBrand } from "@ucode/branding";
 import cliManifest from "../package.json" with { type: "json" };
+import { runCoreStart } from "./commands/core-start.ts";
+import { runTui } from "./commands/tui.ts";
+import { runWeb } from "./commands/web.ts";
+import { COMMANDS, defaultDataDir, parseCli } from "./options.ts";
+import { log } from "./runtime.ts";
 
 const brand = getBrand();
 
-/**
- * 步骤 0 的子命令面：命令名已定（impl §4.1），实现按同文档 §七 的步骤推进。
- * 文案一律从品牌配置派生，代码里不出现产品名与数据层目录名的字面量。
- */
-const COMMANDS = [
-  { name: "core start", summary: "启动核心层（步骤 2）" },
-  { name: "web", summary: "启动内置 Web 壳（步骤 5）" },
-  { name: "tui", summary: "启动内置 TUI 壳（步骤 5）" },
-] as const;
-
-const OPTIONS = {
-  help: { type: "boolean", short: "h" },
-  version: { type: "boolean", short: "v" },
-} as const;
-
 function usage(): string {
-  const commands = COMMANDS.map((c) => `  ${c.name.padEnd(12)}${c.summary}`).join("\n");
+  const commands = COMMANDS.map((command) => `  ${command.name.padEnd(12)}${command.summary}`).join(
+    "\n",
+  );
+  const fallback = defaultDataDir();
   return [
     `${brand.productName} —— 分层智能体`,
     "",
@@ -31,48 +23,45 @@ function usage(): string {
     "命令：",
     commands,
     "",
-    "选项：",
-    "  -h, --help      显示本帮助",
-    "  -v, --version   显示版本",
+    "常用选项：",
+    "  --data-dir <目录>   数据层目录（也可用环境变量 " + envVar("DATA_DIR") + "）",
+    "  --cwd <目录>        会话的默认工作目录",
+    "  -h, --help          显示本帮助",
+    "  -v, --version       显示版本",
     "",
-    `数据层默认目录：~/${brand.dataDirName}`,
-    `  可用 --data-dir 或环境变量 ${envVar("DATA_DIR")} 覆盖`,
+    "core start 的绑定选项：",
+    "  --binding stdio|rpc|http|ws   传输（stdio 供父进程 spawn，rpc 供 unix socket / tcp）",
+    "  --socket <路径>               rpc 绑定的 unix socket 路径",
+    "  --port <端口>                 rpc / http / ws 的端口（0 = 自动分配）",
+    "  --host <地址>                 监听地址（默认只监听环回）",
+    "  --allow-non-loopback          显式允许非环回监听（信任级别降为 untrusted：只读 + 对话）",
+    "",
+    `数据层默认目录：${fallback.dataDir}${fallback.source === "env" ? "（来自环境变量）" : ""}`,
     "",
   ].join("\n");
 }
 
-function fail(message: string, code: number): number {
-  process.stderr.write(`${message}\n运行 ${brand.productName} --help 查看用法。\n`);
-  return code;
+async function main(argv: string[]): Promise<number> {
+  const parsed = parseCli(argv);
+
+  switch (parsed.kind) {
+    case "help":
+      process.stdout.write(usage());
+      return 0;
+    case "version":
+      process.stdout.write(`${cliManifest.version}\n`);
+      return 0;
+    case "error":
+      log(parsed.message);
+      log(`运行 ${brand.productName} --help 查看用法。`);
+      return parsed.code;
+    case "core.start":
+      return runCoreStart(parsed.options);
+    case "web":
+      return runWeb(parsed.options);
+    case "tui":
+      return runTui(parsed.options);
+  }
 }
 
-export function main(argv: string[]): number {
-  let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
-  try {
-    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true });
-  } catch (error) {
-    return fail(error instanceof Error ? error.message : String(error), 2);
-  }
-
-  const { values, positionals } = parsed;
-
-  if (values.version) {
-    process.stdout.write(`${cliManifest.version}\n`);
-    return 0;
-  }
-
-  if (values.help || positionals.length === 0) {
-    process.stdout.write(usage());
-    return 0;
-  }
-
-  const requested = positionals.slice(0, 2).join(" ");
-  if (!COMMANDS.some((c) => c.name === requested)) {
-    return fail(`未知命令：「${requested}」。`, 2);
-  }
-
-  process.stderr.write(`「${requested}」尚未实现：步骤 0 只交付工程脚手架。\n`);
-  return 1;
-}
-
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = await main(process.argv.slice(2));
