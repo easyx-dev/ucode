@@ -162,6 +162,12 @@ export function App({ sdk, productName }: AppProps): ReactNode {
       setDraft("");
       setMode({ kind: "idle" });
       if (text === "" || activeSessionId === null) return;
+      if (state.views[activeSessionId]?.readOnly === true) {
+        setBootError(
+          "该会话是只读挂载：写权限在另一个核心层实例手上。请改用 `--core <该实例的地址>` 连过去。",
+        );
+        return;
+      }
       const running = state.views[activeSessionId]?.running === true;
       void (running ? sdk.steer(activeSessionId, text) : sdk.prompt(activeSessionId, text)).catch(
         (error: unknown) => {

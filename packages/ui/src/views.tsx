@@ -231,10 +231,16 @@ export function Composer({ sessionId }: { sessionId: string }): ReactNode {
   const send = useAgentStore((store) => store.send);
   const state = useAgentStore((store) => store.state);
   const running = state.views[sessionId]?.running === true;
+  const readOnly = state.views[sessionId]?.readOnly === true;
   const pending = state.interactions.filter((request) => request.sessionId === sessionId).length;
 
   return (
     <div className="border-t border-[var(--color-border-subtle)] p-3">
+      {readOnly && (
+        <p className="mb-2 rounded bg-[oklch(0.34_0.06_80)] px-2 py-1 text-[11px] text-[var(--color-warn)]">
+          该会话是只读挂载：写权限在另一个核心层实例手上（同一数据层只允许一个 writer）。
+        </p>
+      )}
       <textarea
         className="h-20 w-full resize-none rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-2 py-2 font-[var(--font-mono)] text-[13px] outline-none focus:border-[var(--color-accent)]"
         placeholder={

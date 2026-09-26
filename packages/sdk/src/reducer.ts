@@ -46,6 +46,11 @@ export type SessionView = {
   lastError: ErrorInfo | null;
   /** 游标失效（如格式迁移）时为真：控制层必须重新全量同步。 */
   needsResync: boolean;
+  /**
+   * 只读挂载：本实例不是该会话的 owner（写权限在另一个核心层实例手上，spec §3.5）。
+   * 界面必须显式告诉用户，否则"发出去没反应"会被当成 bug。
+   */
+  readOnly: boolean;
 };
 
 export type SdkNotice = { level: "info" | "warn" | "error"; message: string; at: number };
@@ -81,6 +86,7 @@ export function emptyView(id: string): SessionView {
     usage: null,
     lastError: null,
     needsResync: false,
+    readOnly: false,
   };
 }
 
