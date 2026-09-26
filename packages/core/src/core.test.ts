@@ -61,7 +61,7 @@ async function setup(): Promise<{ core: Core; provider: FakeProvider; projectDir
 function connect(
   target: Core,
   trustLevel: "implicit" | "local" | "untrusted",
-  capabilities = ALL_CAPABILITIES,
+  _capabilities = ALL_CAPABILITIES,
 ): TestClient {
   const messages: ServerMessage[] = [];
   const handle = target.attachConnection({

@@ -107,6 +107,11 @@ export type AgentSdk = {
   displayMessages(sessionId: string): DisplayMessage[];
 };
 
+/** 让定时器不阻止进程退出；浏览器里 setTimeout 返回 number，没有 unref。 */
+function unrefTimer(timer: unknown): void {
+  (timer as { unref?: () => void }).unref?.();
+}
+
 class SdkError extends Error {
   readonly info: ErrorInfo;
   constructor(info: ErrorInfo) {
@@ -218,13 +223,14 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     return new Promise<ServerMessage>((resolve, reject) => {
       const entry = { predicate, resolve };
       waiters.push(entry);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const index = waiters.indexOf(entry);
         if (index !== -1) {
           waiters.splice(index, 1);
           reject(new Error("等待核心层消息超时"));
         }
-      }, timeoutMs).unref?.();
+      }, timeoutMs);
+      unrefTimer(timer);
     });
   }
 
@@ -280,7 +286,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
         pendingRequests.delete(id);
         reject(new Error(`命令 ${command} 超时`));
       }, requestTimeoutMs);
-      timer.unref?.();
+      unrefTimer(timer);
       pendingRequests.set(id, { resolve, reject, timer });
       transport.send({ type: "command", id, command, sessionId, args });
     });
@@ -327,7 +333,12 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
 
     async listSessions() {
       const data = await request<{ sessions: SessionSummary[] }>("session.list", {}, null);
-      publish({ ...state, sessions: data.sessions });
+      const views = { ...state.views };
+      for (const session of data.sessions) {
+        const view = views[session.id] ?? emptyView(session.id);
+        views[session.id] = { ...view, summary: session };
+      }
+      publish({ ...state, sessions: data.sessions, views });
       return data.sessions;
     },
 
@@ -484,9 +495,10 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       const id = `chan-${++counter}`;
       const result = new Promise<unknown>((resolve, reject) => {
         pendingChannels.set(id, { resolve, reject });
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           if (pendingChannels.delete(id)) reject(new Error(`通道请求 ${method} 超时`));
-        }, requestTimeoutMs).unref?.();
+        }, requestTimeoutMs);
+        unrefTimer(timer);
       });
       transport.send({ type: "channel.request", id, channelId, method, params: params ?? {} });
       return (await result) as T;

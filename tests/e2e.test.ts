@@ -280,7 +280,7 @@ describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", 
       for (;;) {
         let chunk: { value?: Uint8Array; done?: boolean };
         try {
-          chunk = (await reader!.read()) ?? { done: true };
+          chunk = (await reader?.read()) ?? { done: true };
         } catch {
           return; // 对端关闭（进程退出或收尾）不算错误
         }

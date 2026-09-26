@@ -22,6 +22,8 @@ export const COMMANDS = [
   { name: "core start", summary: "启动核心层（headless，可脱离控制层单独运行）" },
   { name: "web", summary: "启动内置 Web 壳（核心层 + HTTP/SSE + 静态资源，同一端口）" },
   { name: "tui", summary: "启动内置 TUI 壳（复用 sdk；默认自己拉起一个核心层）" },
+  { name: "provider add", summary: "写入模型供应商配置（本地权威，写进数据层的 models.json）" },
+  { name: "provider list", summary: "列出当前可用的模型" },
 ] as const;
 
 export type ParsedCli =
@@ -30,7 +32,17 @@ export type ParsedCli =
   | { kind: "core.start"; options: CoreStartOptions }
   | { kind: "web"; options: WebOptions }
   | { kind: "tui"; options: TuiOptions }
+  | { kind: "provider.add"; options: ProviderAddOptions }
+  | { kind: "provider.list"; options: { dataDir: string } }
   | { kind: "error"; message: string; code: number };
+
+export type ProviderAddOptions = GlobalOptions & {
+  id: string;
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  api: string;
+};
 
 export type BindingName = "stdio" | "rpc" | "http" | "ws";
 
@@ -165,6 +177,56 @@ export function parseCli(argv: string[]): ParsedCli {
           ...(core === undefined ? {} : { coreEndpoint: parseCoreEndpoint(core) }),
         },
       };
+    }
+
+    if (first === "provider") {
+      const sub = second;
+      if (sub === "add") {
+        const parsed = parseArgs({
+          args: rest,
+          options: {
+            ...SHARED_OPTIONS,
+            id: { type: "string", default: "local" },
+            "base-url": { type: "string" },
+            model: { type: "string" },
+            "api-key": { type: "string" },
+            api: { type: "string", default: "openai-completions" },
+          },
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        const baseUrl = parsed.values["base-url"];
+        const model = parsed.values.model;
+        if (baseUrl === undefined || model === undefined) {
+          return {
+            kind: "error",
+            message: "provider add 需要 --base-url 与 --model（可选 --api-key / --id / --api）。",
+            code: 2,
+          };
+        }
+        const base = resolveDataDir(parsed.values["data-dir"]);
+        return {
+          kind: "provider.add",
+          options: {
+            ...base,
+            id: parsed.values.id,
+            baseUrl,
+            model,
+            api: parsed.values.api,
+            ...(parsed.values["api-key"] === undefined ? {} : { apiKey: parsed.values["api-key"] }),
+          },
+        };
+      }
+      if (sub === "list") {
+        const parsed = parseArgs({
+          args: rest,
+          options: SHARED_OPTIONS,
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        return { kind: "provider.list", options: resolveDataDir(parsed.values["data-dir"]) };
+      }
+      return { kind: "error", message: `未知的 provider 子命令：「${sub ?? ""}」。`, code: 2 };
     }
 
     if (first === undefined || first === "--help" || first === "-h") return { kind: "help" };

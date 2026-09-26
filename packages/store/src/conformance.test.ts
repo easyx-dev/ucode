@@ -48,6 +48,34 @@ describe("参考实现的额外约束", () => {
     }
   });
 
+  it("另一个实例的追加会让索引失效（多实例共享一个数据层）", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "store-index-fresh-"));
+    const writer = await openStore({ dataDir: dir });
+    const reader = await openStore({ dataDir: dir });
+    try {
+      const repo = await writer.createSession({ cwd: dir });
+      // 读者先建一次索引（此时 0 条记录）
+      const before = await reader.listSessions();
+      expect(before[0]?.entryCount).toBe(0);
+
+      // 写者追加（读者不知道发生了什么——两条进程本来就是这么共享目录的）
+      await writer.openSession(repo.id);
+      const writable = await writer.openSession(repo.id);
+      await writable?.append({ type: "message", message: { role: "user", content: "来自写者" } });
+
+      const after = await reader.listSessions();
+      expect(after[0]?.entryCount).toBe(1);
+      expect(after[0]?.firstMessage).toBe("来自写者");
+    } finally {
+      await writer.close();
+      await reader.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("索引会因数据变化而失效（新建会话立刻出现在列表里）", async () => {
     const { mkdtemp, rm } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");

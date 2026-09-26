@@ -145,6 +145,65 @@ function upsertEntry(view: SessionView, seq: number, entry: SessionEntry): Sessi
   };
 }
 
+/**
+ * 记录到达时同步更新"会话摘要"（侧栏用）。
+ *
+ * 不这么做的话，列表要等下一次 `session.list` 才会更新——用户在侧栏看到的条目数会一直落后，
+ * 而这恰恰是"记录已经落盘"最直观的证据。摘要只是派生数据，这里就近维护它成本最低。
+ */
+function touchSummary(
+  state: SdkState,
+  sessionId: string,
+  seq: number,
+  entry: SessionEntry,
+): SdkState {
+  const previous = state.sessions.find((session) => session.id === sessionId);
+  const previousFirst = previous?.firstMessage ?? null;
+  const firstMessage = previousFirst ?? firstUserText(entry) ?? null;
+  const entryCount = Math.max(previous?.entryCount ?? 0, seq);
+  const updatedAt = entry.timestamp;
+
+  const sessions =
+    previous === undefined
+      ? state.sessions
+      : state.sessions.map((session) =>
+          session.id === sessionId ? { ...session, entryCount, firstMessage, updatedAt } : session,
+        );
+
+  const view = state.views[sessionId];
+  const baseSummary = view?.summary ?? previous ?? null;
+  const views =
+    view === undefined
+      ? state.views
+      : {
+          ...state.views,
+          [sessionId]: {
+            ...view,
+            summary:
+              baseSummary === null ? null : { ...baseSummary, entryCount, firstMessage, updatedAt },
+          },
+        };
+
+  if (sessions === state.sessions && views === state.views) return state;
+  return { ...state, sessions, views };
+}
+
+function firstUserText(entry: SessionEntry): string | null {
+  if (entry.type !== "message") return null;
+  const message = entry.message as { role?: string; content?: unknown } | undefined;
+  if (message?.role !== "user") return null;
+  if (typeof message.content === "string") return message.content.slice(0, 200);
+  if (!Array.isArray(message.content)) return null;
+  const parts: string[] = [];
+  for (const part of message.content) {
+    if (typeof part === "object" && part !== null && (part as { type?: string }).type === "text") {
+      const text = (part as { text?: string }).text;
+      if (typeof text === "string") parts.push(text);
+    }
+  }
+  return parts.length === 0 ? null : parts.join("").slice(0, 200);
+}
+
 /** 一条记录到达 = 权威信号：清掉同一条消息对应的流式增量。 */
 function isAuthoritativeText(entry: SessionEntry): boolean {
   return entry.type === "message";
@@ -195,7 +254,7 @@ export function applyServerMessage(state: SdkState, message: ServerMessage, at: 
       return state;
 
     case "entry_appended": {
-      return withView(state, message.sessionId, (view) => {
+      const withEntry = withView(state, message.sessionId, (view) => {
         const next = upsertEntry(view, message.seq, message.entry);
         if (next === view) return view;
         const cleared = isAuthoritativeText(message.entry)
@@ -203,6 +262,7 @@ export function applyServerMessage(state: SdkState, message: ServerMessage, at: 
           : {};
         return { ...next, ...cleared };
       });
+      return touchSummary(withEntry, message.sessionId, message.seq, message.entry);
     }
 
     case "message_delta": {

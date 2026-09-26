@@ -5,7 +5,8 @@
   "type": "module",
   "description": "控制层共用 UI 层（React 组件与视图模型，只被 Web / 桌面复用）",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -14,6 +15,10 @@
     "@ucode/branding": "workspace:*",
     "@ucode/protocol": "workspace:*",
     "@ucode/sdk": "workspace:*",
-    "react": "catalog:"
+    "react": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:"
   }
 }

@@ -64,6 +64,32 @@ export async function invalidateIndex(paths: StorePaths): Promise<void> {
   await removeFile(join(paths.cache, INDEX_FILE_NAME));
 }
 
+/**
+ * 索引是否还新鲜：拿它的生成时间与 sessions 目录的 mtime 比。
+ *
+ * 为什么需要它：**索引是派生数据，而写它的是别的实例**（多实例共享一个数据层）。
+ * 只靠"本实例写完就作废"在单实例下够用，跨实例就会一直读到旧索引。
+ * 对账的代价是一次 readdir——比"猜它是否新鲜"便宜得多。
+ */
+export async function isIndexFresh(paths: StorePaths, index: SessionIndex): Promise<boolean> {
+  const generatedAt = Date.parse(index.generatedAt);
+  if (Number.isNaN(generatedAt)) return false;
+  const roots = [paths.sessions];
+  const buckets = await readdir(paths.sessions, { withFileTypes: true }).catch(() => []);
+  for (const bucket of buckets) {
+    if (bucket.isDirectory()) roots.push(join(paths.sessions, bucket.name));
+  }
+  for (const root of roots) {
+    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      const info = await stat(join(root, entry.name)).catch(() => undefined);
+      if (info !== undefined && info.mtimeMs > generatedAt) return false;
+    }
+  }
+  return true;
+}
+
 /** 扫描会话目录构建索引（协议 D 的唯一真相来源是磁盘本身）。 */
 export async function scanSessions(
   paths: StorePaths,

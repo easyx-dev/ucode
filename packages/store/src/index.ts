@@ -11,6 +11,7 @@ export * from "./atomic.ts";
 export * from "./guards.ts";
 export * from "./index-cache.ts";
 export * from "./layout.ts";
+export * from "./models-config.ts";
 export * from "./open-store.ts";
 export * from "./owner.ts";
 export * from "./session-repo.ts";

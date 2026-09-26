@@ -4,7 +4,7 @@ import { createClient as createRpcClient } from "@ucode/sdk/rpc";
 import { createClient as createStdioClient } from "@ucode/sdk/stdio";
 import { render } from "ink";
 import { createElement } from "react";
-import { App } from "./app.tsx";
+import { App } from "./app.ts";
 
 /**
  * TUI 壳入口：把"怎么连上核心层"与"界面长什么样"分开。
@@ -12,6 +12,8 @@ import { App } from "./app.tsx";
  * 控制层声明自己**能承载**四种阻塞式交互（select/confirm/input/editor），
  * 核心层据此按信任矩阵授予 `interaction.respond`——这就是"能力声明与能力授予分离"的实际用处：
  * 一个只会展示不会应答的壳子声明得少，就不会收到它处理不了的请求。
+ *
+ * 本包由 Node 直接执行（源码直出），因此**只用 `.ts`、不用 JSX**（类型剥离不支持 JSX）。
  */
 export type TuiLaunchOptions = {
   productName: string;
@@ -24,22 +26,22 @@ export type TuiLaunchOptions = {
   capabilities?: Capability[];
 };
 
+const DEFAULT_CAPABILITIES: Capability[] = [
+  "sessions.read",
+  "sessions.write",
+  "prompt.run",
+  "tools.direct",
+  "interaction.respond",
+  "autonomy.unattended",
+  "channel.workspace",
+];
+
 export async function runTui(options: TuiLaunchOptions): Promise<number> {
   const transport = buildTransport(options);
   const sdk: AgentSdk = await connect({
     transport,
     clientKind: "tui",
-    capabilities:
-      options.capabilities ??
-      ([
-        "sessions.read",
-        "sessions.write",
-        "prompt.run",
-        "tools.direct",
-        "interaction.respond",
-        "autonomy.unattended",
-        "channel.workspace",
-      ] as Capability[]),
+    capabilities: options.capabilities ?? DEFAULT_CAPABILITIES,
   });
 
   try {
@@ -81,4 +83,4 @@ function buildTransport(options: TuiLaunchOptions): Transport {
   });
 }
 
-export { App } from "./app.tsx";
+export { App } from "./app.ts";

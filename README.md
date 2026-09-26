@@ -4,18 +4,23 @@
 
 ## 当前状态
 
-**工程脚手架已就位（实现步骤 0），功能代码尚未开始。**
+**Web 壳与 TUI 壳已可用（实现步骤 0–5 落地）**；桌面壳与远程（uhub / 中继）尚未开始。
 
 - 单仓多包：`packages/`（库）· `apps/`（cli | web | desktop | tui）· `hub/`（单独部署，可缺省）。
 - 依赖严格单向（`apps/* → ui → sdk → bindings/* → protocol`；`core → store → data-layer-spec`），由**允许列表门禁**在 CI 拦截。
 - 品牌参数化：产品名、数据层目录名等一律从 `@ucode/branding` 读取，源码里禁止出现字面量（同样有门禁）。
-- 进度：步骤 0 已完成；下一步是**步骤 1（数据层）**，见[实现设计 §七](docs/impl/00-实现设计.md)。
+- 已落地：协议 C 的 Zod schema · 协议 D 的参考实现 + 一致性套件（18 例）· 核心层（握手 / 会话运行时 / 交互中转 / 工具闸门 / 工作区查询）· 四种绑定（stdio / rpc / http+SSE / ws）· headless SDK · CLI · TUI（Ink）· Web 壳（React + Tailwind）。
+- 尚未落地：桌面壳、PTY 通道、非 owner 实例的文件跟随、无人值守的"释放等待态"、uhub。清单见[实现设计 §七](docs/impl/00-实现设计.md)。
 
 ```bash
 pnpm install
-pnpm check          # 类型检查 + Biome + 依赖边界门禁 + 品牌字面量门禁 + 测试
-pnpm ucode --help   # 启动入口（core / web / tui 子命令按实现步骤逐个落地）
+pnpm check                                            # 类型检查 + Biome + 两道门禁 + 测试（77 例）
+pnpm ucode provider add --base-url <端点> --model <模型> --api-key <密钥>   # 配一个模型（本地权威）
+pnpm ucode web --port 3000                            # 浏览器打开 http://127.0.0.1:3000
+pnpm ucode tui                                        # 终端里的壳（默认自己拉起核心层）
 ```
+
+核心层也可以脱离控制层单独跑：`pnpm ucode core start --binding stdio|rpc|http|ws`。
 
 **架构已完成技术验证并定稿**：`docs/spec/` 是 ucode 的**定稿需求与架构**（基线 tag `spec-baseline`）——骨架已确认，承重假设（V-1…V-10）已逐条验证（`V-5` 推翻、`V-8` 部分，处置见 [03](docs/spec/03-假设与验证.md)）。
 

@@ -18,7 +18,6 @@ import {
   parseErrorResponse,
   type Response,
   requiresTrustToDrive,
-  type ServerMessage,
   type SessionEntry,
   type SessionEvent,
   type SessionState,

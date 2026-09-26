@@ -436,17 +436,16 @@ export function createConformanceSuite(factory: StoreFactory): ConformanceCase[]
         const inodeBefore = (await stat(repo.file)).ino;
 
         // 模拟格式迁移：同一 inode 上原地重写（内容前缀断裂）
-        const rewritten =
-          [
-            lines[0],
-            JSON.stringify({
-              type: "custom",
-              id: "z1",
-              parentId: null,
-              timestamp: "2026-01-01T00:00:00.000Z",
-              customType: "migrated",
-            }),
-          ].join("\n") + "\n";
+        const rewritten = `${[
+          lines[0],
+          JSON.stringify({
+            type: "custom",
+            id: "z1",
+            parentId: null,
+            timestamp: "2026-01-01T00:00:00.000Z",
+            customType: "migrated",
+          }),
+        ].join("\n")}\n`;
         await writeFile(repo.file, rewritten, "utf8");
         const inodeAfter = (await stat(repo.file)).ino;
         assertEqual(inodeAfter, inodeBefore, "本用例要求原地重写（inode 不变）才具备区分力");

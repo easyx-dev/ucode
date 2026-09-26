@@ -1,12 +1,13 @@
 import type { AgentSdk, DisplayMessage } from "@ucode/sdk";
 import { Box, Text, useInput } from "ink";
-import { type ReactElement, useEffect, useMemo, useState } from "react";
+import { createElement as h, type ReactNode, useEffect, useMemo, useState } from "react";
 
 /**
- * 交互弹窗：把协议 C 的阻塞式交互（confirm / select / input）渲染成终端里的一次问答。
+ * 交互弹窗与消息行。
  *
- * 可靠性要求与通知完全不同：**不能丢也不能重复应答**——丢一次权限确认会让 agent 永久挂起。
- * 因此这里只做"把用户的决定发回去"，不做超时判断（超时由核心层按降级策略处置）。
+ * **这里是 `createElement` 而不是 JSX**：TUI 由 Node 直接执行（源码直出，靠原生类型剥离），
+ * 而类型剥离**不支持 JSX**（那需要转译）。所以被 Node 直接跑的包一律只用 `.ts`；
+ * 只有经打包器处理的 `apps/web` 才用 `.tsx`。
  */
 
 export type InteractionPanelProps = {
@@ -14,7 +15,7 @@ export type InteractionPanelProps = {
   sessions: { id: string; label: string }[];
 };
 
-export function InteractionPanel({ sdk, sessions }: InteractionPanelProps): ReactElement | null {
+export function InteractionPanel({ sdk, sessions }: InteractionPanelProps): ReactNode {
   const interaction = sdk.state.interactions[0];
   const [draft, setDraft] = useState("");
   const [selected, setSelected] = useState(0);
@@ -33,16 +34,15 @@ export function InteractionPanel({ sdk, sessions }: InteractionPanelProps): Reac
   useInput(
     (input, key) => {
       if (interaction === undefined) return;
-      const method = interaction.method;
 
-      if (method === "confirm") {
+      if (interaction.method === "confirm") {
         if (input === "y" || input === "Y") sdk.respondToInteraction(interaction.id, true);
         else if (input === "n" || input === "N" || key.escape)
           sdk.respondToInteraction(interaction.id, false);
         return;
       }
 
-      if (method === "select") {
+      if (interaction.method === "select") {
         if (key.upArrow) setSelected((current) => Math.max(0, current - 1));
         else if (key.downArrow) setSelected((current) => Math.min(options.length - 1, current + 1));
         else if (key.return) sdk.respondToInteraction(interaction.id, options[selected] ?? null);
@@ -74,50 +74,53 @@ export function InteractionPanel({ sdk, sessions }: InteractionPanelProps): Reac
   const sessionLabel = sessions.find((session) => session.id === interaction.sessionId)?.label;
   const title = params.title ?? "需要你的决定";
 
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Text color="yellow">
-        ⚠ {title}
-        {sessionLabel === undefined ? "" : `（${sessionLabel}）`}
-      </Text>
-      {params.message !== undefined && params.message !== "" && (
-        <Box marginTop={1}>
-          <Text>{params.message}</Text>
-        </Box>
-      )}
-      {interaction.method === "select" && (
-        <Box flexDirection="column" marginTop={1}>
-          {options.map((option, index) => (
-            <Text key={option} color={index === selected ? "cyan" : undefined}>
-              {index === selected ? "❯ " : "  "}
-              {option}
-            </Text>
-          ))}
-        </Box>
-      )}
-      {(interaction.method === "input" || interaction.method === "editor") && (
-        <Box marginTop={1}>
-          <Text color="cyan">❯ {draft}</Text>
-          {draft === "" && params.placeholder !== undefined && (
-            <Text dimColor> {params.placeholder}</Text>
-          )}
-        </Box>
-      )}
-      <Box marginTop={1}>
-        <Text dimColor>
-          {interaction.method === "confirm"
-            ? "y 允许 / n 拒绝"
-            : interaction.method === "select"
-              ? "↑↓ 选择 / Enter 确认 / Esc 取消"
-              : "Enter 提交 / Esc 取消"}
-        </Text>
-      </Box>
-    </Box>
+  const hint =
+    interaction.method === "confirm"
+      ? "y 允许 / n 拒绝"
+      : interaction.method === "select"
+        ? "↑↓ 选择 / Enter 确认 / Esc 取消"
+        : "Enter 提交 / Esc 取消";
+
+  return h(
+    Box,
+    { flexDirection: "column", borderStyle: "round", borderColor: "yellow", paddingX: 1 },
+    h(
+      Text,
+      { color: "yellow" },
+      `⚠ ${title}${sessionLabel === undefined ? "" : `（${sessionLabel}）`}`,
+    ),
+    params.message !== undefined && params.message !== ""
+      ? h(Box, { marginTop: 1 }, h(Text, null, params.message))
+      : null,
+    interaction.method === "select"
+      ? h(
+          Box,
+          { flexDirection: "column", marginTop: 1 },
+          options.map((option, index) =>
+            h(
+              Text,
+              { key: option, color: index === selected ? "cyan" : undefined },
+              `${index === selected ? "❯ " : "  "}${option}`,
+            ),
+          ),
+        )
+      : null,
+    interaction.method === "input" || interaction.method === "editor"
+      ? h(
+          Box,
+          { marginTop: 1 },
+          h(Text, { color: "cyan" }, `❯ ${draft}`),
+          draft === "" && params.placeholder !== undefined
+            ? h(Text, { dimColor: true }, ` ${params.placeholder}`)
+            : null,
+        )
+      : null,
+    h(Box, { marginTop: 1 }, h(Text, { dimColor: true }, hint)),
   );
 }
 
 /** 消息行：不同角色不同颜色；流式尾巴带标记，避免和"已保存"混淆。 */
-export function MessageLine({ message }: { message: DisplayMessage }): ReactElement {
+export function MessageLine({ message }: { message: DisplayMessage }): ReactNode {
   const color =
     message.role === "user"
       ? "green"
@@ -134,13 +137,10 @@ export function MessageLine({ message }: { message: DisplayMessage }): ReactElem
         : message.role === "notice"
           ? "· "
           : "  ";
-  return (
-    <Box flexDirection="column">
-      <Text color={color}>
-        {prefix}
-        {message.text}
-      </Text>
-      {message.streaming === true && <Text dimColor> (流式，尚未落盘)</Text>}
-    </Box>
+  return h(
+    Box,
+    { flexDirection: "column" },
+    h(Text, { color }, `${prefix}${message.text}`),
+    message.streaming === true ? h(Text, { dimColor: true }, " (流式，尚未落盘)") : null,
   );
 }

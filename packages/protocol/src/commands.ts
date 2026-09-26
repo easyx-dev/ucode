@@ -164,6 +164,6 @@ export function parseCommand(raw: unknown): ParsedCommand {
 }
 
 /** 在处理器内部取强类型参数（handler 已按命令名注册，这里的断言是安全的）。 */
-export function commandArgs<K extends CommandName>(command: K, args: unknown): CommandArgs<K> {
+export function commandArgs<K extends CommandName>(_command: K, args: unknown): CommandArgs<K> {
   return args as CommandArgs<K>;
 }

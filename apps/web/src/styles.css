@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "@ucode/ui/styles.css";
+
+/*
+ * Tailwind 的内容扫描：组件类名写在共享的 @ucode/ui 里，而 CSS 入口在 apps/web，
+ * 因此必须显式声明源码目录（v4 的自动扫描只看当前项目）。
+ */
+@source "../../../packages/ui/src";

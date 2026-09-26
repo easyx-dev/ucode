@@ -228,6 +228,7 @@ export async function openSessionRepo(options: {
   id: string;
   cwd?: string;
   now?: () => Date;
+  onAppend?: () => Promise<void>;
 }): Promise<SessionRepo | undefined> {
   assertSafeSessionId(options.id);
   const now = options.now ?? ((): Date => new Date());
@@ -246,6 +247,7 @@ export async function openSessionRepo(options: {
       createdAt: new Date(parsed.header.timestamp),
       state: stateFromContent(content),
       now,
+      onAppend: options.onAppend,
     });
   }
   return undefined;

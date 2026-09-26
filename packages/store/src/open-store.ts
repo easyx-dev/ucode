@@ -21,7 +21,13 @@ import {
   detectDangerousFileSystem,
   resolveWithin,
 } from "./guards.ts";
-import { invalidateIndex, readIndex, scanSessions, writeIndex } from "./index-cache.ts";
+import {
+  invalidateIndex,
+  isIndexFresh,
+  readIndex,
+  scanSessions,
+  writeIndex,
+} from "./index-cache.ts";
 import { managedDirs, resolveDataDir, storePaths } from "./layout.ts";
 import { acquireOwner, isOwner } from "./owner.ts";
 import { createSessionRepo, openSessionRepo } from "./session-repo.ts";
@@ -86,14 +92,22 @@ export const openStore: StoreFactory = async (options: StoreOptions) => {
 
     async openSession(id, openOptions): Promise<SessionRepo | undefined> {
       assertSafeSessionId(id);
-      return openSessionRepo({ paths, id, cwd: openOptions?.cwd, now });
+      // 打开也要挂失效钩子：会话运行时用的是这条路径，漏掉它索引就会一直陈旧。
+      return openSessionRepo({
+        paths,
+        id,
+        cwd: openOptions?.cwd,
+        now,
+        onAppend: () => invalidateIndex(paths),
+      });
     },
 
     async listSessions(listOptions): Promise<IndexedSession[]> {
       const { index, valid } = await readIndex(paths);
+      const fresh = valid && index !== undefined ? await isIndexFresh(paths, index) : false;
       const sessions =
-        valid && index !== undefined ? index.sessions : await scanSessions(paths, { now });
-      if (!valid) await writeIndex(paths, sessions, now);
+        fresh && index !== undefined ? index.sessions : await scanSessions(paths, { now });
+      if (!fresh) await writeIndex(paths, sessions, now);
       return listOptions?.cwd === undefined
         ? sessions
         : sessions.filter((session) => session.cwd === listOptions.cwd);
