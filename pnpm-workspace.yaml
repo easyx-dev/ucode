@@ -9,6 +9,7 @@ packages:
 # 三个包都来自基座 pi 的依赖树——只有 esbuild 需要平台二进制，另两个不需要 postinstall。
 allowBuilds:
   '@google/genai': false
+  electron: true
   esbuild: true
   protobufjs: false
 

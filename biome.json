@@ -13,7 +13,8 @@
       "!**/coverage",
       "!spike",
       "!**/__gate_probe*",
-      "!**/*.css"
+      "!**/*.css",
+      "!**/dist-renderer"
     ]
   },
   "formatter": {

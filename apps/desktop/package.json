@@ -8,10 +8,24 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "build": "vite build"
   },
   "dependencies": {
-    "@ucode/branding": "workspace:*",
-    "@ucode/ui": "workspace:*"
+    "@ucode/sdk": "workspace:*",
+    "@ucode/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "main": "main.mjs",
+  "devDependencies": {
+    "electron": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "vite": "catalog:",
+    "@vitejs/plugin-react": "^5.1.0",
+    "@tailwindcss/vite": "catalog:"
   }
 }
