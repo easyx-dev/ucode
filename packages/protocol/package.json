@@ -1,0 +1,16 @@
+{
+  "name": "@ucode/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "协议 C / 协议 B 的消息类型与 Zod schema（叶子包，无内部依赖）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  }
+}

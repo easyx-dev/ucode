@@ -1,0 +1,17 @@
+{
+  "name": "@ucode/hub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "单独部署的服务：登录、准入、审计、中继、能力目录（可缺省，删之不影响主产品）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*",
+    "@ucode/protocol": "workspace:*"
+  }
+}

@@ -1,0 +1,48 @@
+packages:
+  - "packages/*"
+  - "packages/bindings/*"
+  - "apps/*"
+  - "hub"
+
+# 统一依赖版本：包内一律以 "catalog:" 引用，不在各包写死版本。
+# 依赖的构建脚本：逐个显式表态，不允许静默执行。
+# 三个包都来自基座 pi 的依赖树——只有 esbuild 需要平台二进制，另两个不需要 postinstall。
+allowBuilds:
+  '@google/genai': false
+  esbuild: true
+  protobufjs: false
+
+catalog:
+  # 语言与工具链
+  typescript: ^7.0.2
+  "@types/node": ^24.19.0
+  "@biomejs/biome": ^2.5.14
+  vitest: ^5.0.2
+  oxc-parser: ^0.151.0
+
+  # 运行期依赖（按实现步骤逐步落地）
+  zod: ^4.6.5
+  "@earendil-works/pi-coding-agent": ^0.87.1
+  jiti: ^2.7.0
+  hono: ^4.13.9
+  pino: ^10.3.1
+  ulid: ^3.0.2
+  node-pty: ^1.1.0
+
+  # 控制层（Web / 桌面 / TUI）
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
+  zustand: ^5.0.15
+  vite: ^8.3.1
+  tailwindcss: ^4.3.3
+  "@tailwindcss/vite": ^4.3.3
+  electron: ^44.4.5
+  ink: ^7.1.1
+
+  # uhub
+  "@tanstack/react-start": ^1.168.58
+
+minimumReleaseAgeExclude:
+  - '@types/node@24.19.0'

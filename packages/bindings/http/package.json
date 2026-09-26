@@ -1,0 +1,17 @@
+{
+  "name": "@ucode/binding-http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "绑定层 HTTP + SSE：下行推送 / 上行 POST，按标识配对",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/protocol": "workspace:*",
+    "hono": "catalog:"
+  }
+}

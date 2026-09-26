@@ -1,4 +1,16 @@
 node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+.vitest/
 results/
 *.log
+
+# 密钥：只走环境变量 / .env，禁止入库
+.env
+.env.*
+!.env.example
 spike/.env
+
+# 门禁自测写入的临时探针文件
+**/__gate_probe*

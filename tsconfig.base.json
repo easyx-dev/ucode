@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    // 运行期用 Node 的原生类型剥离直跑源码，因此只允许"可擦除"语法
+    // （禁 enum / namespace / 参数属性）——否则会出现"类型检查通过、跑起来才炸"。
+    "erasableSyntaxOnly": true,
+    // 相对导入写 .ts 后缀（Node 原生 ESM 要求显式后缀）；构建时由 tsc 改写为 .js。
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
+
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}

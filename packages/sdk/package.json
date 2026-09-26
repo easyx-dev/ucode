@@ -1,0 +1,20 @@
+{
+  "name": "@ucode/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "headless 控制层 SDK：建连、命令封装、事件折叠、断线续传",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/binding-http": "workspace:*",
+    "@ucode/binding-rpc": "workspace:*",
+    "@ucode/binding-stdio": "workspace:*",
+    "@ucode/binding-ws": "workspace:*",
+    "@ucode/protocol": "workspace:*"
+  }
+}

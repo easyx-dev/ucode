@@ -1,0 +1,16 @@
+{
+  "name": "@ucode/binding-stdio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "绑定层 stdio：行分隔 JSON，按字节切分",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/protocol": "workspace:*"
+  }
+}

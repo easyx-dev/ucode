@@ -1,0 +1,28 @@
+{
+  "name": "ucode",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check:boundaries": "node tools/check-boundaries.ts",
+    "check:brand": "node tools/check-brand-literals.ts",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm check:brand && pnpm test",
+    "ucode": "node apps/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@types/node": "catalog:",
+    "@ucode/branding": "workspace:*",
+    "@ucode/cli": "workspace:*",
+    "oxc-parser": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

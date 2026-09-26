@@ -1,0 +1,17 @@
+{
+  "name": "@ucode/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "桌面壳（Electron 主进程 + 复用 UI 的渲染进程；主进程 spawn 核心层，不 import 核心层）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*",
+    "@ucode/ui": "workspace:*"
+  }
+}

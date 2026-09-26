@@ -1,0 +1,20 @@
+{
+  "name": "@ucode/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "协议 C 服务端：握手、attachment、会话运行时、交互中转、资源与工具",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@ucode/branding": "workspace:*",
+    "@ucode/protocol": "workspace:*",
+    "@ucode/store": "workspace:*",
+    "jiti": "catalog:"
+  }
+}

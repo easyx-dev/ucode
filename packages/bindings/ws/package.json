@@ -1,0 +1,17 @@
+{
+  "name": "@ucode/binding-ws",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "绑定层 WebSocket：一帧一消息",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/protocol": "workspace:*",
+    "hono": "catalog:"
+  }
+}

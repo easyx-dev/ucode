@@ -1,0 +1,19 @@
+{
+  "name": "@ucode/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Web 壳（浏览器宿主）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*",
+    "@ucode/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

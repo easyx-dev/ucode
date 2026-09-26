@@ -1,0 +1,26 @@
+{
+  "name": "@ucode/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "启动入口：内置 Web 与 TUI 壳，并可启动核心层",
+  "bin": {
+    "ucode": "./src/main.ts"
+  },
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/binding-http": "workspace:*",
+    "@ucode/binding-rpc": "workspace:*",
+    "@ucode/binding-stdio": "workspace:*",
+    "@ucode/binding-ws": "workspace:*",
+    "@ucode/branding": "workspace:*",
+    "@ucode/core": "workspace:*",
+    "@ucode/tui": "workspace:*",
+    "@ucode/web": "workspace:*"
+  }
+}

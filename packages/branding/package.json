@@ -1,0 +1,14 @@
+{
+  "name": "@ucode/branding",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "品牌配置与资源（叶子包，无内部依赖；构建期注入的单一事实来源）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./brand.json": "./brand.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

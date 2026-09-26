@@ -1,0 +1,8 @@
+{
+  "productName": "ucode",
+  "dataDirName": ".ucode",
+  "appId": "com.earendil.ucode",
+  "vendor": "Earendil",
+  "urlScheme": "ucode",
+  "theme": "default"
+}

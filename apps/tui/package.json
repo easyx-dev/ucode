@@ -1,0 +1,17 @@
+{
+  "name": "@ucode/tui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TUI 壳（Ink；只复用 SDK，不复用 UI）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*",
+    "@ucode/sdk": "workspace:*"
+  }
+}

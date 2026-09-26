@@ -4,7 +4,18 @@
 
 ## 当前状态
 
-**尚未实现任何代码。** 本仓库当前只有文档。
+**工程脚手架已就位（实现步骤 0），功能代码尚未开始。**
+
+- 单仓多包：`packages/`（库）· `apps/`（cli | web | desktop | tui）· `hub/`（单独部署，可缺省）。
+- 依赖严格单向（`apps/* → ui → sdk → bindings/* → protocol`；`core → store → data-layer-spec`），由**允许列表门禁**在 CI 拦截。
+- 品牌参数化：产品名、数据层目录名等一律从 `@ucode/branding` 读取，源码里禁止出现字面量（同样有门禁）。
+- 进度：步骤 0 已完成；下一步是**步骤 1（数据层）**，见[实现设计 §七](docs/impl/00-实现设计.md)。
+
+```bash
+pnpm install
+pnpm check          # 类型检查 + Biome + 依赖边界门禁 + 品牌字面量门禁 + 测试
+pnpm ucode --help   # 启动入口（core / web / tui 子命令按实现步骤逐个落地）
+```
 
 **架构已完成技术验证并定稿**：`docs/spec/` 是 ucode 的**定稿需求与架构**（基线 tag `spec-baseline`）——骨架已确认，承重假设（V-1…V-10）已逐条验证（`V-5` 推翻、`V-8` 部分，处置见 [03](docs/spec/03-假设与验证.md)）。
 

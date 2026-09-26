@@ -1,0 +1,19 @@
+{
+  "name": "@ucode/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "控制层共用 UI 层（React 组件与视图模型，只被 Web / 桌面复用）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*",
+    "@ucode/protocol": "workspace:*",
+    "@ucode/sdk": "workspace:*",
+    "react": "catalog:"
+  }
+}

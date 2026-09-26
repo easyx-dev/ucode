@@ -1,0 +1,13 @@
+{
+  "name": "@ucode/data-layer-spec",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "协议 D 的类型与一致性测试套件工厂（叶子包，无内部依赖）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
