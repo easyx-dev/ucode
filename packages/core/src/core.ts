@@ -50,7 +50,7 @@ export type {
   CoreConfig,
 } from "./types.ts";
 
-import { openStore } from "@ucode/store";
+import { type Follower, followSession, openStore } from "@ucode/store";
 import { gitChanges, gitLog, workspaceRead, workspaceTree } from "./workspace.ts";
 
 /**
@@ -81,10 +81,13 @@ type ConnectionState = {
 };
 
 type RuntimeEntry = {
-  runtime: SessionRuntime;
+  /** owner 挂载才有运行时（能驱动 agent）；跟随挂载没有，它只跟读别人的追加。 */
+  runtime: SessionRuntime | undefined;
   repo: SessionRepo;
   lease: OwnerLease | undefined;
   readOnly: boolean;
+  /** 非 owner 挂载的跟随器：数据层文件兼作事件总线（spec §3.7）。 */
+  follower: Follower | undefined;
 };
 
 const LEASE_TTL_MS = 30_000;
@@ -169,7 +172,27 @@ export async function createCore(config: CoreConfig): Promise<Core> {
   }
 
   function statusOf(entry: RuntimeEntry): SessionStatus {
-    return entry.runtime.status === "idle" ? "idle" : entry.runtime.status;
+    const status = entry.runtime?.status ?? "idle";
+    return status === "idle" ? "idle" : status;
+  }
+
+  /** 会话状态：owner 挂载问运行时；跟随挂载用数据层的事实合成（不假装知道对方在忙什么）。 */
+  async function stateOf(entry: RuntimeEntry): Promise<SessionState> {
+    if (entry.runtime !== undefined) return entry.runtime.state();
+    const header = await entry.repo.readHeader();
+    return {
+      sessionId: entry.repo.id,
+      name: null,
+      cwd: header.cwd,
+      model: null,
+      thinkingLevel: null,
+      autonomy: defaultAutonomy,
+      status: "idle",
+      cursor: entry.follower?.cursor() ?? (await entry.repo.count()),
+      pendingMessages: 0,
+      pendingInteractions: 0,
+      attachments: bus.attachmentsFor(entry.repo.id).length,
+    };
   }
 
   async function openRuntime(sessionId: string): Promise<RuntimeEntry> {
@@ -181,6 +204,48 @@ export async function createCore(config: CoreConfig): Promise<Core> {
 
     const lease = await store.acquireOwner(sessionId, { ttlMs: LEASE_TTL_MS });
     const readOnly = lease === undefined;
+
+    if (readOnly) {
+      // 不是 owner：只读挂载。**不建 agent 运行时**（既写不了，也没必要占资源），
+      // 改为跟随数据层文件的追加流——这正是"数据层文件兼作实例间事件总线"的落地。
+      const follower = await followSession(
+        repo,
+        {
+          onEntries: (records) => {
+            for (const record of records) {
+              bus.broadcastToSession(sessionId, {
+                type: "entry_appended",
+                sessionId,
+                seq: record.seq,
+                entry: record.entry,
+              });
+            }
+            bus.notifyStatus(sessionId, "idle", 0);
+          },
+          onResync: (cursor, reason) => {
+            // 文件变小（迁移原地重写 / 崩溃尾部被处置）：游标可能已失效，
+            // 必须显式通知控制层重新全量同步（spec §4.5）
+            bus.broadcastToSession(sessionId, {
+              type: "resync_required",
+              sessionId,
+              reason,
+              cursor,
+            });
+            bus.notifyStatus(sessionId, "idle", 0);
+          },
+        },
+        { pollIntervalMs: 300 },
+      );
+      const followerEntry: RuntimeEntry = {
+        runtime: undefined,
+        repo,
+        lease: undefined,
+        readOnly: true,
+        follower,
+      };
+      runtimes.set(sessionId, followerEntry);
+      return followerEntry;
+    }
 
     const runtime = await SessionRuntime.open(
       {
@@ -210,7 +275,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       await repo.entries(),
     );
 
-    const entry: RuntimeEntry = { runtime, repo, lease, readOnly };
+    const entry: RuntimeEntry = { runtime, repo, lease, readOnly: false, follower: undefined };
     runtimes.set(sessionId, entry);
     return entry;
   }
@@ -234,11 +299,15 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     }
   }
 
-  function writable(entry: RuntimeEntry): RuntimeEntry {
-    if (entry.readOnly) {
+  /**
+   * 写入前的闸门：只读挂载（owner 在别的实例手上）一律拒绝，并把类型收窄成"一定有运行时"。
+   * 这样"非 owner 不写"在类型层面就成立，而不是靠每个处理器自觉判断。
+   */
+  function writable(entry: RuntimeEntry): RuntimeEntry & { runtime: SessionRuntime } {
+    if (entry.readOnly || entry.runtime === undefined) {
       throw new CoreError("session_not_owned", "本实例不是该会话的 owner，不能写入（只读挂载）。");
     }
-    return entry;
+    return entry as RuntimeEntry & { runtime: SessionRuntime };
   }
 
   function guardAutonomy(connection: ConnectionState, autonomy: AutonomyLevel): void {
@@ -266,8 +335,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const cwd = args.cwd ?? defaultCwd;
         const repo = await store.createSession({ cwd });
         if (autonomy !== defaultAutonomy) {
-          const entry = await openRuntime(repo.id);
-          entry.runtime.setAutonomy(autonomy);
+          // 刚建的会话以本实例为 owner，因此这里一定拿得到运行时
+          writable(await openRuntime(repo.id)).runtime.setAutonomy(autonomy);
         }
         connection.attachmentSessionId = repo.id;
         return okResponse(id, command, { sessionId: repo.id, cwd, autonomy });
@@ -287,7 +356,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         connection.attachmentSessionId = sessionId;
         const entry = await openRuntime(sessionId);
         // 中途挂载：先给状态快照，再全量重放已落盘记录，随后增量事件自然接上（spec §4.5 第 3 条）
-        const state = entry.runtime.state();
+        const state = await stateOf(entry);
         connection.options.send({
           type: "status",
           sessionId,
@@ -316,7 +385,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         if (sessionId === null) throw new CoreError("invalid_args", "get_state 需要 sessionId。");
         const entry = runtimes.get(sessionId);
         if (entry !== undefined) {
-          return okResponse(id, command, { state: entry.runtime.state() });
+          return okResponse(id, command, { state: await stateOf(entry) });
         }
         const repo = await store.openSession(sessionId);
         if (repo === undefined)
@@ -602,6 +671,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
 
   const heartbeat = setInterval(() => {
     for (const entry of runtimes.values()) {
+      if (entry.readOnly) continue; // 跟随挂载没有租约，也没有心跳
       void entry.lease?.heartbeat().catch(() => undefined);
     }
   }, HEARTBEAT_INTERVAL_MS);
@@ -759,7 +829,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     async close(): Promise<void> {
       clearInterval(heartbeat);
       for (const entry of runtimes.values()) {
-        await entry.runtime.dispose().catch(() => undefined);
+        entry.follower?.stop();
+        await entry.runtime?.dispose().catch(() => undefined);
         await entry.lease?.release().catch(() => undefined);
       }
       runtimes.clear();

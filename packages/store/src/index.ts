@@ -8,6 +8,7 @@
  * 等沿用 pi 约定，因此 `PI_CODING_AGENT_DIR=<数据层目录>` 即可让 pi 生态直接读写同一份数据。
  */
 export * from "./atomic.ts";
+export * from "./follower.ts";
 export * from "./guards.ts";
 export * from "./index-cache.ts";
 export * from "./layout.ts";
