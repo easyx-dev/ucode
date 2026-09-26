@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Capability } from "./trust.ts";
 import { ReferenceSchema } from "./session.ts";
 import { AutonomyLevelSchema } from "./trust.ts";
 
@@ -43,6 +44,13 @@ export const CommandArgsSchemas = {
   "session.set_name": z.object({ name: z.string().min(1) }),
   "session.set_autonomy": z.object({ level: AutonomyLevelSchema }),
   "session.archive": z.object({ archived: z.boolean() }),
+  /** 解决一个**持久化**的待决交互（无人值守场景：请求当时无人应答，已落盘；稍后有人来了）。 */
+  "interaction.resolve": z.object({
+    /** 持久化记录里的交互 id（不是实时的 ui.request id）。 */
+    interactionId: z.string().min(1),
+    value: z.union([z.string(), z.boolean(), z.null()]).default(null),
+    cancelled: z.boolean().default(false),
+  }),
   "session.attach": z.object({}),
   "session.detach": z.object({}),
 
@@ -77,10 +85,7 @@ export function isCommandName(value: string): value is CommandName {
 }
 
 /** 一条命令需要的能力（信任矩阵按"能力"裁剪，而不是按命令名硬编码在绑定里）。 */
-export const COMMAND_CAPABILITIES: Record<
-  CommandName,
-  "sessions.read" | "sessions.write" | "prompt.run" | "tools.direct"
-> = {
+export const COMMAND_CAPABILITIES: Record<CommandName, Capability> = {
   "session.create": "sessions.write",
   "session.list": "sessions.read",
   "session.get_state": "sessions.read",
@@ -91,6 +96,7 @@ export const COMMAND_CAPABILITIES: Record<
   "session.set_name": "sessions.write",
   "session.set_autonomy": "sessions.write",
   "session.archive": "sessions.write",
+  "interaction.resolve": "interaction.respond",
   "session.attach": "sessions.read",
   "session.detach": "sessions.read",
   prompt: "prompt.run",

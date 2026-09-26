@@ -275,9 +275,64 @@ function NoticeRow({ text }: { text: string }): ReactNode {
   return <p className="my-2 text-center text-[11px] text-[var(--color-content-muted)]">{text}</p>;
 }
 
+/** 持久化待决交互卡片（无人值守场景）：当时无人应答，现在可以补答。 */
+function PendingRow({
+  item,
+  onResolve,
+}: {
+  item: { interactionId: string; method: string; params: Record<string, unknown> };
+  onResolve: (value: string | boolean | null) => void;
+}): ReactNode {
+  const [resolved, setResolved] = useState<string | null>(null);
+  const params = item.params as { title?: string; message?: string; options?: string[] } | undefined;
+
+  if (resolved !== null) {
+    return <NoticeRow text={`待决交互已处理（${resolved}）`} />;
+  }
+  return (
+    <div className="my-2 rounded-md border border-[var(--color-warn)] bg-[oklch(0.3_0.05_80)] p-3">
+      <p className="text-[12px] font-medium text-[var(--color-warn)]">
+        ⏸ 待决交互（当时无人应答，已持久化）
+      </p>
+      {params?.title !== undefined && <p className="mt-1 text-[13px]">{params.title}</p>}
+      {params?.message !== undefined && <p className="text-[12px] text-[var(--color-content-muted)]">{params.message}</p>}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {params?.options !== undefined
+          ? params.options.map((option) => (
+              <Button
+                key={option}
+                size="sm"
+                variant={option === "拒绝" ? "danger" : "ghost"}
+                onClick={() => {
+                  setResolved(option);
+                  onResolve(option);
+                }}
+              >
+                {option}
+              </Button>
+            ))
+          : (
+            <>
+              <Button size="sm" variant="primary" onClick={() => { setResolved("允许"); onResolve(true); }}>
+                允许
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => { setResolved("拒绝"); onResolve(false); }}>
+                拒绝
+              </Button>
+            </>
+          )}
+      </div>
+      <p className="mt-1.5 text-[10px] text-[var(--color-content-muted)]">
+        应答后会作为新的消息转达给 agent（agent 据此重试或调整方案）。
+      </p>
+    </div>
+  );
+}
+
 export function Transcript({ sessionId }: { sessionId: string }): ReactNode {
   const state = useAgentStore((store) => store.state);
   const view = state.views[sessionId];
+  const resolveInteraction = useAgentStore((store) => store.resolveInteraction);
   const items = useMemo(() => (view === undefined ? [] : toDisplayItems(view)), [view]);
   const scroller = useRef<HTMLDivElement | null>(null);
   const lastItem = items.at(-1);

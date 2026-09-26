@@ -365,6 +365,15 @@ export function applyServerMessage(state: SdkState, message: ServerMessage, at: 
 
 export type DisplayItem =
   | { kind: "user"; id: string; seq: number; text: string; timestamp: string }
+  | {
+      kind: "pending";
+      id: string;
+      seq: number;
+      interactionId: string;
+      method: string;
+      params: Record<string, unknown>;
+      timestamp: string;
+    }
   | { kind: "assistant"; id: string; seq: number; markdown: string; timestamp: string }
   | {
       kind: "tool";
@@ -511,6 +520,32 @@ export function toDisplayItems(view: SessionView): DisplayItem[] {
         id: entry.id,
         seq,
         summary: String(entry.summary ?? ""),
+        timestamp: entry.timestamp,
+      });
+      continue;
+    }
+    if (entry.type === "custom" && (entry.customType === "ui.pending" || entry.customType === "ui.resolved")) {
+      // 持久化待决交互（spec §2.7 / ADR-020）：请求落盘，稍后有人来再解决。
+      // 已解决的显示一行；未解决的生成可应答卡片（解决后由 ui.resolved 抹掉）。
+      const data = entry.data as { interactionId?: string; method?: string; params?: Record<string, unknown>; decision?: string } | undefined;
+      if (data?.interactionId === undefined) continue;
+      if (entry.customType === "ui.resolved") {
+        items.push({
+          kind: "notice",
+          id: entry.id,
+          seq,
+          text: `待决交互 ${data.interactionId} 已处理：${data.decision ?? "?"}`,
+          timestamp: entry.timestamp,
+        });
+        continue;
+      }
+      items.push({
+        kind: "pending",
+        id: entry.id,
+        seq,
+        interactionId: data.interactionId,
+        method: data.method ?? "交互",
+        params: data.params ?? {},
         timestamp: entry.timestamp,
       });
       continue;

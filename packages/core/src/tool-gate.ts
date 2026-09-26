@@ -97,14 +97,19 @@ export function createToolGateExtension(options: ToolGateOptions): (pi: Extensio
           };
         }
 
-        const approved = await ui.confirm(
-          `允许执行 ${event.toolName}？`,
-          summarizeToolInput(event.input ?? {}),
-        );
+        // 三选一（ZCode 同款）：允许一次 / 本会话内总是允许 / 拒绝。
+        // 用 select 而不是 confirm，是为了让"决策记忆"成为用户显式的选择。
+        const choice = await ui.select(`允许执行 ${event.toolName}？`, [
+          "允许一次",
+          "本会话内总是允许",
+          "拒绝",
+        ]);
+        const approved = choice === "允许一次" || choice === "本会话内总是允许";
+        if (choice === "本会话内总是允许") options.sessionAllowed.add(event.toolName);
         options.onDecision?.({
           toolName: event.toolName,
           approved,
-          reason: approved ? "user-approved" : "user-denied",
+          reason: approved ? `user-approved:${choice}` : "user-denied",
         });
         return approved ? {} : { block: true, reason: "用户未批准该操作。" };
       },

@@ -319,7 +319,10 @@ export class SessionRuntime {
         const record = await this.#repo.append(
           entry as unknown as Record<string, unknown> & { type: string },
         );
-        this.#persisted = record.seq;
+        // **#persisted 数的是管理器条目的下标**，不是仓库的行号——仓库里还有别的
+        // 写入者（待决交互、审计记录等）会插入非 agent 记录，行号会超前于管理器
+        // 的条目数。混用两者会让锚点检查永远失配，每次事件都触发全量重同步（实测）。
+        this.#persisted = index + 1;
         this.#lastPersistedId = record.entry.id;
         this.#options.onEvent({
           type: "entry_appended",

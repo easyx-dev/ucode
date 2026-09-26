@@ -322,7 +322,7 @@ describe("核心层：交互面（批准）与降级", () => {
       ServerMessage,
       { type: "ui.request" }
     >;
-    expect(request.method).toBe("confirm");
+    expect(request.method).toBe("select");
     const mirrored = (await secondary.waitFor(
       "ui.request",
       (message) => message.id === request.id,
@@ -330,17 +330,17 @@ describe("核心层：交互面（批准）与降级", () => {
     )) as Extract<ServerMessage, { type: "ui.request" }>;
     expect(mirrored.id).toBe(request.id);
 
-    // 第二个应答（晚到的）必须被忽略；第一个生效
+    // 第二个应答（晚到的）必须被忽略；第一个生效（select 的"允许一次"）
     await secondary.send({
       type: "ui.response",
       id: request.id,
-      value: true,
+      value: "允许一次",
       responderId: secondary.id,
     });
     await primary.send({
       type: "ui.response",
       id: request.id,
-      value: false,
+      value: "拒绝",
       responderId: primary.id,
     });
 

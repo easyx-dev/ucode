@@ -146,14 +146,11 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     bus,
     defaultTimeoutMs: interactionTimeoutMs,
     onNoCapacity: (request) => {
-      // 没有可承载交互的 attachment：请求不发出，直接降级（spec §2.7）。
-      // 记录在案，让控制层事后能看到"这里发生过一次无人应答的请求"。
+      // 没有可承载交互的 attachment：**持久化待决**（spec §2.7 / ADR-020）——
+      // 请求写入数据层，会话进入等待态；任何人/任何设备/任何时间应答后恢复。
+      // 当前这轮工具调用按策略拒绝（无人应答不放行），agent 会在下一轮得到转达。
       if (request.sessionId === null) return;
-      void recordDecision(request.sessionId, "interaction.unanswered", {
-        method: request.method,
-        origin: request.origin,
-        outcome: "no-capacity",
-      });
+      void persistPendingInteraction(request.sessionId, request).catch(() => undefined);
     },
   });
 
@@ -172,6 +169,101 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     } catch {
       // 审计失败不影响主流程
     }
+  }
+
+  /**
+   * 把待决交互写进会话（协议 D 的合法用法：追加式表达状态）。
+   * 重启后 openRuntime 时从记录里恢复（unresolved 的 ui.pending → 重新可应答）。
+   */
+  async function persistPendingInteraction(
+    sessionId: string,
+    request: { id: string; method: string; params: unknown; origin: string },
+  ): Promise<void> {
+    const entry = runtimes.get(sessionId);
+    if (entry === undefined || entry.readOnly) return;
+    const interactionId = `pending-${randomBytes(4).toString("hex")}`;
+    const record = await entry.repo.append({
+      type: "custom",
+      customType: "ui.pending",
+      data: {
+        interactionId,
+        method: request.method,
+        params: request.params,
+        origin: request.origin,
+        askedAt: new Date().toISOString(),
+      },
+    });
+    bus.broadcastToSession(sessionId, {
+      type: "entry_appended",
+      sessionId,
+      seq: record.seq,
+      entry: record.entry,
+    });
+    bus.notifyStatus(sessionId, "waiting", 1);
+  }
+
+  /** 解决持久化待决交互：标记已解决，并向 agent 转达决定（它据此继续工作）。 */
+  async function resolvePendingInteraction(
+    sessionId: string,
+    interactionId: string,
+    value: string | boolean | null,
+    cancelled: boolean,
+    connection: ConnectionState,
+  ): Promise<boolean> {
+    const entry = runtimes.get(sessionId);
+    if (entry === undefined || entry.readOnly) return false;
+    const entries = await entry.repo.entries();
+    const pending = [...entries]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.type === "custom" &&
+          candidate.customType === "ui.pending" &&
+          (candidate.data as { interactionId?: string } | undefined)?.interactionId === interactionId,
+      );
+    if (pending === undefined) return false;
+    const alreadyResolved = [...entries]
+      .reverse()
+      .some(
+        (candidate) =>
+          candidate.type === "custom" &&
+          candidate.customType === "ui.resolved" &&
+          (candidate.data as { interactionId?: string } | undefined)?.interactionId === interactionId,
+      );
+    if (alreadyResolved) return false;
+
+    const decision = cancelled ? "cancelled" : String(value);
+    const record = await entry.repo.append({
+      type: "custom",
+      customType: "ui.resolved",
+      data: { interactionId, decision, by: connection.id, resolvedAt: new Date().toISOString() },
+    });
+    bus.broadcastToSession(sessionId, {
+      type: "entry_appended",
+      sessionId,
+      seq: record.seq,
+      entry: record.entry,
+    });
+
+    // 向 agent 转达：这一轮是新的 prompt（释放等待态后恢复工作的方式，V-8 的约束下
+    // pi 没有现成挂起点，我们用"记录在案 + 明确转达"实现同样的语义）。
+    const gate = pending.data as { method?: string; params?: { title?: string; message?: string } };
+    const text =
+      `此前有一个待决交互（${gate?.method ?? "交互"}）当时无人应答，现在有了答复：${decision}。` +
+      `请据此继续：若已允许，请重试该操作；若已拒绝或取消，请调整方案。`;
+    writable(entry).runtime
+      .startPrompt(text)
+      .catch((error: unknown) => {
+        // 转达失败必须可见（否则用户以为应答生效了，agent 却毫无动静）
+        bus.broadcastToSession(sessionId, {
+          type: "ui.notify",
+          level: "error",
+          message: `待决交互的答复转达失败：${error instanceof Error ? error.message : String(error)}`,
+          sessionId,
+        });
+      });
+    bus.notifyStatus(sessionId, "running", 0);
+    return true;
   }
 
   function statusOf(entry: RuntimeEntry): SessionStatus {
@@ -457,6 +549,22 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const entry = writable(await openRuntime(sessionId));
         await entry.runtime.setName(args.name);
         return okResponse(id, command, { sessionId, name: args.name });
+      }
+
+      case "interaction.resolve": {
+        const args = commandArgs(command, envelope.args);
+        const sessionId = requireAttachment(connection, envelope.sessionId);
+        const resolved = await resolvePendingInteraction(
+          sessionId,
+          args.interactionId,
+          args.value,
+          args.cancelled,
+          connection,
+        );
+        if (!resolved) {
+          throw new CoreError("invalid_args", `待决交互不存在或已解决：${args.interactionId}`);
+        }
+        return okResponse(id, command, { sessionId, interactionId: args.interactionId });
       }
 
       case "session.archive": {

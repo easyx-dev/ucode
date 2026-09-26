@@ -26,6 +26,7 @@ export type AgentStoreState = {
   compact(sessionId: string): Promise<void>;
   renameSession(sessionId: string, name: string): Promise<void>;
   respond(interactionId: string, value: string | boolean | null, cancelled?: boolean): void;
+  resolveInteraction(sessionId: string, interactionId: string, value: string | boolean | null, cancelled?: boolean): Promise<void>;
   forkSession(sessionId: string): Promise<string>;
   refresh(): Promise<void>;
 };
@@ -106,6 +107,10 @@ export function createAgentStore(sdk: AgentSdk): AgentStore {
 
       respond(interactionId, value, cancelled = false) {
         sdk.respondToInteraction(interactionId, value, { cancelled });
+      },
+
+      async resolveInteraction(sessionId, interactionId, value, cancelled = false) {
+        await guard(() => sdk.resolveInteraction(sessionId, interactionId, value, cancelled));
       },
 
       async forkSession(sessionId) {
