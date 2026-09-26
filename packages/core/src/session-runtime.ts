@@ -65,6 +65,8 @@ export class SessionRuntime {
   #manager: SessionManager;
   #session: AgentSession | undefined;
   #autonomy: AutonomyLevel;
+  /** 决策记忆（F-1.10）：本会话内被"总是允许"的工具。 */
+  readonly sessionAllowedTools = new Set<string>();
   #status: SessionState["status"] = "idle";
   #persisted = 0;
   #lastPersistedId: string | null = null;
@@ -110,6 +112,7 @@ export class SessionRuntime {
       extensionFactories: [
         createToolGateExtension({
           autonomy: () => this.#autonomy,
+          sessionAllowed: this.sessionAllowedTools,
           onDecision: options.onDecision,
         }),
       ],

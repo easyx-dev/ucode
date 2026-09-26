@@ -11,6 +11,9 @@ import {
 import { removeFile, writeFileAtomic } from "./atomic.ts";
 import { anyOwnerAlive } from "./owner.ts";
 
+/** 归档标记的自定义记录类型（协议 D 的合法用法：追加式表达状态变化）。 */
+export const ARCHIVE_MARKER = "session.archived";
+
 /**
  * 派生数据（spec §3.2 的最后一行、§3.4 第 3 条）。
  *
@@ -121,16 +124,18 @@ export async function scanSessions(
       if (parsed.header === null) continue;
       if (options.cwd !== undefined && parsed.header.cwd !== options.cwd) continue;
 
+      const entries = parsed.entries.map((record) => record.entry);
       sessions.push({
         id: parsed.header.id,
         cwd: parsed.header.cwd,
         file: filePath,
-        name: lastName(parsed.entries.map((record) => record.entry)),
+        name: lastName(entries),
         createdAt: parsed.header.timestamp,
         updatedAt: info.mtime.toISOString(),
-        entryCount: parsed.entries.length,
-        firstMessage: firstUserText(parsed.entries.map((record) => record.entry)),
+        entryCount: entries.length,
+        firstMessage: firstUserText(entries),
         owned: await anyOwnerAlive(paths, parsed.header.id),
+        archived: isArchived(entries),
       });
     }
   }
@@ -140,6 +145,16 @@ export async function scanSessions(
 }
 
 type ScannedEntry = SessionEntry;
+
+/** 最后一条归档标记说了算（追加式表达状态变化）。 */
+function isArchived(entries: ScannedEntry[]): boolean {
+  let archived = false;
+  for (const entry of entries) {
+    if (entry.type !== "custom" || entry.customType !== ARCHIVE_MARKER) continue;
+    archived = (entry.data as { archived?: boolean } | undefined)?.archived === true;
+  }
+  return archived;
+}
 
 function firstUserText(entries: ScannedEntry[]): string | null {
   for (const entry of entries) {

@@ -59,6 +59,8 @@ export function summarizeToolInput(input: Record<string, unknown>): string {
 export type ToolGateOptions = {
   /** 当前会话的自主级别（可变：命令面可以改）。 */
   autonomy: () => AutonomyLevel;
+  /** 决策记忆（F-1.10）：本会话内被"总是允许"的工具。由会话运行时持有。 */
+  sessionAllowed: Set<string>;
   /** 无 UI 承载时的拒绝原因文案。 */
   noUiReason?: string;
   /** 决策审计（谁批了什么，spec §6.7 预留字段）。 */

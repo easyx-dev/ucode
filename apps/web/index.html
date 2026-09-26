@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ucode</title>
+    <script>
+      // 渲染层崩溃至少要能看见（诊断入口，之后可换成错误边界上报）
+      window.addEventListener("error", (event) => {
+        document.title = "ERR: " + event.message;
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        document.title = "REJ: " + (event.reason && event.reason.message ? event.reason.message : String(event.reason));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

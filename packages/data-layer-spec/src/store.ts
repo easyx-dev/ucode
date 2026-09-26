@@ -38,6 +38,8 @@ export type IndexedSession = {
   firstMessage: string | null;
   /** 是否被某个实例持有（读锁文件 + 校核心跳）。 */
   owned: boolean;
+  /** 手动归档（B-8：手动归档、不自动删除）。 */
+  archived: boolean;
 };
 
 export type SessionRecord = {

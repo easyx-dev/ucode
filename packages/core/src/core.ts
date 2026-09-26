@@ -456,6 +456,25 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         return okResponse(id, command, { sessionId, name: args.name });
       }
 
+      case "session.archive": {
+        const args = commandArgs(command, envelope.args);
+        const sessionId = requireAttachment(connection, envelope.sessionId);
+        const entry = writable(await openRuntime(sessionId));
+        const record = await entry.repo.append({
+          type: "custom",
+          customType: "session.archived",
+          data: { archived: args.archived },
+        });
+        bus.broadcastToSession(sessionId, {
+          type: "entry_appended",
+          sessionId,
+          seq: record.seq,
+          entry: record.entry,
+        });
+        await store.listSessions().catch(() => undefined);
+        return okResponse(id, command, { sessionId, archived: args.archived });
+      }
+
       case "session.set_autonomy": {
         const args = commandArgs(command, envelope.args);
         const sessionId = requireAttachment(connection, envelope.sessionId);

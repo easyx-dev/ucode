@@ -361,7 +361,199 @@ export function applyServerMessage(state: SdkState, message: ServerMessage, at: 
   }
 }
 
-/** 记录 → 展示行。工具调用与工具结果都折成一行，便于终端与网页排版。 */
+// ── 结构化展示项（给 Web/桌面的 ZCode 风格界面用；TUI 继续用 toDisplayMessages） ──
+
+export type DisplayItem =
+  | { kind: "user"; id: string; seq: number; text: string; timestamp: string }
+  | { kind: "assistant"; id: string; seq: number; markdown: string; timestamp: string }
+  | {
+      kind: "tool";
+      id: string;
+      seq: number;
+      callId: string;
+      toolName: string;
+      args: Record<string, unknown>;
+      /** running：还没等到结果；done / error：结果已落盘。 */
+      status: "running" | "done" | "error";
+      output: string;
+      timestamp: string;
+    }
+  | { kind: "thinking"; id: string; seq: number; text: string; timestamp: string }
+  | { kind: "notice"; id: string; seq: number; text: string; timestamp: string }
+  | { kind: "compaction"; id: string; seq: number; summary: string; timestamp: string };
+
+/**
+ * 记录 → 结构化展示项。
+ *
+ * 关键是**工具调用与结果配对**：基座把"调用"写在 assistant 消息的内容里（toolCall 部分，
+ * 带 callId），把"结果"写成独立的 toolResult 消息（toolCallId + isError）。配对规则：
+ * 先按 callId 找；找不到就挂到最近一个还在 running 的调用上（顺序兜底）。
+ */
+export function toDisplayItems(view: SessionView): DisplayItem[] {
+  const items: DisplayItem[] = [];
+  const toolByCallId = new Map<string, Extract<DisplayItem, { kind: "tool" }>>();
+  let lastRunningTool: Extract<DisplayItem, { kind: "tool" }> | undefined;
+
+  let lastAssistantEntryId: string | null = null;
+  const pushAssistantText = (entry: SessionEntry, seq: number, text: string): void => {
+    if (text === "") return;
+    const last = items.at(-1);
+    // 同一条助手消息里的多个文本段并入一项（markdown 需要连续上下文）；跨消息不合并
+    if (last?.kind === "assistant" && lastAssistantEntryId === entry.id) {
+      last.markdown = `${last.markdown}\n\n${text}`;
+      return;
+    }
+    lastAssistantEntryId = entry.id;
+    items.push({
+      kind: "assistant",
+      id: entry.id,
+      seq,
+      markdown: text,
+      timestamp: entry.timestamp,
+    });
+  };
+
+  for (const entry of view.entries) {
+    const seq = view.seqByEntryId[entry.id] ?? 0;
+    if (entry.type === "message") {
+      const message = entry.message as
+        | {
+            role?: string;
+            content?: unknown;
+            toolCallId?: string;
+            toolName?: string;
+            isError?: boolean;
+          }
+        | undefined;
+      const role = message?.role;
+
+      if (role === "user") {
+        items.push({
+          kind: "user",
+          id: entry.id,
+          seq,
+          text: renderContent(message?.content),
+          timestamp: entry.timestamp,
+        });
+        continue;
+      }
+      if (role === "toolResult") {
+        const callId = String(message?.toolCallId ?? "");
+        const target =
+          toolByCallId.get(callId) ?? (lastRunningTool !== undefined ? lastRunningTool : undefined);
+        const output = renderContent(message?.content);
+        if (target !== undefined) {
+          target.status = message?.isError === true ? "error" : "done";
+          target.output = output;
+          if (lastRunningTool === target) lastRunningTool = undefined;
+        } else {
+          // 没配到调用（例如历史被裁剪）：仍以工具卡片呈现
+          items.push({
+            kind: "tool",
+            id: entry.id,
+            seq,
+            callId,
+            toolName: String(message?.toolName ?? "tool"),
+            args: {},
+            status: message?.isError === true ? "error" : "done",
+            output,
+            timestamp: entry.timestamp,
+          });
+        }
+        continue;
+      }
+
+      // assistant / system
+      if (role === "system") continue;
+      const content = message?.content;
+      if (!Array.isArray(content)) continue;
+      for (const part of content) {
+        if (typeof part !== "object" || part === null) continue;
+        const record = part as Record<string, unknown>;
+        if (record.type === "text" && typeof record.text === "string" && record.text !== "") {
+          pushAssistantText(entry, seq, record.text);
+          continue;
+        }
+        if (record.type === "thinking" && typeof record.thinking === "string") {
+          items.push({
+            kind: "thinking",
+            id: entry.id,
+            seq,
+            text: record.thinking,
+            timestamp: entry.timestamp,
+          });
+          continue;
+        }
+        if (record.type === "toolCall" || record.type === "tool_use") {
+          const callId = String(record.id ?? record.toolCallId ?? `call-${seq}-${items.length}`);
+          const toolItem: Extract<DisplayItem, { kind: "tool" }> = {
+            kind: "tool",
+            id: `${entry.id}:${callId}`,
+            seq,
+            callId,
+            toolName: String(record.name ?? record.toolName ?? "tool"),
+            args: (record.arguments ?? record.input ?? {}) as Record<string, unknown>,
+            status: "running",
+            output: "",
+            timestamp: entry.timestamp,
+          };
+          items.push(toolItem);
+          toolByCallId.set(callId, toolItem);
+          lastRunningTool = toolItem;
+        }
+      }
+      continue;
+    }
+
+    if (entry.type === "compaction") {
+      items.push({
+        kind: "compaction",
+        id: entry.id,
+        seq,
+        summary: String(entry.summary ?? ""),
+        timestamp: entry.timestamp,
+      });
+      continue;
+    }
+    if (entry.type === "custom" && entry.customType === "tool.decision") {
+      const data = entry.data as
+        | { toolName?: string; approved?: boolean; reason?: string }
+        | undefined;
+      if (data !== undefined) {
+        items.push({
+          kind: "notice",
+          id: entry.id,
+          seq,
+          text: `工具 ${data.toolName ?? "?"}：${data.approved === true ? "已放行" : "已拦截"}（${data.reason ?? ""}）`,
+          timestamp: entry.timestamp,
+        });
+      }
+    }
+  }
+
+  // 流式（非权威）：文本与思考各一条
+  if (view.streaming.thinking !== "") {
+    items.push({
+      kind: "thinking",
+      id: "__streaming_thinking__",
+      seq: Number.MAX_SAFE_INTEGER - 1,
+      text: view.streaming.thinking,
+      timestamp: new Date().toISOString(),
+    });
+  }
+  if (view.streaming.text !== "") {
+    items.push({
+      kind: "assistant",
+      id: "__streaming__",
+      seq: Number.MAX_SAFE_INTEGER,
+      markdown: view.streaming.text,
+      timestamp: new Date().toISOString(),
+    });
+  }
+  return items;
+}
+
+/** 记录 → 展示行。工具调用与工具结果都折成一行，便于终端排版。 */
 export function toDisplayMessages(view: SessionView): DisplayMessage[] {
   const rows: DisplayMessage[] = [];
   for (const entry of view.entries) {

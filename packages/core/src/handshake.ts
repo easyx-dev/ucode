@@ -99,5 +99,6 @@ export function toSummary(session: IndexedSession): SessionSummary {
     entryCount: session.entryCount,
     firstMessage: session.firstMessage,
     owned: session.owned,
+    archived: session.archived,
   };
 }

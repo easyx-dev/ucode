@@ -29,10 +29,12 @@ export { type AgentSdk, type ConnectOptions, connect } from "./agent-sdk.ts";
 export {
   applyServerMessage,
   createInitialState,
+  type DisplayItem,
   type DisplayMessage,
   emptyView,
   type SdkNotice,
   type SdkState,
   type SessionView,
+  toDisplayItems,
   toDisplayMessages,
 } from "./reducer.ts";

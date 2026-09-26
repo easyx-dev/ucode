@@ -26,6 +26,8 @@ export const SessionSummarySchema = z.object({
   firstMessage: z.string().nullable(),
   /** 是否正被某个实例持有（owner 语义，spec §3.5）。 */
   owned: z.boolean(),
+  /** 手动归档（B-8：手动归档、不自动删除）。默认列表不显示已归档会话。 */
+  archived: z.boolean().default(false),
 });
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;
 

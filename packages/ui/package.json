@@ -15,7 +15,11 @@
     "@ucode/branding": "workspace:*",
     "@ucode/protocol": "workspace:*",
     "@ucode/sdk": "workspace:*",
+    "highlight.js": "catalog:",
     "react": "catalog:",
+    "react-markdown": "catalog:",
+    "rehype-highlight": "catalog:",
+    "remark-gfm": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {

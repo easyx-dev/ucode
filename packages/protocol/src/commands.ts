@@ -42,6 +42,7 @@ export const CommandArgsSchemas = {
   "session.clone": NoArgs,
   "session.set_name": z.object({ name: z.string().min(1) }),
   "session.set_autonomy": z.object({ level: AutonomyLevelSchema }),
+  "session.archive": z.object({ archived: z.boolean() }),
   "session.attach": z.object({}),
   "session.detach": z.object({}),
 
@@ -89,6 +90,7 @@ export const COMMAND_CAPABILITIES: Record<
   "session.clone": "sessions.write",
   "session.set_name": "sessions.write",
   "session.set_autonomy": "sessions.write",
+  "session.archive": "sessions.write",
   "session.attach": "sessions.read",
   "session.detach": "sessions.read",
   prompt: "prompt.run",

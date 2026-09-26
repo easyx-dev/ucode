@@ -27,6 +27,7 @@ const welcome = (sessions: { id: string; entryCount: number }[] = []): ServerMes
     entryCount: session.entryCount,
     firstMessage: null,
     owned: false,
+    archived: false,
   })),
   resumeAck: null,
 });

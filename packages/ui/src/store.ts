@@ -20,6 +20,7 @@ export type AgentStoreState = {
   createSession(cwd?: string): Promise<string>;
   attachSession(sessionId: string): Promise<void>;
   setAutonomy(sessionId: string, level: AutonomyLevel): Promise<void>;
+  archiveSession(sessionId: string, archived: boolean): Promise<void>;
   setModel(sessionId: string, provider: string, modelId: string): Promise<void>;
   abort(sessionId: string): Promise<void>;
   compact(sessionId: string): Promise<void>;
@@ -81,6 +82,10 @@ export function createAgentStore(sdk: AgentSdk): AgentStore {
 
       async setAutonomy(sessionId, level) {
         await guard(() => sdk.setAutonomy(sessionId, level));
+      },
+
+      async archiveSession(sessionId, archived) {
+        await guard(() => sdk.archiveSession(sessionId, archived));
       },
 
       async setModel(sessionId, provider, modelId) {

@@ -70,6 +70,7 @@ export type AgentSdk = {
   cloneSession(sessionId: string): Promise<{ sessionId: string }>;
   setSessionName(sessionId: string, name: string): Promise<void>;
   setAutonomy(sessionId: string, level: AutonomyLevel): Promise<void>;
+  archiveSession(sessionId: string, archived: boolean): Promise<void>;
 
   // 驱动
   prompt(sessionId: string, text: string, references?: Reference[]): Promise<void>;
@@ -161,6 +162,28 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     return state.views[sessionId]?.maxSeq ?? 0;
   }
 
+  /**
+   * 握手去重：`connect()` 与"事件流重连"可能同时想握手（初次连接时 stream.ready 先于
+   * hello 到达是常态）。并发握手会让两个等待者抢一条 welcome——其中一个永远等不到。
+   * 因此共享同一个在途握手。
+   */
+  let handshakeInFlight: Promise<ServerMessage & { type: "welcome" }> | undefined;
+  /**
+   * 连接阶段：`connecting`（初始握手进行中）/ `online`（握手完成）/ `offline`（流断了）。
+   *
+   * `stream.ready` 只在**非初次连接**时触发重新握手——初次连接时它先于 welcome 到达是常态，
+   * 若不区分，它会与 connect() 的握手竞争（真实缺陷：connect 返回后 connected 仍是 false）。
+   */
+  let phase: "connecting" | "online" | "offline" = "connecting";
+  function handshakeOnce(): Promise<ServerMessage & { type: "welcome" }> {
+    if (handshakeInFlight === undefined) {
+      handshakeInFlight = handshake().finally(() => {
+        handshakeInFlight = undefined;
+      });
+    }
+    return handshakeInFlight;
+  }
+
   async function handshake(): Promise<ServerMessage & { type: "welcome" }> {
     const resumeSession = activeSessionId();
     const resume =
@@ -188,9 +211,11 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       throw new SdkError({ code: "version_unsupported", message: message.message });
     }
     if (message.type !== "welcome") {
+      phase = "offline";
       throw new SdkError({ code: "internal_error", message: "握手返回了意外的消息类型。" });
     }
     apply(message);
+    phase = "online";
     return message;
   }
 
@@ -238,7 +263,10 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     const type = (raw as { type?: string } | null)?.type;
     if (type === "stream.ready") {
       // 事件流（重）连上了：带游标重新握手，让核心层补齐断线期间的缺口。
-      void handshake().catch(() => undefined);
+      // 初次连接阶段不触发——那时的握手已经由 connect() 在途（真实缺陷：并发握手会
+      // 让两个等待者抢一条 welcome，其中一个永远等不到）。
+      if (phase === "connecting") return;
+      void handshakeOnce().catch(() => undefined);
       return;
     }
     if (type === "stream.ping") return;
@@ -271,6 +299,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
 
   transport.onClose(() => {
     if (closed) return;
+    phase = "offline";
     publish({ ...state, connected: false, reconnects: state.reconnects + 1 });
   });
   transport.onError(() => undefined);
@@ -307,7 +336,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
 
     async connect() {
       await transport.ready();
-      return handshake();
+      return handshakeOnce();
     },
 
     async close() {
@@ -406,6 +435,11 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     async setAutonomy(sessionId, level) {
       await request("session.set_autonomy", { level }, sessionId);
       await sdk.getSessionState(sessionId).catch(() => undefined);
+    },
+
+    async archiveSession(sessionId, archived) {
+      await request("session.archive", { archived }, sessionId);
+      await sdk.listSessions().catch(() => undefined);
     },
 
     async prompt(sessionId, text, references) {
