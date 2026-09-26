@@ -14,7 +14,9 @@
       "!spike",
       "!**/__gate_probe*",
       "!**/*.css",
-      "!**/dist-renderer"
+      "!**/dist-renderer",
+      "!**/core-bundle",
+      "!**/release"
     ]
   },
   "formatter": {

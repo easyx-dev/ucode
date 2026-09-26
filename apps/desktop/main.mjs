@@ -32,7 +32,14 @@ const cwd =
   process.env[`${productName.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_CWD`] ?? process.cwd();
 
 function resolveCliEntry() {
-  // apps/desktop/main.mjs → ../cli/src/main.ts（仓内布局；打包时换成随包的 CLI 入口）
+  // 打包布局：main.mjs 在 app.asar 里，core-bundle 被 asarUnpack 到 app.asar.unpacked
+  const isPackaged = here.includes("app.asar");
+  if (isPackaged) {
+    const bundled = here.replace("app.asar", "app.asar.unpacked") + "/core-bundle/cli.mjs";
+    if (existsSync(bundled)) return bundled;
+    throw new Error(`找不到打包的核心层入口（${bundled}）`);
+  }
+  // 仓内布局：main.mjs → ../cli/src/main.ts（Node 24 原生类型剥离直跑）
   const relative = join(here, "..", "cli", "src", "main.ts");
   if (existsSync(relative)) return relative;
   throw new Error(`找不到 CLI 入口（${relative}）：桌面壳需要一个能跑 core start 的入口。`);

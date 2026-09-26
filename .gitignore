@@ -1,5 +1,7 @@
 node_modules/
 dist/
+**/core-bundle/
+**/release/
 *.tsbuildinfo
 coverage/
 .vitest/

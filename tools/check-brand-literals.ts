@@ -21,7 +21,16 @@ const ROOT = resolveRoot(process.argv.slice(2));
 const SCAN_ROOTS = ["packages", "packages/bindings", "apps", "hub", "tools", "tests"];
 const ROOT_FILES = ["vitest.config.ts"];
 const EXTENSIONS = [".ts", ".tsx", ".mjs", ".cjs", ".js"];
-const SKIP_DIRS = new Set(["node_modules", "dist", "coverage", ".git", "assets"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "dist-renderer",
+  "core-bundle",
+  "release",
+  "coverage",
+  ".git",
+  "assets",
+]);
 
 const brand = getBrand();
 const forbidden = [

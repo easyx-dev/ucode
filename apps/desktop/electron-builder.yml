@@ -1,0 +1,29 @@
+# 桌面壳打包（electron-builder）。
+#
+# 产物形态：先 `--dir` 出未打包的 .app 验证；dmg/安装包（含签名公证）属发布流程，不在开发期。
+# 应用内容：
+# - main.mjs / preload.cjs —— 主进程与桥
+# - dist-renderer/         —— 渲染进程（Vite 产物）
+# - core-bundle/           —— 打包后的核心层 CLI（esbuild 单文件 + 自带 node_modules）
+appId: com.earendil.ucode
+productName: ucode
+directories:
+  output: release
+  buildResources: assets
+files:
+  - main.mjs
+  - preload.cjs
+  - dist-renderer/**/*
+  - core-bundle/**/*
+  - "!core-bundle/node_modules/.cache/**/*"
+  - package.json
+asar: true
+# 主进程要 spawn core-bundle 里的核心层进程并访问其 node_modules：
+# asar 里无法 exec，因此把核心层目录拆出 asar（extraResources），主进程按打包布局解析路径
+asarUnpack:
+  - core-bundle/**/*
+mac:
+  category: public.app-category.developer-tools
+  identity: null
+  target:
+    - dir

@@ -10,6 +10,7 @@ packages:
 allowBuilds:
   '@google/genai': false
   electron: true
+  electron-winstaller: false
   esbuild: true
   node-pty: true
   protobufjs: false
@@ -54,5 +55,12 @@ catalog:
   # uhub
   "@tanstack/react-start": ^1.168.58
 
+  # 桌面打包
+  esbuild: ^0.25.0
+
 minimumReleaseAgeExclude:
   - '@types/node@24.19.0'
+  - app-builder-lib@26.17.0
+  - dmg-builder@26.17.0
+  - electron-builder-squirrel-windows@26.17.0
+  - electron-builder@26.17.0

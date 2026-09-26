@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "electron .",
     "smoke": "electron . --smoke",
-    "build": "vite build"
+    "build": "vite build",
+    "bundle-core": "node ./scripts/bundle-core.mjs",
+    "dist": "pnpm build && pnpm bundle-core && electron-builder --dir"
   },
   "dependencies": {
     "@ucode/sdk": "workspace:*",
@@ -26,6 +28,8 @@
     "@types/react-dom": "catalog:",
     "vite": "catalog:",
     "@vitejs/plugin-react": "^5.1.0",
-    "@tailwindcss/vite": "catalog:"
+    "@tailwindcss/vite": "catalog:",
+    "esbuild": "catalog:",
+    "electron-builder": "^26.17.0"
   }
 }
