@@ -151,7 +151,7 @@ export function SessionSidebar({ productName }: { productName: string }): ReactN
 
 // ── 顶栏 ──
 
-export function TopBar(): ReactNode {
+export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): ReactNode {
   const state = useAgentStore((store) => store.state);
   const setModel = useAgentStore((store) => store.setModel);
   const setAutonomy = useAgentStore((store) => store.setAutonomy);
@@ -218,6 +218,9 @@ export function TopBar(): ReactNode {
           <option value="auto-edit">自动编辑</option>
           <option value="full-access">完全访问</option>
         </select>
+        <Button size="sm" onClick={onToggleTerminal} title="打开/关闭终端面板（工作区 PTY）">
+          终端
+        </Button>
         <Button
           size="sm"
           onClick={() => sessionId !== null && void compact(sessionId)}

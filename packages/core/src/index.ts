@@ -13,6 +13,7 @@
 export * from "./core.ts";
 export * from "./handshake.ts";
 export * from "./models.ts";
+export * from "./pty.ts";
 export * from "./session-runtime.ts";
 export * from "./tool-gate.ts";
 export * from "./trust.ts";

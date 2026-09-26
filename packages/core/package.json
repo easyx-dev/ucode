@@ -16,6 +16,7 @@
     "@ucode/data-layer-spec": "workspace:*",
     "@ucode/protocol": "workspace:*",
     "@ucode/store": "workspace:*",
-    "jiti": "catalog:"
+    "jiti": "catalog:",
+    "node-pty": "catalog:"
   }
 }

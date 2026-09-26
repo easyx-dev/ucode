@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@ucode/ui/styles.css";
+@import "@xterm/xterm/css/xterm.css";
 
 /*
  * Tailwind 的内容扫描：组件类名写在共享的 @ucode/ui 里，而 CSS 入口在 apps/web，

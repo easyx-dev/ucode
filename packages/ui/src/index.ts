@@ -9,6 +9,7 @@
 export { AgentShell } from "./app.tsx";
 export { ErrorBoundary } from "./components/error-boundary.tsx";
 export { Badge, Button, Card, Modal, Spinner } from "./components/primitives.tsx";
+export { TerminalPanel } from "./components/terminal-panel.tsx";
 export { AgentStoreProvider, useAgent, useAgentStore, useStickToBottom } from "./context.ts";
 export type { AgentStore, AgentStoreState } from "./store.ts";
 export { createAgentStore } from "./store.ts";

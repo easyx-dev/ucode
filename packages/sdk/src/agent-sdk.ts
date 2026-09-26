@@ -98,6 +98,21 @@ export type AgentSdk = {
 
   // 通道
   openWorkspaceChannel(sessionId: string, channelId?: string): Promise<string>;
+  /**
+   * 打开 PTY 终端通道。输出帧经 `onData`（base64 字节）回调，输入用 `write`。
+   * 返回句柄用于 resize / signal / 关闭。
+   */
+  openTerminal(
+    sessionId: string,
+    handlers: { onData(base64: string): void; onClose(reason?: string): void },
+    options?: { cols?: number; rows?: number },
+  ): Promise<{
+    channelId: string;
+    write(base64: string): void;
+    resize(cols: number, rows: number): void;
+    signal(name: string): void;
+    close(): void;
+  }>;
   requestWorkspace<T = unknown>(
     channelId: string,
     method: string,
@@ -142,6 +157,8 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
+  /** 终端通道的帧处理器：channel.data 等原始帧直接分流到这里（不走协议折叠）。 */
+  const terminalMessageHandlers: ((raw: unknown) => void)[] = [];
   let counter = 0;
   let closed = false;
 
@@ -270,6 +287,11 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       return;
     }
     if (type === "stream.ping") return;
+    if (type === "channel.data" || type === "channel.closed" || type === "channel.event") {
+      // 终端帧直接交给注册的通道处理器（不走协议解析/折叠）
+      for (const handler of [...terminalMessageHandlers]) handler(raw);
+      return;
+    }
     const parsed = parseServerMessage(raw);
     if (!parsed.ok) return;
     const message = parsed.value;
@@ -514,6 +536,64 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
         value,
         responderId: clientId,
       });
+    },
+
+    async openTerminal(sessionId, handlers, options = {}) {
+      await sdk.attachSession(sessionId).catch(() => undefined);
+      const channelId = `pty-${++counter}`;
+      const dataHandler = (raw: unknown) => {
+        const message = raw as {
+          type?: string;
+          channelId?: string;
+          data?: string;
+          reason?: string;
+        };
+        if (
+          message.type === "channel.data" &&
+          message.channelId === channelId &&
+          message.data !== undefined
+        ) {
+          handlers.onData(message.data);
+          return;
+        }
+        if (message.type === "channel.closed" && message.channelId === channelId) {
+          terminalTransport.onMessage(() => undefined); // 保持注册，防重复触发
+          handlers.onClose(message.reason);
+        }
+      };
+      const terminalTransport = transport;
+      terminalMessageHandlers.push(dataHandler);
+      transport.send({
+        type: "channel.open",
+        channelId,
+        channel: "pty",
+        params: {
+          ...(options.cols === undefined ? {} : { cols: options.cols }),
+          ...(options.rows === undefined ? {} : { rows: options.rows }),
+        },
+      });
+      const opened = await waitForMessage(
+        (message) =>
+          (message.type === "channel.opened" || message.type === "channel.closed") &&
+          (message as { channelId?: string }).channelId === channelId,
+      );
+      if (opened.type === "channel.closed") {
+        throw new SdkError({
+          code: "unsupported_channel",
+          message: opened.reason ?? "通道被拒绝。",
+        });
+      }
+      return {
+        channelId,
+        write: (base64) => transport.send({ type: "channel.data", channelId, data: base64 }),
+        resize: (cols, rows) => transport.send({ type: "channel.resize", channelId, cols, rows }),
+        signal: (name) => transport.send({ type: "channel.signal", channelId, signal: name }),
+        close: () => {
+          const index = terminalMessageHandlers.indexOf(dataHandler);
+          if (index !== -1) terminalMessageHandlers.splice(index, 1);
+          transport.send({ type: "channel.close", channelId });
+        },
+      };
     },
 
     async openWorkspaceChannel(sessionId, channelId = `ws-${++counter}`) {

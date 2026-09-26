@@ -51,6 +51,7 @@ export type {
 } from "./types.ts";
 
 import { type Follower, followSession, openStore } from "@ucode/store";
+import { newChannelId, openPtyChannel, type PtyChannel } from "./pty.ts";
 import { gitChanges, gitLog, workspaceRead, workspaceTree } from "./workspace.ts";
 
 /**
@@ -104,6 +105,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
 
   const connections = new Map<string, ConnectionState>();
   const runtimes = new Map<string, RuntimeEntry>();
+  /** PTY 通道注册表：通道随连接断开而关闭（防孤儿 shell）。 */
+  const ptyChannels = new Map<string, { channel: PtyChannel; connectionId: string }>();
 
   const bus: CoreBus = {
     attachmentsFor(sessionId): AttachmentView[] {
@@ -613,12 +616,35 @@ export async function createCore(config: CoreConfig): Promise<Core> {
   ): Promise<void> {
     if (message.type === "channel.open") {
       if (message.channel === "pty") {
-        // PTY 通道属后续版本（骨架已定义帧格式）；这里显式降级，不让控制层干等。
-        connection.options.send({
-          type: "channel.closed",
-          channelId: message.channelId,
-          reason: "unsupported_channel：PTY 通道尚未实现（后续版本）。",
-        });
+        const params = (message.params ?? {}) as { cols?: number; rows?: number; cwd?: string };
+        try {
+          const channelId = message.channelId;
+          const channel = openPtyChannel(
+            channelId,
+            {
+              ...(params.cols === undefined ? {} : { cols: params.cols }),
+              ...(params.rows === undefined ? {} : { rows: params.rows }),
+              cwd: params.cwd ?? defaultCwd,
+            },
+            connection.trustLevel,
+            (out) => connection.options.send(out),
+            (id) => ptyChannels.delete(id),
+          );
+          ptyChannels.set(channelId, { channel, connectionId: connection.id });
+          channel.onData((out) => connection.options.send(out));
+          connection.options.send({
+            type: "channel.opened",
+            channelId,
+            channel: "pty",
+            params: { cols: params.cols ?? 80, rows: params.rows ?? 24 },
+          });
+        } catch (error) {
+          connection.options.send({
+            type: "channel.closed",
+            channelId: message.channelId,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
       const sessionId = connection.attachmentSessionId;
@@ -640,7 +666,26 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       return;
     }
 
-    if (message.type === "channel.close") return;
+    if (message.type === "channel.close") {
+      ptyChannels.get(message.channelId)?.channel.close();
+      ptyChannels.delete(message.channelId);
+      return;
+    }
+
+    if (message.type === "channel.data") {
+      ptyChannels.get(message.channelId)?.channel.write(message.data);
+      return;
+    }
+
+    if (message.type === "channel.resize") {
+      ptyChannels.get(message.channelId)?.channel.resize(message.cols, message.rows);
+      return;
+    }
+
+    if (message.type === "channel.signal") {
+      ptyChannels.get(message.channelId)?.channel.signal(message.signal);
+      return;
+    }
 
     if (message.type === "channel.request") {
       const sessionId = connection.attachmentSessionId;
@@ -841,12 +886,20 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         async close(): Promise<void> {
           connections.delete(id);
           broker.withdrawForConnection(id);
+          for (const [channelId, entry] of ptyChannels) {
+            if (entry.connectionId === id) {
+              entry.channel.close();
+              ptyChannels.delete(channelId);
+            }
+          }
         },
       };
     },
 
     async close(): Promise<void> {
       clearInterval(heartbeat);
+      for (const { channel } of ptyChannels.values()) channel.close();
+      ptyChannels.clear();
       for (const entry of runtimes.values()) {
         entry.follower?.stop();
         await entry.runtime?.dispose().catch(() => undefined);

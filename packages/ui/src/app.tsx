@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { ErrorBoundary } from "./components/error-boundary.tsx";
+import { TerminalPanel } from "./components/terminal-panel.tsx";
 import { useAgentStore } from "./context.ts";
 import {
   Composer,
@@ -30,6 +31,7 @@ export function AgentShell({ productName, defaultCwd }: AgentShellProps): ReactN
   const bootError = useAgentStore((store) => store.bootError);
   const activeSessionId = state.activeSessionId;
   const [initialized, setInitialized] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   useEffect(() => {
     if (initialized) return;
@@ -57,7 +59,7 @@ export function AgentShell({ productName, defaultCwd }: AgentShellProps): ReactN
     <div className="flex h-full">
       <SessionSidebar productName={productName} />
       <main className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
+        <TopBar onToggleTerminal={() => setTerminalOpen((current) => !current)} />
         {bootError !== null && (
           <div className="border-b border-[var(--color-border-subtle)] bg-[oklch(0.3_0.06_25)] px-3 py-1.5 text-xs text-[var(--color-danger)]">
             {bootError}
@@ -66,10 +68,19 @@ export function AgentShell({ productName, defaultCwd }: AgentShellProps): ReactN
         {activeSessionId === null ? (
           <EmptyState onCreate={() => void createSession(defaultCwd)} />
         ) : (
-          <ErrorBoundary label="会话视图">
-            <Transcript sessionId={activeSessionId} />
-            <Composer sessionId={activeSessionId} />
-          </ErrorBoundary>
+          <>
+            <ErrorBoundary label="会话视图">
+              <Transcript sessionId={activeSessionId} />
+            </ErrorBoundary>
+            {terminalOpen && (
+              <ErrorBoundary label="终端">
+                <TerminalPanel sessionId={activeSessionId} onClose={() => setTerminalOpen(false)} />
+              </ErrorBoundary>
+            )}
+            <ErrorBoundary label="输入区">
+              <Composer sessionId={activeSessionId} />
+            </ErrorBoundary>
+          </>
         )}
         <StatusBar />
       </main>

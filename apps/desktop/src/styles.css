@@ -1,4 +1,5 @@
 @import "tailwindcss";
 @import "@ucode/ui/styles.css";
+@import "@xterm/xterm/css/xterm.css";
 
 @source "../../../packages/ui/src";
