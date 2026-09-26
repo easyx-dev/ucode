@@ -118,10 +118,14 @@ describe("sdk 经 HTTP + SSE", () => {
     const created = await client.createSession({});
     await client.attachSession(created.sessionId);
     await client.prompt(created.sessionId, "第一句");
+    // 等这一轮**结束**再断开：运行中再 prompt 会按设计返回 session_busy
+    // （运行中介入要用 steer/follow_up），这里模拟的是"壳在空闲时断开"
     await waitUntil(
-      () => (client.state.views[created.sessionId]?.maxSeq ?? 0) > 0,
-      25_000,
-      "第一轮落盘",
+      () =>
+        (client.state.views[created.sessionId]?.maxSeq ?? 0) > 0 &&
+        client.state.views[created.sessionId]?.running === false,
+      30_000,
+      "第一轮结束",
     );
     const cursorBefore = client.state.views[created.sessionId]?.maxSeq ?? 0;
     const entriesBefore = client.state.views[created.sessionId]?.entries.length ?? 0;

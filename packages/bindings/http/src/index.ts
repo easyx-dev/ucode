@@ -31,10 +31,17 @@ export type HttpBindingOptions = {
   allowNonLoopback?: boolean;
 };
 
+type HttpStream = {
+  write: (text: string) => void;
+  close: () => void;
+  /** 本流的代号：重连竞态下，旧流的 abort 不得清掉新流的注册。 */
+  token: symbol;
+};
+
 type HttpConnection = {
   connection: ReturnType<CoreServer["attachConnection"]>;
   /** 当前 SSE 流（控制层断开时为空）。 */
-  stream: { write: (text: string) => void; close: () => void } | undefined;
+  stream: HttpStream | undefined;
   /** 控制层还没连上事件流时，先攒着。 */
   buffered: ServerMessage[];
   lastSeen: number;
@@ -137,7 +144,11 @@ export function createBinding(
       context.req.query("clientId") ?? context.req.header("x-client-id") ?? "default";
     const state = acquire(clientId);
     return streamSSE(context, async (stream) => {
+      // 每条流一个代号：同一 clientId 重连时新旧流会短暂并存，
+      // 旧流的 abort 若把新流的注册清掉，后续广播就全部丢失（真实缺陷）。
+      const token = Symbol();
       state.stream = {
+        token,
         write: (text) => {
           void stream.write(text);
         },
@@ -146,7 +157,7 @@ export function createBinding(
         },
       };
       stream.onAbort(() => {
-        if (state.stream !== undefined) state.stream = undefined;
+        if (state.stream?.token === token) state.stream = undefined;
         state.lastSeen = Date.now();
       });
 
@@ -159,12 +170,12 @@ export function createBinding(
 
       for (;;) {
         await stream.sleep(KEEPALIVE_MS);
+        if (state.stream?.token !== token) break;
         try {
           await stream.writeSSE({ data: JSON.stringify({ type: "stream.ping", at: Date.now() }) });
         } catch {
           break;
         }
-        if (state.stream === undefined) break;
       }
     });
   });
