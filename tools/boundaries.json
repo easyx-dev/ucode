@@ -9,7 +9,7 @@
     "@ucode/branding": [],
     "@ucode/data-layer-spec": [],
     "@ucode/store": ["@ucode/data-layer-spec"],
-    "@ucode/core": ["@ucode/protocol", "@ucode/store", "@ucode/branding"],
+    "@ucode/core": ["@ucode/data-layer-spec", "@ucode/protocol", "@ucode/store", "@ucode/branding"],
     "@ucode/binding-stdio": ["@ucode/protocol"],
     "@ucode/binding-rpc": ["@ucode/protocol"],
     "@ucode/binding-http": ["@ucode/protocol"],

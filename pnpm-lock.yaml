@@ -333,6 +333,9 @@ importers:
       '@ucode/branding':
         specifier: workspace:*
         version: link:../branding
+      '@ucode/data-layer-spec':
+        specifier: workspace:*
+        version: link:../data-layer-spec
       '@ucode/protocol':
         specifier: workspace:*
         version: link:../protocol

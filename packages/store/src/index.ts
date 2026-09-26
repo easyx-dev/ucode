@@ -1,7 +1,16 @@
 /**
- * @ucode/store —— 协议 D 的参考实现（唯一写会话文件者）
+ * @ucode/store —— 协议 D 的参考实现。
  *
- * 步骤 0 仅建骨架：包边界、依赖方向、类型检查已就位；实现按 docs/impl/00-实现设计.md §七 推进。
- * 包职责与允许依赖见该文档 §二、§三。
+ * 定位（spec §3.1、§7.2）：数据层的**唯一写会话文件者**。核心层不得绕过它直接读写会话文件；
+ * 它只实现协议 D，不 import 核心层。
+ *
+ * 目录布局是 **pi agent-dir 的超集**：`settings.json` / `models.json` / `auth.json` / `sessions/`
+ * 等沿用 pi 约定，因此 `PI_CODING_AGENT_DIR=<数据层目录>` 即可让 pi 生态直接读写同一份数据。
  */
-export {};
+export * from "./atomic.ts";
+export * from "./guards.ts";
+export * from "./index-cache.ts";
+export * from "./layout.ts";
+export * from "./open-store.ts";
+export * from "./owner.ts";
+export * from "./session-repo.ts";
