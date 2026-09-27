@@ -1,7 +1,7 @@
-// 把核心层 + CLI 打成单文件（供打包后的桌面壳 spawn）。
+// 把服务层 + CLI 打成单文件（供打包后的桌面壳 spawn）。
 //
 // 打包后的桌面应用没有 workspace 源码树，也没有 Node 的类型剥离——所以 CLI 入口
-// 必须预编译成纯 JS。esbuild 打包 apps/cli/src/main.ts（核心层 + 全部绑定 + 基座
+// 必须预编译成纯 JS。esbuild 打包 apps/cli/src/main.ts（服务层 + 全部绑定 + 基座
 // 一并进来），platform=node，format=esm；基座里 jiti 的动态加载在运行期解析，
 // 保持 external 以免打包器误折。
 
@@ -60,4 +60,12 @@ await writeFile(
     2,
   ),
 );
+// Web 壳产物随包分发：打包后的桌面壳没有 workspace 包树，服务层发不出界面就白屏。
+// 主进程 spawn 服务层时用 `--web-assets` 指向这里（见 main.mjs）。
+const webDist = join(desktopDir, "..", "web", "dist");
+try {
+  await cp(webDist, join(outDir, "web-assets"), { recursive: true });
+} catch {
+  throw new Error(`找不到 Web 壳产物（${webDist}）：先运行 pnpm -F @ucode/web build。`);
+}
 console.log("core bundle 就绪：", join(outDir, "cli.mjs"));

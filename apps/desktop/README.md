@@ -1,53 +1,41 @@
-# @ucode/desktop
+# @ucode/desktop — 桌面壳（Electron）
 
-桌面壳（Electron）：主进程 spawn 核心层，渲染进程复用 `@ucode/ui`。
+桌面壳是**客户端**，与 web / tui 同一条路子：主进程确保**共享服务**在跑，窗口加载的界面
+**由服务的 HTTP 端点同源发出**——也就是说，桌面与浏览器里跑的是**同一份 Web 产物**
+（`@ucode/web/dist`，随 `core-bundle/web-assets` 分发）。因此没有 CORS、没有跨站 cookie 问题，
+界面也永远与 Web 壳一致。
 
-## 职责
+## 主进程做什么
 
-- 主进程：spawn 核心层子进程（stdio 绑定），把渲染进程的协议消息经 IPC 桥到子进程 stdin，把 stdout 按字节切行后推给渲染进程；开窗口、装托盘、发系统通知、持有 `powerSaveBlocker` 与 `safeStorage` 凭据、内置浏览器窗口。
-- preload：在沙箱里向渲染进程暴露 `window.desktopBridge`（消息收发、核心层退出通知、环境信息、保持唤醒、通知、凭据读写、打开浏览器）。
-- 渲染进程：复用 `@ucode/sdk` + `@ucode/ui`，传输是 IPC 而非 HTTP。
-- **不做**：主进程**不 import 核心层**——它只 spawn。核心层进不了渲染进程的依赖树。
+| 步骤 | 说明 |
+|---|---|
+| 确保服务 | 读 `<数据根>/runtime/service.json` → 进程活着且给出 `http` 端点就复用；否则用打包好的 CLI（dev 直跑源码）spawn 一个 **detached** 的 `service start`，轮询注册表等它就绪 |
+| 开窗口 | `loadURL(<服务 http 端点>)`，preload 注入本机能力 |
+| 本机能力 | 托盘与菜单、系统通知、`safeStorage` OS 凭据（加密不可用拒存）、`keepAwake`→`powerSaveBlocker`、内置浏览器窗口 |
+| 退出 | **不杀服务**：它是与 web / tui 共享的后端（一个数据根一个服务），停止用 `ucode service stop` |
 
-## 三层产物
+## 产物
 
-| 产物 | 路径 | 说明 |
-|---|---|---|
-| 主进程 | `main.mjs` | **纯 JS，无 TS 语法**：Electron 直载，不经打包器，类型剥离不适用 |
-| preload | `preload.cjs` | **必须是 CommonJS**：沙箱 `require` 只认 `electron` 与少数内置模块，`node:fs` 都不可用，因此品牌配置由主进程读、经 IPC 递给渲染进程 |
-| 渲染进程 | `dist-renderer/` | Vite 产物，`base` 为 `./`（`file://` 下加载） |
-| 核心层单文件 | `core-bundle/cli.mjs` | esbuild 打包 CLI 入口，基座 / ws / jiti 保持 external；**输出必须 esm**（cjs 会因基座顶层 await 失败） |
-
-打包时 `core-bundle/` 走 `asarUnpack` 拆出 asar（asar 里无法 exec），主进程按打包布局解析路径。
-
-## 运行
-
-```bash
-pnpm -F @ucode/desktop start          # 开发态起 Electron
-pnpm -F @ucode/desktop smoke          # 无头冒烟：8s 后截图退出
-pnpm -F @ucode/desktop build          # 只出渲染进程产物
-pnpm -F @ucode/desktop bundle-core    # 只出核心层单文件
-pnpm -F @ucode/desktop dist           # 渲染进程 + 核心层 bundle + electron-builder --dir
-```
-
-签名/公证/dmg 属发布流程（`.github/workflows/release.yml`），凭据全走 secrets；缺凭据时只产出未签名包、不失败。
-
-## 依赖位置
-
-依赖 `@ucode/sdk`、`@ucode/ui`；外部 `react`、`react-dom`（开发依赖 `electron`、`electron-builder`、`vite`、`esbuild`）。
-
-权威来源：[tools/boundaries.json](../../tools/boundaries.json) 的 `@ucode/desktop` 条目。
-
-## 关键约束
-
-- **主进程与 preload 不能有 TS 语法**（主进程 `.mjs`、preload CommonJS）——由 Electron 的加载方式决定，不是风格选择。
-- **OS 凭据只在加密可用时存**（`safeStorage`）：加密不可用就**拒存**，宁可不存也不落明文；明文不落盘、不进日志。
-- 退出时要优雅关停核心层，释放 owner 租约。
-- 品牌配置由主进程读取（解析 `@ucode/branding/brand.json`）后经 IPC 递给渲染进程，两处都不写死品牌。
-- `electron-builder.yml` 里出现的 `appId` / `productName` 属门禁不扫的位置，须人工与 `brand.json` 同源。
-
-## 开发
+| 产物 | 说明 |
+|---|---|
+| `main.mjs` / `preload.cjs` | 主进程与桥（纯 JS，Electron 直载，不经打包器；preload 必须是 CommonJS） |
+| `core-bundle/cli.mjs` | esbuild 打包的服务层 CLI 单文件（基座 / ws / jiti / node-pty 保持 external，由自带的 `node_modules` 提供；**输出必须 esm**） |
+| `core-bundle/web-assets/` | Web 壳产物副本：打包形态下服务层发不出界面就白屏，主进程用 `--web-assets` 把位置告诉它 |
 
 ```bash
-pnpm -F @ucode/desktop typecheck
+pnpm -F @ucode/web build          # 先有 Web 产物（bundle-core 会把它拷进 core-bundle）
+pnpm -F @ucode/desktop start      # 开发态直接起（直跑源码的 CLI）
+pnpm -F @ucode/desktop smoke      # 冒烟：等界面连上服务 → 截图 → 退出
+pnpm -F @ucode/desktop dist       # bundle-core + electron-builder --dir
 ```
+
+## 依赖边界
+
+**主进程不 import 服务层**：它只 spawn CLI；界面经 HTTP 连服务端点。桌面包的运行时依赖只有
+`@ucode/branding`（读 `brand.json`，不写死产品名与目录名），因此反向验收（壳的依赖树里不得
+出现 `@ucode/service`）天然成立。
+
+## 环境变量
+
+`<产品名大写>_DATA_DIR` 指定数据根、`<产品名大写>_CWD` 指定会话默认工作目录
+（冒烟与多环境测试用）。

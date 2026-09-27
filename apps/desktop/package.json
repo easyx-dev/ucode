@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "桌面壳（Electron 主进程 + 复用 UI 的渲染进程；主进程 spawn 核心层，不 import 核心层）",
+  "description": "\u684c\u9762\u58f3\uff08Electron \u4e3b\u8fdb\u7a0b + \u4e0e Web \u540c\u6e90\u7684\u754c\u9762\uff1b\u786e\u4fdd\u5171\u4eab\u670d\u52a1\u5728\u8dd1\uff0c\u4e0d import \u670d\u52a1\u5c42\uff09",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -11,25 +11,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "electron .",
     "smoke": "electron . --smoke",
-    "build": "vite build",
     "bundle-core": "node ./scripts/bundle-core.mjs",
-    "dist": "pnpm build && pnpm bundle-core && electron-builder --dir"
-  },
-  "dependencies": {
-    "@ucode/sdk": "workspace:*",
-    "@ucode/ui": "workspace:*",
-    "react": "catalog:",
-    "react-dom": "catalog:"
+    "dist": "pnpm bundle-core && electron-builder --dir"
   },
   "main": "main.mjs",
   "devDependencies": {
     "electron": "catalog:",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "vite": "catalog:",
-    "@vitejs/plugin-react": "^5.1.0",
-    "@tailwindcss/vite": "catalog:",
     "esbuild": "catalog:",
     "electron-builder": "^26.17.0"
+  },
+  "dependencies": {
+    "@ucode/branding": "workspace:*"
   }
 }

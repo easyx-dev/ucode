@@ -1,12 +1,13 @@
 # @ucode/web
 
-Web 壳（浏览器宿主）：复用 `@ucode/ui` 的 React 界面，经 HTTP + SSE 连核心层。
+Web 壳（浏览器宿主）：复用 `@ucode/ui` 的 React 界面，经 HTTP + SSE 连服务层。
+**同一份产物也被桌面壳加载**（Electron 窗口指向服务端点），因此界面只有这一份实现。
 
 ## 职责
 
 - 提供浏览器宿主的入口与打包配置（Vite）。
 - 按 `location.origin` 建 HTTP/SSE 连接，以 `clientKind: "web"` 握手，渲染 `AgentShell`。
-- **不做**：不依赖 `@ucode/core`（只走 `@ucode/sdk`）；界面组件本身在 `@ucode/ui` 里。
+- **不做**：不依赖 `@ucode/service`（只走 `@ucode/sdk`）；界面组件本身在 `@ucode/ui` 里。
 
 ## 入口与产物
 
@@ -35,7 +36,7 @@ pnpm ucode web --foreground   # 前台把服务跑起来（旧行为，Ctrl-C �
 
 ## 关键约束
 
-- **不得依赖 `@ucode/core`**：只通过 `@ucode/sdk` 的传输子路径连核心层。
+- **不得依赖 `@ucode/service`**：只通过 `@ucode/sdk` 的传输子路径连服务层。
 - 只 import 自己那一份传输（`@ucode/sdk/http`），`node:net` / `node:child_process` 不能进打包结果。
 - 样式必须引入 `@ucode/ui/styles.css`（主题 token 的唯一载体）。
 - `index.html` 里的标题等品牌信息属门禁不扫的位置（`.html`），须人工与 `brand.json` 保持同源。

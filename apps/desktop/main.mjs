@@ -1,9 +1,12 @@
 // 桌面壳主进程（Electron）。
 //
-// 职责（spec §7.1：主进程 spawn 核心层 + 托盘/通知/OS 凭据等廉价本机能力）：
-// 1. **spawn 核心层子进程**（stdio 绑定）——桌面壳与核心层之间没有 HTTP，走协议 C 的 JSONL 线；
-// 2. 把渲染进程的协议消息经 IPC 桥到子进程的 stdin，把子进程的 stdout 按字节切行后推给渲染进程；
-// 3. 开窗口、装托盘（图标缺省时跳过）、退出时优雅关停核心层（释放 owner 租约）。
+// 与 web / tui 同一条路子：**壳是客户端**。主进程做三件事：
+// 1. **确保共享服务在跑**（发现 → 连上，没有就用打包好的 CLI 拉起一个 detached 的）；
+// 2. 把服务的 HTTP 端点交给窗口，界面（同一份 Web 产物）**由服务同源发出**——
+//    没有 CORS、没有跨站问题，桌面与浏览器看到的是同一个界面；
+// 3. 托盘 / 通知 / OS 凭据 / 保持唤醒这些**本机能力**留在主进程，经 preload 暴露。
+//
+// 退出桌面**不杀服务**：它是与 web / tui 共享的后端，停止用 `服务名 service stop`。
 //
 // **为什么是 .mjs 且纯 JS**：Electron 直接加载主进程与 preload，不经过打包器；
 // 类型剥离不适用于它，因此这里不能有任何 TS 语法。渲染进程（React）才走 Vite 构建。
@@ -12,7 +15,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
@@ -47,76 +50,80 @@ function resolveCliEntry() {
   if (isPackaged) {
     const bundled = `${here.replace("app.asar", "app.asar.unpacked")}/core-bundle/cli.mjs`;
     if (existsSync(bundled)) return bundled;
-    throw new Error(`找不到打包的核心层入口（${bundled}）`);
+    throw new Error(`找不到打包的服务层入口（${bundled}）`);
   }
   // 仓内布局：main.mjs → ../cli/src/main.ts（Node 24 原生类型剥离直跑）
   const relative = join(here, "..", "cli", "src", "main.ts");
   if (existsSync(relative)) return relative;
-  throw new Error(`找不到 CLI 入口（${relative}）：桌面壳需要一个能跑 core start 的入口。`);
+  throw new Error(`找不到 CLI 入口（${relative}）：桌面壳需要它来拉起共享服务。`);
 }
 
-function resolveRendererIndex() {
-  const dist = join(here, "dist-renderer", "index.html");
-  if (!existsSync(dist)) {
-    throw new Error(`渲染进程尚未构建（缺少 ${dist}）。请先运行：pnpm -F @ucode/desktop build`);
-  }
-  return dist;
-}
-
-let core;
 let windows = [];
 
-function spawnCore() {
-  // ELECTRON_RUN_AS_NODE=1：用 Electron 自带的 Node 跑 CLI 入口（它没有独立的 node 二进制）
+/** 服务注册表在运行时目录里（`<数据根>/runtime/service.json`）。 */
+function registrationFile() {
+  return join(dataDir, "runtime", "service.json");
+}
+
+/** 读注册表并确认那个进程还活着；拿不到就当作"没有服务"。 */
+function readLiveRegistration() {
+  try {
+    const registration = JSON.parse(readFileSync(registrationFile(), "utf8"));
+    if (typeof registration?.pid !== "number") return undefined;
+    process.kill(registration.pid, 0);
+    return registration;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 拉起常驻服务：detached + 日志进运行时目录（与 CLI 的 `service start` 同一条路子）。 */
+function spawnService() {
+  // ELECTRON_RUN_AS_NODE=1：Electron 自带的 Node 跑 CLI 入口（应用里没有独立的 node 二进制）
   const child = spawn(
     process.execPath,
     [
-      // 直跑源码：exports 的 source 条件（打包后走的是 core-bundle，不需要它）
       "--conditions=dev-src",
       resolveCliEntry(),
-      "core",
+      "service",
       "start",
-      "--binding",
-      "stdio",
       "--data-dir",
       dataDir,
       "--cwd",
       cwd,
+      // 打包形态：Web 产物随 core-bundle 分发，得把位置告诉服务层（开发形态自动能解析到）
+      ...(packagedWebAssets() === undefined ? [] : ["--web-assets", packagedWebAssets()]),
     ],
-    {
-      cwd,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-      stdio: ["pipe", "pipe", "pipe"],
-    },
+    { cwd, detached: true, stdio: "ignore", env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
   );
-  child.stderr?.on("data", (chunk) => {
-    // 核心层的日志走 stderr；主进程转发到自己的 stderr 便于诊断
-    process.stderr.write(`[core] ${chunk.toString("utf8")}`);
-  });
-  child.on("exit", (code) => {
-    process.stderr.write(`[desktop] 核心层退出（code=${code ?? "null"}）\n`);
-    core = undefined;
-    for (const window of windows) {
-      window.webContents.send("desktop:core-exit", `核心层进程退出（code=${code ?? "null"}）`);
-    }
-  });
-  return child;
+  child.unref();
 }
 
-/** 按字节切分（协议 B：只认 0x0a，禁用行读取器——JSON 字符串里可以有 U+2028/U+2029）。 */
-function attachLineFraming(child, onLine) {
-  let buffer = Buffer.alloc(0);
-  child.stdout?.on("data", (chunk) => {
-    buffer = buffer.length === 0 ? Buffer.from(chunk) : Buffer.concat([buffer, chunk]);
-    for (;;) {
-      const index = buffer.indexOf(0x0a);
-      if (index === -1) break;
-      const line = buffer.subarray(0, index).toString("utf8").trim();
-      buffer = buffer.subarray(index + 1);
-      if (line === "") continue;
-      onLine(line);
+/** 打包后的 Web 产物目录（在 asar 之外，服务层读得到）。 */
+function packagedWebAssets() {
+  if (!here.includes("app.asar")) return undefined;
+  const dir = `${here.replace("app.asar", "app.asar.unpacked")}/core-bundle/web-assets`;
+  return existsSync(join(dir, "index.html")) ? dir : undefined;
+}
+
+/** 确保共享服务在跑，返回它的 HTTP 端点（界面由服务同源发出）。 */
+async function ensureServiceEndpoint(timeoutMs = 25_000) {
+  const existing = readLiveRegistration();
+  if (existing !== undefined && typeof existing.endpoints?.http === "string") {
+    return existing.endpoints.http;
+  }
+  spawnService();
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const registration = readLiveRegistration();
+    if (registration !== undefined && typeof registration.endpoints?.http === "string") {
+      return registration.endpoints.http;
     }
-  });
+    if (Date.now() > deadline) {
+      throw new Error(`等待服务就绪超时：${registrationFile()}（日志见同目录 service.log）`);
+    }
+    await new Promise((done) => setTimeout(done, 150));
+  }
 }
 
 /** 凭据存储（F-5.4）：懒建，加密不可用时 set 会抛错（宁可不存，也不落明文）。 */
@@ -133,7 +140,7 @@ function credentialStore() {
   return credentials;
 }
 
-/** 保持唤醒（F-4.4）：核心层暴露 keepAwake，主进程据此阻止系统休眠。 */
+/** 保持唤醒（F-4.4）：服务层暴露 keepAwake，主进程据此阻止系统休眠。 */
 let keepAwakeBlocker = null;
 function setKeepAwake(enabled) {
   if (enabled === true && keepAwakeBlocker === null) {
@@ -145,12 +152,13 @@ function setKeepAwake(enabled) {
   return keepAwakeBlocker !== null;
 }
 
-function registerIpc() {
-  ipcMain.on("desktop:send", (_event, message) => {
-    if (core === undefined) core = spawnCore();
-    core.stdin?.write(`${JSON.stringify(message)}\n`);
-  });
-  ipcMain.handle("desktop:environment", () => ({ productName, dataDir }));
+function registerIpc(serviceEndpoint) {
+  // 端点交给界面：渲染进程用 sdk 的 HTTP 传输直连（与服务同源，没有跨站问题）。
+  ipcMain.handle("desktop:environment", () => ({
+    productName,
+    dataDir,
+    serviceEndpoint,
+  }));
 
   // 保持唤醒：渲染进程根据 SDK 的 keepAwake 切换。
   ipcMain.handle("desktop:keep-awake", (_event, enabled) => setKeepAwake(enabled === true));
@@ -185,7 +193,7 @@ function registerIpc() {
   });
 }
 
-function createWindow() {
+function createWindow(serviceEndpoint) {
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -197,7 +205,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  void window.loadURL(pathToFileURL(resolveRendererIndex()).href);
+  void window.loadURL(serviceEndpoint);
   windows.push(window);
   window.on("closed", () => {
     windows = windows.filter((candidate) => candidate !== window);
@@ -252,22 +260,21 @@ function tryCreateTray() {
   }
 }
 
-app.whenReady().then(() => {
-  registerIpc();
-  core = spawnCore();
-  attachLineFraming(core, (line) => {
-    let parsed;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      return; // 非 JSON 行忽略
-    }
-    for (const window of windows) {
-      window.webContents.send("desktop:message", parsed);
-    }
-  });
+app.whenReady().then(async () => {
+  let serviceEndpoint;
+  try {
+    serviceEndpoint = await ensureServiceEndpoint();
+  } catch (error) {
+    process.stderr.write(
+      `[desktop] 服务未就绪：${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    app.quit();
+    return;
+  }
+  process.stderr.write(`[desktop] 服务端点：${serviceEndpoint}\n`);
 
-  const window = createWindow();
+  registerIpc(serviceEndpoint);
+  const window = createWindow(serviceEndpoint);
   tryCreateTray();
 
   if (smokeMode) {
@@ -297,9 +304,8 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
-  // 优雅退出：核心层收到 SIGTERM 会释放 owner 租约（spec §3.5）
-  core?.kill("SIGTERM");
-  core = undefined;
+  // 不杀服务：它是与 web / tui 共享的后端（一个数据根一个服务，生命周期由 `service` 子命令管）。
+  // 需要连服务一起停时用：<产品名> service stop
 });
 
 app.on("window-all-closed", () => {

@@ -7,12 +7,26 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 /**
- * Web 壳入口。
+ * Web 壳入口（**桌面壳复用同一份产物**：Electron 从服务的 HTTP 端点加载它）。
  *
- * 与核心层同源（由 CLI 的 web 子命令在同一端口发布），因此：
+ * 与服务层同源（由服务把静态资源发出去），因此：
  * - 直接用 `location.origin` 连，没有 CORS、没有跨站 cookie 问题；
  * - 传输是 HTTP + SSE（下行推、上行 POST），断线由 sdk 自动带游标续传。
+ *
+ * 宿主差异只有一处：Electron 里 preload 会暴露 `desktopBridge`（系统通知、OS 凭据、
+ * 保持唤醒、内置浏览器）。浏览器里它不存在，因此全部按可选处理。
  */
+
+/** 桌面宿主（Electron）经 preload 暴露的本机能力。 */
+type DesktopBridge = {
+  setKeepAwake?(enabled: boolean): Promise<boolean>;
+};
+
+declare global {
+  interface Window {
+    desktopBridge?: DesktopBridge;
+  }
+}
 const brand = getBrand();
 
 const capabilities: Capability[] = [
@@ -50,9 +64,9 @@ try {
 } catch (error) {
   root.render(
     <div className="p-6 text-sm text-[var(--color-danger)]">
-      连接核心层失败：{error instanceof Error ? error.message : String(error)}
+      连接服务层失败：{error instanceof Error ? error.message : String(error)}
       <p className="mt-2 text-[var(--color-content-muted)]">
-        请确认是通过 `{brand.productName} web` 打开的页面（页面与核心层必须同源）。
+        请确认是通过 `{brand.productName} web` 打开的页面（页面与服务层必须同源）。
       </p>
     </div>,
   );
@@ -60,6 +74,15 @@ try {
 }
 
 document.title = brand.productName;
+
+// 保持唤醒（桌面壳）：服务层在状态里给出 keepAwake，主进程据此阻止系统休眠。
+// 只在**变化时**发一次 IPC，避免每次状态更新都打扰主进程；浏览器里没有这条通路。
+let lastKeepAwake: boolean | null = null;
+sdk.subscribe((state) => {
+  if (state.keepAwake === lastKeepAwake) return;
+  lastKeepAwake = state.keepAwake;
+  void globalThis.window?.desktopBridge?.setKeepAwake?.(state.keepAwake);
+});
 
 root.render(
   <StrictMode>
