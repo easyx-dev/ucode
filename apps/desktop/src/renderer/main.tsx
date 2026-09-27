@@ -45,6 +45,15 @@ try {
 
 document.title = environment.productName;
 
+// 保持唤醒（F-4.4）：核心层在任务列表里给出 keepAwake，这里把它接到主进程的 powerSaveBlocker。
+// 只在**变化时**发一次 IPC，避免每次状态更新都打扰主进程。
+let lastKeepAwake: boolean | null = null;
+sdk.subscribe((state) => {
+  if (state.keepAwake === lastKeepAwake) return;
+  lastKeepAwake = state.keepAwake;
+  void window.desktopBridge.setKeepAwake?.(state.keepAwake);
+});
+
 const root = createRoot(document.getElementById("root") as HTMLElement);
 root.render(
   <StrictMode>

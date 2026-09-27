@@ -21,10 +21,17 @@ export type UiContextOptions = {
   broker: UiBroker;
   /** 发通知类消息给这个会话的所有挂载者。 */
   broadcast: (message: ServerMessage) => void;
+  /**
+   * 提问**没有被回答**时的回调（F-1.11：降级为 agent 自决）。
+   *
+   * 只在"超时"与"无人承载"时触发——用户主动取消（cancelled）不算"没人管"，不该替他继续。
+   * 核心层据此给 agent 追一条消息，让它按最佳判断往下走，而不是把整轮挂死等人。
+   */
+  onUnanswered?: (info: { method: UiMethod; reason: "timeout" | "no-capacity" }) => void;
 };
 
 export function createExtensionUiContext(options: UiContextOptions): ExtensionUIContext {
-  const { sessionId, broker, broadcast } = options;
+  const { sessionId, broker, broadcast, onUnanswered } = options;
 
   const ask = async (
     method: UiMethod,
@@ -37,6 +44,9 @@ export function createExtensionUiContext(options: UiContextOptions): ExtensionUI
       origin: "question",
     });
     if (outcome.status === "answered") return outcome.value;
+    if (outcome.reason === "timeout" || outcome.reason === "no-capacity") {
+      onUnanswered?.({ method, reason: outcome.reason });
+    }
     return null; // 超时 / 无承载 / 撤回：都返回"没答"，由调用方决定语义
   };
 

@@ -24,6 +24,9 @@ export const COMMANDS = [
   { name: "tui", summary: "启动内置 TUI 壳（复用 sdk；默认自己拉起一个核心层）" },
   { name: "provider add", summary: "写入模型供应商配置（本地权威，写进数据层的 models.json）" },
   { name: "provider list", summary: "列出当前可用的模型" },
+  { name: "node add", summary: "登记一个核心层节点（本机或直连远端；凭据放 OS 凭据存储）" },
+  { name: "node list", summary: "列出已登记的节点" },
+  { name: "node remove", summary: "移除一个已登记的节点" },
 ] as const;
 
 export type ParsedCli =
@@ -34,7 +37,21 @@ export type ParsedCli =
   | { kind: "tui"; options: TuiOptions }
   | { kind: "provider.add"; options: ProviderAddOptions }
   | { kind: "provider.list"; options: { dataDir: string } }
+  | { kind: "node.add"; options: NodeAddOptions }
+  | { kind: "node.list"; options: { dataDir: string } }
+  | { kind: "node.remove"; options: { dataDir: string; name: string } }
   | { kind: "error"; message: string; code: number };
+
+/** 节点登记参数（F-6.3）：http 用 --url，rpc 用 --socket 或 --host/--port。 */
+export type NodeAddOptions = GlobalOptions & {
+  name: string;
+  url?: string;
+  socketPath?: string;
+  host?: string;
+  port?: number;
+  displayName?: string;
+  credentialRef?: string;
+};
 
 export type ProviderAddOptions = GlobalOptions & {
   id: string;
@@ -227,6 +244,87 @@ export function parseCli(argv: string[]): ParsedCli {
         return { kind: "provider.list", options: resolveDataDir(parsed.values["data-dir"]) };
       }
       return { kind: "error", message: `未知的 provider 子命令：「${sub ?? ""}」。`, code: 2 };
+    }
+
+    if (first === "node") {
+      const sub = second;
+      if (sub === "add") {
+        const parsed = parseArgs({
+          args: rest,
+          options: {
+            ...SHARED_OPTIONS,
+            name: { type: "string" },
+            url: { type: "string" },
+            socket: { type: "string" },
+            host: { type: "string" },
+            port: { type: "string" },
+            "display-name": { type: "string" },
+            "credential-ref": { type: "string" },
+          },
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        const name = parsed.values.name;
+        const url = parsed.values.url;
+        const socketPath = parsed.values.socket;
+        const host = parsed.values.host;
+        const port = parsed.values.port;
+        if (name === undefined) {
+          return { kind: "error", message: "node add 需要 --name。", code: 2 };
+        }
+        if (url === undefined && socketPath === undefined && port === undefined) {
+          return {
+            kind: "error",
+            message: "node add 需要 --url（http 端点）或 --socket / --port（rpc 端点）。",
+            code: 2,
+          };
+        }
+        const portNumber = port === undefined ? undefined : Number.parseInt(port, 10);
+        if (
+          port !== undefined &&
+          (Number.isNaN(portNumber as number) || (portNumber as number) <= 0)
+        ) {
+          return { kind: "error", message: `非法端口：${port}`, code: 2 };
+        }
+        return {
+          kind: "node.add",
+          options: {
+            ...resolveDataDir(parsed.values["data-dir"]),
+            name,
+            ...(url === undefined ? {} : { url }),
+            ...(socketPath === undefined ? {} : { socketPath }),
+            ...(host === undefined ? {} : { host }),
+            ...(portNumber === undefined ? {} : { port: portNumber }),
+            ...(parsed.values["display-name"] === undefined
+              ? {}
+              : { displayName: parsed.values["display-name"] }),
+            ...(parsed.values["credential-ref"] === undefined
+              ? {}
+              : { credentialRef: parsed.values["credential-ref"] }),
+          },
+        };
+      }
+      if (sub === "list") {
+        const parsed = parseArgs({ args: rest, options: SHARED_OPTIONS, allowPositionals: false });
+        if (parsed.values.help === true) return { kind: "help" };
+        return { kind: "node.list", options: resolveDataDir(parsed.values["data-dir"]) };
+      }
+      if (sub === "remove") {
+        const parsed = parseArgs({
+          args: rest,
+          options: { ...SHARED_OPTIONS, name: { type: "string" } },
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        if (parsed.values.name === undefined) {
+          return { kind: "error", message: "node remove 需要 --name。", code: 2 };
+        }
+        return {
+          kind: "node.remove",
+          options: { ...resolveDataDir(parsed.values["data-dir"]), name: parsed.values.name },
+        };
+      }
+      return { kind: "error", message: `未知的 node 子命令：「${sub ?? ""}」。`, code: 2 };
     }
 
     if (first === undefined || first === "--help" || first === "-h") return { kind: "help" };

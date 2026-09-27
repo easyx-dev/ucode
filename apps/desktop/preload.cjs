@@ -35,4 +35,20 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   },
   /** 主进程环境信息（产品名、数据层目录）。 */
   environment: () => ipcRenderer.invoke("desktop:environment"),
+
+  // ── 本机能力（F-5.4 / F-4.4 / F-2.9）：渲染进程只拿到"动作"，实现与密钥都在主进程 ──
+
+  /** 保持唤醒（F-4.4）：传 SDK 的 keepAwake，主进程据此阻止系统休眠。 */
+  setKeepAwake: (enabled) => ipcRenderer.invoke("desktop:keep-awake", enabled === true),
+  /** 系统通知；系统不支持时返回 false。 */
+  notify: (payload) => ipcRenderer.invoke("desktop:notify", payload),
+  /** OS 凭据存储（safeStorage 加密后落盘，明文不落盘）。 */
+  credentials: {
+    list: () => ipcRenderer.invoke("desktop:credential-list"),
+    set: (name, value) => ipcRenderer.invoke("desktop:credential-set", name, value),
+    get: (name) => ipcRenderer.invoke("desktop:credential-get", name),
+    remove: (name) => ipcRenderer.invoke("desktop:credential-delete", name),
+  },
+  /** 内置浏览器（F-2.9）：开独立窗口加载 http(s) 地址。 */
+  openBrowser: (url) => ipcRenderer.invoke("desktop:browser-open", url),
 });

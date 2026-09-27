@@ -1,6 +1,14 @@
 import type { AutonomyLevel } from "@ucode/sdk";
 import { toDisplayItems } from "@ucode/sdk";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  commandUsage,
+  matchCommands,
+  parseSlashCommand,
+  SLASH_COMMANDS,
+  usageOf,
+} from "./components/command-hints.ts";
+import { CommandHints } from "./components/command-hints-panel.tsx";
 import { Markdown } from "./components/markdown.tsx";
 import { Badge, Button, Card, Modal, Spinner } from "./components/primitives.tsx";
 import { ThinkingBlock, ToolCard } from "./components/tool-card.tsx";
@@ -151,7 +159,23 @@ export function SessionSidebar({ productName }: { productName: string }): ReactN
 
 // ── 顶栏 ──
 
-export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): ReactNode {
+export function TopBar({
+  onToggleTerminal,
+  onToggleTasks,
+  onToggleWorkspace,
+  onToggleMarketplace,
+  onToggleInsights,
+  onOpenModelConfig,
+  activeTasks = 0,
+}: {
+  onToggleTerminal: () => void;
+  onToggleTasks?: () => void;
+  onToggleWorkspace?: () => void;
+  onToggleMarketplace?: () => void;
+  onToggleInsights?: () => void;
+  onOpenModelConfig?: () => void;
+  activeTasks?: number;
+}): ReactNode {
   const state = useAgentStore((store) => store.state);
   const setModel = useAgentStore((store) => store.setModel);
   const setAutonomy = useAgentStore((store) => store.setAutonomy);
@@ -178,7 +202,27 @@ export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): 
         </span>
       )}
 
-      <div className="ml-auto flex items-center gap-2 text-xs">
+      <div className="topbar-actions ml-auto flex items-center gap-2 text-xs">
+        {onToggleWorkspace !== undefined && (
+          <Button size="sm" onClick={onToggleWorkspace} title="工作区：文件树 / 变更 / 历史 / 预览">
+            工作区
+          </Button>
+        )}
+        {onToggleMarketplace !== undefined && (
+          <Button size="sm" onClick={onToggleMarketplace} title="插件与市场：源 / 目录 / 已装">
+            插件
+          </Button>
+        )}
+        {onToggleInsights !== undefined && (
+          <Button size="sm" onClick={onToggleInsights} title="用量 / 支持包 / 迁移">
+            用量
+          </Button>
+        )}
+        {onToggleTasks !== undefined && (
+          <Button size="sm" onClick={onToggleTasks} title="自动化任务面板">
+            自动化{activeTasks > 0 ? ` (${activeTasks})` : ""}
+          </Button>
+        )}
         <select
           className="rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-1.5 py-1 text-xs"
           value={
@@ -187,14 +231,20 @@ export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): 
               : `${view.state.model.provider}/${view.state.model.modelId}`
           }
           onChange={(event) => {
+            if (event.target.value === "__manage__") {
+              onOpenModelConfig?.();
+              return;
+            }
             const [provider, modelId] = event.target.value.split("/");
             if (sessionId !== null && provider !== undefined && modelId !== undefined) {
               void setModel(sessionId, provider, modelId);
             }
           }}
-          title="切换模型"
+          title="选择模型"
         >
-          <option value="">（默认模型）</option>
+          <option value="">
+            {state.models.length === 0 ? "（还没有可用模型）" : "（默认模型）"}
+          </option>
           {state.models.map((model) => (
             <option
               key={`${model.provider}/${model.modelId}`}
@@ -203,6 +253,8 @@ export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): 
               {model.provider}/{model.modelId}
             </option>
           ))}
+          {/* 对齐 zcode 的「管理模型」：选择器里直接带一个入口，不用去别处找。 */}
+          {onOpenModelConfig !== undefined && <option value="__manage__">管理模型…</option>}
         </select>
         <select
           className="rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-1.5 py-1 text-xs"
@@ -243,11 +295,18 @@ export function TopBar({ onToggleTerminal }: { onToggleTerminal: () => void }): 
 
 // ── 转录 ──
 
-function UserRow({ text }: { text: string }): ReactNode {
+function UserRow({ text, onQuote }: { text: string; onQuote?: () => void }): ReactNode {
   return (
-    <div className="my-3 flex justify-end">
+    <div className="group my-3 flex justify-end">
       <div className="max-w-[85%] rounded-lg rounded-br-sm border border-[var(--color-accent-soft)] bg-[var(--color-accent-soft)] px-3 py-2">
         <p className="whitespace-pre-wrap break-words text-[13px] leading-5">{text}</p>
+        {onQuote !== undefined && (
+          <div className="reveal-hover mt-1 flex justify-end">
+            <Button size="sm" onClick={onQuote} title="把这段引用到输入框追问">
+              追问这段
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -256,16 +315,25 @@ function UserRow({ text }: { text: string }): ReactNode {
 function AssistantRow({
   markdown,
   streaming,
+  onQuote,
 }: {
   markdown: string;
   streaming?: boolean;
+  onQuote?: () => void;
 }): ReactNode {
   return (
-    <div className="my-3">
+    <div className="group my-3">
       <div className="mb-1 text-[11px] font-medium text-[var(--color-content-muted)]">助手</div>
       <Markdown>{markdown}</Markdown>
       {streaming === true && (
         <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-[var(--color-accent)] align-middle" />
+      )}
+      {onQuote !== undefined && (
+        <div className="reveal-hover mt-1">
+          <Button size="sm" onClick={onQuote} title="把这段引用到输入框追问">
+            追问这段
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -351,6 +419,7 @@ export function Transcript({ sessionId }: { sessionId: string }): ReactNode {
   const state = useAgentStore((store) => store.state);
   const view = state.views[sessionId];
   const resolveInteraction = useAgentStore((store) => store.resolveInteraction);
+  const quoteIntoDraft = useAgentStore((store) => store.quoteIntoDraft);
   const items = useMemo(() => (view === undefined ? [] : toDisplayItems(view)), [view]);
   const scroller = useRef<HTMLDivElement | null>(null);
   const lastItem = items.at(-1);
@@ -371,13 +440,20 @@ export function Transcript({ sessionId }: { sessionId: string }): ReactNode {
         const row = (() => {
           switch (item.kind) {
             case "user":
-              return <UserRow key={item.id} text={item.text} />;
+              return (
+                <UserRow
+                  key={item.id}
+                  text={item.text}
+                  onQuote={() => quoteIntoDraft(sessionId, item.text)}
+                />
+              );
             case "assistant":
               return (
                 <AssistantRow
                   key={item.id}
                   markdown={item.markdown}
                   streaming={item.id === "__streaming__"}
+                  onQuote={() => quoteIntoDraft(sessionId, item.markdown)}
                 />
               );
             case "tool":
@@ -400,17 +476,102 @@ export function Transcript({ sessionId }: { sessionId: string }): ReactNode {
 
 // ── 输入区 ──
 
-export function Composer({ sessionId }: { sessionId: string }): ReactNode {
+export type ComposerPanel = "tasks" | "plugins" | "usage" | "model";
+
+export function Composer({
+  sessionId,
+  onOpenPanel,
+  productName,
+}: {
+  sessionId: string;
+  onOpenPanel: (panel: ComposerPanel) => void;
+  productName: string;
+}): ReactNode {
   const draft = useAgentStore((store) => store.drafts[sessionId] ?? "");
   const setDraft = useAgentStore((store) => store.setDraft);
   const send = useAgentStore((store) => store.send);
   const state = useAgentStore((store) => store.state);
+  const createSession = useAgentStore((store) => store.createSession);
+  const compact = useAgentStore((store) => store.compact);
+  const setAutonomy = useAgentStore((store) => store.setAutonomy);
+  const abort = useAgentStore((store) => store.abort);
   const view = state.views[sessionId];
   const running = view?.running === true;
   const readOnly = view?.readOnly === true;
+  const modelAvailable = view?.state?.modelAvailable !== false;
   const pending = state.interactions.filter((request) => request.sessionId === sessionId).length;
   const usage = view?.usage as { totalTokens?: number } | undefined;
   const textarea = useRef<HTMLTextAreaElement | null>(null);
+  const [hintIndex, setHintIndex] = useState(0);
+  const [hintsDismissed, setHintsDismissed] = useState(false);
+  const [localNotice, setLocalNotice] = useState<string | null>(null);
+  const hints = hintsDismissed ? [] : matchCommands(draft);
+  const hasHistory = (view?.entries.length ?? 0) > 0;
+
+  const runCommand = async (name: string, args: string[]): Promise<void> => {
+    switch (name) {
+      case "/help":
+        setLocalNotice(
+          SLASH_COMMANDS.map((command) => `${usageOf(command)} — ${command.description}`).join(
+            "\n",
+          ),
+        );
+        return;
+      case "/new":
+        await createSession(args[0]);
+        return;
+      case "/compact":
+        await compact(sessionId);
+        return;
+      case "/model":
+        onOpenPanel("model");
+        return;
+      case "/tasks":
+        onOpenPanel("tasks");
+        return;
+      case "/plugins":
+        onOpenPanel("plugins");
+        return;
+      case "/usage":
+        onOpenPanel("usage");
+        return;
+      case "/autonomy": {
+        const level = args[0];
+        if (level === undefined) {
+          setLocalNotice(`用法：${commandUsage("/autonomy") ?? ""}`);
+          return;
+        }
+        await setAutonomy(sessionId, level as AutonomyLevel);
+        return;
+      }
+      default: {
+        const usageText = commandUsage(name);
+        setLocalNotice(
+          usageText === null ? `未知命令 ${name}。输入 / 查看可用命令。` : `用法：${usageText}`,
+        );
+      }
+    }
+  };
+
+  const submit = (): void => {
+    const command = parseSlashCommand(draft);
+    if (command !== null) {
+      // 命令由壳自己执行，不进对话——否则模型会收到一条它看不懂的 `/compact`。
+      setDraft(sessionId, "");
+      setLocalNotice(null);
+      void runCommand(command.name, command.args);
+      return;
+    }
+    void send(sessionId);
+  };
+
+  const completeCommand = (selected: number): void => {
+    const target = hints[selected];
+    if (target === undefined) return;
+    setDraft(sessionId, `${target.name}${target.args === undefined ? " " : " "}`);
+    setHintsDismissed(false);
+    textarea.current?.focus();
+  };
 
   const autoGrow = (): void => {
     const node = textarea.current;
@@ -421,6 +582,17 @@ export function Composer({ sessionId }: { sessionId: string }): ReactNode {
   useEffect(autoGrow, [draft]);
 
   const blocked = readOnly || pending > 0;
+  // zcode 的 placeholder 按上下文换（新任务 / 追问 / 排队），不是一句固定的提示。
+  const placeholder =
+    pending > 0
+      ? "先处理上面的请求…"
+      : !modelAvailable
+        ? "还没有可用模型：点「模型」配置一个供应商"
+        : running
+          ? "继续输入以排队后续修改"
+          : hasHistory
+            ? "提出后续修改要求"
+            : `向 ${productName} 提问，使用 / 选择命令或能力`;
 
   return (
     <div className="border-t border-[var(--color-border-subtle)] p-3">
@@ -429,28 +601,85 @@ export function Composer({ sessionId }: { sessionId: string }): ReactNode {
           该会话是只读挂载：写权限在另一个核心层实例手上（同一会话只允许一个 writer）。
         </p>
       )}
-      <div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] focus-within:border-[var(--color-accent)]">
+      {!modelAvailable && !readOnly && (
+        <p className="mb-2 flex items-center gap-2 rounded bg-[oklch(0.34_0.06_80)] px-2 py-1 text-[11px] text-[var(--color-warn)]">
+          还没有可用的模型，发送会被拒绝。
+          <button
+            type="button"
+            className="underline"
+            onClick={() => onOpenPanel("model")}
+            title="配置供应商：端点 / 密钥 / 模型 ID"
+          >
+            立即配置
+          </button>
+        </p>
+      )}
+      {localNotice !== null && (
+        <div className="mb-2 flex items-start gap-2 rounded bg-[var(--color-surface-overlay)] px-2 py-1.5">
+          <pre className="flex-1 whitespace-pre-wrap break-words font-[var(--font-mono)] text-[11px] text-[var(--color-content)]">
+            {localNotice}
+          </pre>
+          <button
+            type="button"
+            className="text-[10px] text-[var(--color-content-muted)] hover:text-[var(--color-content)]"
+            onClick={() => setLocalNotice(null)}
+          >
+            关闭
+          </button>
+        </div>
+      )}
+      <CommandHints
+        input={draft}
+        selected={hintIndex}
+        onHover={setHintIndex}
+        onDismiss={() => setHintsDismissed(true)}
+        onSelect={(command) => {
+          const index = hints.findIndex((candidate) => candidate.name === command.name);
+          completeCommand(index < 0 ? 0 : index);
+        }}
+      />
+      <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] focus-within:border-[var(--color-accent)]">
         <textarea
           ref={textarea}
           value={draft}
           disabled={blocked}
           rows={2}
-          placeholder={
-            pending > 0
-              ? "先处理上面的请求…"
-              : running
-                ? "运行中：Enter 作为 steer 送入本轮"
-                : "输入消息，Enter 发送，Shift+Enter 换行"
-          }
+          placeholder={placeholder}
           className="block w-full resize-none bg-transparent px-3 pt-2.5 font-[var(--font-mono)] text-[13px] leading-5 outline-none"
           onChange={(event) => {
             setDraft(sessionId, event.target.value);
+            setHintIndex(0);
+            setHintsDismissed(false);
+            setLocalNotice(null);
             autoGrow();
           }}
           onKeyDown={(event) => {
+            if (hints.length > 0) {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setHintIndex((current) => (current + 1) % hints.length);
+                return;
+              }
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setHintIndex((current) => (current - 1 + hints.length) % hints.length);
+                return;
+              }
+              // Enter / Tab 先把命令名补全，再把光标交回输入框让用户填参数。
+              if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
+                event.preventDefault();
+                completeCommand(hintIndex);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setHintsDismissed(true);
+                return;
+              }
+            }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              void send(sessionId);
+              submit();
             }
           }}
         />
@@ -460,12 +689,18 @@ export function Composer({ sessionId }: { sessionId: string }): ReactNode {
           {(view?.state?.pendingMessages ?? 0) > 0 && (
             <span>队列 {view?.state?.pendingMessages}</span>
           )}
+          <span className="ml-auto">Enter 发送 · Shift+Enter 换行 · / 命令</span>
+          {running && draft.trim() === "" && (
+            <Button size="sm" title="停止生成（Esc）" onClick={() => void abort(sessionId)}>
+              停止
+            </Button>
+          )}
           <Button
-            className="ml-auto"
             size="sm"
-            variant={running ? "danger" : "primary"}
+            variant="primary"
             disabled={draft.trim() === "" || blocked}
-            onClick={() => void send(sessionId)}
+            title={running ? "送入本轮" : "发送"}
+            onClick={submit}
           >
             {running ? "送入本轮" : "发送"}
           </Button>
@@ -590,13 +825,39 @@ export function StatusBar(): ReactNode {
   );
 }
 
-export function EmptyState({ onCreate }: { onCreate: () => void }): ReactNode {
+/**
+ * 空会话的问候语。
+ *
+ * 对齐 zcode 的 `ConversationDraftEmptyState`：按时段给一句问候，
+ * 而不是一句干巴巴的"还没有消息"——用户打开界面第一眼看到的东西，
+ * 决定他知不知道接下来能做什么。
+ */
+export function greetingFor(hour: number): string {
+  if (hour < 5) return "夜深啦，别忘了照顾好自己哦";
+  if (hour < 9) return "早上好呀，新的一天开始啦";
+  if (hour < 12) return "上午好呀，有什么想让我帮忙的吗";
+  if (hour < 14) return "中午好呀，要不要先休息一下";
+  if (hour < 18) return "下午好呀，接下来交给我吧";
+  return "晚上好呀，今天辛苦啦";
+}
+
+export function EmptyState({
+  onCreate,
+  productName,
+}: {
+  onCreate: () => void;
+  productName: string;
+}): ReactNode {
+  const hour = new Date().getHours();
   return (
-    <Card className="m-6 p-6 text-sm">
-      <p className="mb-3">还没有打开任何会话。</p>
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6">
+      <p className="text-lg text-[var(--color-content)]">{greetingFor(hour)}</p>
+      <p className="max-w-md text-center text-xs text-[var(--color-content-muted)]">
+        向 {productName} 提问，使用 / 选择命令或能力。
+      </p>
       <Button variant="primary" onClick={onCreate}>
         新建会话
       </Button>
-    </Card>
+    </div>
   );
 }

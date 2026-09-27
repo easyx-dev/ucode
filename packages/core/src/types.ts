@@ -10,6 +10,7 @@ import type {
   SessionStatus,
   TrustLevel,
 } from "@ucode/protocol";
+import type { TaskScheduler } from "./tasks/scheduler.ts";
 
 /**
  * 核心层的对外契约（传输无关）。
@@ -75,6 +76,8 @@ export type Core = CoreServer & {
   readonly store: Store;
   /** 核心层自身的能力全集（welcome 里回告）。 */
   capabilities(): Capability[];
+  /** 自动化任务调度器（F-4.1~4.4）。 */
+  readonly tasks: TaskScheduler;
   /** 关闭：释放 owner 租约、dispose 所有会话运行时。 */
   close(): Promise<void>;
 };

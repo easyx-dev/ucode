@@ -5,5 +5,9 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "types": []
   },
-  "include": ["src"]
+  "include": ["src"],
+  // `src/native/**` 是**主进程侧**的纯 Node 模块（不含 DOM、用 node API），
+  // 与渲染进程的类型环境不同（这里 types 为空、只有 dom lib），因此分开检查：
+  // 它们由 vitest 单测覆盖，Electron 直载 .mjs（本就不经 tsc）。
+  "exclude": ["src/native"]
 }

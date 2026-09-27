@@ -1,0 +1,38 @@
+# 发布用的打包配置（与开发用的 electron-builder.yml **分开**）。
+#
+# 为什么分开：开发态那条 `pnpm -F @ucode/desktop dist` 走 `--dir`、显式 `identity: null`
+# 不签名（本地没有证书也不该失败）；发布态要**签名 + 公证 + dmg**。
+# 两者混在一个文件里，"本地能跑"与"发版能签"必然互相牵制（identity: null 会抑制自动发现）。
+#
+# 凭据全部来自环境变量（CI 里由 secrets 注入）：
+#   CSC_LINK / CSC_KEY_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
+appId: com.earendil.ucode
+productName: ucode
+directories:
+  output: release
+  buildResources: assets
+files:
+  - main.mjs
+  - preload.cjs
+  - dist-renderer/**/*
+  - core-bundle/**/*
+  - "!core-bundle/node_modules/.cache/**/*"
+  - src/native/**/*
+  - "!src/native/**/*.test.ts"
+  - package.json
+asar: true
+asarUnpack:
+  - core-bundle/**/*
+mac:
+  category: public.app-category.developer-tools
+  # 不写 identity：让 electron-builder 按 CSC_LINK 自动发现证书（没有则退回不签名）
+  hardenedRuntime: true
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  # 有 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID 时执行公证
+  notarize: true
+  target:
+    - dmg
+    - zip
+dmg:
+  title: ${productName}

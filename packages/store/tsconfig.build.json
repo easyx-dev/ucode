@@ -1,0 +1,14 @@
+{
+  // 构建产物（D-3）：把库包 emit 成纯 JS，供"以包形式安装"的形态使用。
+  // 开发态仍直跑 src/*.ts（exports 的 source 条件），产物只在安装/发布场景生效。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/testing/**"]
+}

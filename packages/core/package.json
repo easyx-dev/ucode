@@ -5,10 +5,15 @@
   "type": "module",
   "description": "协议 C 服务端：握手、attachment、会话运行时、交互中转、资源与工具",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "dev-src": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",
@@ -17,6 +22,7 @@
     "@ucode/protocol": "workspace:*",
     "@ucode/store": "workspace:*",
     "jiti": "catalog:",
-    "node-pty": "catalog:"
+    "node-pty": "catalog:",
+    "typebox": "catalog:"
   }
 }

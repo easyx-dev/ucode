@@ -21,6 +21,8 @@ await esbuild.build({
   platform: "node",
   format: "esm",
   target: "node22",
+  // 从源码打包：dist 是为「以包安装」准备的产物，打包桌面壳时不该依赖它。
+  conditions: ["dev-src"],
   outfile: join(outDir, "cli.mjs"),
   // ws 及其可选加速依赖（来自 @hono/node-ws）含运行期 require：
   // ESM 输出里 esbuild 的 require shim 会抛错——保持 external，由打包目录的 node_modules 提供

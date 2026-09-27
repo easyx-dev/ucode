@@ -18,7 +18,15 @@ import type {
   SessionState,
   SessionTreeNode,
 } from "@ucode/protocol";
+import { createGoalExtension } from "./goal/extension.ts";
+import { createHooksExtension } from "./hooks/extension.ts";
+import { createImportExtension } from "./import/extension.ts";
+import { createMemoryExtension } from "./memory/extension.ts";
+import { createSshExtension } from "./ssh/extension.ts";
+import { createSubagentsExtension } from "./subagents/extension.ts";
 import { createToolGateExtension } from "./tool-gate.ts";
+import { createUndoExtension } from "./undo/extension.ts";
+import { createWikiExtension } from "./wiki/extension.ts";
 
 /**
  * 会话运行时：**包住基座的 agent session**（spec §7.1「session-runtime 包住 agent session」）。
@@ -71,6 +79,8 @@ export class SessionRuntime {
   #persisted = 0;
   #lastPersistedId: string | null = null;
   #deltaIndex = 0;
+  /** 会话有没有可用模型。**未配置时置 false**，发送前据此直接报错（见 startPrompt）。 */
+  #modelAvailable: boolean | undefined = undefined;
   #persistChain: Promise<void> = Promise.resolve();
   #disposed = false;
   #options: SessionRuntimeOptions;
@@ -115,11 +125,45 @@ export class SessionRuntime {
           sessionAllowed: this.sessionAllowedTools,
           onDecision: options.onDecision,
         }),
+        createMemoryExtension({ dataDir: options.dataDir, cwd: options.cwd }),
+        createSubagentsExtension({
+          dataDir: options.dataDir,
+          cwd: options.cwd,
+          modelRuntime: options.modelRuntime,
+          autonomy: () => this.#autonomy,
+          sessionAllowed: this.sessionAllowedTools,
+        }),
+        createGoalExtension({
+          dataDir: options.dataDir,
+          cwd: options.cwd,
+          modelRuntime: options.modelRuntime,
+          autonomy: () => this.#autonomy,
+        }),
+        createUndoExtension(),
+        createWikiExtension({
+          dataDir: options.dataDir,
+          cwd: options.cwd,
+          modelRuntime: options.modelRuntime,
+        }),
+        createSshExtension({ dataDir: options.dataDir }),
+        createImportExtension({ dataDir: options.dataDir, cwd: options.cwd }),
+        createHooksExtension({
+          dataDir: options.dataDir,
+          cwd: options.cwd,
+          sessionId: options.sessionId,
+          onDecision: (decision) =>
+            options.onDecision?.({
+              toolName: decision.hook,
+              approved: decision.approved,
+              reason: `hook:${decision.event}:${decision.reason}`,
+            }),
+        }),
       ],
     });
     await resourceLoader.reload();
 
     const model = await pickModel(options.modelRuntime, options.dataDir);
+    this.#modelAvailable = model !== undefined;
     const { session } = await createAgentSession({
       cwd: options.cwd,
       agentDir: options.dataDir,
@@ -180,6 +224,7 @@ export class SessionRuntime {
       pendingMessages: session?.pendingMessageCount ?? 0,
       pendingInteractions: this.#options.pendingInteractions(),
       attachments: this.#options.attachments(),
+      modelAvailable: this.#modelAvailable ?? model !== undefined,
     };
   }
 
@@ -220,6 +265,14 @@ export class SessionRuntime {
   }
 
   async startPrompt(text: string, references?: Reference[]): Promise<void> {
+    // 没有可用模型就**明确报错**，而不是把这一轮咽下去。
+    // 之前这里会走完流程却什么也没发生：界面上看不出任何异常，
+    // 用户只能看到"发出去没反应"（实测过，排查成本极高）。
+    if (this.#modelAvailable === false) {
+      throw new Error(
+        "还没有可用的模型：请在「模型配置」里添加一个供应商（端点 + 模型 + 密钥），或运行 `provider add`。",
+      );
+    }
     const expanded = expandReferences(text, references);
     this.#status = "running";
     this.#deltaIndex = 0;
@@ -253,6 +306,7 @@ export class SessionRuntime {
     const model = this.#options.modelRuntime.getModel(provider, modelId);
     if (model === undefined) return false;
     await this.session.setModel(model);
+    this.#modelAvailable = true;
     await this.#persistNewEntries();
     this.#emitStatus();
     return true;
@@ -278,6 +332,19 @@ export class SessionRuntime {
 
   async setName(name: string): Promise<void> {
     this.session.setSessionName(name);
+    await this.#persistNewEntries();
+    this.#emitStatus();
+  }
+
+  /**
+   * 编辑历史对话（F-1.3）：对某条已落的记录做**追加式的上下文改写**。
+   *
+   * 关键取舍：不就地改文件里的旧记录（那会破坏"只追加"这条承重假设，V-1），
+   * 而是追加一条 `context_edit`——原记录仍在（可追溯），模型上下文按最新编辑生效。
+   * `content` 为 null 表示把该条从上下文里剔除。
+   */
+  async editEntry(targetId: string, content: string | null): Promise<void> {
+    this.#manager.appendContextEdit(targetId, content === null ? null : { content });
     await this.#persistNewEntries();
     this.#emitStatus();
   }
@@ -473,27 +540,49 @@ export class UnsupportedReferenceError extends Error {
   }
 }
 
-/** 选模型：优先数据层 settings.json 里的默认模型，否则取第一个可用的。 */
+/**
+ * 选模型：数据层 settings.json 的默认 → 用户自配的供应商 → 第一个可用的。
+ *
+ * 中间那一档不是锦上添花：`getAvailable()[0]` 的顺序由基座决定，**当用户自配的
+ * 供应商 id 与基座内置供应商重名时，内置模型会排到前面**（实测：id 写 `deepseek`
+ * 时首个可用模型是内置的 `deepseek-flash`，用户声明的 `deepseek-v4-flash` 被跳过，
+ * 请求因而发到一个端点不认识的模型上）。优先用户自己写进 `models.json` 的那些，
+ * 才符合"本地配置是唯一来源"。
+ */
 type AvailableModel = Awaited<ReturnType<ModelRuntime["getAvailable"]>>[number];
 
 async function pickModel(
   modelRuntime: ModelRuntime,
   dataDir?: string,
 ): Promise<AvailableModel | undefined> {
-  if (dataDir !== undefined) {
-    try {
-      const raw = JSON.parse(await readFile(join(dataDir, "settings.json"), "utf8")) as {
-        defaultProvider?: string;
-        defaultModel?: string;
-      };
-      if (raw.defaultProvider !== undefined && raw.defaultModel !== undefined) {
-        const configured = modelRuntime.getModel(raw.defaultProvider, raw.defaultModel);
-        if (configured !== undefined) return configured;
-      }
-    } catch {
-      // 没有 settings.json 或格式不对：退回"第一个可用模型"
-    }
-  }
   const available = await modelRuntime.getAvailable();
+  if (dataDir === undefined) return available[0];
+
+  const settings = await readJsonFile<{ defaultProvider?: string; defaultModel?: string }>(
+    join(dataDir, "settings.json"),
+  );
+  if (settings?.defaultProvider !== undefined && settings.defaultModel !== undefined) {
+    const configured = modelRuntime.getModel(settings.defaultProvider, settings.defaultModel);
+    if (configured !== undefined) return configured;
+  }
+
+  const modelsConfig = await readJsonFile<{ providers?: Record<string, unknown> }>(
+    join(dataDir, "models.json"),
+  );
+  const ownProviders = Object.keys(modelsConfig?.providers ?? {});
+  for (const provider of ownProviders) {
+    const preferred = available.find((model) => model.provider === provider);
+    if (preferred !== undefined) return preferred;
+  }
   return available[0];
+}
+
+/** 读一个 JSON 配置；不存在、不可读或不是对象都当作"没配"，不抛。 */
+async function readJsonFile<T>(file: string): Promise<T | undefined> {
+  try {
+    const parsed = JSON.parse(await readFile(file, "utf8")) as unknown;
+    return typeof parsed === "object" && parsed !== null ? (parsed as T) : undefined;
+  } catch {
+    return undefined;
+  }
 }

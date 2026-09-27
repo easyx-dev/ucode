@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "TUI 壳（Ink；只复用 SDK，不复用 UI）",
+  "description": "TUI 壳（复用基座 @earendil-works/pi-tui 的组件层；只依赖 SDK，不复用 UI）",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -11,12 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@earendil-works/pi-tui": "catalog:",
     "@ucode/branding": "workspace:*",
-    "@ucode/sdk": "workspace:*",
-    "ink": "catalog:",
-    "react": "catalog:"
-  },
-  "devDependencies": {
-    "@types/react": "catalog:"
+    "@ucode/sdk": "workspace:*"
   }
 }

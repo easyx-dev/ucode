@@ -49,6 +49,11 @@ export const SessionStateSchema = z.object({
   pendingInteractions: z.number().int().nonnegative(),
   /** 本会话的 attachment 数（多壳同看一个会话）。 */
   attachments: z.number().int().nonnegative(),
+  /**
+   * 有没有可用模型。为 false 时发送会被明确拒绝——界面据此提示"先去配一个模型"，
+   * 而不是让用户对着一个永远没有回复的输入框猜。
+   */
+  modelAvailable: z.boolean(),
 });
 export type SessionState = z.infer<typeof SessionStateSchema>;
 

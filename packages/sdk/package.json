@@ -5,14 +5,40 @@
   "type": "module",
   "description": "headless 控制层 SDK：建连、命令封装、事件折叠、断线续传",
   "exports": {
-    ".": "./src/index.ts",
-    "./stdio": "./src/transports/stdio.ts",
-    "./rpc": "./src/transports/rpc.ts",
-    "./http": "./src/transports/http.ts",
-    "./ws": "./src/transports/ws.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "dev-src": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./stdio": {
+      "types": "./src/transports/stdio.ts",
+      "dev-src": "./src/transports/stdio.ts",
+      "default": "./dist/transports/stdio.js"
+    },
+    "./rpc": {
+      "types": "./src/transports/rpc.ts",
+      "dev-src": "./src/transports/rpc.ts",
+      "default": "./dist/transports/rpc.js"
+    },
+    "./http": {
+      "types": "./src/transports/http.ts",
+      "dev-src": "./src/transports/http.ts",
+      "default": "./dist/transports/http.js"
+    },
+    "./node-transport": {
+      "types": "./src/node-transport.ts",
+      "dev-src": "./src/node-transport.ts",
+      "default": "./dist/node-transport.js"
+    },
+    "./ws": {
+      "types": "./src/transports/ws.ts",
+      "dev-src": "./src/transports/ws.ts",
+      "default": "./dist/transports/ws.js"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@ucode/binding-http": "workspace:*",

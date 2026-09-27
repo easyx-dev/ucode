@@ -11,13 +11,24 @@
  * - agent loop、工具执行、插件运行时来自基座 `@earendil-works/pi-coding-agent`。
  */
 export * from "./core.ts";
+export * from "./goal/index.ts";
 export * from "./handshake.ts";
+export * from "./hooks/index.ts";
+export * from "./import/index.ts";
+export * from "./insights/index.ts";
+export * from "./marketplace/index.ts";
+export * from "./memory/index.ts";
 export * from "./models.ts";
+export * from "./plugins/index.ts";
 export * from "./pty.ts";
 export * from "./session-runtime.ts";
+export * from "./ssh/index.ts";
+export * from "./subagents/index.ts";
 export * from "./tool-gate.ts";
 export * from "./trust.ts";
 export * from "./types.ts";
 export * from "./ui-broker.ts";
 export * from "./ui-context.ts";
+export * from "./undo/index.ts";
+export * from "./wiki/index.ts";
 export * from "./workspace.ts";

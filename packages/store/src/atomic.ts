@@ -32,7 +32,8 @@ async function fsyncDir(dir: string): Promise<void> {
 
 export async function writeFileAtomic(
   file: string,
-  contents: string,
+  /** 文本或二进制（导出包是 gzip 字节，同样走"临时文件 + rename"的原子路径）。 */
+  contents: string | Uint8Array,
   options: { mode?: number } = {},
 ): Promise<void> {
   const dir = dirname(file);

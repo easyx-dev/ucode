@@ -35,8 +35,15 @@ const MUTATING_TOOLS = new Set([
   "notebookedit",
 ]);
 
+/**
+ * 不受批准门槛约束的额外工具：它们的作用域被自身实现限制在安全目录内（`memory` 只能写
+ * 数据层的记忆目录），因此"改动类"的判断在这里不成立。
+ */
+const NON_MUTATING_TOOLS = new Set(["memory", "subagent", "goal", "wiki"]);
+
 export function isMutatingTool(toolName: string): boolean {
   const normalized = toolName.toLowerCase();
+  if (NON_MUTATING_TOOLS.has(normalized)) return false;
   if (MUTATING_TOOLS.has(normalized)) return true;
   return !/^(read|read_file|grep|find|glob|ls|list|list_dir|search|web_search|webfetch|fetch|todo|task)/.test(
     normalized,

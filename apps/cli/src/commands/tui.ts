@@ -32,6 +32,8 @@ export async function runTui(options: TuiOptions): Promise<number> {
           spawnCore: {
             command: process.execPath,
             args: [
+              // 直跑源码：exports 的 source 条件（dist 只在以包安装的形态下存在）
+              "--conditions=dev-src",
               cliEntry,
               "core",
               "start",

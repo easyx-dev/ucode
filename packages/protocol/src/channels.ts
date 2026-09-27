@@ -35,6 +35,33 @@ export const WorkspaceReadParamsSchema = z.object({
 export const WorkspaceMethodSchema = z.enum(["tree", "git.log", "git.changes", "read"]);
 export type WorkspaceMethod = z.infer<typeof WorkspaceMethodSchema>;
 
+// 查询结果形状（F-2.7/F-2.8）。核心层是产出方，控制层据此渲染文件树/Git 图谱/预览。
+export type WorkspaceTreeEntry = {
+  /** 相对工作区根的路径。 */
+  path: string;
+  name: string;
+  kind: "file" | "dir";
+  size?: number;
+  mtime?: string;
+};
+export type WorkspaceTreeResult = { root: string; entries: WorkspaceTreeEntry[] };
+export type WorkspaceGitCommit = {
+  hash: string;
+  shortHash: string;
+  author: string;
+  date: string;
+  subject: string;
+};
+export type WorkspaceGitLogResult = { commits: WorkspaceGitCommit[]; hasMore: boolean };
+export type WorkspaceGitChange = { path: string; status: string };
+export type WorkspaceGitChangesResult = { changes: WorkspaceGitChange[] };
+export type WorkspaceReadResult = {
+  path: string;
+  content: string;
+  truncated: boolean;
+  size: number;
+};
+
 export const ChannelOpenSchema = z.object({
   type: z.literal("channel.open"),
   channelId: z.string().min(1),

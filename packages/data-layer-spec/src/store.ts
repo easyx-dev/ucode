@@ -22,6 +22,18 @@ export type StorePaths = {
   skills: string;
   prompts: string;
   themes: string;
+  /** 项目级持久记忆（F-2.5）：`memories/projects/<slug>-<hash>/`。 */
+  memories: string;
+  /** 子智能体定义（F-3.3）：`agents/<name>.md`。 */
+  agents: string;
+  /** 定时/闲时任务定义与运行历史（F-4.1/F-4.2）。 */
+  tasks: string;
+  /** 生命周期钩子配置（F-3.7）：`hooks.json`。 */
+  hooks: string;
+  /** 生成的 Wiki（F-2.6）：`wiki/<project-key>.md`。 */
+  wiki: string;
+  /** 已登记的 SSH 连接（F-6.5）：`ssh.json`。 **不放密钥**，只放连接定义。 */
+  ssh: string;
 };
 
 /** 索引里的会话条目：派生数据，随时可丢、可重建（真相永远是扫描数据层本身）。 */

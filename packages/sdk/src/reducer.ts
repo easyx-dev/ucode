@@ -6,6 +6,7 @@ import type {
   SessionEntry,
   SessionState,
   SessionSummary,
+  TaskSummary,
   TrustLevel,
   UiRequest,
 } from "@ucode/protocol";
@@ -70,6 +71,10 @@ export type SdkState = {
   models: { provider: string; modelId: string; name: string }[];
   editorText: string;
   reconnects: number;
+  /** 自动化任务（F-4.5 面板数据）：由 `task.list` 刷新，不随事件流推送。 */
+  tasks: TaskSummary[];
+  /** 有活跃任务时为真（F-4.4，宿主据此决定是否阻止休眠）。 */
+  keepAwake: boolean;
 };
 
 export function emptyView(id: string): SessionView {
@@ -105,6 +110,8 @@ export function createInitialState(): SdkState {
     models: [],
     editorText: "",
     reconnects: 0,
+    tasks: [],
+    keepAwake: false,
   };
 }
 

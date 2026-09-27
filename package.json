@@ -14,7 +14,8 @@
     "check:brand": "node tools/check-brand-literals.ts",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm check:brand && pnpm test",
-    "ucode": "node apps/cli/src/main.ts"
+    "ucode": "node --conditions=dev-src apps/cli/src/main.ts",
+    "build:libs": "pnpm -r run build"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

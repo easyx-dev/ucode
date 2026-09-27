@@ -1,322 +1,378 @@
-import type { AgentSdk } from "@ucode/sdk";
-import { Box, Text, useApp, useInput, useStdout } from "ink";
-import { createElement as h, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { InteractionPanel, MessageLine } from "./panel.ts";
-import { useSdkState, useTranscript } from "./use-sdk.ts";
+import {
+  CombinedAutocompleteProvider,
+  Container,
+  Editor,
+  type EditorTheme,
+  matchesKey,
+  ProcessTerminal,
+  SelectList,
+  type SelectListTheme,
+  type SlashCommand,
+  Text,
+  TuiMainScreen,
+} from "@earendil-works/pi-tui";
+import type { AgentSdk, AutonomyLevel } from "@ucode/sdk";
+import {
+  bannerFor,
+  COMMAND_SPECS,
+  helpText,
+  hintLine,
+  sessionItems,
+  statusLine,
+  transcriptLines,
+} from "./view.ts";
 
 /**
- * TUI 壳（Ink）。
+ * TUI 壳：**复用基座 `@earendil-works/pi-tui` 的组件层**，只把"数据从哪来"换成我们的 SDK（协议 C）。
  *
- * 只复用 `sdk`（不 import ui，spec §7.2）：终端与浏览器共享的是"协议 C 的折叠结果"，
- * 而不是 React 组件——这也是"新增一种壳不改核心层"能否成立的实际检验。
+ * 复用的是三层现成件，而不是自己重写一遍：
+ * - `Editor`：多行编辑、历史（↑↓）、撤销、kill-ring、Tab 补全；
+ * - `CombinedAutocompleteProvider`：输入 `/` 时的命令提示面板（"没有命令提示"那条反馈的正解）；
+ * - `TuiMainScreen` + `Text`/`Container`/`SelectList`：差分渲染与 CJK 宽度。
  *
- * 用 `createElement` 而不是 JSX：TUI 由 Node 直接执行（源码直出 + 原生类型剥离），
- * 而类型剥离不支持 JSX。
+ * 分层：`view.ts` 是纯函数（状态 → 文本行），这里只做"把组件挂到终端 + 把输入接到 SDK"。
+ * 因此渲染逻辑可脱离终端单测，本文件只承担 I/O 与命令分发。
+ *
+ * 一条硬性经验：**提交后必须自己清空输入框**。`Editor` 不替调用方清空，
+ * 而"回车了、字还在"会让用户以为没发出去（实测：接着输入会把两条消息粘成一条）。
  */
 
-export type AppProps = {
+export type PiTuiOptions = {
   sdk: AgentSdk;
   productName: string;
 };
 
-type Mode =
-  | { kind: "idle" }
-  | { kind: "compose" }
-  | { kind: "sessions" }
-  | { kind: "models" }
-  | { kind: "help" };
+type Notice = { level: "info" | "warn" | "error"; message: string };
 
-export function App({ sdk, productName }: AppProps): ReactNode {
-  const state = useSdkState(sdk);
-  const { exit } = useApp();
-  const { stdout } = useStdout();
-  const [mode, setMode] = useState<Mode>({ kind: "idle" });
-  const [draft, setDraft] = useState("");
-  const [pickerIndex, setPickerIndex] = useState(0);
-  const [bootError, setBootError] = useState<string | null>(null);
-  const activeSessionId = state.activeSessionId;
-  const transcript = useTranscript(sdk, activeSessionId);
-  const height = (stdout?.rows ?? 30) - 8;
-  const visible = useMemo(
-    () => transcript.slice(Math.max(0, transcript.length - height)),
-    [transcript, height],
-  );
-  const interactions = state.interactions.filter(
-    (request) => request.sessionId === activeSessionId,
-  );
-  const pending = interactions[0];
-  const initialized = useRef(false);
+const ANSI = {
+  reset: "\u001B[0m",
+  dim: "\u001B[2m",
+  bold: "\u001B[1m",
+  red: "\u001B[31m",
+  yellow: "\u001B[33m",
+  cyan: "\u001B[36m",
+} as const;
 
-  // 启动：列会话 → 有就接上最近一个，没有就建一个
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    void (async () => {
-      try {
-        const sessions = await sdk.listSessions();
-        const first = sessions[0];
-        if (first === undefined) {
-          const created = await sdk.createSession({});
-          await sdk.attachSession(created.sessionId);
-        } else {
-          await sdk.attachSession(first.id);
-        }
-        await sdk.getEntries(state.activeSessionId ?? "").catch(() => undefined);
-        await sdk.listModels().catch(() => undefined);
-      } catch (error) {
-        setBootError(error instanceof Error ? error.message : String(error));
-      }
-    })();
-  }, [sdk, state.activeSessionId]);
+const SELECT_THEME: SelectListTheme = {
+  selectedPrefix: (text) => `${ANSI.cyan}${text}${ANSI.reset}`,
+  selectedText: (text) => `${ANSI.bold}${text}${ANSI.reset}`,
+  description: (text) => `${ANSI.dim}${text}${ANSI.reset}`,
+  scrollInfo: (text) => `${ANSI.dim}${text}${ANSI.reset}`,
+  noMatch: (text) => `${ANSI.dim}${text}${ANSI.reset}`,
+};
 
-  const sessions = state.sessions;
+const EDITOR_THEME: EditorTheme = {
+  borderColor: (text) => `${ANSI.dim}${text}${ANSI.reset}`,
+  selectList: SELECT_THEME,
+};
 
-  useInput((input, key) => {
-    if (key.ctrl && input === "c") {
-      void sdk.close().finally(() => exit());
-      return;
-    }
-
-    if (mode.kind === "sessions" || mode.kind === "models") {
-      const list = mode.kind === "sessions" ? sessions : state.models;
-      if (key.upArrow) setPickerIndex((index) => Math.max(0, index - 1));
-      else if (key.downArrow)
-        setPickerIndex((index) => Math.min(Math.max(0, list.length - 1), index + 1));
-      else if (key.escape) setMode({ kind: "idle" });
-      else if (key.return) {
-        if (mode.kind === "sessions") {
-          const picked = sessions[pickerIndex];
-          if (picked !== undefined) void sdk.attachSession(picked.id).catch(() => undefined);
-        } else {
-          const picked = state.models[pickerIndex];
-          if (picked !== undefined && activeSessionId !== null) {
-            void sdk
-              .setModel(activeSessionId, picked.provider, picked.modelId)
-              .catch(() => undefined);
-          }
-        }
-        setMode({ kind: "idle" });
-      }
-      return;
-    }
-
-    if (mode.kind === "help") {
-      setMode({ kind: "idle" });
-      return;
-    }
-
-    // 有交互待应答时，键盘归弹窗（见 panel.ts），这里不抢
-    if (pending !== undefined) return;
-
-    if (mode.kind === "idle") {
-      if (input === "i" || input === ":") {
-        setMode({ kind: "compose" });
-        return;
-      }
-      if (input === "n") {
-        void sdk
-          .createSession({})
-          .then((created) => sdk.attachSession(created.sessionId))
-          .catch(() => undefined);
-        return;
-      }
-      if (input === "s") {
-        setPickerIndex(0);
-        setMode({ kind: "sessions" });
-        return;
-      }
-      if (input === "m") {
-        setPickerIndex(0);
-        setMode({ kind: "models" });
-        return;
-      }
-      if (input === "?") {
-        setMode({ kind: "help" });
-        return;
-      }
-      if (input === "a") {
-        if (activeSessionId !== null) void sdk.abort(activeSessionId).catch(() => undefined);
-        return;
-      }
-      if (input === "E") {
-        if (activeSessionId !== null)
-          void sdk.setAutonomy(activeSessionId, "auto-edit").catch(() => undefined);
-        return;
-      }
-      if (input === "C") {
-        if (activeSessionId !== null)
-          void sdk.setAutonomy(activeSessionId, "confirm").catch(() => undefined);
-        return;
-      }
-      return;
-    }
-
-    // compose：单行输入
-    if (key.escape) {
-      setDraft("");
-      setMode({ kind: "idle" });
-      return;
-    }
-    if (key.return) {
-      const text = draft.trim();
-      setDraft("");
-      setMode({ kind: "idle" });
-      if (text === "" || activeSessionId === null) return;
-      if (state.views[activeSessionId]?.readOnly === true) {
-        setBootError(
-          "该会话是只读挂载：写权限在另一个核心层实例手上。请改用 `--core <该实例的地址>` 连过去。",
-        );
-        return;
-      }
-      const running = state.views[activeSessionId]?.running === true;
-      void (running ? sdk.steer(activeSessionId, text) : sdk.prompt(activeSessionId, text)).catch(
-        (error: unknown) => {
-          setBootError(error instanceof Error ? error.message : String(error));
-        },
-      );
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setDraft((current) => current.slice(0, -1));
-      return;
-    }
-    if (input !== "" && !key.ctrl && !key.meta) setDraft((current) => current + input);
-  });
-
-  const view = activeSessionId === null ? undefined : state.views[activeSessionId];
-  const status =
-    view?.running === true
-      ? "运行中"
-      : view !== undefined && view.pendingInteractions > 0
-        ? "等待应答"
-        : "空闲";
-  const lastNotice = state.notices.at(-1);
-  const model = view?.state?.model;
-  const headerRight = [
-    activeSessionId === null
-      ? "无会话"
-      : (sessions.find((session) => session.id === activeSessionId)?.name ??
-        activeSessionId.slice(0, 12)),
-    model === undefined || model === null ? "" : `${model.provider}/${model.modelId}`,
-    view?.state?.autonomy ?? "",
-    status,
-    state.connected ? "" : "未连接（正在重连）",
-  ]
-    .filter((part) => part !== "")
-    .join(" · ");
-
-  return h(
-    Box,
-    { flexDirection: "column", height: stdout?.rows },
-    h(
-      Box,
-      { justifyContent: "space-between" },
-      h(Text, { bold: true, color: "cyan" }, productName),
-      h(Text, { dimColor: true }, headerRight),
-    ),
-    h(
-      Box,
-      { flexDirection: "column", flexGrow: 1, marginTop: 1 },
-      bootError !== null ? h(Text, { color: "red" }, `启动失败：${bootError}`) : null,
-      visible.length === 0
-        ? h(Text, { dimColor: true }, "（还没有消息。按 i 输入，? 查看快捷键）")
-        : null,
-      visible.map((message) => h(MessageLine, { key: `${message.id}-${message.seq}`, message })),
-    ),
-    pending !== undefined
-      ? h(InteractionPanel, {
-          key: pending.id,
-          sdk,
-          sessions: sessions.map((session) => ({
-            id: session.id,
-            label: session.name ?? session.id.slice(0, 12),
-          })),
-        })
-      : null,
-    pending === undefined && mode.kind === "sessions"
-      ? h(Picker, {
-          title: "选择会话（Enter 挂载 / Esc 取消）",
-          items: sessions.map((session) => ({
-            label: `${session.name ?? session.id.slice(0, 12)}  ${session.entryCount} 条  ${session.firstMessage ?? ""}`,
-            active: session.id === activeSessionId,
-          })),
-          index: pickerIndex,
-        })
-      : null,
-    pending === undefined && mode.kind === "models"
-      ? h(Picker, {
-          title: "切换模型（Enter 应用 / Esc 取消）",
-          items: state.models.map((entry) => ({
-            label: `${entry.provider}/${entry.modelId}  ${entry.name}`,
-            active: entry.modelId === view?.state?.model?.modelId,
-          })),
-          index: pickerIndex,
-        })
-      : null,
-    pending === undefined && mode.kind === "help"
-      ? h(
-          Box,
-          { flexDirection: "column", borderStyle: "round", paddingX: 1 },
-          h(Text, { bold: true }, "快捷键"),
-          h(Text, null, "i / : 输入 · n 新建会话 · s 会话列表 · m 切换模型"),
-          h(Text, null, "a 中止本轮 · C 变更前确认 · E 自动编辑 · ? 本帮助 · Ctrl+C 退出"),
-          h(Text, { dimColor: true }, "运行中提交的输入会作为 steer 送入当前这一轮（不打断）。"),
-        )
-      : null,
-    pending === undefined && (mode.kind === "compose" || mode.kind === "idle")
-      ? h(
-          Box,
-          null,
-          h(Text, { color: "cyan" }, mode.kind === "compose" ? "❯ " : "· "),
-          h(Text, null, mode.kind === "compose" ? draft : "按 i 输入…"),
-          view?.running === true
-            ? h(Text, { dimColor: true }, "  （本轮运行中，Enter 将作为 steer 送入）")
-            : null,
-        )
-      : null,
-    lastNotice !== undefined
-      ? h(
-          Box,
-          null,
-          h(
-            Text,
-            {
-              color:
-                lastNotice.level === "error"
-                  ? "red"
-                  : lastNotice.level === "warn"
-                    ? "yellow"
-                    : "gray",
-            },
-            lastNotice.message,
-          ),
-        )
-      : null,
-  );
+/** 把命令清单喂给基座的补全器（它按"不带斜杠"的名字匹配，补全时自己加回斜杠）。 */
+function slashCommands(): SlashCommand[] {
+  return COMMAND_SPECS.map((spec) => ({
+    name: spec.name.slice(1),
+    description: spec.description,
+    ...(spec.args === undefined ? {} : { argumentHint: spec.args }),
+  }));
 }
 
-function Picker({
-  title,
-  items,
-  index,
-}: {
-  title: string;
-  items: { label: string; active: boolean }[];
-  index: number;
-}): ReactNode {
-  return h(
-    Box,
-    { flexDirection: "column", borderStyle: "round", paddingX: 1 },
-    h(Text, { bold: true }, title),
-    items.length === 0 ? h(Text, { dimColor: true }, "（空）") : null,
-    items
-      .slice(0, 12)
-      .map((item, position) =>
-        h(
-          Text,
-          { key: item.label, color: position === index ? "cyan" : undefined },
-          `${position === index ? "❯ " : "  "}${item.active ? "* " : ""}${item.label}`,
-        ),
-      ),
-  );
+export async function runPiTui(options: PiTuiOptions): Promise<number> {
+  const { sdk, productName } = options;
+  const terminal = new ProcessTerminal();
+  const tui = new TuiMainScreen(terminal);
+
+  const root = new Container();
+  const transcript = new Container();
+  const noticesBlock = new Container();
+  const banner = new Text("");
+  const hint = new Text("");
+  const status = new Text("");
+  const editor = new Editor(tui, EDITOR_THEME, { paddingX: 1 });
+  root.addChild(transcript);
+  root.addChild(noticesBlock);
+  root.addChild(banner);
+  root.addChild(hint);
+  root.addChild(status);
+  root.addChild(editor);
+  tui.addChild(root);
+  tui.setFocus(editor);
+  editor.setAutocompleteProvider(new CombinedAutocompleteProvider(slashCommands(), process.cwd()));
+
+  /** 最近的操作反馈；成功一次就清掉，避免陈旧的错误一直挂在屏幕上。 */
+  let notices: Notice[] = [];
+  let resolveExit: (() => void) | undefined;
+  const exited = new Promise<void>((resolve) => {
+    resolveExit = resolve;
+  });
+
+  function activeView() {
+    const state = sdk.state;
+    if (state.activeSessionId === null) return null;
+    return state.views[state.activeSessionId] ?? null;
+  }
+
+  function refresh(): void {
+    const state = sdk.state;
+    const view = activeView();
+    const width = terminal.columns === 0 ? 80 : terminal.columns;
+
+    transcript.clear();
+    if (view === null) {
+      transcript.addChild(new Text("(没有活动会话。输入 /new 新建。)"));
+    } else {
+      for (const line of transcriptLines(view, { width })) transcript.addChild(new Text(line));
+    }
+
+    noticesBlock.clear();
+    for (const notice of notices.slice(-4)) {
+      const mark = notice.level === "error" ? "✗" : notice.level === "warn" ? "⚠" : "·";
+      const color =
+        notice.level === "error" ? ANSI.red : notice.level === "warn" ? ANSI.yellow : ANSI.dim;
+      for (const line of notice.message.split("\n")) {
+        noticesBlock.addChild(new Text(`${color}${mark} ${line}${ANSI.reset}`));
+      }
+    }
+
+    const bannerText = bannerFor({ connected: state.connected, view, notices });
+    banner.setText(bannerText === null ? "" : `${ANSI.yellow}${bannerText}${ANSI.reset}`);
+
+    const running = view?.running === true;
+    hint.setText(
+      `${ANSI.dim}${hintLine({
+        running,
+        streaming: view !== null && view.streaming.text.trim() !== "",
+      })}${ANSI.reset}`,
+    );
+
+    status.setText(
+      statusLine({
+        productName,
+        connected: state.connected,
+        trustLevel: state.trustLevel,
+        sessionCount: state.sessions.length,
+        view,
+        model: view?.state?.model?.modelId ?? null,
+      }),
+    );
+    tui.requestRender(true);
+  }
+
+  function notify(level: Notice["level"], message: string): void {
+    notices.push({ level, message });
+    refresh();
+  }
+
+  /** 成功路径：用"这次做成了什么"覆盖掉旧反馈（包括旧的错误）。 */
+  function succeed(message: string): void {
+    notices = [{ level: "info", message }];
+    refresh();
+  }
+
+  function fail(error: unknown, prefix: string): void {
+    const message = error instanceof Error ? error.message : String(error);
+    notices.push({ level: "error", message: `${prefix}：${message}` });
+    refresh();
+  }
+
+  const unsubscribe = sdk.subscribe(() => refresh());
+
+  /**
+   * 挂上会话。
+   *
+   * 只挑**本实例拥有**的会话：非 owner 的会话是只读挂载（同一会话只允许一个 writer），
+   * 挂上去之后每一次发送都会被拒绝——之前正是因此表现为"发消息完全没反应"。
+   * 没有可写的会话就新建一个，这才是用户想要的结果，而不是让他自己去排查权限。
+   */
+  async function ensureSession(): Promise<void> {
+    const state = sdk.state;
+    if (state.activeSessionId !== null) return;
+    const owned = state.sessions.find((session) => session.owned && !session.archived);
+    if (owned !== undefined) {
+      await sdk.attachSession(owned.id);
+      return;
+    }
+    await sdk.createSession({});
+  }
+
+  function showSessionPicker(): void {
+    const state = sdk.state;
+    const items = sessionItems(state.sessions, state.activeSessionId);
+    if (items.length === 0) {
+      notify("warn", "还没有会话。");
+      return;
+    }
+    const list = new SelectList(items, 10, SELECT_THEME);
+    list.onSelect = (item) => {
+      tui.hideOverlay();
+      tui.setFocus(editor);
+      void sdk
+        .attachSession(item.value)
+        .then(() => succeed(`已切换到会话 ${item.value}`))
+        .catch((error: unknown) => fail(error, "切换失败"));
+    };
+    list.onCancel = () => {
+      tui.hideOverlay();
+      tui.setFocus(editor);
+      refresh();
+    };
+    tui.showOverlay(list, {});
+    tui.setFocus(list);
+    refresh();
+  }
+
+  /** 命令处理。返回 false 表示"不认识这条命令"。 */
+  async function runCommand(command: string, rest: string[]): Promise<boolean> {
+    switch (command) {
+      case "/help":
+        notify("info", helpText());
+        return true;
+      case "/new": {
+        const sessionId = await sdk.createSession(rest[0] === undefined ? {} : { cwd: rest[0] });
+        succeed(`已新建会话 ${sessionId}`);
+        return true;
+      }
+      case "/sessions":
+        showSessionPicker();
+        return true;
+      case "/model": {
+        const sessionId = sdk.state.activeSessionId;
+        if (sessionId === null) {
+          notify("warn", "没有活动会话，输入 /new 新建。");
+          return true;
+        }
+        const target = rest[0];
+        if (target === undefined) {
+          const models = sdk.state.models;
+          notify(
+            models.length === 0 ? "warn" : "info",
+            models.length === 0
+              ? "还没有可用的模型：用 /provider <id> <baseUrl> <模型> [密钥] 添加一个供应商。"
+              : `可用模型（用 /model 供应商/模型 切换）：\n${models
+                  .map((model) => `  ${model.provider}/${model.modelId}`)
+                  .join("\n")}`,
+          );
+          return true;
+        }
+        const [provider, modelId] = target.split("/");
+        if (provider === undefined || modelId === undefined) {
+          notify("warn", "用法：/model 供应商/模型Id（不带参数则列出可选模型）");
+          return true;
+        }
+        await sdk.setModel(sessionId, provider, modelId);
+        succeed(`已切换到 ${provider}/${modelId}`);
+        return true;
+      }
+      case "/provider": {
+        const [id, baseUrl, model, apiKey] = rest;
+        if (id === undefined || baseUrl === undefined || model === undefined) {
+          notify(
+            "warn",
+            "用法：/provider <id> <baseUrl> <模型> [密钥]\n" +
+              "  例：/provider my-proxy http://127.0.0.1:8000/v1 gpt-4o-mini sk-xxx\n" +
+              "  id 不要与基座内置供应商同名（内置目录会与之合并，模型会被换掉）。",
+          );
+          return true;
+        }
+        const outcome = await sdk.addProvider({
+          id,
+          baseUrl,
+          models: [{ id: model, name: model, input: ["text"] }],
+          ...(apiKey === undefined ? {} : { apiKey }),
+          makeDefault: true,
+        });
+        if (outcome.warning !== null) notify("warn", outcome.warning);
+        else
+          succeed(
+            `已${outcome.created ? "添加" : "覆盖"}供应商 ${id}（模型 ${model}），并设为默认模型`,
+          );
+        return true;
+      }
+      case "/autonomy": {
+        const sessionId = sdk.state.activeSessionId;
+        if (sessionId === null) {
+          notify("warn", "没有活动会话，输入 /new 新建。");
+          return true;
+        }
+        const level = rest[0];
+        if (level === undefined) {
+          notify("warn", "用法：/autonomy confirm | auto-edit | plan | full-access");
+          return true;
+        }
+        await sdk.setAutonomy(sessionId, level as AutonomyLevel);
+        succeed(`自主级别已设为 ${level}`);
+        return true;
+      }
+      case "/tasks":
+        notify(
+          "info",
+          "自动化任务的界面在 Web/桌面壳（协议 task.* 命令已就绪）；TUI 暂不提供面板。",
+        );
+        return true;
+      case "/quit":
+        resolveExit?.();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  async function handleSubmit(value: string): Promise<void> {
+    const text = value.trim();
+    if (text === "") return;
+    // 先清空：无论成败，用户敲的那行都已经"被收走了"。
+    editor.setText("");
+
+    if (!text.startsWith("/")) {
+      const sessionId = sdk.state.activeSessionId;
+      if (sessionId === null) {
+        notify("warn", "没有活动会话，输入 /new 新建。");
+        return;
+      }
+      const view = activeView();
+      if (view?.readOnly === true) {
+        notify("warn", "这是只读挂载（本实例不是该会话的 owner），输入 /new 开一个新会话。");
+        return;
+      }
+      try {
+        await sdk.prompt(sessionId, text);
+      } catch (error) {
+        fail(error, "发送失败");
+      }
+      return;
+    }
+
+    const [command = "", ...rest] = text.split(/\s+/);
+    try {
+      const known = await runCommand(command, rest);
+      if (!known) notify("warn", `未知命令 ${command}，输入 /help 查看。`);
+    } catch (error) {
+      fail(error, "命令失败");
+    }
+  }
+
+  editor.onSubmit = (value: string) => {
+    void handleSubmit(value);
+  };
+
+  const removeListener = tui.addInputListener((data: string) => {
+    if (matchesKey(data, "ctrl+c")) {
+      resolveExit?.();
+      return { consume: true };
+    }
+    return undefined;
+  });
+
+  tui.start();
+  try {
+    await ensureSession();
+    await sdk.listModels().catch(() => undefined);
+  } catch (error) {
+    fail(error, "初始化会话失败");
+  }
+  refresh();
+
+  await exited;
+  removeListener();
+  unsubscribe();
+  tui.stop({ preserveScreen: true });
+  return 0;
 }

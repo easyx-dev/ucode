@@ -25,6 +25,12 @@ export function storePaths(dataDir: string): StorePaths {
     skills: join(dataDir, "skills"),
     prompts: join(dataDir, "prompts"),
     themes: join(dataDir, "themes"),
+    memories: join(dataDir, "memories"),
+    agents: join(dataDir, "agents"),
+    tasks: join(dataDir, "tasks"),
+    hooks: join(dataDir, "hooks.json"),
+    wiki: join(dataDir, "wiki"),
+    ssh: join(dataDir, "ssh.json"),
   };
 }
 

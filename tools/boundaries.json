@@ -30,6 +30,7 @@
       "@ucode/branding",
       "@ucode/core",
       "@ucode/protocol",
+      "@ucode/sdk",
       "@ucode/tui",
       "@ucode/web"
     ],

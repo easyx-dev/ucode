@@ -13,7 +13,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { app, BrowserWindow, ipcMain, Tray } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  Notification,
+  powerSaveBlocker,
+  safeStorage,
+  Tray,
+} from "electron";
+import { CredentialStore, credentialsFileFor } from "./src/native/credentials.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const smokeMode = process.argv.includes("--smoke");
@@ -35,7 +45,7 @@ function resolveCliEntry() {
   // 打包布局：main.mjs 在 app.asar 里，core-bundle 被 asarUnpack 到 app.asar.unpacked
   const isPackaged = here.includes("app.asar");
   if (isPackaged) {
-    const bundled = here.replace("app.asar", "app.asar.unpacked") + "/core-bundle/cli.mjs";
+    const bundled = `${here.replace("app.asar", "app.asar.unpacked")}/core-bundle/cli.mjs`;
     if (existsSync(bundled)) return bundled;
     throw new Error(`找不到打包的核心层入口（${bundled}）`);
   }
@@ -60,7 +70,19 @@ function spawnCore() {
   // ELECTRON_RUN_AS_NODE=1：用 Electron 自带的 Node 跑 CLI 入口（它没有独立的 node 二进制）
   const child = spawn(
     process.execPath,
-    [resolveCliEntry(), "core", "start", "--binding", "stdio", "--data-dir", dataDir, "--cwd", cwd],
+    [
+      // 直跑源码：exports 的 source 条件（打包后走的是 core-bundle，不需要它）
+      "--conditions=dev-src",
+      resolveCliEntry(),
+      "core",
+      "start",
+      "--binding",
+      "stdio",
+      "--data-dir",
+      dataDir,
+      "--cwd",
+      cwd,
+    ],
     {
       cwd,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
@@ -97,12 +119,70 @@ function attachLineFraming(child, onLine) {
   });
 }
 
+/** 凭据存储（F-5.4）：懒建，加密不可用时 set 会抛错（宁可不存，也不落明文）。 */
+let credentials;
+function credentialStore() {
+  credentials ??= new CredentialStore({
+    file: credentialsFileFor(dataDir),
+    crypto: {
+      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      encryptString: (value) => safeStorage.encryptString(value),
+      decryptString: (buffer) => safeStorage.decryptString(buffer),
+    },
+  });
+  return credentials;
+}
+
+/** 保持唤醒（F-4.4）：核心层暴露 keepAwake，主进程据此阻止系统休眠。 */
+let keepAwakeBlocker = null;
+function setKeepAwake(enabled) {
+  if (enabled === true && keepAwakeBlocker === null) {
+    keepAwakeBlocker = powerSaveBlocker.start("prevent-app-suspension");
+  } else if (enabled !== true && keepAwakeBlocker !== null) {
+    if (powerSaveBlocker.isStarted(keepAwakeBlocker)) powerSaveBlocker.stop(keepAwakeBlocker);
+    keepAwakeBlocker = null;
+  }
+  return keepAwakeBlocker !== null;
+}
+
 function registerIpc() {
   ipcMain.on("desktop:send", (_event, message) => {
     if (core === undefined) core = spawnCore();
     core.stdin?.write(`${JSON.stringify(message)}\n`);
   });
   ipcMain.handle("desktop:environment", () => ({ productName, dataDir }));
+
+  // 保持唤醒：渲染进程根据 SDK 的 keepAwake 切换。
+  ipcMain.handle("desktop:keep-awake", (_event, enabled) => setKeepAwake(enabled === true));
+
+  // 系统通知：渲染进程可主动弹一条（托盘常驻时窗口可能在后台）。
+  ipcMain.handle("desktop:notify", (_event, payload) => {
+    if (!Notification.isSupported()) return false;
+    new Notification({
+      title: typeof payload?.title === "string" ? payload.title : productName,
+      body: typeof payload?.body === "string" ? payload.body : "",
+    }).show();
+    return true;
+  });
+
+  // 凭据：只暴露"名字 + 值"这一层，密文与落盘位置留在主进程。
+  ipcMain.handle("desktop:credential-list", () => credentialStore().list());
+  ipcMain.handle("desktop:credential-set", (_event, name, value) => {
+    credentialStore().set(name, value);
+    return true;
+  });
+  ipcMain.handle("desktop:credential-get", (_event, name) => credentialStore().get(name));
+  ipcMain.handle("desktop:credential-delete", (_event, name) => credentialStore().delete(name));
+
+  // 内置浏览器（F-2.9）：开一个独立窗口加载 URL。
+  ipcMain.handle("desktop:browser-open", (_event, url) => {
+    if (typeof url !== "string" || !/^https?:\/\//iu.test(url)) {
+      throw new Error("只允许 http(s) 地址。");
+    }
+    const window = new BrowserWindow({ width: 1024, height: 760, title: url });
+    void window.loadURL(url);
+    return true;
+  });
 }
 
 function createWindow() {
@@ -125,13 +205,48 @@ function createWindow() {
   return window;
 }
 
-/** 托盘：没有图标资源时跳过（托盘是廉价本机能力，不是本步的验收点）。 */
+/**
+ * 托盘（F-5.4 的本机能力之一）：常驻入口 + 菜单（显示/隐藏、退出）。
+ * 没有图标资源时跳过——托盘是锦上添花，不该让主功能起不来。
+ */
 function tryCreateTray() {
   try {
     const iconPath = join(here, "assets", "tray.png");
     if (!existsSync(iconPath)) return;
     const tray = new Tray(iconPath);
     tray.setToolTip(productName);
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        {
+          label: `显示 ${productName}`,
+          click: () => {
+            const window = windows[0] ?? createWindow();
+            window.show();
+            window.focus();
+          },
+        },
+        {
+          label: "隐藏窗口",
+          click: () => {
+            for (const window of windows) window.hide();
+          },
+        },
+        { type: "separator" },
+        { label: "退出", click: () => app.quit() },
+      ]),
+    );
+    tray.on("click", () => {
+      const window = windows[0];
+      if (window === undefined) {
+        createWindow();
+        return;
+      }
+      if (window.isVisible()) window.hide();
+      else {
+        window.show();
+        window.focus();
+      }
+    });
   } catch {
     // 没有托盘不影响主功能
   }

@@ -26,9 +26,35 @@ import {
   type TrustLevel,
   type UiResponse,
 } from "@ucode/protocol";
+import { createEphemeralRepo } from "./ephemeral-repo.ts";
 import { handleHello, toSummary } from "./handshake.ts";
-import { createModelRuntime, listModels } from "./models.ts";
+import {
+  applyMigration,
+  collectUsageStats,
+  exportSupportBundle,
+  preflightMigration,
+  summarizeUsage,
+} from "./insights/index.ts";
+import {
+  addSource,
+  findSource,
+  installPlugin,
+  listInstalled,
+  listSources,
+  readCatalog,
+  removeSource,
+  summarizeInstall,
+  uninstallPlugin,
+} from "./marketplace/index.ts";
+import {
+  addProviderConfig,
+  createModelRuntime,
+  deleteProviderConfig,
+  listModels,
+  listProviderSummaries,
+} from "./models.ts";
 import { SessionRuntime, UnsupportedReferenceError } from "./session-runtime.ts";
+import { type AutomationTask, type TaskRunOutcome, TaskScheduler } from "./tasks/index.ts";
 import { canDriveUnattended, canRespondToInteraction, coreCapabilities } from "./trust.ts";
 import type {
   AttachConnectionOptions,
@@ -98,7 +124,8 @@ export async function createCore(config: CoreConfig): Promise<Core> {
   const coreId = config.coreId ?? `${hostname()}-${process.pid}-${randomBytes(3).toString("hex")}`;
   const store: Store =
     config.overrides?.store ?? (await openStore({ dataDir: config.dataDir, ownerId: coreId }));
-  const modelRuntime: ModelRuntime = await createModelRuntime(store.paths);
+  // 可变：供应商配置写入后必须**重建**运行时才能看到新模型（基座的 ModelRuntime 没有 reload）。
+  let modelRuntime: ModelRuntime = await createModelRuntime(store.paths);
   const defaultCwd = config.cwd ?? process.cwd();
   const interactionTimeoutMs = config.interactionTimeoutMs ?? 120_000;
   const defaultAutonomy: AutonomyLevel = config.defaultAutonomy ?? "confirm";
@@ -289,18 +316,27 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       pendingMessages: 0,
       pendingInteractions: 0,
       attachments: bus.attachmentsFor(entry.repo.id).length,
+      // 跟随挂载不建运行时，也就无从判断模型：报"有"，让真正的拒绝发生在 owner 那一侧。
+      modelAvailable: true,
     };
   }
 
-  async function openRuntime(sessionId: string): Promise<RuntimeEntry> {
+  async function openRuntime(
+    sessionId: string,
+    /** 临时会话（F-1.5）自带内存仓库：跳过 store 查找与 owner 竞争。 */
+    override?: { repo: SessionRepo },
+  ): Promise<RuntimeEntry> {
     const existing = runtimes.get(sessionId);
     if (existing !== undefined) return existing;
 
-    const repo = await store.openSession(sessionId);
+    const repo = override?.repo ?? (await store.openSession(sessionId));
     if (repo === undefined) throw new CoreError("session_not_found", `会话不存在：${sessionId}`);
 
-    const lease = await store.acquireOwner(sessionId, { ttlMs: LEASE_TTL_MS });
-    const readOnly = lease === undefined;
+    const lease =
+      override === undefined
+        ? await store.acquireOwner(sessionId, { ttlMs: LEASE_TTL_MS })
+        : undefined;
+    const readOnly = override === undefined && lease === undefined;
 
     if (readOnly) {
       // 不是 owner：只读挂载。**不建 agent 运行时**（既写不了，也没必要占资源），
@@ -356,6 +392,18 @@ export async function createCore(config: CoreConfig): Promise<Core> {
           sessionId,
           broker,
           broadcast: (message) => bus.broadcastToSession(sessionId, message),
+          // F-1.11：提问超时/无人承载 → 不让整轮挂死，转达"按最佳判断继续"。
+          onUnanswered: ({ method, reason }) => {
+            const current = runtimes.get(sessionId);
+            if (current?.runtime === undefined || current.readOnly) return;
+            void current.runtime
+              .followUp(
+                `此前有一次询问（${method}）${
+                  reason === "timeout" ? "超时无人应答" : "没有可承载交互的控制层"
+                }。不要继续等：按你的最佳判断往下做，并在结果里说明你做了哪些假设。`,
+              )
+              .catch(() => undefined);
+          },
         }),
         onEvent: (event: SessionEvent) => bus.broadcastToSession(sessionId, event),
         onStatusChange: () => {
@@ -430,11 +478,29 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const autonomy = args.autonomy ?? defaultAutonomy;
         guardAutonomy(connection, autonomy);
         const cwd = args.cwd ?? defaultCwd;
-        const repo = await store.createSession({ cwd });
-        if (autonomy !== defaultAutonomy) {
-          // 刚建的会话以本实例为 owner，因此这里一定拿得到运行时
-          writable(await openRuntime(repo.id)).runtime.setAutonomy(autonomy);
+
+        // 临时会话（F-1.5 辅助对话）：不建文件、不进列表，仓库换成内存实现。
+        if (args.ephemeral === true) {
+          const ephemeralId = `eph-${randomBytes(6).toString("hex")}`;
+          const entry = await openRuntime(ephemeralId, {
+            repo: createEphemeralRepo({ id: ephemeralId, cwd }),
+          });
+          if (autonomy !== defaultAutonomy) writable(entry).runtime.setAutonomy(autonomy);
+          connection.attachmentSessionId = ephemeralId;
+          return okResponse(id, command, {
+            sessionId: ephemeralId,
+            cwd,
+            autonomy,
+            ephemeral: true,
+          });
         }
+
+        const repo = await store.createSession({ cwd });
+        // **无条件建运行时**：之前只在"自主级别非默认"时才建，于是新建的会话在界面里
+        // 一直显示"无模型 / 未知目录"（状态来自冷读路径），而第一次发送又要临时承担
+        // 建运行时的延迟。建会话本来就是要用它，提前建没有代价。
+        const created = writable(await openRuntime(repo.id));
+        if (autonomy !== defaultAutonomy) created.runtime.setAutonomy(autonomy);
         connection.attachmentSessionId = repo.id;
         return okResponse(id, command, { sessionId: repo.id, cwd, autonomy });
       }
@@ -447,7 +513,9 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       case "session.attach": {
         const sessionId = envelope.sessionId;
         if (sessionId === null) throw new CoreError("invalid_args", "attach 需要 sessionId。");
-        const repo = await store.openSession(sessionId);
+        // 临时会话（F-1.5）不在 store 里：已在运行时表中的会话直接复用，不再查数据层。
+        const known = runtimes.get(sessionId);
+        const repo = known?.repo ?? (await store.openSession(sessionId));
         if (repo === undefined)
           throw new CoreError("session_not_found", `会话不存在：${sessionId}`);
         connection.attachmentSessionId = sessionId;
@@ -500,6 +568,9 @@ export async function createCore(config: CoreConfig): Promise<Core> {
           pendingMessages: 0,
           pendingInteractions: 0,
           attachments: bus.attachmentsFor(sessionId).length,
+          // 没建过运行时的会话：模型可用性还没被判定过。冷读不臆断，报"有"，
+          // 真正需要时会由 owner 侧在发送前拒绝。
+          modelAvailable: true,
         };
         return okResponse(id, command, { state: cold });
       }
@@ -508,7 +579,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const args = commandArgs(command, envelope.args);
         const sessionId = envelope.sessionId;
         if (sessionId === null) throw new CoreError("invalid_args", "get_entries 需要 sessionId。");
-        const repo = await store.openSession(sessionId);
+        const repo = runtimes.get(sessionId)?.repo ?? (await store.openSession(sessionId));
         if (repo === undefined)
           throw new CoreError("session_not_found", `会话不存在：${sessionId}`);
         const records = await repo.read(args.fromSeq ?? 0, args.limit);
@@ -521,7 +592,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       case "session.get_tree": {
         const sessionId = envelope.sessionId;
         if (sessionId === null) throw new CoreError("invalid_args", "get_tree 需要 sessionId。");
-        const repo = await store.openSession(sessionId);
+        const repo = runtimes.get(sessionId)?.repo ?? (await store.openSession(sessionId));
         if (repo === undefined)
           throw new CoreError("session_not_found", `会话不存在：${sessionId}`);
         return okResponse(id, command, { tree: buildTree(await repo.entries()) });
@@ -551,6 +622,19 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const entry = writable(await openRuntime(sessionId));
         await entry.runtime.setName(args.name);
         return okResponse(id, command, { sessionId, name: args.name });
+      }
+
+      case "session.edit_entry": {
+        // 编辑历史（F-1.3）：追加式改写，不破坏原记录。
+        const args = commandArgs(command, envelope.args);
+        const sessionId = requireAttachment(connection, envelope.sessionId);
+        const entry = writable(await openRuntime(sessionId));
+        await entry.runtime.editEntry(args.entryId, args.content);
+        return okResponse(id, command, {
+          sessionId,
+          entryId: args.entryId,
+          omitted: args.content === null,
+        });
       }
 
       case "interaction.resolve": {
@@ -674,6 +758,33 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         return okResponse(id, command, { models });
       }
 
+      // 供应商配置（F-5.3）：控制层的"模型配置窗口"经此写入数据层。
+      case "provider.list": {
+        return okResponse(id, command, await listProviderSummaries(store.dataDir));
+      }
+
+      case "provider.add": {
+        const args = commandArgs(command, envelope.args);
+        const outcome = await addProviderConfig(store.dataDir, {
+          id: args.id,
+          baseUrl: args.baseUrl,
+          ...(args.api === undefined ? {} : { api: args.api }),
+          ...(args.apiKey === undefined ? {} : { apiKey: args.apiKey }),
+          models: args.models,
+          ...(args.makeDefault === undefined ? {} : { makeDefault: args.makeDefault }),
+        });
+        // 新供应商要立刻可用：重建运行时，否则本次连接后续的 model.list 仍是旧目录。
+        modelRuntime = await createModelRuntime(store.paths);
+        return okResponse(id, command, outcome);
+      }
+
+      case "provider.remove": {
+        const args = commandArgs(command, envelope.args);
+        const removed = await deleteProviderConfig(store.dataDir, args.id);
+        modelRuntime = await createModelRuntime(store.paths);
+        return okResponse(id, command, { removed });
+      }
+
       case "thinking.set": {
         const args = commandArgs(command, envelope.args);
         const sessionId = requireAttachment(connection, envelope.sessionId);
@@ -716,6 +827,172 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const entry = writable(await openRuntime(sessionId));
         entry.runtime.session.abortBash();
         return okResponse(id, command, { sessionId });
+      }
+
+      case "task.list": {
+        return okResponse(id, command, {
+          tasks: scheduler.list(),
+          keepAwake: scheduler.keepAwake,
+        });
+      }
+
+      case "task.create": {
+        const args = commandArgs(command, envelope.args);
+        // 越权任务必须显式声明自主级别，且要过信任矩阵（未认证通路不能建自动执行的任务）。
+        if (args.autonomy !== undefined) guardAutonomy(connection, args.autonomy);
+        const task = await scheduler.create({
+          kind: args.kind,
+          prompt: args.prompt,
+          sessionId: args.sessionId ?? null,
+          ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
+          ...(args.cron === undefined ? {} : { cron: args.cron }),
+          ...(args.delayMinutes === undefined ? {} : { delayMinutes: args.delayMinutes }),
+          ...(args.everyMinutes === undefined ? {} : { everyMinutes: args.everyMinutes }),
+          ...(args.autonomy === undefined ? {} : { autonomy: args.autonomy }),
+        });
+        return okResponse(id, command, { task });
+      }
+
+      case "task.cancel": {
+        const { taskId } = commandArgs(command, envelope.args);
+        const removed = await scheduler.cancel(taskId);
+        if (!removed) throw new CoreError("invalid_args", `任务不存在：${taskId}`);
+        return okResponse(id, command, { taskId });
+      }
+
+      case "task.pause": {
+        const { taskId } = commandArgs(command, envelope.args);
+        if (!(await scheduler.pause(taskId)))
+          throw new CoreError("invalid_args", `任务不存在：${taskId}`);
+        return okResponse(id, command, { taskId, status: "paused" });
+      }
+
+      case "task.resume": {
+        const { taskId } = commandArgs(command, envelope.args);
+        if (!(await scheduler.resume(taskId)))
+          throw new CoreError("invalid_args", `任务不存在：${taskId}`);
+        return okResponse(id, command, { taskId, status: "active" });
+      }
+
+      case "task.run": {
+        const { taskId } = commandArgs(command, envelope.args);
+        const run = await scheduler.runNow(taskId);
+        if (run === null) throw new CoreError("invalid_args", `任务不存在：${taskId}`);
+        return okResponse(id, command, { taskId, run });
+      }
+
+      case "stats.usage": {
+        // F-5.6：从会话记录本地聚合，不另建统计表（避免出现两份对不上的数据）。
+        const summary = await collectUsageStats(store.dataDir);
+        return okResponse(id, command, { usage: summary, readable: summarizeUsage(summary) });
+      }
+
+      case "support.export": {
+        // F-5.7：导出前脱敏——这是要发出去的东西。
+        const args = commandArgs(command, envelope.args);
+        const bundle = await exportSupportBundle({
+          dataDir: store.dataDir,
+          ...(args.maxLogFiles === undefined ? {} : { maxLogFiles: args.maxLogFiles }),
+        });
+        return okResponse(id, command, {
+          file: bundle.file,
+          bytes: bundle.bytes,
+          included: bundle.included,
+        });
+      }
+
+      case "migration.preflight": {
+        // F-5.8：只读预检，不写任何东西。
+        const { from } = commandArgs(command, envelope.args);
+        const report = await preflightMigration({ from, to: store.dataDir });
+        return okResponse(id, command, { report });
+      }
+
+      case "migration.import": {
+        const args = commandArgs(command, envelope.args);
+        const result = await applyMigration({
+          from: args.from,
+          to: store.dataDir,
+          ...(args.onConflict === undefined ? {} : { onConflict: args.onConflict }),
+        });
+        await store.rebuildIndex().catch(() => undefined);
+        return okResponse(id, command, {
+          copied: result.copied.length,
+          skipped: result.skipped.length,
+        });
+      }
+
+      case "marketplace.overview": {
+        // F-3.6：源（用户登记的）与已装资源（数据层里现在有什么）一起给，面板一次渲染完。
+        const [sources, installed] = await Promise.all([
+          listSources(store.dataDir),
+          listInstalled(store.dataDir),
+        ]);
+        return okResponse(id, command, {
+          sources,
+          installed: installed.map((resource) => ({
+            kind: resource.kind,
+            name: resource.name,
+            path: resource.path,
+          })),
+        });
+      }
+
+      case "marketplace.catalog": {
+        const { source: sourceName } = commandArgs(command, envelope.args);
+        const source = await findSource(store.dataDir, sourceName);
+        if (source === undefined) {
+          throw new CoreError("invalid_args", `没有名为 ${sourceName} 的市场源。`);
+        }
+        return okResponse(id, command, { entries: await readCatalog(source) });
+      }
+
+      case "marketplace.add_source": {
+        const args = commandArgs(command, envelope.args);
+        const source = await addSource(store.dataDir, {
+          name: args.name,
+          kind: args.kind,
+          location: args.location,
+          ...(args.description === undefined ? {} : { description: args.description }),
+        });
+        return okResponse(id, command, { source });
+      }
+
+      case "marketplace.remove_source": {
+        const { name } = commandArgs(command, envelope.args);
+        if (!(await removeSource(store.dataDir, name))) {
+          throw new CoreError("invalid_args", `没有名为 ${name} 的市场源。`);
+        }
+        return okResponse(id, command, { name });
+      }
+
+      case "marketplace.install": {
+        const args = commandArgs(command, envelope.args);
+        const source = await findSource(store.dataDir, args.source);
+        if (source === undefined) {
+          throw new CoreError("invalid_args", `没有名为 ${args.source} 的市场源。`);
+        }
+        const entry = (await readCatalog(source)).find((item) => item.name === args.plugin);
+        if (entry === undefined) {
+          throw new CoreError("invalid_args", `源 ${args.source} 里没有插件 ${args.plugin}。`);
+        }
+        const report = await installPlugin({
+          dataDir: store.dataDir,
+          source,
+          entry,
+          ...(args.overwrite === undefined ? {} : { overwrite: args.overwrite }),
+        });
+        return okResponse(id, command, { report, readable: summarizeInstall(report) });
+      }
+
+      case "marketplace.uninstall": {
+        const args = commandArgs(command, envelope.args);
+        const result = await uninstallPlugin({
+          dataDir: store.dataDir,
+          kind: args.kind,
+          name: args.name,
+        });
+        return okResponse(id, command, result);
       }
     }
   }
@@ -850,6 +1127,38 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     }
   }, HEARTBEAT_INTERVAL_MS);
   heartbeat.unref?.();
+
+  /**
+   * 任务触发时驱动 agent（F-4.1~4.3）：绑定了会话就投递到该会话，否则新建一个。
+   *
+   * 安全：任务声明的自主级别在**创建时**已经过 `guardAutonomy`（未认证通路不能建越权任务），
+   * 因此这里可以放心地按任务的级别驱动；非 owner 时明确失败而不是假装跑了。
+   */
+  async function runAutomationTask(task: AutomationTask): Promise<TaskRunOutcome> {
+    let sessionId = task.sessionId;
+    if (sessionId === null || (await store.openSession(sessionId)) === undefined) {
+      const repo = await store.createSession({ cwd: task.cwd });
+      sessionId = repo.id;
+    }
+    const entry = await openRuntime(sessionId);
+    if (entry.readOnly || entry.runtime === undefined) {
+      return { sessionId, status: "failed", note: "本实例不是该会话的 owner，无法驱动。" };
+    }
+    if (task.autonomy !== undefined) entry.runtime.setAutonomy(task.autonomy);
+    await entry.runtime.startPrompt(task.prompt);
+    return { sessionId, status: "completed" };
+  }
+
+  const scheduler = new TaskScheduler({
+    dataDir: store.dataDir,
+    runner: runAutomationTask,
+    // 闲时任务让路判据：有会话在跑或等待交互，就算"宿主忙"。
+    isBusy: () =>
+      [...runtimes.values()].some((entry) => {
+        const status = entry.runtime?.status;
+        return status === "running" || status === "waiting" || status === "compacting";
+      }),
+  });
 
   const core: Core = {
     coreId,
@@ -1006,8 +1315,11 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       };
     },
 
+    tasks: scheduler,
+
     async close(): Promise<void> {
       clearInterval(heartbeat);
+      await scheduler.stop();
       for (const { channel } of ptyChannels.values()) channel.close();
       ptyChannels.clear();
       for (const entry of runtimes.values()) {
@@ -1021,6 +1333,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
     },
   };
 
+  await scheduler.start();
   return core;
 }
 

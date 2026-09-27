@@ -2,9 +2,7 @@ import { type AgentSdk, type Capability, connect, type Transport } from "@ucode/
 import { createClient as createHttpClient } from "@ucode/sdk/http";
 import { createClient as createRpcClient } from "@ucode/sdk/rpc";
 import { createClient as createStdioClient } from "@ucode/sdk/stdio";
-import { render } from "ink";
-import { createElement } from "react";
-import { App } from "./app.ts";
+import { runPiTui } from "./app.ts";
 
 /**
  * TUI 壳入口：把"怎么连上核心层"与"界面长什么样"分开。
@@ -13,7 +11,8 @@ import { App } from "./app.ts";
  * 核心层据此按信任矩阵授予 `interaction.respond`——这就是"能力声明与能力授予分离"的实际用处：
  * 一个只会展示不会应答的壳子声明得少，就不会收到它处理不了的请求。
  *
- * 本包由 Node 直接执行（源码直出），因此**只用 `.ts`、不用 JSX**（类型剥离不支持 JSX）。
+ * 界面复用基座 `@earendil-works/pi-tui` 的组件层（见 app.ts / view.ts）；
+ * 本包由 Node 直接执行（源码直出），因此**只用 `.ts`、不用 JSX**。
  */
 export type TuiLaunchOptions = {
   productName: string;
@@ -54,10 +53,29 @@ export async function runTui(options: TuiLaunchOptions): Promise<number> {
     return 1;
   }
 
-  const instance = render(createElement(App, { sdk, productName: options.productName }));
-  await instance.waitUntilExit();
-  await sdk.close();
-  return 0;
+  let closed = false;
+  /** 关一次就够了：sdk.close() 会终止自己拉起的核心层进程。 */
+  const closeOnce = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    await sdk.close().catch(() => undefined);
+  };
+
+  // 被信号打断时也要回收子进程。少了这一步，被 kill 掉的 TUI 会留下一个仍在跑的
+  // 核心层——它继续持有会话的 owner 租约，下一次启动就只能只读挂载（表现为"发消息没反应"）。
+  const onSignal = (): void => {
+    void closeOnce().finally(() => process.exit(130));
+  };
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+
+  try {
+    return await runPiTui({ sdk, productName: options.productName });
+  } finally {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+    await closeOnce();
+  }
 }
 
 function buildTransport(options: TuiLaunchOptions): Transport {
@@ -83,4 +101,4 @@ function buildTransport(options: TuiLaunchOptions): Transport {
   });
 }
 
-export { App } from "./app.ts";
+export { runPiTui } from "./app.ts";

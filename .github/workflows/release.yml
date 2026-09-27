@@ -1,0 +1,73 @@
+# 发布：macOS 安装包（dmg / zip）+ 签名 + 公证。
+#
+# **凭据一律走 secrets，仓库里不放任何密钥**（ADR-023 的品牌与凭据都不进代码）：
+#   CSC_LINK                        —— 开发者证书（.p12 的 base64 内容）
+#   CSC_KEY_PASSWORD                —— 证书口令
+#   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID —— 公证用的 Apple 账号
+# 缺少这些 secrets 时**不失败**：只是产出未签名包（`identity: null` 的开发配置），
+# 这样 fork 与本地试跑不会被凭据卡住；正式发版才需要它们。
+#
+# 触发：推 v* 标签，或手动 dispatch。
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    env:
+      # 有证书就自动发现并签名；没有就退回不签名（见文件头注释）
+      CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 门禁与验收（发版前同样要过）
+        run: |
+          pnpm check
+          node tools/acceptance-reverse.ts
+          node tools/acceptance-core-standalone.ts
+
+      - name: 产出库包 dist
+        run: pnpm build:libs
+
+      - name: 构建渲染进程与核心层 bundle
+        run: |
+          pnpm -F @ucode/desktop build
+          pnpm -F @ucode/desktop bundle-core
+
+      - name: 打包 dmg / zip（有 secrets 则签名并公证）
+        working-directory: apps/desktop
+        run: npx electron-builder --config electron-builder.release.yml --publish never
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ucode-macos
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+          if-no-files-found: error

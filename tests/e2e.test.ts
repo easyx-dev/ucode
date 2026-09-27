@@ -57,7 +57,9 @@ async function freePort(): Promise<number> {
 }
 
 function spawnCore(args: string[]): { child: ChildProcess; stderr: () => string } {
-  const child = spawn(process.execPath, [CLI_ENTRY, ...args], {
+  // `--conditions=dev-src`：子进程必须显式带上（vitest 的 resolve.conditions 只影响
+  // 测试进程自身），否则它会走 exports 的 default → dist，测到的是上一次构建的产物。
+  const child = spawn(process.execPath, ["--conditions=dev-src", CLI_ENTRY, ...args], {
     cwd: ROOT,
     stdio: ["pipe", "pipe", "pipe"],
   });

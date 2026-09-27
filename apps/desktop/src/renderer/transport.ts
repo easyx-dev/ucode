@@ -14,6 +14,16 @@ type DesktopBridge = {
   onMessage(handler: (raw: unknown) => void): () => void;
   onCoreExit(handler: (reason: string) => void): () => void;
   environment(): Promise<{ productName: string; dataDir: string }>;
+  /** 本机能力（F-5.4/F-4.4/F-2.9）；Web 宿主没有这些，因此可选。 */
+  setKeepAwake?(enabled: boolean): Promise<boolean>;
+  notify?(payload: { title?: string; body?: string }): Promise<boolean>;
+  credentials?: {
+    list(): Promise<string[]>;
+    set(name: string, value: string): Promise<boolean>;
+    get(name: string): Promise<string | null>;
+    remove(name: string): Promise<boolean>;
+  };
+  openBrowser?(url: string): Promise<boolean>;
 };
 
 declare global {

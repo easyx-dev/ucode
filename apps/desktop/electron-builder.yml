@@ -16,6 +16,9 @@ files:
   - dist-renderer/**/*
   - core-bundle/**/*
   - "!core-bundle/node_modules/.cache/**/*"
+  # 主进程 import 的纯 JS 模块（凭据存储等）：不在 files 里就打包不进去
+  - src/native/**/*
+  - "!src/native/**/*.test.ts"
   - package.json
 asar: true
 # 主进程要 spawn core-bundle 里的核心层进程并访问其 node_modules：

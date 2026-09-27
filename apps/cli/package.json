@@ -8,10 +8,15 @@
     "ucode": "./src/main.ts"
   },
   "exports": {
-    ".": "./src/main.ts"
+    ".": {
+      "types": "./src/main.ts",
+      "dev-src": "./src/main.ts",
+      "default": "./dist/main.js"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@ucode/binding-http": "workspace:*",
@@ -21,6 +26,7 @@
     "@ucode/branding": "workspace:*",
     "@ucode/core": "workspace:*",
     "@ucode/protocol": "workspace:*",
+    "@ucode/sdk": "workspace:*",
     "@ucode/tui": "workspace:*",
     "@ucode/web": "workspace:*"
   }

@@ -2,6 +2,7 @@
 import { envVar, getBrand } from "@ucode/branding";
 import cliManifest from "../package.json" with { type: "json" };
 import { runCoreStart } from "./commands/core-start.ts";
+import { runNodeAdd, runNodeList, runNodeRemove } from "./commands/nodes.ts";
 import { runProviderAdd, runProviderList } from "./commands/provider.ts";
 import { runTui } from "./commands/tui.ts";
 import { runWeb } from "./commands/web.ts";
@@ -72,6 +73,12 @@ async function main(argv: string[]): Promise<number> {
       return runProviderAdd(parsed.options);
     case "provider.list":
       return runProviderList(parsed.options);
+    case "node.add":
+      return runNodeAdd(parsed.options);
+    case "node.list":
+      return runNodeList(parsed.options);
+    case "node.remove":
+      return runNodeRemove(parsed.options);
   }
 }
 

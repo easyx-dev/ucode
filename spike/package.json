@@ -12,7 +12,10 @@
     "v7": "node v7-pty.ts",
     "v8": "node v8-pending-interaction.ts",
     "v9": "node v9-subprocess-hook.ts",
-    "v10": "node v10-reader.ts"
+    "v10": "node v10-reader.ts",
+    "memory": "node memory-live.ts",
+    "tui": "node tui-live.ts",
+    "wiki": "node wiki-live.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.87.1",

@@ -10,6 +10,8 @@ import { defineConfig } from "vite";
  */
 export default defineConfig({
   base: "./",
+  // 优先 source 条件：开发态打包源码（dist 是给「以包安装」形态用的产物）。
+  resolve: { conditions: ["dev-src"] },
   plugins: [react(), tailwindcss()],
   build: {
     outDir: "dist",

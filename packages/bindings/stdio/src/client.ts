@@ -84,10 +84,21 @@ export function createStdioClient(options: StdioClientOptions = {}): Transport {
     },
     async close() {
       input().off?.("data", onData);
-      if (child !== undefined) {
-        child.kill();
-        child = undefined;
-      }
+      const running = child;
+      child = undefined;
+      if (running === undefined || running.exitCode !== null || running.signalCode !== null) return;
+      // 先礼后兵：SIGTERM 让核心层有机会收尾（释放 owner 租约、关 PTY），
+      // 短暂等待后仍然活着就 SIGKILL——**留下一个孤儿核心层是有代价的**：
+      // 它继续持有会话的 owner 租约，下一次启动的新实例只能只读挂载。
+      const exited = new Promise<void>((resolve) => {
+        running.once("exit", () => resolve());
+      });
+      running.kill();
+      const timedOut = await Promise.race([
+        exited.then(() => false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 1_000)),
+      ]);
+      if (timedOut) running.kill("SIGKILL");
     },
     ready: () => readyPromise,
   };

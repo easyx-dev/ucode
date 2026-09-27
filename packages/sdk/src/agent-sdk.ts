@@ -1,17 +1,36 @@
 import {
   type AutonomyLevel,
   type Capability,
+  type CatalogEntry,
   type ClientKind,
   type CommandName,
   type ErrorInfo,
+  type InstallResult,
+  type MarketplaceOverview,
+  type MarketplaceSource,
+  type MarketplaceSourceKind,
+  type MigrationImportResult,
+  type MigrationPreflight,
+  type PluginComponentKind,
   PROTOCOL_VERSION,
+  type ProviderAddResult,
+  type ProviderListResult,
+  type ProviderRemoveResult,
   parseServerMessage,
   type Reference,
   type Response,
   type ServerMessage,
   type SessionState,
   type SessionSummary,
+  type SupportBundleResult,
+  type TaskKind,
+  type TaskSummary,
   type Transport,
+  type UsageSummary,
+  type WorkspaceGitChangesResult,
+  type WorkspaceGitLogResult,
+  type WorkspaceReadResult,
+  type WorkspaceTreeResult,
 } from "@ucode/protocol";
 import {
   applyServerMessage,
@@ -43,6 +62,18 @@ export type ConnectOptions = {
   now?: () => number;
 };
 
+/**
+ * 新增供应商时声明的模型。**没有 `available`**：可用性要等基座解析之后才成立，
+ * 让调用方在写入时就能断言它，只会制造"我明明写了能用"的错觉。
+ */
+export type ProviderModelInput = {
+  id: string;
+  name?: string;
+  input?: string[];
+  contextWindow?: number;
+  maxTokens?: number;
+};
+
 export type AgentSdk = {
   readonly clientId: string;
   get state(): SdkState;
@@ -56,6 +87,8 @@ export type AgentSdk = {
     cwd?: string;
     name?: string;
     autonomy?: AutonomyLevel;
+    /** 临时会话（F-1.5 辅助对话）：不落盘、不进列表。 */
+    ephemeral?: boolean;
   }): Promise<{ sessionId: string }>;
   listSessions(): Promise<SessionSummary[]>;
   attachSession(sessionId: string): Promise<{ replayed: boolean; readOnly: boolean }>;
@@ -69,6 +102,8 @@ export type AgentSdk = {
   forkSession(sessionId: string, fromId?: string): Promise<{ sessionId: string }>;
   cloneSession(sessionId: string): Promise<{ sessionId: string }>;
   setSessionName(sessionId: string, name: string): Promise<void>;
+  /** 编辑历史对话（F-1.3）：改写某条记录的上下文；content 为 null 表示从上下文剔除。 */
+  editEntry(sessionId: string, entryId: string, content: string | null): Promise<void>;
   setAutonomy(sessionId: string, level: AutonomyLevel): Promise<void>;
   archiveSession(sessionId: string, archived: boolean): Promise<void>;
   /** 解决一个持久化待决交互（无人值守场景：当时无人应答，已落盘）。 */
@@ -89,12 +124,40 @@ export type AgentSdk = {
   // 配置与工具
   setModel(sessionId: string, provider: string, modelId: string): Promise<void>;
   listModels(): Promise<{ provider: string; modelId: string; name: string }[]>;
+  /** 供应商配置（F-5.3）：模型选择器的前提——没有它，新用户只能看到空列表。 */
+  listProviders(): Promise<ProviderListResult>;
+  addProvider(input: {
+    id: string;
+    baseUrl: string;
+    api?: string;
+    apiKey?: string;
+    models: ProviderModelInput[];
+    makeDefault?: boolean;
+  }): Promise<ProviderAddResult>;
+  removeProvider(id: string): Promise<ProviderRemoveResult>;
   setThinkingLevel(sessionId: string, level: string): Promise<void>;
   compact(sessionId: string, instructions?: string): Promise<void>;
   runBash(
     sessionId: string,
     command: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }>;
+
+  // 自动化任务（F-4.1~4.5）
+  taskList(): Promise<TaskSummary[]>;
+  taskCreate(input: {
+    kind: TaskKind;
+    prompt: string;
+    cwd?: string;
+    cron?: string;
+    delayMinutes?: number;
+    everyMinutes?: number;
+    sessionId?: string | null;
+    autonomy?: AutonomyLevel;
+  }): Promise<TaskSummary>;
+  taskCancel(taskId: string): Promise<void>;
+  taskPause(taskId: string): Promise<void>;
+  taskResume(taskId: string): Promise<void>;
+  taskRun(taskId: string): Promise<void>;
 
   // 交互
   respondToInteraction(
@@ -125,6 +188,50 @@ export type AgentSdk = {
     method: string,
     params?: Record<string, unknown>,
   ): Promise<T>;
+
+  // 插件市场（F-3.6）
+  marketplaceOverview(): Promise<MarketplaceOverview>;
+  marketplaceCatalog(source: string): Promise<CatalogEntry[]>;
+  marketplaceAddSource(input: {
+    name: string;
+    kind: MarketplaceSourceKind;
+    location: string;
+    description?: string;
+  }): Promise<MarketplaceSource>;
+  marketplaceRemoveSource(name: string): Promise<void>;
+  marketplaceInstall(input: {
+    source: string;
+    plugin: string;
+    overwrite?: boolean;
+  }): Promise<InstallResult>;
+  marketplaceUninstall(input: {
+    kind: PluginComponentKind;
+    name: string;
+  }): Promise<{ removed: boolean; path: string }>;
+
+  // 用量统计 / 支持包导出 / 数据迁移（F-5.6~5.8）
+  usageStats(): Promise<{ summary: UsageSummary; readable: string }>;
+  exportSupportBundle(options?: { maxLogFiles?: number }): Promise<SupportBundleResult>;
+  migrationPreflight(from: string): Promise<MigrationPreflight>;
+  migrationImport(
+    from: string,
+    options?: { onConflict?: "skip" | "overwrite" },
+  ): Promise<MigrationImportResult>;
+
+  // 工作区结构化查询（F-2.7/F-2.8）：通道按会话懒开并复用，调用方不必管 channelId。
+  workspaceTree(
+    sessionId: string,
+    params?: { path?: string; depth?: number; filter?: string },
+  ): Promise<WorkspaceTreeResult>;
+  workspaceGitLog(
+    sessionId: string,
+    params?: { limit?: number; skip?: number },
+  ): Promise<WorkspaceGitLogResult>;
+  workspaceGitChanges(sessionId: string): Promise<WorkspaceGitChangesResult>;
+  workspaceRead(
+    sessionId: string,
+    params: { path: string; maxBytes?: number },
+  ): Promise<WorkspaceReadResult>;
 
   // 展示助手
   displayMessages(sessionId: string): DisplayMessage[];
@@ -166,6 +273,8 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
   >();
   /** 终端通道的帧处理器：channel.data 等原始帧直接分流到这里（不走协议折叠）。 */
   const terminalMessageHandlers: ((raw: unknown) => void)[] = [];
+  /** 工作区查询通道按会话复用：面板会连续查树/变更/历史，不该每次重开通道。 */
+  const workspaceChannels = new Map<string, string>();
   let counter = 0;
   let closed = false;
 
@@ -353,6 +462,14 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     return response.data as T;
   }
 
+  async function ensureWorkspaceChannel(sessionId: string): Promise<string> {
+    const existing = workspaceChannels.get(sessionId);
+    if (existing !== undefined) return existing;
+    const channelId = await sdk.openWorkspaceChannel(sessionId);
+    workspaceChannels.set(sessionId, channelId);
+    return channelId;
+  }
+
   const sdk: AgentSdk = {
     clientId,
     get state() {
@@ -381,10 +498,18 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
           ...(sessionOptions.cwd === undefined ? {} : { cwd: sessionOptions.cwd }),
           ...(sessionOptions.name === undefined ? {} : { name: sessionOptions.name }),
           ...(sessionOptions.autonomy === undefined ? {} : { autonomy: sessionOptions.autonomy }),
+          ...(sessionOptions.ephemeral === undefined
+            ? {}
+            : { ephemeral: sessionOptions.ephemeral }),
         },
         null,
       );
       publish({ ...state, activeSessionId: data.sessionId });
+      // 必须把新会话的状态取回来：`session.state` 只在**状态变化**时推送，
+      // 而刚建好的会话没有任何变化事件——漏了这一步，界面会一直显示
+      // "无模型 / 未知目录"（状态栏和模型选择器都读它）。
+      await sdk.getSessionState(data.sessionId).catch(() => undefined);
+      // 临时会话不在列表里；刷新列表是为了让"普通会话"的计数准确，失败也无妨。
       await sdk.listSessions().catch(() => undefined);
       return data;
     },
@@ -461,6 +586,11 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       await sdk.listSessions().catch(() => undefined);
     },
 
+    async editEntry(sessionId, entryId, content) {
+      await request("session.edit_entry", { entryId, content }, sessionId);
+      await sdk.getEntries(sessionId).catch(() => undefined);
+    },
+
     async setAutonomy(sessionId, level) {
       await request("session.set_autonomy", { level }, sessionId);
       await sdk.getSessionState(sessionId).catch(() => undefined);
@@ -515,9 +645,75 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       return data.models;
     },
 
+    async listProviders() {
+      return request<ProviderListResult>("provider.list", {}, null);
+    },
+
+    async addProvider(input) {
+      const result = await request<ProviderAddResult>("provider.add", input, null);
+      // 配置变了，模型列表随之变了：顺手刷新，界面不用自己串两件事。
+      await sdk.listModels().catch(() => undefined);
+      return result;
+    },
+
+    async removeProvider(id) {
+      const result = await request<ProviderRemoveResult>("provider.remove", { id }, null);
+      await sdk.listModels().catch(() => undefined);
+      return result;
+    },
+
     async setThinkingLevel(sessionId, level) {
       await request("thinking.set", { level }, sessionId);
       await sdk.getSessionState(sessionId).catch(() => undefined);
+    },
+
+    async taskList() {
+      const data = await request<{ tasks: TaskSummary[]; keepAwake: boolean }>(
+        "task.list",
+        {},
+        null,
+      );
+      publish({ ...state, tasks: data.tasks, keepAwake: data.keepAwake });
+      return data.tasks;
+    },
+
+    async taskCreate(input) {
+      const data = await request<{ task: TaskSummary }>(
+        "task.create",
+        {
+          kind: input.kind,
+          prompt: input.prompt,
+          ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+          ...(input.cron === undefined ? {} : { cron: input.cron }),
+          ...(input.delayMinutes === undefined ? {} : { delayMinutes: input.delayMinutes }),
+          ...(input.everyMinutes === undefined ? {} : { everyMinutes: input.everyMinutes }),
+          ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
+          ...(input.autonomy === undefined ? {} : { autonomy: input.autonomy }),
+        },
+        null,
+      );
+      await sdk.taskList().catch(() => undefined);
+      return data.task;
+    },
+
+    async taskCancel(taskId) {
+      await request("task.cancel", { taskId }, null);
+      await sdk.taskList().catch(() => undefined);
+    },
+
+    async taskPause(taskId) {
+      await request("task.pause", { taskId }, null);
+      await sdk.taskList().catch(() => undefined);
+    },
+
+    async taskResume(taskId) {
+      await request("task.resume", { taskId }, null);
+      await sdk.taskList().catch(() => undefined);
+    },
+
+    async taskRun(taskId) {
+      await request("task.run", { taskId }, null);
+      await sdk.taskList().catch(() => undefined);
     },
 
     async compact(sessionId, instructions) {
@@ -628,6 +824,109 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
       });
       transport.send({ type: "channel.request", id, channelId, method, params: params ?? {} });
       return (await result) as T;
+    },
+
+    async marketplaceOverview() {
+      return request<MarketplaceOverview>("marketplace.overview", {}, null);
+    },
+
+    async marketplaceCatalog(source) {
+      const data = await request<{ entries: CatalogEntry[] }>(
+        "marketplace.catalog",
+        { source },
+        null,
+      );
+      return data.entries;
+    },
+
+    async marketplaceAddSource(input) {
+      const data = await request<{ source: MarketplaceSource }>(
+        "marketplace.add_source",
+        {
+          name: input.name,
+          kind: input.kind,
+          location: input.location,
+          ...(input.description === undefined ? {} : { description: input.description }),
+        },
+        null,
+      );
+      return data.source;
+    },
+
+    async marketplaceRemoveSource(name) {
+      await request("marketplace.remove_source", { name }, null);
+    },
+
+    async marketplaceInstall(input) {
+      const data = await request<{ report: InstallResult }>(
+        "marketplace.install",
+        {
+          source: input.source,
+          plugin: input.plugin,
+          ...(input.overwrite === undefined ? {} : { overwrite: input.overwrite }),
+        },
+        null,
+      );
+      return data.report;
+    },
+
+    async marketplaceUninstall(input) {
+      return request<{ removed: boolean; path: string }>(
+        "marketplace.uninstall",
+        { kind: input.kind, name: input.name },
+        null,
+      );
+    },
+
+    async usageStats() {
+      return request<{ summary: UsageSummary; readable: string }>("stats.usage", {}, null);
+    },
+
+    async exportSupportBundle(options) {
+      return request<SupportBundleResult>(
+        "support.export",
+        { ...(options?.maxLogFiles === undefined ? {} : { maxLogFiles: options.maxLogFiles }) },
+        null,
+      );
+    },
+
+    async migrationPreflight(from) {
+      const data = await request<{ report: MigrationPreflight }>(
+        "migration.preflight",
+        { from },
+        null,
+      );
+      return data.report;
+    },
+
+    async migrationImport(from, options) {
+      const data = await request<MigrationImportResult>(
+        "migration.import",
+        { from, ...(options?.onConflict === undefined ? {} : { onConflict: options.onConflict }) },
+        null,
+      );
+      await sdk.listSessions().catch(() => undefined);
+      return data;
+    },
+
+    async workspaceTree(sessionId, params) {
+      const channelId = await ensureWorkspaceChannel(sessionId);
+      return sdk.requestWorkspace<WorkspaceTreeResult>(channelId, "tree", params ?? {});
+    },
+
+    async workspaceGitLog(sessionId, params) {
+      const channelId = await ensureWorkspaceChannel(sessionId);
+      return sdk.requestWorkspace<WorkspaceGitLogResult>(channelId, "git.log", params ?? {});
+    },
+
+    async workspaceGitChanges(sessionId) {
+      const channelId = await ensureWorkspaceChannel(sessionId);
+      return sdk.requestWorkspace<WorkspaceGitChangesResult>(channelId, "git.changes", {});
+    },
+
+    async workspaceRead(sessionId, params) {
+      const channelId = await ensureWorkspaceChannel(sessionId);
+      return sdk.requestWorkspace<WorkspaceReadResult>(channelId, "read", params);
     },
 
     displayMessages(sessionId) {
