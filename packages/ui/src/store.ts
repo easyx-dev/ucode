@@ -265,7 +265,7 @@ export function createAgentStore(sdk: AgentSdk): AgentStore {
         const text = (get().drafts[sessionId] ?? "").trim();
         if (text === "") return;
         set({ drafts: { ...get().drafts, [sessionId]: "" }, bootError: null });
-        // 一律走 prompt：会话在跑时由核心层排进下一轮（`queued`），
+        // 一律走 prompt：会话在跑时由服务层排进下一轮（`queued`），
         // 壳不再自己判断该 prompt 还是 steer——那会让两端行为不一致。
         await guard(async () => {
           await sdk.prompt(sessionId, text);

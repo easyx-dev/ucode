@@ -1,7 +1,7 @@
 /**
  * 反向验收（spec §7.3 的第 2 条必跑验收）：**只装壳时依赖树里不含 core**。
  *
- * 这是"核心层与控制层真的解耦"的独立证据——不是看源码里的 import，而是看**装出来的依赖树**：
+ * 这是"服务层与控制层真的解耦"的独立证据——不是看源码里的 import，而是看**装出来的依赖树**：
  * 壳包把依赖声明错了（比如为了省事直接依赖 core），源码审查看不出来，装完就露馅。
  *
  *   node tools/acceptance-reverse.ts
@@ -14,11 +14,11 @@ import { spawnSync } from "node:child_process";
 const SHELL_PACKAGES = ["@ucode/web", "@ucode/desktop", "@ucode/tui"];
 
 /**
- * 壳不该在依赖树里看到的包：核心层与它的地基。
+ * 壳不该在依赖树里看到的包：服务层与它的地基。
  * 注意**不含 bindings**——`sdk` 依赖四种绑定是设计如此（sdk 提供传输工厂子路径），
- * 壳经 sdk 拿到绑定不等于拿到了核心层。
+ * 壳经 sdk 拿到绑定不等于拿到了服务层。
  */
-const FORBIDDEN = new Set(["@ucode/core", "@ucode/store", "@ucode/data-layer-spec"]);
+const FORBIDDEN = new Set(["@ucode/service"]);
 
 type DependencyNode = { name?: string; dependencies?: Record<string, DependencyNode> };
 
@@ -59,14 +59,14 @@ function main(): void {
   }
 
   if (violations.length > 0) {
-    process.stderr.write("反向验收失败：壳的依赖树里出现了核心层侧包。\n");
+    process.stderr.write("反向验收失败：壳的依赖树里出现了服务层侧包。\n");
     for (const violation of violations) {
       process.stderr.write(`  ${violation.shell} 依赖树里有 ${violation.forbidden}\n`);
     }
     process.exit(1);
   }
   process.stdout.write(
-    `反向验收通过：${SHELL_PACKAGES.join("、")} 的依赖树里都没有 core/store/data-layer-spec。\n`,
+    `反向验收通过：${SHELL_PACKAGES.join("、")} 的依赖树里都没有 @ucode/service（壳只是客户端）。\n`,
   );
 }
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * 交互面（spec §4.6）：**方向与命令面相反——核心层发起，控制层应答**。
+ * 交互面（spec §4.6）：**方向与命令面相反——服务层发起，控制层应答**。
  *
  * 分两类，可靠性要求完全不同：
  * - **阻塞式**（ui.request / ui.response）：需要应答、按标识配对；丢一次权限确认会让 agent 永久挂起。
@@ -15,7 +15,7 @@ export type UiMethod = z.infer<typeof UiMethodSchema>;
 export const UiSelectParamsSchema = z.object({
   title: z.string(),
   options: z.array(z.string()).min(1),
-  /** 0 或省略 = 不超时（由核心层按降级策略处置）。 */
+  /** 0 或省略 = 不超时（由服务层按降级策略处置）。 */
   timeoutMs: z.number().int().nonnegative().optional(),
 });
 

@@ -3,7 +3,7 @@
  *
  * 分两类证据：
  *  - 合成工作区（临时目录里造包与策略）：逐条覆盖每种违规分支，不污染真实仓库；
- *  - 真实仓库：注入一处真实违规（绑定层导入核心层），证明真实策略确实拦得住。
+ *  - 真实仓库：注入一处真实违规（壳的库导入服务层），证明真实策略确实拦得住。
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -166,12 +166,15 @@ describe("依赖边界门禁 · 真实仓库", () => {
     expect(status).toBe(0);
   });
 
-  it("绑定层导入核心层：被拦（真实策略）", () => {
-    const probe = join(ROOT, "packages/bindings/stdio/src/__gate_probe-boundary.ts");
+  it("壳导入服务层：被拦（真实策略）", () => {
+    const probe = join(ROOT, "packages/sdk/src/__gate_probe-boundary.ts");
     try {
-      writeFileSync(probe, 'import type { Core } from "@ucode/core";\nexport type X = Core;\n');
+      writeFileSync(
+        probe,
+        'import type { Service } from "@ucode/service";\nexport type X = Service;\n',
+      );
       const { status, output } = runGate("check-boundaries.ts");
-      expect(output).toContain("@ucode/core");
+      expect(output).toContain("@ucode/service");
       expect(status).toBe(1);
     } finally {
       rmSync(probe, { force: true });

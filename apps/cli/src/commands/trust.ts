@@ -4,15 +4,16 @@ import {
   hasProjectLocalResources,
   listProjectTrust,
   projectTrustFor,
+  servicePaths,
   setProjectTrust,
-} from "@ucode/core";
+} from "@ucode/service";
 import type { TrustOptions } from "../options.ts";
 import { log } from "../runtime.ts";
 
 /**
  * 项目信任的授信入口。
  *
- * 核心层**默认不加载项目本地资源**（`<cwd>/.pi/extensions|skills|prompts|themes`、
+ * 服务层**默认不加载项目本地资源**（`<cwd>/.pi/extensions|skills|prompts|themes`、
  * 向上查找的 `.agents/skills`）——那是"clone 一个仓库就执行其中代码"的唯一入口。
  * 授信决定记在数据层的 `trust.json`（与基座同一份文件、同一套语义：授一个父目录，
  * 其子项目都生效）。
@@ -25,12 +26,12 @@ export async function runTrust(options: TrustOptions): Promise<number> {
 
   const target = resolve(options.cwd, options.dir ?? ".");
   if (options.command === "revoke") {
-    setProjectTrust(options.dataDir, target, null);
+    setProjectTrust(servicePaths(options.dataDir).piDir, target, null);
     log(`已撤销项目信任：${target}`);
     return 0;
   }
 
-  setProjectTrust(options.dataDir, target, true);
+  setProjectTrust(servicePaths(options.dataDir).piDir, target, true);
   const name = getBrand().productName;
   log(`已授信：${target}`);
   if (hasProjectLocalResources(target)) {
@@ -43,7 +44,7 @@ export async function runTrust(options: TrustOptions): Promise<number> {
 }
 
 async function listTrust(dataDir: string, cwd: string): Promise<number> {
-  const entries = await listProjectTrust(dataDir);
+  const entries = await listProjectTrust(servicePaths(dataDir).piDir);
   const paths = Object.keys(entries);
   if (paths.length === 0) {
     log("没有任何项目信任记录。");
@@ -56,7 +57,7 @@ async function listTrust(dataDir: string, cwd: string): Promise<number> {
   if (hasProjectLocalResources(cwd)) {
     // 判定要用基座的查询语义（它规范化路径、并且会向上找最近的记录）：
     // 直接比对原始字符串会在 macOS 上误判（`/tmp` 与 `/private/tmp` 是同一个地方）。
-    const decision = projectTrustFor(dataDir, cwd);
+    const decision = projectTrustFor(servicePaths(dataDir).piDir, cwd);
     log(`当前目录有项目本地资源：${resolve(cwd)}（${describeDecision(decision)}）`);
     if (decision !== true) {
       log(`  未授信 → 本次不加载。要启用：${getBrand().productName} trust`);

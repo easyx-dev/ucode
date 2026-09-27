@@ -1,55 +1,34 @@
 {
   "notes": [
     "依赖边界的唯一事实来源：允许列表（allow-list），不是禁止列表。",
-    "理由见 docs/spec/01-架构.md §7.2：显式列出每个包允许依赖什么；新增包若未登记会直接报错。",
+    "理由见 docs/archive/01-架构.md §7.2：显式列出每个包允许依赖什么；新增包若未登记会直接报错。",
     "本文件的键必须覆盖所有工作区包，漏登记 = 门禁失败（不允许静默放行）。"
   ],
   "allowList": {
     "@ucode/protocol": [],
     "@ucode/branding": [],
-    "@ucode/data-layer-spec": [],
-    "@ucode/store": ["@ucode/data-layer-spec"],
-    "@ucode/core": ["@ucode/data-layer-spec", "@ucode/protocol", "@ucode/store", "@ucode/branding"],
-    "@ucode/binding-stdio": ["@ucode/protocol"],
-    "@ucode/binding-rpc": ["@ucode/protocol"],
-    "@ucode/binding-http": ["@ucode/protocol"],
-    "@ucode/binding-ws": ["@ucode/protocol"],
-    "@ucode/sdk": [
-      "@ucode/protocol",
-      "@ucode/binding-stdio",
-      "@ucode/binding-rpc",
-      "@ucode/binding-http",
-      "@ucode/binding-ws"
-    ],
+    "@ucode/service": ["@ucode/branding", "@ucode/protocol"],
+    "@ucode/sdk": ["@ucode/protocol"],
     "@ucode/ui": ["@ucode/protocol", "@ucode/sdk", "@ucode/branding"],
     "@ucode/cli": [
-      "@ucode/binding-http",
-      "@ucode/binding-rpc",
-      "@ucode/binding-stdio",
-      "@ucode/binding-ws",
       "@ucode/branding",
-      "@ucode/core",
       "@ucode/protocol",
       "@ucode/sdk",
+      "@ucode/service",
       "@ucode/tui",
       "@ucode/web"
     ],
     "@ucode/web": ["@ucode/branding", "@ucode/sdk", "@ucode/ui"],
-    "@ucode/desktop": ["@ucode/branding", "@ucode/sdk", "@ucode/ui"],
+    "@ucode/desktop": ["@ucode/branding"],
     "@ucode/tui": ["@ucode/branding", "@ucode/sdk"],
     "@ucode/hub": ["@ucode/protocol", "@ucode/branding"]
   },
   "forbiddenTransitive": {
-    "@ucode/web": ["@ucode/core"],
-    "@ucode/desktop": ["@ucode/core"],
-    "@ucode/tui": ["@ucode/core"],
-    "@ucode/binding-stdio": ["@ucode/core", "@ucode/sdk", "@ucode/ui"],
-    "@ucode/binding-rpc": ["@ucode/core", "@ucode/sdk", "@ucode/ui"],
-    "@ucode/binding-http": ["@ucode/core", "@ucode/sdk", "@ucode/ui"],
-    "@ucode/binding-ws": ["@ucode/core", "@ucode/sdk", "@ucode/ui"],
-    "@ucode/protocol": ["@ucode/core", "@ucode/store", "@ucode/sdk"],
-    "@ucode/data-layer-spec": ["@ucode/store", "@ucode/core"],
-    "@ucode/store": ["@ucode/core", "@ucode/sdk"]
+    "@ucode/web": ["@ucode/service"],
+    "@ucode/desktop": ["@ucode/service"],
+    "@ucode/tui": ["@ucode/service"],
+    "@ucode/protocol": ["@ucode/service", "@ucode/sdk"],
+    "@ucode/sdk": ["@ucode/service"]
   },
   "alwaysAllowedExternals": ["vitest"],
   "allowComputedDynamicImports": []

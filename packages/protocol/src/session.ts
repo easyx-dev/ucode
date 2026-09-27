@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 /**
- * 会话记录（协议 D 的条目形状，spec §3.12）。
+ * 会话记录（pi 兼容的条目形状）。
  *
- * 用宽松对象：记录格式沿用 pi 的约定并由 pi 演进（§3.11），核心层只保证几个公共字段，
+ * 用宽松对象：记录格式沿用 pi 的约定并由 pi 演进，服务层只保证几个公共字段，
  * 其余原样透传。附加字段不得被这里剥掉——否则落盘与广播的内容会与磁盘不一致。
  */
 export const SessionEntrySchema = z.looseObject({
@@ -14,19 +14,16 @@ export const SessionEntrySchema = z.looseObject({
 });
 export type SessionEntry = z.infer<typeof SessionEntrySchema>;
 
-/** 会话的元信息（列表用；来自 store 的扫描与索引对账结果，不是真相）。 */
+/** 会话的元信息（列表用；来自服务层的索引——正文与真相永远在会话文件里）。 */
 export const SessionSummarySchema = z.object({
   id: z.string(),
   cwd: z.string(),
   name: z.string().nullable(),
-  file: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
   entryCount: z.number().int().nonnegative(),
   firstMessage: z.string().nullable(),
-  /** 是否正被某个实例持有（owner 语义，spec §3.5）。 */
-  owned: z.boolean(),
-  /** 手动归档（B-8：手动归档、不自动删除）。默认列表不显示已归档会话。 */
+  /** 手动归档、不自动删除。默认列表不显示已归档会话。 */
   archived: z.boolean().default(false),
 });
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;

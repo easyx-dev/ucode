@@ -1,15 +1,14 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createBinding } from "@ucode/binding-http";
-import { createHttpClient } from "@ucode/binding-http/client";
-import { type Core, createCore } from "@ucode/core";
 import { type AgentSdk, connect } from "@ucode/sdk";
+import { createClient as createHttpClient } from "@ucode/sdk/http";
+import { createHttpBinding, createService, type Service, servicePaths } from "@ucode/service";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   type FakeProvider,
   startFakeProvider,
-} from "../packages/core/src/testing/fake-provider.ts";
+} from "../packages/service/src/testing/fake-provider.ts";
 
 /**
  * sdk 经真实 HTTP + SSE 的端到端测试（浏览器用的是同一条路径）。
@@ -18,8 +17,8 @@ import {
  * 这边验证 **sdk 本身**——请求-应答配对、事件折叠、断线重连与带游标续传。
  */
 
-let core: Core | undefined;
-let binding: ReturnType<typeof createBinding> | undefined;
+let core: Service | undefined;
+let binding: ReturnType<typeof createHttpBinding> | undefined;
 let provider: FakeProvider | undefined;
 let dataDir: string | undefined;
 let sdk: AgentSdk | undefined;
@@ -40,9 +39,9 @@ afterEach(async () => {
 async function setup(): Promise<{ sdk: AgentSdk; baseUrl: string }> {
   provider = await startFakeProvider({ defaultReply: { text: "来自假模型的回答。" } });
   dataDir = await mkdtemp(join(tmpdir(), "sdk-http-"));
-  await provider.writeModelsJson(dataDir);
-  core = await createCore({ dataDir, cwd: dataDir });
-  binding = createBinding(core, { port: 0 });
+  await provider.writeModelsJson(servicePaths(dataDir).piDir);
+  core = await createService({ dataDir, cwd: dataDir });
+  binding = createHttpBinding(core, { port: 0 });
   await binding.start();
   const baseUrl = binding.endpoint ?? "";
   sdk = await connect({
@@ -113,6 +112,25 @@ describe("sdk 经 HTTP + SSE", () => {
     expect(client.state.views[created.sessionId]?.summary?.entryCount ?? 0).toBeGreaterThan(0);
   });
 
+  it("命令面的返回形状与控制层读到的一致（stats.usage 曾因此永远空着）", async () => {
+    const { sdk } = await setup();
+    const usage = await sdk.usageStats();
+    // 曾经的真实缺陷：服务端回 `{ usage }`、SDK/UI 读 `{ summary }`，两边都"没报错"，
+    // 用量面板却一直空着。断言形状而不是数值——数值取决于假供应商是否报用量。
+    expect(typeof usage.summary).toBe("object");
+    expect(typeof usage.summary.records).toBe("number");
+    expect(typeof usage.readable).toBe("string");
+
+    const providers = await sdk.listProviders();
+    expect(Array.isArray(providers.providers)).toBe(true);
+    expect(typeof providers.configFile).toBe("string");
+
+    const models = await sdk.listModels();
+    expect(Array.isArray(models)).toBe(true);
+    // 服务刚起来也不能是空列表：模型选择器会因此看起来"没有模型可用"
+    expect(models.length).toBeGreaterThan(0);
+  });
+
   it("断线重连：带游标补齐缺口，不丢不重", async () => {
     const { sdk: client, baseUrl } = await setup();
     const created = await client.createSession({});
@@ -129,10 +147,10 @@ describe("sdk 经 HTTP + SSE", () => {
     const cursorBefore = client.state.views[created.sessionId]?.maxSeq ?? 0;
     const entriesBefore = client.state.views[created.sessionId]?.entries.length ?? 0;
 
-    // 断开事件流：模拟"壳与核心层之间的连接断了"
+    // 断开事件流：模拟"壳与服务层之间的连接断了"
     await client.close();
 
-    // 期间核心层继续产生记录（用另一条连接驱动第二轮）
+    // 期间服务层继续产生记录（用另一条连接驱动第二轮）
     const { sdk: other } = await (async () => {
       const second = await connect({
         transport: createHttpClient({ baseUrl, clientId: "sdk-other" }),

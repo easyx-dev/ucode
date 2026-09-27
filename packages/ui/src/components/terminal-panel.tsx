@@ -9,7 +9,7 @@ import { Button } from "./primitives.tsx";
  *
  * 字节流走协议 C 的 PTY 通道：`sdk.openTerminal` → channel.data（base64）↔ xterm；
  * 容器尺寸变化时自动 resize（FitAddon + channel.resize）。
- * 组件卸载时关闭通道（核心层会随之杀掉 shell，不留孤儿进程）。
+ * 组件卸载时关闭通道（服务层会随之杀掉 shell，不留孤儿进程）。
  */
 export function TerminalPanel({
   sessionId,

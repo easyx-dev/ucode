@@ -7,7 +7,7 @@
 - 提供整套界面组件：会话侧栏与对话流、输入 composer、交互对话框、任务/市场/用量/工作区/终端面板、Markdown 渲染、primitives。
 - 以 zustand vanilla store 承载界面状态（`createAgentStore`），并把它挂进 React 树（`AgentStoreProvider`）。
 - 把展示逻辑抽成纯函数模块（`*-format.ts`），以便单测而不必渲染。
-- **不做**：不依赖任何 `apps/*`；不依赖 `@ucode/core`（数据经 SDK 拿）。宿主差异（窗口、托盘、通知、端口映射）留在各壳里。
+- **不做**：不依赖任何 `apps/*`；不依赖 `@ucode/service`（数据经 SDK 拿）。宿主差异（窗口、托盘、通知、端口映射）留在各壳里。
 
 ## 公开入口
 

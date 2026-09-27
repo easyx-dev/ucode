@@ -4,7 +4,7 @@ import { z } from "zod";
  * 信任级别 = 认证的替代品（spec §2.2）。
  *
  * **它由绑定声明，不由客户端自报**（ADR-004）：对端声称自己可信等于没有信任模型。
- * 因此协议里这个类型只出现在核心层给出的方向（welcome 回告实际授予什么）。
+ * 因此协议里这个类型只出现在服务层给出的方向（welcome 回告实际授予什么）。
  */
 export const TrustLevelSchema = z.enum([
   /** 父进程 spawn（stdio）：对端本来就是这台机器的主人。 */
@@ -18,7 +18,7 @@ export type TrustLevel = z.infer<typeof TrustLevelSchema>;
 
 /**
  * 能力按面拆分，便于"操作被拒时能区分承载不了与信任不足"（spec §4.3）。
- * 绑定声明自己**能承载**什么（capabilities），核心层按信任矩阵回告**实际授予**什么（grantedCapabilities）。
+ * 绑定声明自己**能承载**什么（capabilities），服务层按信任矩阵回告**实际授予**什么（grantedCapabilities）。
  */
 export const CapabilitySchema = z.enum([
   /** 读取会话：列表、状态、历史、分支结构。 */

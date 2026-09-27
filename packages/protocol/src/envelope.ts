@@ -9,8 +9,8 @@ import { UiResponseSchema, UiServerMessageSchema } from "./ui.ts";
 /**
  * 线路信封：一条连接上往来的两类消息。
  *
- * 分方向定义（客户端 → 核心层 / 核心层 → 客户端），因为**交互面方向相反**：
- * ui.request 由核心层发起，ui.response 由控制层回。方向搞错会死锁，所以在类型上就分开。
+ * 分方向定义（客户端 → 服务层 / 服务层 → 客户端），因为**交互面方向相反**：
+ * ui.request 由服务层发起，ui.response 由控制层回。方向搞错会死锁，所以在类型上就分开。
  */
 export const ClientMessageSchema = [
   HelloSchema,

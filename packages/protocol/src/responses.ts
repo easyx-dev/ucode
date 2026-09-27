@@ -39,11 +39,10 @@ export const ERROR_CODES = {
   interaction_timeout: "交互请求超时。",
   not_attached: "这条连接没有挂载到该会话。",
   session_not_found: "会话不存在。",
-  session_not_owned: "本实例不是该会话的 owner，不能写入。",
   session_busy: "会话正在运行中，该操作暂不可用。",
   unsupported_reference: "该引用类型尚未实现（首发只支持文件与文件夹）。",
   unsupported_channel: "该通道在这条通路上不可用。",
-  internal_error: "核心层内部错误。",
+  internal_error: "服务层内部错误。",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

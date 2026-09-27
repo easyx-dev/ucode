@@ -7,11 +7,12 @@ import { fileURLToPath } from "node:url";
 import { type AgentSdk, connect } from "@ucode/sdk";
 import { createClient as createHttpClient } from "@ucode/sdk/http";
 import { createClient as createRpcClient } from "@ucode/sdk/rpc";
+import { servicePaths } from "@ucode/service";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   type FakeProvider,
   startFakeProvider,
-} from "../packages/core/src/testing/fake-provider.ts";
+} from "../packages/service/src/testing/fake-provider.ts";
 
 /**
  * 服务（BS 架构）的端到端验收：`service` 子命令起的是常驻的唯一后端，壳都是客户端。
@@ -54,9 +55,9 @@ afterEach(async () => {
 
 async function makeEnv(): Promise<{ dataDir: string; runDir: string }> {
   const dataDir = await mkdtemp(join(tmpdir(), "svc-data-"));
-  const runDir = await mkdtemp(join(tmpdir(), "svc-run-"));
-  tempDirs.push(dataDir, runDir);
-  return { dataDir, runDir };
+  tempDirs.push(dataDir);
+  // 运行时状态（注册表 / 锁 / socket / 日志）现在就在数据根下面。
+  return { dataDir, runDir: join(dataDir, "runtime") };
 }
 
 /** 跑一次 CLI 并等它退出（`service start` 不带 --foreground 时会自己返回）。 */
@@ -85,11 +86,8 @@ function isAlive(pid: number): boolean {
 }
 
 async function registrationOf(runDir: string): Promise<Registration | undefined> {
-  const files = await readdir(runDir).catch(() => []);
-  const file = files.find((name) => name.startsWith("service-") && name.endsWith(".json"));
-  if (file === undefined) return undefined;
   try {
-    return JSON.parse(await readFile(join(runDir, file), "utf8")) as Registration;
+    return JSON.parse(await readFile(join(runDir, "service.json"), "utf8")) as Registration;
   } catch {
     return undefined;
   }
@@ -149,7 +147,7 @@ describe("服务：生命周期与发现", () => {
 
     // 独立存活：runCli 的父进程已经退出了，服务进程还在
     expect(isAlive(registration.pid)).toBe(true);
-    expect(registration.dataDir).toBe(dataDir);
+    expect(registration.dataDir).toBe(join(dataDir, "v1"));
     // socket 落在运行时目录（而不是数据层目录：那是会被迁移与支持包带走的地方）
     expect(registration.endpoints.unix?.startsWith(runDir)).toBe(true);
     expect(registration.endpoints.unix?.endsWith(".sock")).toBe(true);
@@ -180,6 +178,30 @@ describe("服务：生命周期与发现", () => {
     expect(left.some((name) => name.endsWith(".log"))).toBe(true);
   });
 
+  it("带 SSE 订阅者时也能优雅退出：长连接不该拖住 SIGTERM", async () => {
+    const { dataDir, runDir } = await makeEnv();
+    const registration = await startService(runDir, dataDir);
+    const baseUrl = registration.endpoints.http;
+    expect(baseUrl, "服务应提供 http 端点").toBeDefined();
+
+    // 开一条真的 SSE 长连接（模拟浏览器壳开着页面）并确认它建立了。
+    const abort = new AbortController();
+    const stream = await fetch(`${baseUrl as string}/events?clientId=long-lived`, {
+      signal: abort.signal,
+    });
+    expect(stream.ok).toBe(true);
+    const reader = stream.body?.getReader();
+    await reader?.read();
+
+    // 这条断言锁的是一个真实踩过的缺陷：SSE 的心跳等待若用不可控的定时器，
+    // SIGTERM 之后事件循环一直被挂着，`service stop` 会耗尽超时（10s）并报失败。
+    const stopped = await runCli(["service", "stop", "--data-dir", dataDir], runDir);
+    expect(stopped.code, stopped.stderr).toBe(0);
+    await waitUntil(() => !isAlive(registration.pid), 8_000, "服务在 SIGTERM 后退出");
+    services.delete(registration.pid);
+    abort.abort();
+  });
+
   it("被 kill -9 留下陈旧注册后仍能恢复（否则这个数据层再也起不来）", async () => {
     const { dataDir, runDir } = await makeEnv();
     const first = await startService(runDir, dataDir);
@@ -204,7 +226,7 @@ describe("服务：多壳打开同一个会话", () => {
     const provider = await startFakeProvider();
     providers.push(provider);
     const { dataDir, runDir } = await makeEnv();
-    await provider.writeModelsJson(dataDir);
+    await provider.writeModelsJson(servicePaths(dataDir).piDir);
 
     // 第一轮故意卡在"工具批准"上：会话因此确定性地处于运行中，
     // 不必靠时间窗口去赌"另一头发消息时它还在跑"。

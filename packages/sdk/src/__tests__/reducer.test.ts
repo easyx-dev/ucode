@@ -16,7 +16,7 @@ const welcome = (sessions: { id: string; entryCount: number }[] = []): ServerMes
   capabilities: ["sessions.read", "prompt.run"],
   grantedCapabilities: ["sessions.read", "prompt.run"],
   trustLevel: "local",
-  dataLayerVersion: 1,
+  dataFormatVersion: "v1",
   sessions: sessions.map((session) => ({
     id: session.id,
     cwd: "/tmp",

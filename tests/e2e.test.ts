@@ -4,16 +4,17 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { servicePaths } from "@ucode/service";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   type FakeProvider,
   startFakeProvider,
-} from "../packages/core/src/testing/fake-provider.ts";
+} from "../packages/service/src/testing/fake-provider.ts";
 
 /**
  * 端到端验收（spec §7.3 的 CI 任务 1，进程级版本）：
  *
- * 空目录里只起**核心层进程**（不装任何壳），用**纯协议客户端**（不依赖 sdk、直接按协议收发）
+ * 空目录里只起**服务进程**（不装任何壳），用**纯协议客户端**（不依赖 sdk、直接按协议收发）
  * 完成：握手 → 新建会话 → 发起对话 → 收到完整事件流 → 取回历史校验。
  *
  * 模型调用走本地假供应商，因此不依赖真实模型、可重复跑。
@@ -43,7 +44,7 @@ function trackProvider(instance: FakeProvider): FakeProvider {
 async function makeDataDir(providerInstance: FakeProvider): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "e2e-data-"));
   tempDirs.push(dir);
-  await providerInstance.writeModelsJson(dir);
+  await providerInstance.writeModelsJson(servicePaths(dir).piDir);
   return dir;
 }
 
@@ -146,17 +147,17 @@ function createLineClient(child: ChildProcess) {
   };
 }
 
-describe("端到端：核心层进程 + 纯协议客户端（stdio）", () => {
+describe("端到端：服务进程 + 纯协议客户端（stdio）", () => {
   it("握手 → 建会话 → 对话 → 完整事件流 → 取回历史", async () => {
     const provider = trackProvider(
       await startFakeProvider({ defaultReply: { text: "这是假模型的回答。" } }),
     );
     const dataDir = await makeDataDir(provider);
     const { child, stderr } = spawnCore([
-      "core",
+      "service",
       "start",
-      "--binding",
-      "stdio",
+      "--foreground",
+      "--stdio",
       "--data-dir",
       dataDir,
     ]);
@@ -221,12 +222,12 @@ describe("端到端：核心层进程 + 纯协议客户端（stdio）", () => {
     expect(indexEntry, "应收到带完整记录的事件").toBeTruthy();
 
     // 5. 退出码与日志：进程仍在跑（stdio 绑定的正常状态），日志不污染 stdout
-    expect(stderr()).toContain("核心层就绪");
+    expect(stderr()).toContain("就绪");
     child.kill("SIGTERM");
   }, 60_000);
 });
 
-describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", () => {
+describe("端到端：服务进程 + HTTP/SSE（下行推、上行 POST）", () => {
   it("同一套命令经 HTTP 绑定得到一致的会话状态", async () => {
     const provider = trackProvider(
       await startFakeProvider({ defaultReply: { text: "经 HTTP 的回答。" } }),
@@ -234,10 +235,9 @@ describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", 
     const dataDir = await makeDataDir(provider);
     const port = await freePort();
     const { child, stderr } = spawnCore([
-      "core",
+      "service",
       "start",
-      "--binding",
-      "http",
+      "--foreground",
       "--port",
       String(port),
       "--data-dir",
@@ -246,9 +246,9 @@ describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", 
 
     // 等它就绪（stderr 上会打印对端地址）
     await new Promise<void>((resolveReady, reject) => {
-      const timer = setTimeout(() => reject(new Error(`核心层未就绪：${stderr()}`)), 20_000);
+      const timer = setTimeout(() => reject(new Error(`服务未就绪：${stderr()}`)), 20_000);
       const check = setInterval(() => {
-        if (stderr().includes("核心层就绪")) {
+        if (stderr().includes("服务端点")) {
           clearInterval(check);
           clearTimeout(timer);
           resolveReady();
@@ -271,10 +271,10 @@ describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", 
     const stream = await Promise.race([
       fetch(`${baseUrl}/events?clientId=${clientId}`, { signal: streamAbort.signal }),
       new Promise<Response>((_, reject) =>
-        setTimeout(() => reject(new Error(`打开事件流超时。核心层 stderr：\n${stderr()}`)), 8_000),
+        setTimeout(() => reject(new Error(`打开事件流超时。服务 stderr：\n${stderr()}`)), 8_000),
       ),
     ]);
-    expect(stream.ok, `事件流返回 ${stream.status}；核心层 stderr：\n${stderr()}`).toBe(true);
+    expect(stream.ok, `事件流返回 ${stream.status}；服务 stderr：\n${stderr()}`).toBe(true);
     const reader = stream.body?.getReader();
     const decoder = new TextDecoder();
     let pending = "";
@@ -324,7 +324,7 @@ describe("端到端：核心层进程 + HTTP/SSE（下行推、上行 POST）", 
           () =>
             reject(
               new Error(
-                `HTTP 事件超时；已收到：${events.map((m) => String(m.type)).join(", ")}；核心层 stderr：\n${stderr()}`,
+                `HTTP 事件超时；已收到：${events.map((m) => String(m.type)).join(", ")}；服务 stderr：\n${stderr()}`,
               ),
             ),
           timeoutMs,

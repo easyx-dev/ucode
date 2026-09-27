@@ -4,7 +4,7 @@ import { z } from "zod";
  * 通道（spec §4.7）：通道类型是一等概念，不是"先转发消息、字节流以后再补"。
  *
  * 首发定义两条通道：
- * 1. **工作区文件 / Git 结构化查询**——控制层要渲染文件树与 Git 图谱，工作区在核心层那台机器上。
+ * 1. **工作区文件 / Git 结构化查询**——控制层要渲染文件树与 Git 图谱，工作区在服务层那台机器上。
  *    不能用工具调用代替：那会把 UI 性能绑在命令解析上。
  * 2. **PTY 字节流**——终端仿真需要双向字节流 + 窗口尺寸变更 + 信号，塞进 JSON 消息面会毁掉体验。
  *
@@ -18,7 +18,7 @@ export type ChannelKind = z.infer<typeof ChannelKindSchema>;
 export const WorkspaceTreeParamsSchema = z.object({
   path: z.string().optional(),
   depth: z.number().int().positive().max(8).optional(),
-  /** 只列出匹配的条目（简单的后缀/包含匹配，避免把 glob 引擎带进核心层）。 */
+  /** 只列出匹配的条目（简单的后缀/包含匹配，避免把 glob 引擎带进服务层）。 */
   filter: z.string().optional(),
 });
 
@@ -35,7 +35,7 @@ export const WorkspaceReadParamsSchema = z.object({
 export const WorkspaceMethodSchema = z.enum(["tree", "git.log", "git.changes", "read"]);
 export type WorkspaceMethod = z.infer<typeof WorkspaceMethodSchema>;
 
-// 查询结果形状（F-2.7/F-2.8）。核心层是产出方，控制层据此渲染文件树/Git 图谱/预览。
+// 查询结果形状（F-2.7/F-2.8）。服务层是产出方，控制层据此渲染文件树/Git 图谱/预览。
 export type WorkspaceTreeEntry = {
   /** 相对工作区根的路径。 */
   path: string;

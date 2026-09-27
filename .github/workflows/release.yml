@@ -49,7 +49,7 @@ jobs:
         run: |
           pnpm check
           node tools/acceptance-reverse.ts
-          node tools/acceptance-core-standalone.ts
+          node tools/acceptance-service-standalone.ts
 
       - name: 产出库包 dist
         run: pnpm build:libs

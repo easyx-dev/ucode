@@ -26,6 +26,7 @@ import {
   type TaskKind,
   type TaskSummary,
   type Transport,
+  type UsageStatsResult,
   type UsageSummary,
   type WorkspaceGitChangesResult,
   type WorkspaceGitLogResult,
@@ -52,7 +53,7 @@ export type ConnectOptions = {
   transport: Transport;
   clientId?: string;
   clientKind?: ClientKind;
-  /** 控制层声明自己能承载什么（不是请求权限；核心层按信任矩阵决定授予什么）。 */
+  /** 控制层声明自己能承载什么（不是请求权限；服务层按信任矩阵决定授予什么）。 */
   capabilities?: Capability[];
   identity?: { user: string | null; device: string | null };
   /** 断线续传：带上上次收到的位置。 */
@@ -116,7 +117,7 @@ export type AgentSdk = {
 
   // 驱动
   /**
-   * 发一条消息。会话正在跑时核心层把它**排进下一轮**（`queued: true`），而不是拒绝——
+   * 发一条消息。会话正在跑时服务层把它**排进下一轮**（`queued: true`），而不是拒绝——
    * 多端共用一个会话时"另一端正在跑"是常态。
    */
   prompt(
@@ -393,7 +394,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
         const index = waiters.indexOf(entry);
         if (index !== -1) {
           waiters.splice(index, 1);
-          reject(new Error("等待核心层消息超时"));
+          reject(new Error("等待服务层消息超时"));
         }
       }, timeoutMs);
       unrefTimer(timer);
@@ -403,7 +404,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
   transport.onMessage((raw) => {
     const type = (raw as { type?: string } | null)?.type;
     if (type === "stream.ready") {
-      // 事件流（重）连上了：带游标重新握手，让核心层补齐断线期间的缺口。
+      // 事件流（重）连上了：带游标重新握手，让服务层补齐断线期间的缺口。
       // 初次连接阶段不触发——那时的握手已经由 connect() 在途（真实缺陷：并发握手会
       // 让两个等待者抢一条 welcome，其中一个永远等不到）。
       if (phase === "connecting") return;
@@ -620,7 +621,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
         { text, ...(references === undefined ? {} : { references }) },
         sessionId,
       );
-      // 会话正在跑时核心层把消息排进下一轮（而不是拒绝）：壳据此告诉用户"已排队"。
+      // 会话正在跑时服务层把消息排进下一轮（而不是拒绝）：壳据此告诉用户"已排队"。
       return {
         queued: data.queued === true,
         pendingMessages: data.pendingMessages ?? 0,
@@ -892,7 +893,7 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     },
 
     async usageStats() {
-      return request<{ summary: UsageSummary; readable: string }>("stats.usage", {}, null);
+      return request<UsageStatsResult>("stats.usage", {}, null);
     },
 
     async exportSupportBundle(options) {

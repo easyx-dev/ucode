@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "启动入口：内置 Web 与 TUI 壳，并可启动核心层",
+  "description": "\u542f\u52a8\u5165\u53e3\uff1a\u5185\u7f6e Web \u4e0e TUI \u58f3\uff0c\u5e76\u53ef\u542f\u52a8\u6838\u5fc3\u5c42",
   "bin": {
     "ucode": "./src/main.ts"
   },
@@ -19,14 +19,10 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@ucode/binding-http": "workspace:*",
-    "@ucode/binding-rpc": "workspace:*",
-    "@ucode/binding-stdio": "workspace:*",
-    "@ucode/binding-ws": "workspace:*",
     "@ucode/branding": "workspace:*",
-    "@ucode/core": "workspace:*",
     "@ucode/protocol": "workspace:*",
     "@ucode/sdk": "workspace:*",
+    "@ucode/service": "workspace:*",
     "@ucode/tui": "workspace:*",
     "@ucode/web": "workspace:*"
   }

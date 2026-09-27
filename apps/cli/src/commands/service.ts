@@ -1,17 +1,15 @@
 import { chmod, mkdir, readFile, unlink } from "node:fs/promises";
-import { createBinding as createHttpBinding } from "@ucode/binding-http";
-import { createBinding as createRpcBinding } from "@ucode/binding-rpc";
 import { getBrand } from "@ucode/branding";
-import { createCore } from "@ucode/core";
 import type { TransportBinding } from "@ucode/protocol";
 import { connect } from "@ucode/sdk";
 import { createClient as createRpcClient } from "@ucode/sdk/rpc";
-import cliManifest from "../../package.json" with { type: "json" };
-import type { ServiceLogsOptions, ServiceStartOptions } from "../options.ts";
-import { log, waitForShutdown } from "../runtime.ts";
 import {
-  acquireServiceLock,
+  acquireInstanceLock,
   clearRegistration,
+  createHttpBinding,
+  createRpcBinding,
+  createService,
+  createStdioBinding,
   ensureService,
   findLiveService,
   isProcessAlive,
@@ -19,23 +17,24 @@ import {
   servicePaths,
   stopService,
   writeRegistration,
-} from "../service-registry.ts";
+} from "@ucode/service";
+import cliManifest from "../../package.json" with { type: "json" };
+import type { ServiceLogsOptions, ServiceStartOptions } from "../options.ts";
+import { log, waitForShutdown } from "../runtime.ts";
+import { serviceCommand } from "../service-command.ts";
 import { resolveWebAssets } from "../web-assets.ts";
 
 /**
  * `service` —— 常驻的唯一后端（BS 架构的服务端）。
  *
  * ```
- *   Web 浏览器 ──HTTP/SSE──┐
- *   TUI        ──unix──────┤── service ── pi 会话
- *   脚本/CLI    ──unix──────┘
+ *   Web 浏览器 ──环回 HTTP（顺带发静态资源）──┐
+ *   TUI        ──unix socket─────────────────┤── service ── pi 会话 + SQLite
+ *   脚本/CLI    ──unix socket─────────────────┘
  * ```
  *
- * 壳不再各自拉起核心层：它们 `ensureService`（发现→连上，没有就拉起），
- * 于是"一个对话，多端同看同写"成立，也不再出现"孤儿核心层占着 owner 租约"。
- *
- * 服务同时监听两条通路：unix socket（壳用，受文件权限约束）与环回 HTTP（浏览器用，
- * 顺带把 Web 壳的静态资源发出去，于是浏览器与服务同源、没有 CORS）。
+ * 壳不各自拉起后端：它们 `ensureService`（发现 → 连上，没有就拉起）。
+ * 一个数据根一个服务，靠运行时目录里的实例锁保证。
  */
 
 export async function runServiceStart(options: ServiceStartOptions): Promise<number> {
@@ -46,12 +45,15 @@ export async function runServiceStart(options: ServiceStartOptions): Promise<num
 
 async function startDetached(options: ServiceStartOptions): Promise<number> {
   const live = await ensureService({
-    dataDir: options.dataDir,
-    cwd: options.cwd,
-    host: options.host,
-    ...(options.port === undefined ? {} : { port: options.port }),
-    ...(options.allowNonLoopback ? { allowNonLoopback: true } : {}),
-    ...(options.noHttp ? { noHttp: true } : {}),
+    paths: servicePaths(options.dataDir),
+    command: serviceCommand({
+      root: options.dataDir,
+      cwd: options.cwd,
+      host: options.host,
+      ...(options.port === undefined ? {} : { port: options.port }),
+      ...(options.allowNonLoopback ? { allowNonLoopback: true } : {}),
+      ...(options.noHttp ? { noHttp: true } : {}),
+    }),
   });
   reportEndpoints(live.registration, "服务就绪");
   return 0;
@@ -59,24 +61,27 @@ async function startDetached(options: ServiceStartOptions): Promise<number> {
 
 /** 前台形态：detached 子进程跑的就是它，也用于调试（Ctrl-C 即停）。 */
 async function runForeground(options: ServiceStartOptions): Promise<number> {
+  if (options.stdio) return runEmbeddedStdio(options);
   const paths = servicePaths(options.dataDir);
-  const releaseLock = await acquireServiceLock(paths, options.dataDir);
+  const releaseLock = await acquireInstanceLock(paths);
 
-  let core: Awaited<ReturnType<typeof createCore>> | undefined;
+  let service: Awaited<ReturnType<typeof createService>> | undefined;
   const bindings: TransportBinding[] = [];
   try {
-    core = await createCore({
+    service = await createService({
       dataDir: options.dataDir,
       cwd: options.cwd,
       defaultAutonomy: options.autonomy,
     });
 
-    await mkdir(paths.dir, { recursive: true, mode: 0o700 });
+    await mkdir(paths.runtimeDir, { recursive: true, mode: 0o700 });
     // 上次可能是被 kill -9 的：陈旧 socket 文件会让 listen 直接失败（EADDRINUSE）。
     if (paths.socket !== undefined) await unlink(paths.socket).catch(() => undefined);
 
     const rpc =
-      paths.socket === undefined ? undefined : createRpcBinding(core, { socketPath: paths.socket });
+      paths.socket === undefined
+        ? undefined
+        : createRpcBinding(service, { socketPath: paths.socket });
     if (rpc !== undefined) {
       await rpc.start();
       bindings.push(rpc);
@@ -88,7 +93,7 @@ async function runForeground(options: ServiceStartOptions): Promise<number> {
     // 静态资源缺失不是错误：服务只是少一条"浏览器直接打开"的通路。
     let staticDir: string | undefined;
     try {
-      staticDir = await resolveWebAssets();
+      staticDir = await resolveWebAssets(options.webAssets);
     } catch (error) {
       log(
         `Web 壳静态资源不可用（${error instanceof Error ? error.message : String(error)}）：` +
@@ -99,7 +104,7 @@ async function runForeground(options: ServiceStartOptions): Promise<number> {
     // `--no-http`：只留 unix socket。环回端口对本机任意进程开放，不需要浏览器时关掉它更干净。
     const http = options.noHttp
       ? undefined
-      : createHttpBinding(core, {
+      : createHttpBinding(service, {
           host: options.host,
           ...(options.port === undefined ? {} : { port: options.port }),
           ...(staticDir === undefined ? {} : { staticDir }),
@@ -115,8 +120,9 @@ async function runForeground(options: ServiceStartOptions): Promise<number> {
 
     const registration = {
       pid: process.pid,
-      coreId: core.coreId,
-      dataDir: core.dataDir,
+      serviceId: service.coreId,
+      dataVersion: paths.dataDir.slice(paths.root.length + 1),
+      dataDir: paths.dataDir,
       startedAt: new Date().toISOString(),
       endpoints: {
         ...(rpc === undefined ? {} : { unix: paths.socket }),
@@ -127,39 +133,64 @@ async function runForeground(options: ServiceStartOptions): Promise<number> {
     };
     await writeRegistration(paths, registration);
     log(
-      `服务就绪：pid=${registration.pid} coreId=${registration.coreId} 数据层=${registration.dataDir}`,
+      `服务就绪：pid=${registration.pid} serviceId=${registration.serviceId} 数据根=${paths.root}`,
     );
     reportEndpoints(registration, "服务端点");
 
     await waitForShutdown();
-    log("收到退出信号：释放 owner 租约并关闭会话运行时……");
+    log("收到退出信号：关闭会话运行时与传输……");
   } finally {
     for (const binding of bindings) await binding.stop().catch(() => undefined);
-    await core?.close().catch(() => undefined);
+    await service?.close().catch(() => undefined);
     await clearRegistration(paths);
     await releaseLock();
   }
   return 0;
 }
 
+/**
+ * 嵌入式形态（`--stdio`）：给**父进程 spawn** 的壳用（桌面壳就是这么起后端的）。
+ *
+ * 与常驻形态的差别是刻意的：不写注册表、不占实例锁、不开环回端口——
+ * 它的生命周期完全由父进程掌握，与"数据根上那个常驻服务"是两回事。
+ */
+async function runEmbeddedStdio(options: ServiceStartOptions): Promise<number> {
+  const service = await createService({
+    dataDir: options.dataDir,
+    cwd: options.cwd,
+    defaultAutonomy: options.autonomy,
+  });
+  const stdio = createStdioBinding(service);
+  try {
+    await stdio.start();
+    log("服务就绪：stdio（嵌入式，父进程持有生命周期）");
+    await waitForShutdown();
+  } finally {
+    await stdio.stop().catch(() => undefined);
+    await service.close().catch(() => undefined);
+  }
+  return 0;
+}
+
 export async function runServiceStatus(options: { dataDir: string }): Promise<number> {
-  const live = await findLiveService(options.dataDir);
+  const live = await findLiveService(servicePaths(options.dataDir));
   if (live === undefined) {
     log("服务未运行。");
-    log(`  数据层：${options.dataDir}`);
+    log(`  数据根：${options.dataDir}`);
     const name = getBrand().productName;
     log(`  启动：${name} service start（或直接跑 ${name} web / ${name} tui，壳会自动拉起）`);
     return 1;
   }
-  const { registration } = live;
+  const { registration, paths } = live;
   log("服务运行中。");
   log(`  pid：${registration.pid}`);
-  log(`  coreId：${registration.coreId}`);
-  log(`  数据层：${registration.dataDir}`);
+  log(`  serviceId：${registration.serviceId}`);
+  log(`  数据根：${paths.root}`);
+  log(`  数据格式：${registration.dataVersion}`);
   log(`  启动于：${registration.startedAt}`);
   reportEndpoints(registration, "端点");
 
-  const count = await sessionCount(live.registration).catch(() => undefined);
+  const count = await sessionCount(registration).catch(() => undefined);
   log(`  会话数：${count === undefined ? "（查询失败）" : String(count)}`);
   return 0;
 }

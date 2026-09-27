@@ -17,13 +17,13 @@ const WELCOME = {
   capabilities: ["sessions.read"],
   grantedCapabilities: ["sessions.read"],
   trustLevel: "local",
-  dataLayerVersion: 1,
+  dataFormatVersion: "v1",
   sessions: [],
   resumeAck: null,
 };
 
 type FakeTransport = Transport & {
-  /** 测试注入：模拟核心层发来一条原始消息。 */
+  /** 测试注入：模拟服务层发来一条原始消息。 */
   emit(raw: unknown): void;
   /** 测试注入：模拟事件流断开。 */
   break(reason: string): void;

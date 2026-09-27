@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@12.4.1",
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json",
@@ -20,17 +20,11 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@types/node": "catalog:",
-    "@ucode/binding-http": "workspace:*",
-    "@ucode/binding-rpc": "workspace:*",
-    "@ucode/binding-stdio": "workspace:*",
-    "@ucode/binding-ws": "workspace:*",
     "@ucode/branding": "workspace:*",
     "@ucode/cli": "workspace:*",
-    "@ucode/core": "workspace:*",
-    "@ucode/data-layer-spec": "workspace:*",
     "@ucode/protocol": "workspace:*",
     "@ucode/sdk": "workspace:*",
-    "@ucode/store": "workspace:*",
+    "@ucode/service": "workspace:*",
     "oxc-parser": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

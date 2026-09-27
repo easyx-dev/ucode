@@ -15,7 +15,7 @@ import { Badge, Button, Card } from "./primitives.tsx";
  * **支持包**（一键导出脱敏的 `.json.gz`，显示路径与体积）、
  * **迁移**（先只读预检，看清冲突与阻塞再决定是否导入）。
  *
- * 面板不做任何聚合或脱敏——那些在核心层；这里只是把结果摆出来、把动作接上。
+ * 面板不做任何聚合或脱敏——那些在服务层；这里只是把结果摆出来、把动作接上。
  */
 
 export function InsightsPanel({ onClose }: { onClose: () => void }): ReactNode {

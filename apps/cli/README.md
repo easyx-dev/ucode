@@ -1,24 +1,24 @@
 # @ucode/cli
 
-统一的启动入口（`bin`）：内置 Web 与 TUI 壳，也能只启动核心层。
+统一的启动入口（`bin`）：管理常驻服务，并内置 Web 与 TUI 壳。
 
 ## 职责
 
 - 解析命令行参数，按子命令分派。
 - `service`：**常驻的唯一后端**（BS 架构的服务端），所有壳都是它的客户端。
-- `core start`：起 headless 核心层并选一条绑定（脱离控制层单独跑时用）。
+- `service start`：起常驻的唯一后端；`--foreground --stdio` 是嵌入式形态（父进程 spawn 的壳用）。
 - `web` / `tui`：打开内置壳。默认都是"确保本机服务在跑，再连它"。
-- `provider` / `node`：维护模型供应商配置与核心层节点登记。
-- **不做**：不含业务逻辑，一律调用 `@ucode/core`、绑定包与各壳。
+- `provider` / `node`：维护模型供应商配置与服务层节点登记。
+- **不做**：不含业务逻辑，一律调用 `@ucode/service`、`@ucode/sdk` 与各壳。
 
 ## 子命令
 
 | 子命令 | 作用 |
 |---|---|
 | `service start` | 拉起常驻服务后返回；`--foreground` 前台运行（Ctrl-C 即停）；`--no-http` 只留 unix socket |
-| `service status` / `stop` | 查看（pid / 端点 / 数据层 / 会话数）/ 优雅停止并清理注册 |
+| `service status` / `stop` | 查看（pid / 端点 / 数据根 / 会话数）/ 优雅停止并清理注册 |
 | `service logs [-f]` | 查看服务日志（`-f` 持续跟踪） |
-| `core start` | 启动核心层，`--binding stdio\|rpc\|http\|ws`（默认 `stdio`） |
+| `service start --foreground --stdio` | 嵌入式形态：只服务 stdio，不注册端点、不占实例锁 |
 | `web` | 打开 Web 壳：确保服务在跑并打印地址（`--open` 顺带开浏览器）；`--foreground` 前台把服务跑起来 |
 | `tui` | 启动内置 TUI 壳；默认连本机服务（没有就拉起），`--core <endpoint>` 连别处 |
 | `provider add` | 写入模型供应商配置（`--base-url`、`--model`，可选 `--api-key` / `--id` / `--api`） |
@@ -26,7 +26,7 @@
 | `node add` | 登记节点（`--name` + `--url`，或 `--socket` / `--host` / `--port`） |
 | `node list` / `node remove` | 列出 / 移除已登记的节点 |
 
-全局参数：`--data-dir`、`--cwd`、`-h/--help`、`-v/--version`。`service start` 另有 `--host`（默认环回）、`--port`、`--autonomy`、`--allow-non-loopback`、`--no-http`；`core start` 另有 `--binding`、`--socket`；`web` 另有 `--foreground`、`--open`。
+全局参数：`--data-dir`（数据根）、`--cwd`、`-h/--help`、`-v/--version`。`service start` 另有 `--foreground`、`--stdio`（嵌入式）、`--host`（默认环回）、`--port`、`--autonomy`、`--allow-non-loopback`、`--no-http`；`web` 另有 `--foreground`、`--open`。
 
 ## 运行
 
@@ -36,7 +36,7 @@ pnpm ucode web --open             # 打开 Web 壳（服务没跑就先拉起）
 pnpm ucode tui                    # 连本机服务；--core http://127.0.0.1:3000 连别处
 pnpm ucode service status         # pid / 端点 / 数据层 / 会话数
 pnpm ucode service stop
-pnpm ucode core start --binding rpc --socket /tmp/core.sock   # 只起核心层，不注册为服务
+pnpm ucode service start --foreground --stdio                 # 嵌入式：只服务 stdio（父进程 spawn 的壳用）
 pnpm ucode provider add --base-url <端点> --model <模型> --api-key <密钥>
 ```
 
@@ -44,9 +44,9 @@ pnpm ucode provider add --base-url <端点> --model <模型> --api-key <密钥>
 
 ## 依赖位置
 
-依赖 `@ucode/core`、`@ucode/sdk`、四个绑定包、`@ucode/branding`（含 `@ucode/branding/node`）、`@ucode/protocol`，以及 `@ucode/tui`、`@ucode/web`。
+依赖 `@ucode/service`、`@ucode/sdk`、四个绑定包、`@ucode/branding`（含 `@ucode/branding/node`）、`@ucode/protocol`，以及 `@ucode/tui`、`@ucode/web`。
 
-**本包是唯一允许直接依赖 `@ucode/core` 的一方**；各壳不得依赖核心层（反向验收会拦）。
+**本包是唯一允许直接依赖 `@ucode/service` 的一方**；各壳不得依赖服务层（反向验收会拦）。
 
 权威来源：[tools/boundaries.json](../../tools/boundaries.json) 的 `@ucode/cli` 条目。
 

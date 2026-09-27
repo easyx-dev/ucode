@@ -14,9 +14,19 @@ import { log } from "./runtime.ts";
 /**
  * Web 壳的构建产物目录。
  *
- * 从 `@ucode/web` 的包清单定位，而不是按仓库相对路径猜——这样打包后仍然成立。
+ * 两种来源：
+ * - **显式目录**（`--web-assets`）：打包后的桌面壳把 Web 产物放进自己的 bundle 目录，
+ *   那里没有 workspace 包树，只能由主进程告诉服务层产物在哪；
+ * - **从 `@ucode/web` 的包清单定位**（默认）：不按仓库相对路径猜，开发形态与安装形态都成立。
  */
-export async function resolveWebAssets(): Promise<string> {
+export async function resolveWebAssets(explicitDir?: string): Promise<string> {
+  if (explicitDir !== undefined && explicitDir !== "") {
+    const index = join(explicitDir, "index.html");
+    if (!existsSync(index)) {
+      throw new Error(`--web-assets 指向的目录里没有 index.html：${explicitDir}`);
+    }
+    return explicitDir;
+  }
   let manifestPath: string;
   try {
     manifestPath = import.meta.resolve("@ucode/web/package.json");

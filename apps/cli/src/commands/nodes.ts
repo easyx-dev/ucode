@@ -6,7 +6,7 @@ import { describeNode, type NodeEndpoint, type NodeRecord, NodeRegistry } from "
  * 节点注册表（F-6.3）：CLI 侧的持久化与展示。
  *
  * 注册表是**控制层的数据**（跟着设备走），所以文件放在数据层目录旁边即可——
- * 本机 CLI 与核心层同机，这样查/改都近。sdk 只提供纯逻辑与序列化，磁盘由这里负责
+ * 本机 CLI 与服务层同机，这样查/改都近。sdk 只提供纯逻辑与序列化，磁盘由这里负责
  * （sdk 不碰 node:fs，浏览器里才用 localStorage）。
  */
 

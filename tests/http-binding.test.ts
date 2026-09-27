@@ -1,26 +1,25 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createBinding } from "@ucode/binding-http";
-import { type Core, createCore } from "@ucode/core";
 import { PROTOCOL_VERSION } from "@ucode/protocol";
+import { createHttpBinding, createService, type Service, servicePaths } from "@ucode/service";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   type FakeProvider,
   startFakeProvider,
-} from "../packages/core/src/testing/fake-provider.ts";
+} from "../packages/service/src/testing/fake-provider.ts";
 
 /**
  * HTTP + SSE 绑定的线格式与配对测试（进程内）。
  *
  * 验三件事：
  * 1. 下行 SSE 推、上行 POST 提交，按 `x-client-id` 配对到同一条协议 C 连接；
- * 2. 纯请求-应答的传输上，交互面的**配对**成立（核心层发 ui.request，控制层 POST 回 ui.response）；
+ * 2. 纯请求-应答的传输上，交互面的**配对**成立（服务层发 ui.request，控制层 POST 回 ui.response）；
  * 3. 暴露面规则生效：监听非环回且未显式声明 → **拒绝启动**（spec §5.3）。
  */
 
-let core: Core | undefined;
-let binding: ReturnType<typeof createBinding> | undefined;
+let core: Service | undefined;
+let binding: ReturnType<typeof createHttpBinding> | undefined;
 let provider: FakeProvider | undefined;
 let dataDir: string | undefined;
 
@@ -56,13 +55,13 @@ async function startHarness(
 ): Promise<Harness> {
   provider = await startFakeProvider({ defaultReply: { text: options.reply ?? "HTTP 回答。" } });
   dataDir = await mkdtemp(join(tmpdir(), "http-binding-"));
-  await provider.writeModelsJson(dataDir);
-  core = await createCore({
+  await provider.writeModelsJson(servicePaths(dataDir).piDir);
+  core = await createService({
     dataDir,
     cwd: dataDir,
     interactionTimeoutMs: options.interactionTimeoutMs ?? 2_000,
   });
-  binding = createBinding(core, {
+  binding = createHttpBinding(core, {
     port: 0,
     ...(options.staticDir === undefined ? {} : { staticDir: options.staticDir }),
   });
@@ -276,17 +275,19 @@ describe("HTTP + SSE 绑定", () => {
   it("监听非环回且未显式声明：拒绝启动", async () => {
     provider = await startFakeProvider();
     dataDir = await mkdtemp(join(tmpdir(), "http-binding-"));
-    await provider.writeModelsJson(dataDir);
-    core = await createCore({ dataDir, cwd: dataDir });
-    expect(() => createBinding(core as Core, { host: "0.0.0.0", port: 0 })).toThrow(/拒绝启动/);
+    await provider.writeModelsJson(servicePaths(dataDir).piDir);
+    core = await createService({ dataDir, cwd: dataDir });
+    expect(() => createHttpBinding(core as Service, { host: "0.0.0.0", port: 0 })).toThrow(
+      /拒绝启动/,
+    );
   });
 
   it("显式允许非环回：信任级别降为 untrusted（只读 + 对话）", async () => {
     provider = await startFakeProvider();
     dataDir = await mkdtemp(join(tmpdir(), "http-binding-"));
-    await provider.writeModelsJson(dataDir);
-    core = await createCore({ dataDir, cwd: dataDir });
-    const unsafe = createBinding(core, { host: "0.0.0.0", port: 0, allowNonLoopback: true });
+    await provider.writeModelsJson(servicePaths(dataDir).piDir);
+    core = await createService({ dataDir, cwd: dataDir });
+    const unsafe = createHttpBinding(core, { host: "0.0.0.0", port: 0, allowNonLoopback: true });
     expect(unsafe.trustLevel).toBe("untrusted");
     // 不 start（本地环境未必允许监听 0.0.0.0），只验证声明与信任级别
   });

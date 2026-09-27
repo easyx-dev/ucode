@@ -5,7 +5,7 @@ import { connect } from "../agent-sdk.ts";
 /**
  * 自动化任务的 SDK 面（F-4.5）：命令发对了、应答映射进了状态。
  *
- * 用假传输按命令名自动应答，专测"命令面 → 状态"的映射，不依赖核心层进程。
+ * 用假传输按命令名自动应答，专测"命令面 → 状态"的映射，不依赖服务层进程。
  */
 
 const WELCOME = {
@@ -15,7 +15,7 @@ const WELCOME = {
   capabilities: ["sessions.read", "sessions.write", "prompt.run"],
   grantedCapabilities: ["sessions.read", "sessions.write", "prompt.run"],
   trustLevel: "local",
-  dataLayerVersion: 1,
+  dataFormatVersion: "v1",
   sessions: [],
   resumeAck: null,
 };

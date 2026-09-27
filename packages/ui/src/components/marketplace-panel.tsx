@@ -14,7 +14,7 @@ import { Badge, Button, Card } from "./primitives.tsx";
  * 三块内容：**源**（用户登记的可装插件的地方，local 目录或 remote 清单）、
  * **目录**（点开源才读，按需拉取）、**已装**（数据层里现在有什么，按类型分组，可卸载）。
  *
- * 面板只做展示与动作转发；装/卸、清单解析、落盘都在核心层（协议命令）。
+ * 面板只做展示与动作转发；装/卸、清单解析、落盘都在服务层（协议命令）。
  */
 
 export function MarketplacePanel({ onClose }: { onClose: () => void }): ReactNode {

@@ -1,6 +1,11 @@
 import { join } from "node:path";
 import { getBrand } from "@ucode/branding";
-import { addProviderConfig, listAvailableModels, listProviderSummaries } from "@ucode/core";
+import {
+  addProviderConfig,
+  listAvailableModels,
+  listProviderSummaries,
+  servicePaths,
+} from "@ucode/service";
 import { log } from "../runtime.ts";
 
 /**
@@ -31,7 +36,7 @@ export async function runProviderAdd(options: ProviderAddOptions): Promise<numbe
     models: [{ id: options.model, name: options.model, input: ["text"] }],
     makeDefault: true,
   });
-  log(`已写入供应商配置：${join(options.dataDir, "models.json")}`);
+  log(`已写入供应商配置：${servicePaths(options.dataDir).models}`);
   log(
     `  供应商 ${options.id} · 端点 ${options.baseUrl} · 模型 ${options.model}` +
       (outcome.created ? "" : "（已存在，已覆盖）"),

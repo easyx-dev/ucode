@@ -11,14 +11,14 @@ import { PROTOCOL_VERSION } from "./version.ts";
  * 2. **版本双向校验**：双方都校验，不支持则显式拒绝（欢迎消息带 CoreRejected 分支）；
  * 3. **从不静默降级**：不匹配是显式错误。
  *
- * 注意：**客户端不报信任级别**（ADR-004）。信任由核心层侧的绑定声明，welcome 里回告。
+ * 注意：**客户端不报信任级别**（ADR-004）。信任由服务层侧的绑定声明，welcome 里回告。
  */
 
 /** 控制层自称的形态，仅用于显示与审计；不参与任何权限判断。 */
 export const ClientKindSchema = z.enum(["cli", "tui", "web", "desktop", "test", "unknown"]);
 export type ClientKind = z.infer<typeof ClientKindSchema>;
 
-/** 身份载荷：信息性，不涉及可验证性（spec §4.3）。核心层只记下"这条 attachment 属于谁"。 */
+/** 身份载荷：信息性，不涉及可验证性（spec §4.3）。服务层只记下"这条 attachment 属于谁"。 */
 export const IdentitySchema = z.object({
   user: z.string().nullable(),
   device: z.string().nullable(),
@@ -37,7 +37,7 @@ export const HelloSchema = z.object({
   /** 认证载荷：首发恒为空（置位不实现，spec §5.3）。 */
   auth: z.null().default(null),
   identity: IdentitySchema.default({ user: null, device: null }),
-  /** 断线续传：带上上次收到的位置，请核心层补齐缺失部分。 */
+  /** 断线续传：带上上次收到的位置，请服务层补齐缺失部分。 */
   resume: z
     .object({
       sessionId: z.string(),
@@ -52,14 +52,14 @@ export const WelcomeSchema = z.object({
   type: z.literal("welcome"),
   protocolVersion: z.number().int().positive(),
   coreId: z.string(),
-  /** 核心层声明自己支持的能力全集。 */
+  /** 服务层声明自己支持的能力全集。 */
   capabilities: z.array(CapabilitySchema),
   /** 按信任矩阵实际授予这条 attachment 的能力。 */
   grantedCapabilities: z.array(CapabilitySchema),
-  /** 核心层为这条通路判定的信任级别（不是客户端自报）。 */
+  /** 服务层为这条通路判定的信任级别（不是客户端自报）。 */
   trustLevel: TrustLevelSchema,
-  /** 协议 D 的数据层版本，便于诊断。 */
-  dataLayerVersion: z.number().int().nonnegative(),
+  /** 磁盘数据格式版本（如 `v1`）：便于诊断"壳与服务看的不是同一份布局"。 */
+  dataFormatVersion: z.string(),
   sessions: z.array(SessionSummarySchema),
   /** 续传时告知客户端"你的游标是否还有效"。 */
   resumeAck: z

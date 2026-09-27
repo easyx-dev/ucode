@@ -24,12 +24,11 @@ export const COMMANDS = [
   { name: "service stop", summary: "停止服务（优雅退出：释放租约并清注册）" },
   { name: "service logs", summary: "查看服务日志（-f 持续跟踪）" },
   { name: "trust", summary: "项目信任：`trust` 授信当前目录（也可 `--list` / `--revoke`）" },
-  { name: "core start", summary: "启动核心层（headless，可脱离控制层单独运行）" },
   { name: "web", summary: "打开 Web 壳（确保服务在跑，然后把浏览器指向它）" },
   { name: "tui", summary: "启动内置 TUI 壳（默认连本机服务，没有就拉起）" },
   { name: "provider add", summary: "写入模型供应商配置（本地权威，写进数据层的 models.json）" },
   { name: "provider list", summary: "列出当前可用的模型" },
-  { name: "node add", summary: "登记一个核心层节点（本机或直连远端；凭据放 OS 凭据存储）" },
+  { name: "node add", summary: "登记一个服务层节点（本机或直连远端；凭据放 OS 凭据存储）" },
   { name: "node list", summary: "列出已登记的节点" },
   { name: "node remove", summary: "移除一个已登记的节点" },
 ] as const;
@@ -37,7 +36,6 @@ export const COMMANDS = [
 export type ParsedCli =
   | { kind: "help" }
   | { kind: "version" }
-  | { kind: "core.start"; options: CoreStartOptions }
   | { kind: "service.start"; options: ServiceStartOptions }
   | { kind: "service.status"; options: GlobalOptions }
   | { kind: "service.stop"; options: GlobalOptions }
@@ -71,18 +69,8 @@ export type ProviderAddOptions = GlobalOptions & {
   api: string;
 };
 
-export type BindingName = "stdio" | "rpc" | "http" | "ws";
-
-export type CoreStartOptions = GlobalOptions & {
-  binding: BindingName;
-  socketPath?: string;
-  host: string;
-  port?: number;
-  /** 启动时就把默认自主级别定下来（新建会话用）。 */
-  autonomy: "confirm" | "auto-edit" | "plan" | "full-access";
-  /** 显式允许非环回监听（信任级别会降为 untrusted）。 */
-  allowNonLoopback: boolean;
-};
+/** 自主级别：新建会话时的默认值。 */
+export type AutonomyOption = "confirm" | "auto-edit" | "plan" | "full-access";
 
 export type WebOptions = GlobalOptions & {
   host: string;
@@ -97,12 +85,16 @@ export type WebOptions = GlobalOptions & {
 export type ServiceStartOptions = GlobalOptions & {
   /** 前台运行；省略则把自己 detach 出去常驻。 */
   foreground: boolean;
+  /** 嵌入式形态：只服务 stdio（父进程 spawn 的壳用），不注册端点、不占实例锁。 */
+  stdio: boolean;
   host: string;
   port?: number;
   allowNonLoopback: boolean;
   /** 只留 unix socket，不监听环回 HTTP（不需要浏览器时更干净）。 */
   noHttp: boolean;
-  autonomy: CoreStartOptions["autonomy"];
+  /** Web 壳产物的显式目录（打包后的桌面壳用它把产物指给服务层）。 */
+  webAssets?: string;
+  autonomy: AutonomyOption;
 };
 
 export type ServiceLogsOptions = GlobalOptions & {
@@ -117,7 +109,7 @@ export type TrustOptions = GlobalOptions & {
 };
 
 export type TuiOptions = GlobalOptions & {
-  /** 连一个已经在跑的核心层/服务；省略则确保本机服务在跑再连它。 */
+  /** 连一个已经在跑的服务层/服务；省略则确保本机服务在跑再连它。 */
   coreEndpoint?:
     | { kind: "rpc"; socketPath?: string; host?: string; port?: number }
     | { kind: "http"; baseUrl: string };
@@ -146,45 +138,8 @@ function resolveDataDir(value: string | undefined): GlobalOptions {
 
 export function parseCli(argv: string[]): ParsedCli {
   const [first, second, ...rest] = argv;
-  const isCoreStart = first === "core" && second === "start";
 
   try {
-    if (isCoreStart) {
-      const parsed = parseArgs({
-        args: rest,
-        options: {
-          ...SHARED_OPTIONS,
-          binding: { type: "string", default: "stdio" },
-          socket: { type: "string" },
-          host: { type: "string", default: "127.0.0.1" },
-          port: { type: "string" },
-          autonomy: { type: "string", default: "confirm" },
-          "allow-non-loopback": { type: "boolean", default: false },
-        },
-        allowPositionals: true,
-      });
-      if (parsed.values.help === true) return { kind: "help" };
-      if (parsed.values.version === true) return { kind: "version" };
-      const binding = parsed.values.binding as BindingName;
-      if (!["stdio", "rpc", "http", "ws"].includes(binding)) {
-        return { kind: "error", message: `未知的绑定：${binding}`, code: 2 };
-      }
-      const base = resolveDataDir(parsed.values["data-dir"]);
-      return {
-        kind: "core.start",
-        options: {
-          ...base,
-          cwd: parsed.values.cwd ?? base.cwd,
-          binding,
-          ...(parsed.values.socket === undefined ? {} : { socketPath: parsed.values.socket }),
-          host: parsed.values.host,
-          ...(parsed.values.port === undefined ? {} : { port: Number(parsed.values.port) }),
-          autonomy: parsed.values.autonomy as CoreStartOptions["autonomy"],
-          allowNonLoopback: parsed.values["allow-non-loopback"] === true,
-        },
-      };
-    }
-
     if (first === "service") {
       const sub = second;
       if (sub === "start") {
@@ -193,9 +148,11 @@ export function parseCli(argv: string[]): ParsedCli {
           options: {
             ...SHARED_OPTIONS,
             foreground: { type: "boolean", default: false },
+            stdio: { type: "boolean", default: false },
             host: { type: "string", default: "127.0.0.1" },
             port: { type: "string" },
             "no-http": { type: "boolean", default: false },
+            "web-assets": { type: "string" },
             autonomy: { type: "string", default: "confirm" },
             "allow-non-loopback": { type: "boolean", default: false },
           },
@@ -208,12 +165,16 @@ export function parseCli(argv: string[]): ParsedCli {
           options: {
             ...base,
             cwd: parsed.values.cwd ?? base.cwd,
-            foreground: parsed.values.foreground === true,
+            foreground: parsed.values.foreground === true || parsed.values.stdio === true,
+            stdio: parsed.values.stdio === true,
             host: parsed.values.host,
             ...(parsed.values.port === undefined ? {} : { port: Number(parsed.values.port) }),
             allowNonLoopback: parsed.values["allow-non-loopback"] === true,
             noHttp: parsed.values["no-http"] === true,
-            autonomy: parsed.values.autonomy as CoreStartOptions["autonomy"],
+            ...(parsed.values["web-assets"] === undefined
+              ? {}
+              : { webAssets: parsed.values["web-assets"] }),
+            autonomy: parsed.values.autonomy as AutonomyOption,
           },
         };
       }

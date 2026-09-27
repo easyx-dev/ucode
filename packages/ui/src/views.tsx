@@ -117,7 +117,6 @@ export function SessionSidebar({ productName }: { productName: string }): ReactN
                         <span className="truncate font-medium">
                           {session.name ?? session.id.slice(0, 10)}
                         </span>
-                        {session.owned && <Badge tone="accent">owner</Badge>}
                         {session.archived && <Badge>已归档</Badge>}
                         <span className="ml-auto shrink-0 text-[10px]">{session.entryCount}</span>
                       </span>
@@ -598,7 +597,7 @@ export function Composer({
     <div className="border-t border-[var(--color-border-subtle)] p-3">
       {readOnly && (
         <p className="mb-2 rounded bg-[oklch(0.34_0.06_80)] px-2 py-1 text-[11px] text-[var(--color-warn)]">
-          该会话是只读挂载：写权限在另一个核心层实例手上（同一会话只允许一个 writer）。
+          该会话当前只读：本机没有它的写权限。
         </p>
       )}
       {!modelAvailable && !readOnly && (
