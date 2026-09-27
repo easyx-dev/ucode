@@ -6,7 +6,7 @@
  * URL scheme 一律从品牌配置读取，代码里不得出现字面量——否则 B 端换一份品牌配置
  * 重新构建时，这些字面量就是漏改的硬编码。
  *
- * 范围：本仓第一方源码（.ts/.tsx/.mjs/.cjs/.js），排除品牌配置自身、spike/、依赖与产物。
+ * 范围：本仓第一方源码（.ts/.tsx/.mjs/.cjs/.js），排除品牌配置自身、依赖与产物。
  * 例外：以 @ 开头的包 scope 标识（如 @ucode/protocol）属编译期标识，机械替换即可，不算违规。
  *
  * 用法：node tools/check-brand-literals.ts [--root <目录>]（--root 供门禁自测用）

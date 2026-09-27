@@ -11,7 +11,6 @@
       "!**/dist",
       "!**/node_modules",
       "!**/coverage",
-      "!spike",
       "!**/__gate_probe*",
       "!**/*.css",
       "!**/dist-renderer",

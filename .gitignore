@@ -12,7 +12,6 @@ results/
 .env
 .env.*
 !.env.example
-spike/.env
 
 # 门禁自测写入的临时探针文件
 **/__gate_probe*

@@ -3,7 +3,7 @@
  * 依赖边界门禁。
  *
  * 规则来源是允许列表（tools/boundaries.json），不是禁止列表——新增包、新增依赖
- * 都必须显式登记，否则直接报错。对应 docs/spec/01-架构.md §7.2 与 §7.3。
+ * 都必须显式登记，否则直接报错。对应 docs/archive/01-架构.md §7.2 与 §7.3。
  *
  * 用 Oxc 的解析器取导入说明符（静态 import / 再导出 / 动态 import 的字面量）：
  * 它与 TypeScript 编译器解耦——TS 7 尚未发布 JS API，编译器 API 类工具（dependency-cruiser、
@@ -17,7 +17,7 @@
  *  5. 相对导入不得逃出本包目录；
  *  6. 外部依赖必须已在 package.json 声明；
  *  7. 无法静态解析的动态导入必须显式登记豁免；
- *  8. 反向验收：forbiddenTransitive 列出的传递依赖不得出现（如只装壳时不得含核心层）。
+ *  8. 反向验收：forbiddenTransitive 列出的传递依赖不得出现（如只装壳时不得含服务层）。
  *
  * 用法：node tools/check-boundaries.ts [--root <目录>]（--root 供门禁自测用）
  */
@@ -276,7 +276,7 @@ function main(): number {
     process.stderr.write(`  ${v.file}:${v.line}  ${v.message}\n`);
   }
   process.stderr.write(
-    `\n共 ${violations.length} 处违规。允许列表见 tools/boundaries.json；依据见 docs/spec/01-架构.md §7.2。\n`,
+    `\n共 ${violations.length} 处违规。允许列表见 tools/boundaries.json；依据见 docs/archive/01-架构.md §7.2。\n`,
   );
   return 1;
 }
