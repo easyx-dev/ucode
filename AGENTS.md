@@ -53,7 +53,7 @@ uhub ──▶ protocol, branding
   2. **sdk 保持 headless**——不 import ui、不假设 DOM，TUI 才能只复用 sdk。
 - **传输走 sdk 子路径**（I-6）：`@ucode/sdk/http` / `@ucode/sdk/stdio` / `@ucode/sdk/rpc` / `@ucode/sdk/ws` / `@ucode/sdk/node-transport`。浏览器只 import 自己那一份，`node:net` / `node:child_process` 不进打包结果，同时保住 `apps/* → sdk` 这条边（不新增 `apps/* → bindings/*`）。
 - **`tools/check-boundaries.ts` 用 Oxc 解析器**（`oxc-parser`）取导入说明符，不依赖 TypeScript 编译器 JS API。原因：本项目用 TS 7（原生编译器，尚未发布 JS API），依赖编译器 API 的工具（dependency-cruiser / typescript-eslint 系）在 TS 源码上会巡游 0 个模块、**门禁静默失效**（已实测）。门禁同时检查"声明了却没导入""导入了却没声明""相对导入穿墙"。
-- **门禁必须自证会拦人**：`tests/gates.spec.ts` 既在合成工作区里逐条覆盖每种违规分支，也在真实仓库里注入一处真实违规证明策略拦得住——禁止"配置存在"式自证。
+- **门禁必须自证会拦人**：`tests/gates.test.ts` 既在合成工作区里逐条覆盖每种违规分支，也在真实仓库里注入一处真实违规证明策略拦得住——禁止"配置存在"式自证。
 
 ### 品牌参数化（硬规则）
 
@@ -147,10 +147,12 @@ uhub ──▶ protocol, branding
 
 ## 测试约定
 
-- 测试文件与被测模块**同目录**，命名 `*.test.ts` / `*.spec.ts`；跨包端到端放 `tests/`；真实模型冒烟放 `spike/`（dev-only，可弃，会消耗额度）。
-- **核心层测试用录制式假供应商**（`packages/core/src/testing/fake-provider.ts`），确定性、零成本、不依赖网络——真实模型验证只在明确需要时做。
-- **门禁自测**（`tests/gates.spec.ts`）证明门禁真的会拦人，而不是"配置存在"。
-- 每个导出函数至少覆盖正常 / 边界 / 错误路径；`describe` 对应被测函数名，`it` 用中文描述场景。
+- **位置**：测试文件放在被测模块**同目录的 `__tests__/` 子目录**，命名 `<模块名>.test.ts`（与 fsdx-web 同源）；允许按子功能拆分命名（如核心层端到端 `core-<主题>.test.ts`）。跨包端到端与门禁自测放顶层 `tests/`；真实模型冒烟放 `spike/`（dev-only、可弃、消耗额度）。
+- **命名**：单元测试 `describe` == **被测函数名**（一个 describe 覆盖多个导出就拆成嵌套 describe，叶子层为函数名；schema / 常量测试用被测对象名）；**集成 / 端到端 / conformance** 用中文**场景主题**。`it` 一律中文，说清"什么条件下期望什么"，不用 `should ...` 模板。
+- **覆盖**：每个导出函数至少覆盖正常 1–2 / 边界 1–2 / 错误 1。
+- **体积**：测试文件同样受 600 行约束，超了按主题拆分（`core.test.ts` 曾 1412 行，已按域拆为 18 个文件）。
+- **核心层测试用录制式假供应商**（`packages/core/src/testing/fake-provider.ts`），确定性、零成本、不依赖网络；核心层端到端的共享 harness 在 `packages/core/src/testing/core-harness.ts`——真实模型验证只在明确需要时做。
+- **门禁自测**（`tests/gates.test.ts`）证明门禁真的会拦人，而不是"配置存在"。
 - 需要 AI 模型信息时用**环境变量 / `spike/.env` 注入**，密钥从 `spike/.env` 读取（已 gitignore），**绝不写进源码或测试**。
 - 改完代码**必须**执行 `pnpm check`（类型 + Biome + 两道门禁 + 全量测试）。
 
