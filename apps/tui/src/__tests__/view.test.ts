@@ -7,6 +7,7 @@ import {
   formatItem,
   helpText,
   hintLine,
+  interactionPrompt,
   sessionItems,
   statusLine,
   transcriptLines,
@@ -91,6 +92,62 @@ describe("formatItem", () => {
         timestamp: "",
       }),
     ).toContain("[待决交互] confirm");
+  });
+});
+
+describe("interactionPrompt", () => {
+  const request = (method: string, params: Record<string, unknown>) =>
+    ({
+      type: "ui.request",
+      id: "r1",
+      sessionId: "s1",
+      method,
+      params,
+      origin: "permission",
+    }) as never;
+
+  it("select 出选项列表（工具批准就是这一档）", () => {
+    const prompt = interactionPrompt(
+      request("select", { title: "允许执行 bash？", options: ["允许一次", "拒绝"] }),
+    );
+    expect(prompt).toEqual({
+      kind: "select",
+      title: "允许执行 bash？",
+      options: ["允许一次", "拒绝"],
+    });
+  });
+
+  it("select 没给选项就不弹（避免弹出空列表）", () => {
+    expect(interactionPrompt(request("select", { title: "x", options: [] }))).toBeNull();
+  });
+
+  it("confirm 出允许/拒绝二选一", () => {
+    expect(interactionPrompt(request("confirm", { title: "确认", message: "要删除吗？" }))).toEqual(
+      {
+        kind: "confirm",
+        title: "确认",
+        message: "要删除吗？",
+      },
+    );
+  });
+
+  it("input / editor 走自由输入，并带上提示语与预填", () => {
+    expect(interactionPrompt(request("input", { title: "去哪？", placeholder: "城市" }))).toEqual({
+      kind: "input",
+      title: "去哪？",
+      placeholder: "城市",
+      prefill: null,
+    });
+    expect(interactionPrompt(request("editor", { title: "改写", prefill: "原文" }))).toMatchObject({
+      kind: "input",
+      prefill: "原文",
+    });
+  });
+
+  it("缺字段时给可读的兜底，而不是 undefined", () => {
+    expect(interactionPrompt(request("select", { options: ["甲"] }))).toMatchObject({
+      title: "需要你确认",
+    });
   });
 });
 
@@ -201,24 +258,20 @@ describe("sessionItems", () => {
         id: "a",
         cwd: "/a",
         name: "甲",
-        file: "",
         createdAt: "",
         updatedAt: "",
         entryCount: 0,
         firstMessage: null,
-        owned: true,
         archived: false,
       },
       {
         id: "b",
         cwd: "/b",
         name: null,
-        file: "",
         createdAt: "",
         updatedAt: "",
         entryCount: 0,
         firstMessage: null,
-        owned: false,
         archived: false,
       },
     ];

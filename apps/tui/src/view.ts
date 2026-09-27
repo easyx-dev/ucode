@@ -4,13 +4,14 @@ import {
   type SessionSummary,
   type SessionView,
   toDisplayItems,
+  type UiRequest,
 } from "@ucode/sdk";
 
 /**
  * TUI 的**视图层**：把 SDK 的状态映射成终端文本。
  *
  * 刻意做成纯函数（输入状态、输出字符串/行），原因有二：
- * - 渲染逻辑可以脱离终端单测（无需 TTY、无需真实核心层）；
+ * - 渲染逻辑可以脱离终端单测（无需 TTY、无需真实服务层）；
  * - 换行交给基座 `@earendil-works/pi-tui` 的 `Text`（它会处理 CJK 宽度），
  *   我们只负责"每一行是什么内容"，不重复实现宽度计算。
  */
@@ -160,12 +161,12 @@ export function bannerFor(input: {
 }): string | null {
   const latestError = [...input.notices].reverse().find((notice) => notice.level === "error");
   if (latestError !== undefined) return `✗ ${latestError.message}`;
-  if (!input.connected) return "⚠ 未连接核心层，正在重连…";
+  if (!input.connected) return "⚠ 未连接服务层，正在重连…";
   const view = input.view;
   if (view === null) return null;
   if (view.lastError !== null) return `✗ ${view.lastError.message}`;
   if (view.readOnly) {
-    return "⚠ 只读挂载：写权限在另一个核心层实例手上，本实例只能看（输入 /new 开一个新会话）。";
+    return "⚠ 只读挂载：写权限在另一个服务层实例手上，本实例只能看（输入 /new 开一个新会话）。";
   }
   if (view.state !== null && !view.state.modelAvailable) {
     return "⚠ 还没有可用的模型：用 /provider <id> <baseUrl> <模型> [密钥] 添加一个供应商。";
@@ -232,4 +233,46 @@ export function commandSuggestions(input: string, limit = 8): CommandSpec[] {
   if (!text.startsWith("/") || text.includes(" ")) return [];
   const needle = text.toLowerCase();
   return COMMAND_SPECS.filter((spec) => spec.name.startsWith(needle)).slice(0, limit);
+}
+
+/**
+ * 一个待决交互请求"该怎么问"（纯函数：请求 → 界面元素，便于单测）。
+ *
+ * 三种形态对应三种输入方式：`select` 选择列表、`confirm` 允许/拒绝、`input`/`editor`
+ * 把编辑器临时变成"回答这一问"。返回 `null` 表示这条请求不该弹窗（例如 select 没有选项）。
+ */
+export type InteractionPrompt =
+  | { kind: "select"; title: string; options: string[] }
+  | { kind: "confirm"; title: string; message: string }
+  | { kind: "input"; title: string; placeholder: string | null; prefill: string | null };
+
+export function interactionPrompt(request: UiRequest): InteractionPrompt | null {
+  const params = request.params as {
+    title?: unknown;
+    options?: unknown;
+    message?: unknown;
+    placeholder?: unknown;
+    prefill?: unknown;
+  };
+  const title = typeof params.title === "string" ? params.title : "需要你确认";
+
+  if (request.method === "select") {
+    const options = (Array.isArray(params.options) ? params.options : []).filter(
+      (option): option is string => typeof option === "string",
+    );
+    return options.length === 0 ? null : { kind: "select", title, options };
+  }
+  if (request.method === "confirm") {
+    return {
+      kind: "confirm",
+      title,
+      message: typeof params.message === "string" ? params.message : "",
+    };
+  }
+  return {
+    kind: "input",
+    title,
+    placeholder: typeof params.placeholder === "string" ? params.placeholder : null,
+    prefill: typeof params.prefill === "string" ? params.prefill : null,
+  };
 }

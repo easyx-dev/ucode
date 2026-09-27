@@ -5,10 +5,10 @@ import { createClient as createStdioClient } from "@ucode/sdk/stdio";
 import { runPiTui } from "./app.ts";
 
 /**
- * TUI 壳入口：把"怎么连上核心层"与"界面长什么样"分开。
+ * TUI 壳入口：把"怎么连上服务层"与"界面长什么样"分开。
  *
  * 控制层声明自己**能承载**四种阻塞式交互（select/confirm/input/editor），
- * 核心层据此按信任矩阵授予 `interaction.respond`——这就是"能力声明与能力授予分离"的实际用处：
+ * 服务层据此按信任矩阵授予 `interaction.respond`——这就是"能力声明与能力授予分离"的实际用处：
  * 一个只会展示不会应答的壳子声明得少，就不会收到它处理不了的请求。
  *
  * 界面复用基座 `@earendil-works/pi-tui` 的组件层（见 app.ts / view.ts）；
@@ -16,7 +16,7 @@ import { runPiTui } from "./app.ts";
  */
 export type TuiLaunchOptions = {
   productName: string;
-  /** 自己拉起核心层（stdio）。 */
+  /** 自己拉起服务层（stdio）。 */
   spawnCore?: { command: string; args: string[]; cwd?: string };
   /** 或者连一个已经在跑的。 */
   endpoint?:
@@ -47,7 +47,7 @@ export async function runTui(options: TuiLaunchOptions): Promise<number> {
     await sdk.connect();
   } catch (error) {
     process.stderr.write(
-      `连接核心层失败：${error instanceof Error ? error.message : String(error)}\n`,
+      `连接服务层失败：${error instanceof Error ? error.message : String(error)}\n`,
     );
     await sdk.close();
     return 1;

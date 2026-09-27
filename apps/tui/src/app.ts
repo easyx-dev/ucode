@@ -11,12 +11,13 @@ import {
   Text,
   TuiMainScreen,
 } from "@earendil-works/pi-tui";
-import type { AgentSdk, AutonomyLevel } from "@ucode/sdk";
+import type { AgentSdk, AutonomyLevel, UiRequest } from "@ucode/sdk";
 import {
   bannerFor,
   COMMAND_SPECS,
   helpText,
   hintLine,
+  interactionPrompt,
   sessionItems,
   statusLine,
   transcriptLines,
@@ -173,7 +174,10 @@ export async function runPiTui(options: PiTuiOptions): Promise<number> {
     refresh();
   }
 
-  const unsubscribe = sdk.subscribe(() => refresh());
+  const unsubscribe = sdk.subscribe(() => {
+    showInteractionIfPending();
+    refresh();
+  });
 
   /**
    * 挂上会话。
@@ -185,12 +189,112 @@ export async function runPiTui(options: PiTuiOptions): Promise<number> {
   async function ensureSession(): Promise<void> {
     const state = sdk.state;
     if (state.activeSessionId !== null) return;
-    const owned = state.sessions.find((session) => session.owned && !session.archived);
-    if (owned !== undefined) {
-      await sdk.attachSession(owned.id);
+    // 会话按更新时间倒序：挑最近一条未归档的作为启动时打开的对象。
+    const recent = state.sessions.find((session) => !session.archived);
+    if (recent !== undefined) {
+      await sdk.attachSession(recent.id);
       return;
     }
     await sdk.createSession({});
+  }
+
+  /**
+   * 交互请求（工具批准 / `question`）的应答入口。
+   *
+   * 这件事**曾经完全缺失**：服务层把请求广播过来，TUI 只在正文里渲染一行
+   * `[待决交互] select {...}`，用户无从应答——于是 `confirm` 档下每个工具调用都只能等超时，
+   * 然后按"无人应答不放行"被拒（实测：真模型要跑 bash 时弹出"待批准"，但界面上没有可点的地方）。
+   *
+   * 三档处理：`select` 用选择列表弹窗；`confirm` 给"允许/拒绝"；`input`/`editor` 把编辑器
+   * 临时变成"回答这一问"的模式（下一次回车当答案发回，而不是当提问发给模型）。
+   */
+  let answering: { id: string } | null = null;
+  let shownRequestId: string | null = null;
+
+  function pendingRequest(): UiRequest | undefined {
+    const state = sdk.state;
+    const active = state.activeSessionId;
+    return (
+      state.interactions.find((request) => request.sessionId === active) ?? state.interactions[0]
+    );
+  }
+
+  function closeOverlay(): void {
+    tui.hideOverlay();
+    tui.setFocus(editor);
+  }
+
+  function respond(id: string, value: string | boolean | null, cancelled = false): void {
+    answering = null;
+    shownRequestId = id;
+    sdk.respondToInteraction(id, value, cancelled ? { cancelled: true } : undefined);
+    refresh();
+  }
+
+  function showInteractionIfPending(): void {
+    const request = pendingRequest();
+    if (request === undefined || answering !== null || shownRequestId === request.id) return;
+    const prompt = interactionPrompt(request);
+    if (prompt === null) return;
+
+    if (prompt.kind === "select") {
+      shownRequestId = request.id;
+      // 选项列表里放不下问题正文，所以问题同时进通知区——否则用户只看到三个选项。
+      notify("warn", prompt.title);
+      const list = new SelectList(
+        prompt.options.map((option) => ({ label: option, value: option })),
+        Math.min(prompt.options.length, 8),
+        SELECT_THEME,
+      );
+      list.onSelect = (item) => {
+        closeOverlay();
+        respond(request.id, item.value);
+      };
+      list.onCancel = () => {
+        closeOverlay();
+        respond(request.id, null, true);
+      };
+      tui.showOverlay(list, {});
+      tui.setFocus(list);
+      refresh();
+      return;
+    }
+
+    if (prompt.kind === "confirm") {
+      shownRequestId = request.id;
+      notify("warn", prompt.message === "" ? prompt.title : `${prompt.title}：${prompt.message}`);
+      const list = new SelectList(
+        [
+          { label: "允许", value: "yes" },
+          { label: "拒绝", value: "no" },
+        ],
+        2,
+        SELECT_THEME,
+      );
+      list.onSelect = (item) => {
+        closeOverlay();
+        respond(request.id, item.value === "yes");
+      };
+      list.onCancel = () => {
+        closeOverlay();
+        respond(request.id, null, true);
+      };
+      tui.showOverlay(list, {});
+      tui.setFocus(list);
+      refresh();
+      return;
+    }
+
+    // input / editor：编辑器变成回答模式
+    shownRequestId = request.id;
+    answering = { id: request.id };
+    if (prompt.prefill !== null) editor.setText(prompt.prefill);
+    notify(
+      "info",
+      `请回答：${prompt.title}${prompt.placeholder === null ? "" : `（${prompt.placeholder}）`}`,
+    );
+    tui.setFocus(editor);
+    refresh();
   }
 
   function showSessionPicker(): void {
@@ -226,7 +330,9 @@ export async function runPiTui(options: PiTuiOptions): Promise<number> {
         notify("info", helpText());
         return true;
       case "/new": {
-        const sessionId = await sdk.createSession(rest[0] === undefined ? {} : { cwd: rest[0] });
+        const { sessionId } = await sdk.createSession(
+          rest[0] === undefined ? {} : { cwd: rest[0] },
+        );
         succeed(`已新建会话 ${sessionId}`);
         return true;
       }
@@ -320,6 +426,15 @@ export async function runPiTui(options: PiTuiOptions): Promise<number> {
     if (text === "") return;
     // 先清空：无论成败，用户敲的那行都已经"被收走了"。
     editor.setText("");
+
+    // 正在回答交互请求：这一行是**答案**，不是发给模型的提问。
+    if (answering !== null) {
+      const id = answering.id;
+      answering = null;
+      sdk.respondToInteraction(id, text);
+      succeed("已回给 agent");
+      return;
+    }
 
     if (!text.startsWith("/")) {
       const sessionId = sdk.state.activeSessionId;
