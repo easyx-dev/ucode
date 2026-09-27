@@ -699,10 +699,10 @@ export function Composer({
             size="sm"
             variant="primary"
             disabled={draft.trim() === "" || blocked}
-            title={running ? "送入本轮" : "发送"}
+            title={running ? "排队：本轮结束后发送" : "发送"}
             onClick={submit}
           >
-            {running ? "送入本轮" : "发送"}
+            {running ? "排队" : "发送"}
           </Button>
         </div>
       </div>

@@ -115,7 +115,15 @@ export type AgentSdk = {
   ): Promise<void>;
 
   // 驱动
-  prompt(sessionId: string, text: string, references?: Reference[]): Promise<void>;
+  /**
+   * 发一条消息。会话正在跑时核心层把它**排进下一轮**（`queued: true`），而不是拒绝——
+   * 多端共用一个会话时"另一端正在跑"是常态。
+   */
+  prompt(
+    sessionId: string,
+    text: string,
+    references?: Reference[],
+  ): Promise<{ queued: boolean; pendingMessages: number }>;
   steer(sessionId: string, text: string): Promise<void>;
   followUp(sessionId: string, text: string): Promise<void>;
   abort(sessionId: string): Promise<void>;
@@ -607,11 +615,16 @@ export async function connect(options: ConnectOptions): Promise<AgentSdk> {
     },
 
     async prompt(sessionId, text, references) {
-      await request(
+      const data = await request<{ queued?: boolean; pendingMessages?: number }>(
         "prompt",
         { text, ...(references === undefined ? {} : { references }) },
         sessionId,
       );
+      // 会话正在跑时核心层把消息排进下一轮（而不是拒绝）：壳据此告诉用户"已排队"。
+      return {
+        queued: data.queued === true,
+        pendingMessages: data.pendingMessages ?? 0,
+      };
     },
 
     async steer(sessionId, text) {

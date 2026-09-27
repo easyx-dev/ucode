@@ -1,6 +1,7 @@
 {
   "productName": "ucode",
   "dataDirName": ".ucode",
+  "runtimeDirName": ".ucode-run",
   "appId": "com.earendil.ucode",
   "vendor": "Earendil",
   "urlScheme": "ucode",

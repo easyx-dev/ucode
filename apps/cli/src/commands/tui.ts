@@ -1,51 +1,40 @@
-import { fileURLToPath } from "node:url";
 import { getBrand } from "@ucode/branding";
 import type { TuiOptions } from "../options.ts";
 import { log } from "../runtime.ts";
+import { ensureService, servicePaths } from "../service-registry.ts";
 
 /**
  * `tui` —— 启动内置 TUI 壳。
  *
- * 两种连法：
- * - 默认：**自己拉起一个核心层**（stdio 绑定）——开箱即用，不要求用户先手动起服务；
- * - `--core <endpoint>`：连一个已经在跑的（unix socket / tcp / http）。
+ * **壳是客户端**：默认确保本机服务在跑（发现→连上；没有就拉起），再经 unix socket 连它。
+ * `--core <endpoint>` 连别处的服务（unix socket / tcp / http）。
  *
- * 这里只负责"把核心层准备好 + 把 sdk 交给 TUI"；界面在 `@ucode/tui` 里，
- * 它只依赖 sdk（不复用 ui，spec §7.2）。
+ * 为什么不再"自己 spawn 一个核心层就算完"：那样每个壳各成一个后端，两个壳打开同一个会话
+ * 会互相把对方挤成只读；而壳被 kill 时留下的孤儿核心层会一直占着 owner 租约（旧实现里这是
+ * "发消息没反应"的常见来源）。BS 架构下只有一个后端，这些问题不存在。
+ *
+ * 界面在 `@ucode/tui` 里，它只依赖 sdk（不复用 ui，spec §7.2）。
  */
 export async function runTui(options: TuiOptions): Promise<number> {
   const { runTui: startTui } = await import("@ucode/tui");
+  const productName = getBrand().productName;
 
-  const endpoint =
-    options.coreEndpoint ??
-    ((): { kind: "spawn" } => {
-      log(`未指定 --core：将在后台拉起一个核心层（数据层：${options.dataDir}）`);
-      return { kind: "spawn" };
-    })();
+  if (options.coreEndpoint !== undefined) {
+    return startTui({ productName, endpoint: options.coreEndpoint });
+  }
 
-  const cliEntry = fileURLToPath(new URL("../main.ts", import.meta.url));
-
-  return startTui({
-    productName: getBrand().productName,
-    ...(endpoint.kind === "spawn"
-      ? {
-          spawnCore: {
-            command: process.execPath,
-            args: [
-              // 直跑源码：exports 的 source 条件（dist 只在以包安装的形态下存在）
-              "--conditions=dev-src",
-              cliEntry,
-              "core",
-              "start",
-              "--binding",
-              "stdio",
-              "--data-dir",
-              options.dataDir,
-              "--cwd",
-              options.cwd,
-            ],
-          },
-        }
-      : { endpoint }),
+  const live = await ensureService({
+    dataDir: options.dataDir,
+    cwd: options.cwd,
+    host: "127.0.0.1",
   });
+  const { unix, http } = live.registration.endpoints;
+  if (unix !== undefined) {
+    return startTui({ productName, endpoint: { kind: "rpc", socketPath: unix } });
+  }
+  if (http !== undefined) {
+    log(`服务未提供 unix socket，改用 HTTP 端点：${http}`);
+    return startTui({ productName, endpoint: { kind: "http", baseUrl: http } });
+  }
+  throw new Error(`服务没有可用端点。请查看日志：${servicePaths(options.dataDir).log}`);
 }

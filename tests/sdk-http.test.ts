@@ -118,8 +118,7 @@ describe("sdk 经 HTTP + SSE", () => {
     const created = await client.createSession({});
     await client.attachSession(created.sessionId);
     await client.prompt(created.sessionId, "第一句");
-    // 等这一轮**结束**再断开：运行中再 prompt 会按设计返回 session_busy
-    // （运行中介入要用 steer/follow_up），这里模拟的是"壳在空闲时断开"
+    // 等这一轮**结束**再断开：这里模拟的是"壳在空闲时断开"（运行中发消息会排队进下一轮）
     await waitUntil(
       () =>
         (client.state.views[created.sessionId]?.maxSeq ?? 0) > 0 &&

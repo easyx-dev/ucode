@@ -54,15 +54,15 @@ export async function runTui(options: TuiLaunchOptions): Promise<number> {
   }
 
   let closed = false;
-  /** 关一次就够了：sdk.close() 会终止自己拉起的核心层进程。 */
+  /** 关一次就够了：连常驻服务时这只是关掉连接，服务继续跑——那正是 BS 架构要的。 */
   const closeOnce = async (): Promise<void> => {
     if (closed) return;
     closed = true;
     await sdk.close().catch(() => undefined);
   };
 
-  // 被信号打断时也要回收子进程。少了这一步，被 kill 掉的 TUI 会留下一个仍在跑的
-  // 核心层——它继续持有会话的 owner 租约，下一次启动就只能只读挂载（表现为"发消息没反应"）。
+  // 被信号打断时把连接收干净。默认连的是常驻服务（不随壳退出），
+  // 所以这里没有"回收子进程"那一步：服务的生死由 `service stop` 管。
   const onSignal = (): void => {
     void closeOnce().finally(() => process.exit(130));
   };

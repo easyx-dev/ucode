@@ -4,6 +4,12 @@ import cliManifest from "../package.json" with { type: "json" };
 import { runCoreStart } from "./commands/core-start.ts";
 import { runNodeAdd, runNodeList, runNodeRemove } from "./commands/nodes.ts";
 import { runProviderAdd, runProviderList } from "./commands/provider.ts";
+import {
+  runServiceLogs,
+  runServiceStart,
+  runServiceStatus,
+  runServiceStop,
+} from "./commands/service.ts";
 import { runTui } from "./commands/tui.ts";
 import { runWeb } from "./commands/web.ts";
 import { COMMANDS, defaultDataDir, parseCli } from "./options.ts";
@@ -31,11 +37,23 @@ function usage(): string {
     "  -h, --help          显示本帮助",
     "  -v, --version       显示版本",
     "",
+    "服务（唯一后端，壳会自动拉起；一个数据层一个服务）：",
+    `  ${brand.productName} service start            拉起常驻服务后返回`,
+    `  ${brand.productName} service start --foreground   前台运行（Ctrl-C 即停）`,
+    `  ${brand.productName} service status|stop|logs [-f]`,
+    "  端点：unix socket（壳用）+ 环回 HTTP（浏览器用，同源服务 Web 壳）",
+    "  --no-http                      只留 unix socket，不监听环回端口",
+    "",
     "provider add 的选项：",
     "  --base-url <端点>    OpenAI 兼容端点（如 http://127.0.0.1:8317/v1）",
     "  --model <模型名>     模型 id",
     "  --api-key <密钥>     密钥（只写本地 models.json，不入库）",
     "  --id <供应商名>      供应商标识（默认 local）",
+    "",
+    "web / tui 的选项：",
+    "  --open              web：顺带在浏览器里打开",
+    "  --foreground        web：前台把服务跑起来（旧行为）",
+    "  --core <端点>       tui：连别处的服务（unix socket / host:port / http://…）",
     "",
     "core start 的绑定选项：",
     "  --binding stdio|rpc|http|ws   传输（stdio 供父进程 spawn，rpc 供 unix socket / tcp）",
@@ -65,6 +83,14 @@ async function main(argv: string[]): Promise<number> {
       return parsed.code;
     case "core.start":
       return runCoreStart(parsed.options);
+    case "service.start":
+      return runServiceStart(parsed.options);
+    case "service.status":
+      return runServiceStatus(parsed.options);
+    case "service.stop":
+      return runServiceStop(parsed.options);
+    case "service.logs":
+      return runServiceLogs(parsed.options);
     case "web":
       return runWeb(parsed.options);
     case "tui":

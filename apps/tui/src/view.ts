@@ -102,7 +102,7 @@ export type StatusInput = {
   model: string | null;
 };
 
-/** 一行状态栏：产品名 · 工作目录 · 模型 · 状态 · 会话数 · 只读提示。 */
+/** 一行状态栏：产品名 · 工作目录 · 模型 · 状态 · 会话数 · 队列 · 只读提示。 */
 export function statusLine(input: StatusInput): string {
   const parts: string[] = [input.productName];
   parts.push(input.connected ? `已连接(${input.trustLevel ?? "?"})` : "未连接");
@@ -112,6 +112,8 @@ export function statusLine(input: StatusInput): string {
     parts.push(modelId ?? "无模型");
     parts.push(input.view.state?.status ?? "idle");
     parts.push(`待决 ${input.view.pendingInteractions}`);
+    const queued = input.view.state?.pendingMessages ?? 0;
+    if (queued > 0) parts.push(`队列 ${queued}`);
     if (input.view.readOnly) parts.push("只读挂载");
   }
   parts.push(`会话 ${input.sessionCount}`);
@@ -139,8 +141,8 @@ export function sessionItems(
 export function hintLine(input: { running: boolean; streaming: boolean }): string {
   if (input.running) {
     return input.streaming
-      ? "生成中…（Enter 不再发送，先等这一轮结束；Ctrl+C 退出）"
-      : "运行中…（Ctrl+C 退出）";
+      ? "生成中…（Enter 排队到下一轮；Ctrl+C 退出）"
+      : "运行中…（Enter 排队到下一轮；Ctrl+C 退出）";
   }
   return "输入 / 查看命令 · Enter 发送 · Shift+Enter 换行 · Tab 补全 · Ctrl+C 退出";
 }

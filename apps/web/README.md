@@ -12,7 +12,7 @@ Web 壳（浏览器宿主）：复用 `@ucode/ui` 的 React 界面，经 HTTP + 
 
 - **真实入口**：`index.html` → `src/main.tsx`（Vite 应用入口，无打包器的宿主不适用）。
 - 构建产物：`dist/`，由 `pnpm -F @ucode/web build` 产出，`base` 为 `./`。
-- 运行时由 CLI 的 `web` 子命令在同一端口托管 `dist/`，于是壳与核心层同源，无 CORS 与 cookie 麻烦。
+- 运行时由 CLI 的 `web` 子命令确保常驻服务在跑，服务在同一端口托管 `dist/`，于是壳与服务同源，无 CORS 与 cookie 麻烦。
 
 > `package.json` 的 `exports["."]` 指向 `./src/index.ts`，该文件并不存在（无任何包 import 它，门禁也不校验 `exports` 指向的文件）。请以 `index.html` → `src/main.tsx` 为准。
 
@@ -20,8 +20,9 @@ Web 壳（浏览器宿主）：复用 `@ucode/ui` 的 React 界面，经 HTTP + 
 
 ```bash
 pnpm -F @ucode/web dev        # Vite 开发服务器
-pnpm -F @ucode/web build      # 产出 dist/，CLI 的 web 子命令服务的就是它
-pnpm ucode web --port 3000    # 起壳 + 核心层（同一端口）
+pnpm -F @ucode/web build      # 产出 dist/，服务托管的就是它
+pnpm ucode web --open         # 确保服务在跑 + 打印地址（+ 开浏览器）
+pnpm ucode web --foreground   # 前台把服务跑起来（旧行为，Ctrl-C 即停）
 ```
 
 **改完 `apps/web` 或 `packages/ui` 的源码必须重建**：CLI 服务的是构建产物而不是源码，否则"看不到效果又看不出哪里不对"。产物比源码旧时 `resolveWebAssets()` 会打印警告。

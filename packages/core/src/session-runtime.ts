@@ -288,6 +288,8 @@ export class SessionRuntime {
   }
 
   async followUp(text: string): Promise<void> {
+    // 不需要在这里补状态广播：基座的 `followUp` 会发 `queue_update`（入队、出队、清空都发），
+    // 由下面的 #onPiEvent 统一转成 status 事件。
     await this.session.followUp(text);
   }
 
@@ -481,6 +483,8 @@ export class SessionRuntime {
         return;
       }
       case "queue_update": {
+        // 基座在入队（steer / followUp）、出队（排队那条被采纳）与 clearQueue 时都发它，
+        // 因此队列计数的广播只需要挂在这里——调用方不必各自补一次。
         this.#emitStatus();
         return;
       }

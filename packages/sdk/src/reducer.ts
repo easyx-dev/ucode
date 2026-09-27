@@ -320,7 +320,15 @@ export function applyServerMessage(state: SdkState, message: ServerMessage, at: 
         ...view,
         running: message.status !== "idle",
         pendingInteractions: message.pendingInteractions,
-        state: view.state === null ? null : { ...view.state, status: message.status },
+        // 队列计数跟着状态事件走：多端共用会话时，别人排的队也要在这里看得见。
+        state:
+          view.state === null
+            ? null
+            : {
+                ...view.state,
+                status: message.status,
+                pendingMessages: message.pendingMessages,
+              },
       }));
 
     case "resync_required":

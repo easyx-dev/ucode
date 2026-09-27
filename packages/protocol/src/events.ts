@@ -81,6 +81,13 @@ export const StatusEventSchema = z.object({
   sessionId: z.string(),
   status: SessionStatusSchema,
   pendingInteractions: z.number().int().nonnegative(),
+  /**
+   * 排队等待下一轮的输入条数。
+   *
+   * "多端共用一个会话"的可见性靠它：某个壳发起的轮次里，别的壳排的队也在同一个计数上，
+   * 于是每个壳都能显示"队列 N"，而不是各自维护一份只有自己看得见的队列。
+   */
+  pendingMessages: z.number().int().nonnegative(),
 });
 
 /**

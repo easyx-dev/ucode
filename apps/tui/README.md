@@ -6,20 +6,20 @@
 
 - 把 SDK 的状态渲染成终端界面：对话流、输入框、状态行、命令补全与帮助。
 - 键盘与斜杠命令的分派，SDK 调用的发起。
-- **不做**：不复用 `@ucode/ui`（终端渲染与 DOM 渲染没有共同组件）；不依赖 `@ucode/core`（默认自己 spawn 一个核心层，或连已有的）。
+- **不做**：不复用 `@ucode/ui`（终端渲染与 DOM 渲染没有共同组件）；不依赖 `@ucode/core`（由 CLI 决定连哪个服务，见下）。
 
 ## 公开入口
 
 | 入口 | 主要符号 |
 |---|---|
-| `src/index.ts` | `runTui(options): Promise<number>`；类型 `TuiLaunchOptions`（`{ productName, spawnCore?, endpoint?, capabilities? }`） |
+| `src/index.ts` | `runTui(options): Promise<number>`；类型 `TuiLaunchOptions`（`{ productName, spawnCore?, endpoint?, capabilities? }`）；`endpoint` 由 CLI 传入（默认连本机常驻服务），`spawnCore` 只留给内嵌/测试 |
 | `src/app.ts` | `runPiTui(options)`；类型 `PiTuiOptions`（I/O 与组件挂载） |
 | `src/view.ts` | 纯函数视图层：`transcriptLines`、`statusLine`、`sessionItems`、`hintLine`、`bannerFor`、`helpText`、`commandSuggestions`、`formatItem`、`usageOf`、`COMMAND_SPECS` |
 
 ## 运行
 
 ```bash
-pnpm ucode tui                       # 默认自己 spawn 一个核心层
+pnpm ucode tui                       # 连本机常驻服务（没有就拉起），推荐
 pnpm ucode tui --core http://127.0.0.1:3000
 pnpm ucode tui --core unix:/tmp/core.sock
 ```

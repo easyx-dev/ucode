@@ -122,6 +122,7 @@ uhub ──▶ protocol, branding
 - **`tool-gate.ts` 是工具执行的闸门**：任何通路都要过信任矩阵 + 自主级别，批准权归 `ui-broker`。
 - **`ui-broker` 承载人类交互**：阻塞式/通知式、超时与降级策略、广播路由与去重。无法承载的交互请求走**降级而非挂起**；超时/无人承载时回调核心层给 agent 追一条"按最佳判断继续"（用户主动取消不触发）。
 - **无人值守的持久化待决交互**：核心层自建状态机（基座没有现成挂起态，V-8），落盘 `ui.pending` / `ui.resolved`，应答后转达 agent。
+- **会话正在跑时 `prompt` 排队进下一轮，不拒绝**：多端共用一个会话时"另一端正在跑"是常态，拒绝会让用户在两个壳之间来回试。排队用基座既有的 `followUp`（`clear_queue` 可撤销），队列条数随 `status` 事件广播给该会话的所有 attachment。
 - **子智能体继承工具闸门**（不是绕过批准的后门），且**不挂记忆与子智能体工具**（防递归），有 `maxTurns` 护栏。
 - 功能域各自成目录（`memory/` `hooks/` `subagents/` `goal/` `tasks/` `undo/` `wiki/` `ssh/` `import/` `marketplace/` `insights/` `plugins/` `pty` `workspace`），每项以"代码 + 测试 + 真实模型验证"三件套落地。
 
@@ -143,6 +144,8 @@ uhub ──▶ protocol, branding
 - **I-9：打包桌面壳 = 三层产物**：主进程/preload（纯 JS）+ 渲染进程（Vite 产物）+ **核心层单文件 bundle**（esbuild 打包 CLI 入口，基座/ws/jiti 保持 external）。esbuild 输出必须 esm（cjs 会因基座顶层 await 失败）。
 - **TUI**：`view.ts` 是**纯函数视图层**（状态→终端行），`app.ts` 只做 I/O 与命令分发；命令清单是**帮助文本与自动补全的唯一来源**（`COMMAND_SPECS`）。**I-13：pi-tui 的 `Editor` 不会替调用方清空输入框**——提交回调收到文本后必须自己 `setText("")`。**I-14：`toDisplayItems` 已经把流式尾巴算进去了**（末尾补 `__streaming__` / `__streaming_thinking__`），视图层若再拼一遍会出现两段一样的回答。
 - **I-15：`web` 子命令服务的是构建产物，不是源码**。改完 `packages/ui` 或 `apps/web` 的源码必须重建（`pnpm -F @ucode/web build`），否则看不到效果而看不出哪里不对；`resolveWebAssets()` 会在产物比源码旧时打印警告。
+- **多端协作 = 多壳连同一个服务**（BS 架构）：`ucode service` 是常驻的唯一后端（数据层 + pi 会话 + 事件扇出），Web/TUI/桌面都是客户端，壳不再各自拉起核心层。壳 `ensureService`：发现→连上，没有就拉起。**这与"多核心层共享一个数据层"是两条不同的轴**——后者仍是一个会话一个 writer、其余只读跟随（协议 D 的约束，见 `packages/store/README.md`）。
+- **服务端点与注册在品牌运行时目录**（`@ucode/branding/node` 的 `runtimeDir()`），不放数据层目录：那些是宿主运行时状态（pid/端口/socket），会被迁移与支持包带走。判活必须注册表 + 端点探测双重确认，否则 `kill -9` 的残骸会让这个数据层再也起不来；反过来只看注册文件又会把陈旧 pid 当成活服务。
 - **I-6 与传输注入**：壳子传给 sdk 的是**注入的传输客户端**（Web 传 HTTP/SSE，TUI 传 stdio 或 rpc），sdk 自身不会把 node 专有模块带进浏览器打包结果。
 
 ## 测试约定
@@ -177,13 +180,13 @@ CI 见 `.github/workflows/ci.yml`（`pnpm check` + 两条验收 + 壳构建）�
 | `pnpm check` | 类型 + Biome + 依赖边界门禁 + 品牌字面量门禁 + 全量测试 |
 | `pnpm test` / `pnpm typecheck` / `pnpm lint`(`:fix`) | 单项 |
 | `pnpm build:libs` | 产出各库包 `dist`（安装/发布形态；开发态直跑源码） |
-| `pnpm ucode <命令>` | CLI（`--conditions=dev-src`）：`core start` / `web` / `tui` / `provider add\|list` / `node add\|list\|remove` |
+| `pnpm ucode <命令>` | CLI（`--conditions=dev-src`）：`service start\|status\|stop\|logs` / `web` / `tui` / `core start` / `provider add\|list` / `node add\|list\|remove` |
 | `pnpm -F @ucode/web build` | 构建 Web 壳产物（**改前端源码后必须重建**） |
 | `pnpm -F @ucode/desktop dist` | 桌面壳：渲染进程构建 + 核心层 bundle + electron-builder `--dir` |
 | `pnpm -F @ucode/desktop smoke` | Electron 冒烟（`--smoke`） |
 | `/review`（[`docs/process/代码审查.md`](docs/process/代码审查.md)） | 代码审查：默认审未提交改动（`all` / `全部` 全量），按语义维度 + 配置文档核对输出分级报告 |
 
-核心层也可脱离控制层单独跑：`pnpm ucode core start --binding stdio|rpc|http|ws`。
+日常用法（多端协作）：`pnpm ucode web`（或 `tui`）会自动拉起常驻服务并连上；`pnpm ucode service status|stop|logs` 管理它。核心层也可脱离控制层单独跑：`pnpm ucode core start --binding stdio|rpc|http|ws`。
 
 ## 文档体系
 

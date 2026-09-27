@@ -160,11 +160,15 @@ export async function createCore(config: CoreConfig): Promise<Core> {
       }
     },
     notifyStatus(sessionId, status, pendingInteractions): void {
+      // 队列计数在这里统一取，而不是让每个调用点自己传：状态事件的语义是"会话现在什么样"，
+      // 漏传一处就会出现"某个壳的队列数突然归零"的假象。
+      const pendingMessages = runtimes.get(sessionId)?.runtime?.state().pendingMessages ?? 0;
       bus.broadcastToSession(sessionId, {
         type: "status",
         sessionId,
         status,
         pendingInteractions,
+        pendingMessages,
       });
     },
   };
@@ -527,6 +531,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
           sessionId,
           status: state.status,
           pendingInteractions: state.pendingInteractions,
+          pendingMessages: state.pendingMessages,
         });
         for (const record of await entry.repo.read(0, 5_000)) {
           connection.options.send({
@@ -691,11 +696,17 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         const sessionId = requireAttachment(connection, envelope.sessionId);
         const entry = writable(await openRuntime(sessionId));
         guardAutonomy(connection, entry.runtime.autonomy);
+        // 会话正在跑：**排队进下一轮**，不是拒绝。
+        // 多端共用一个会话时，"另一端正在跑"是常态而不是错误——拒绝会让用户在两个壳之间
+        // 来回试；排队则让任意一端随时都能把话说完（次序由队列保证）。
         if (entry.runtime.status !== "idle") {
-          throw new CoreError(
-            "session_busy",
-            "会话正在运行；运行中介入请用 steer，排队请用 follow_up。",
-          );
+          await entry.runtime.followUp(args.text);
+          return okResponse(id, command, {
+            sessionId,
+            accepted: true,
+            queued: true,
+            pendingMessages: entry.runtime.state().pendingMessages,
+          });
         }
         // 不阻塞响应：一轮可能跑很久，事件面负责把进展发出去。
         void entry.runtime.startPrompt(args.text, args.references).catch((error: unknown) => {
@@ -708,7 +719,7 @@ export async function createCore(config: CoreConfig): Promise<Core> {
             sessionId,
           });
         });
-        return okResponse(id, command, { sessionId, accepted: true });
+        return okResponse(id, command, { sessionId, accepted: true, queued: false });
       }
 
       case "steer": {

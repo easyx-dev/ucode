@@ -19,9 +19,13 @@ export type GlobalOptions = {
 };
 
 export const COMMANDS = [
+  { name: "service start", summary: "启动常驻服务（唯一后端；壳会自动拉起它）" },
+  { name: "service status", summary: "查看服务状态（pid / 端点 / 数据层 / 会话数）" },
+  { name: "service stop", summary: "停止服务（优雅退出：释放租约并清注册）" },
+  { name: "service logs", summary: "查看服务日志（-f 持续跟踪）" },
   { name: "core start", summary: "启动核心层（headless，可脱离控制层单独运行）" },
-  { name: "web", summary: "启动内置 Web 壳（核心层 + HTTP/SSE + 静态资源，同一端口）" },
-  { name: "tui", summary: "启动内置 TUI 壳（复用 sdk；默认自己拉起一个核心层）" },
+  { name: "web", summary: "打开 Web 壳（确保服务在跑，然后把浏览器指向它）" },
+  { name: "tui", summary: "启动内置 TUI 壳（默认连本机服务，没有就拉起）" },
   { name: "provider add", summary: "写入模型供应商配置（本地权威，写进数据层的 models.json）" },
   { name: "provider list", summary: "列出当前可用的模型" },
   { name: "node add", summary: "登记一个核心层节点（本机或直连远端；凭据放 OS 凭据存储）" },
@@ -33,6 +37,10 @@ export type ParsedCli =
   | { kind: "help" }
   | { kind: "version" }
   | { kind: "core.start"; options: CoreStartOptions }
+  | { kind: "service.start"; options: ServiceStartOptions }
+  | { kind: "service.status"; options: GlobalOptions }
+  | { kind: "service.stop"; options: GlobalOptions }
+  | { kind: "service.logs"; options: ServiceLogsOptions }
   | { kind: "web"; options: WebOptions }
   | { kind: "tui"; options: TuiOptions }
   | { kind: "provider.add"; options: ProviderAddOptions }
@@ -78,10 +86,30 @@ export type WebOptions = GlobalOptions & {
   host: string;
   port: number;
   allowNonLoopback: boolean;
+  /** 前台跑服务（旧行为：阻塞，Ctrl-C 即停）；默认是"确保服务在跑"后返回。 */
+  foreground: boolean;
+  /** 顺带在浏览器里打开。 */
+  open: boolean;
+};
+
+export type ServiceStartOptions = GlobalOptions & {
+  /** 前台运行；省略则把自己 detach 出去常驻。 */
+  foreground: boolean;
+  host: string;
+  port?: number;
+  allowNonLoopback: boolean;
+  /** 只留 unix socket，不监听环回 HTTP（不需要浏览器时更干净）。 */
+  noHttp: boolean;
+  autonomy: CoreStartOptions["autonomy"];
+};
+
+export type ServiceLogsOptions = GlobalOptions & {
+  /** 持续跟踪（Ctrl-C 退出）。 */
+  follow: boolean;
 };
 
 export type TuiOptions = GlobalOptions & {
-  /** 连一个已经在跑的核心层；省略则自己 spawn 一个（stdio）。 */
+  /** 连一个已经在跑的核心层/服务；省略则确保本机服务在跑再连它。 */
   coreEndpoint?:
     | { kind: "rpc"; socketPath?: string; host?: string; port?: number }
     | { kind: "http"; baseUrl: string };
@@ -149,6 +177,64 @@ export function parseCli(argv: string[]): ParsedCli {
       };
     }
 
+    if (first === "service") {
+      const sub = second;
+      if (sub === "start") {
+        const parsed = parseArgs({
+          args: rest,
+          options: {
+            ...SHARED_OPTIONS,
+            foreground: { type: "boolean", default: false },
+            host: { type: "string", default: "127.0.0.1" },
+            port: { type: "string" },
+            "no-http": { type: "boolean", default: false },
+            autonomy: { type: "string", default: "confirm" },
+            "allow-non-loopback": { type: "boolean", default: false },
+          },
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        const base = resolveDataDir(parsed.values["data-dir"]);
+        return {
+          kind: "service.start",
+          options: {
+            ...base,
+            cwd: parsed.values.cwd ?? base.cwd,
+            foreground: parsed.values.foreground === true,
+            host: parsed.values.host,
+            ...(parsed.values.port === undefined ? {} : { port: Number(parsed.values.port) }),
+            allowNonLoopback: parsed.values["allow-non-loopback"] === true,
+            noHttp: parsed.values["no-http"] === true,
+            autonomy: parsed.values.autonomy as CoreStartOptions["autonomy"],
+          },
+        };
+      }
+      if (sub === "status" || sub === "stop") {
+        const parsed = parseArgs({ args: rest, options: SHARED_OPTIONS, allowPositionals: false });
+        if (parsed.values.help === true) return { kind: "help" };
+        const options = resolveDataDir(parsed.values["data-dir"]);
+        return sub === "status"
+          ? { kind: "service.status", options }
+          : { kind: "service.stop", options };
+      }
+      if (sub === "logs") {
+        const parsed = parseArgs({
+          args: rest,
+          options: { ...SHARED_OPTIONS, follow: { type: "boolean", short: "f", default: false } },
+          allowPositionals: false,
+        });
+        if (parsed.values.help === true) return { kind: "help" };
+        return {
+          kind: "service.logs",
+          options: {
+            ...resolveDataDir(parsed.values["data-dir"]),
+            follow: parsed.values.follow === true,
+          },
+        };
+      }
+      return { kind: "error", message: `未知的 service 子命令：「${sub ?? ""}」。`, code: 2 };
+    }
+
     if (first === "web") {
       const parsed = parseArgs({
         args: [second, ...rest].filter((value) => value !== undefined),
@@ -157,6 +243,8 @@ export function parseCli(argv: string[]): ParsedCli {
           host: { type: "string", default: "127.0.0.1" },
           port: { type: "string", default: "3000" },
           "allow-non-loopback": { type: "boolean", default: false },
+          foreground: { type: "boolean", default: false },
+          open: { type: "boolean", default: false },
         },
         allowPositionals: false,
       });
@@ -170,6 +258,8 @@ export function parseCli(argv: string[]): ParsedCli {
           host: parsed.values.host,
           port: Number(parsed.values.port ?? "3000"),
           allowNonLoopback: parsed.values["allow-non-loopback"] === true,
+          foreground: parsed.values.foreground === true,
+          open: parsed.values.open === true,
         },
       };
     }

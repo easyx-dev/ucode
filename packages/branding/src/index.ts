@@ -12,6 +12,13 @@ export type BrandProfile = {
   productName: string;
   /** 数据层默认目录名（含前导点）；实际路径仍可被 --data-dir / 环境变量覆盖。 */
   dataDirName: string;
+  /**
+   * 宿主运行时目录名（含前导点）：服务注册表、unix socket、服务日志放这里。
+   *
+   * **不放数据层**：那些是宿主运行时状态（pid / 端口），放进数据目录会被迁移与
+   * 支持包带走，还可能误导别的机器上的客户端。
+   */
+  runtimeDirName: string;
   /** 桌面应用的 appId（electron-builder 用）。 */
   appId: string;
   /** 厂商名。 */

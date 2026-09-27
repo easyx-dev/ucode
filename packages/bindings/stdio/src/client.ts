@@ -88,8 +88,9 @@ export function createStdioClient(options: StdioClientOptions = {}): Transport {
       child = undefined;
       if (running === undefined || running.exitCode !== null || running.signalCode !== null) return;
       // 先礼后兵：SIGTERM 让核心层有机会收尾（释放 owner 租约、关 PTY），
-      // 短暂等待后仍然活着就 SIGKILL——**留下一个孤儿核心层是有代价的**：
-      // 它继续持有会话的 owner 租约，下一次启动的新实例只能只读挂载。
+      // 短暂等待后仍然活着就 SIGKILL——**stdio 通路自己拉起的核心层是有代价的**：
+      // 留下的孤儿进程会继续持有会话的 owner 租约，下一次启动的新实例只能只读挂载。
+      // （壳的默认路径不这么用：它连 `service` 起的常驻服务，服务不随壳退出。）
       const exited = new Promise<void>((resolve) => {
         running.once("exit", () => resolve());
       });

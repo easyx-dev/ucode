@@ -333,7 +333,10 @@ export async function runPiTui(options: PiTuiOptions): Promise<number> {
         return;
       }
       try {
-        await sdk.prompt(sessionId, text);
+        const result = await sdk.prompt(sessionId, text);
+        if (result.queued) {
+          notify("info", `已排队（第 ${result.pendingMessages} 条）：这一轮结束后发送。`);
+        }
       } catch (error) {
         fail(error, "发送失败");
       }

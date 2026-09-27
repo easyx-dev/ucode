@@ -10,6 +10,11 @@
       "dev-src": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./node": {
+      "types": "./src/node.ts",
+      "dev-src": "./src/node.ts",
+      "default": "./dist/node.js"
+    },
     "./brand.json": "./brand.json"
   },
   "scripts": {
