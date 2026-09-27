@@ -23,6 +23,7 @@ export const COMMANDS = [
   { name: "service status", summary: "查看服务状态（pid / 端点 / 数据层 / 会话数）" },
   { name: "service stop", summary: "停止服务（优雅退出：释放租约并清注册）" },
   { name: "service logs", summary: "查看服务日志（-f 持续跟踪）" },
+  { name: "trust", summary: "项目信任：`trust` 授信当前目录（也可 `--list` / `--revoke`）" },
   { name: "core start", summary: "启动核心层（headless，可脱离控制层单独运行）" },
   { name: "web", summary: "打开 Web 壳（确保服务在跑，然后把浏览器指向它）" },
   { name: "tui", summary: "启动内置 TUI 壳（默认连本机服务，没有就拉起）" },
@@ -41,6 +42,7 @@ export type ParsedCli =
   | { kind: "service.status"; options: GlobalOptions }
   | { kind: "service.stop"; options: GlobalOptions }
   | { kind: "service.logs"; options: ServiceLogsOptions }
+  | { kind: "trust"; options: TrustOptions }
   | { kind: "web"; options: WebOptions }
   | { kind: "tui"; options: TuiOptions }
   | { kind: "provider.add"; options: ProviderAddOptions }
@@ -106,6 +108,12 @@ export type ServiceStartOptions = GlobalOptions & {
 export type ServiceLogsOptions = GlobalOptions & {
   /** 持续跟踪（Ctrl-C 退出）。 */
   follow: boolean;
+};
+
+/** 项目信任：默认列出；给了子命令就授信/撤销（`dir` 省略时用 --cwd）。 */
+export type TrustOptions = GlobalOptions & {
+  command: "list" | "grant" | "revoke";
+  dir?: string;
 };
 
 export type TuiOptions = GlobalOptions & {
@@ -282,6 +290,32 @@ export function parseCli(argv: string[]): ParsedCli {
           ...base,
           cwd: parsed.values.cwd ?? base.cwd,
           ...(core === undefined ? {} : { coreEndpoint: parseCoreEndpoint(core) }),
+        },
+      };
+    }
+
+    if (first === "trust") {
+      const parsed = parseArgs({
+        args: [second, ...rest].filter((value) => value !== undefined),
+        options: {
+          ...SHARED_OPTIONS,
+          revoke: { type: "boolean", default: false },
+          list: { type: "boolean", default: false },
+        },
+        allowPositionals: true,
+      });
+      if (parsed.values.help === true) return { kind: "help" };
+      const base = resolveDataDir(parsed.values["data-dir"]);
+      const dir = parsed.positionals[0];
+      const command =
+        parsed.values.list === true ? "list" : parsed.values.revoke === true ? "revoke" : "grant";
+      return {
+        kind: "trust",
+        options: {
+          ...base,
+          cwd: parsed.values.cwd ?? base.cwd,
+          command,
+          ...(dir === undefined ? {} : { dir }),
         },
       };
     }

@@ -119,7 +119,8 @@ uhub ──▶ protocol, branding
 
 ## 核心层约定
 
-- **`tool-gate.ts` 是工具执行的闸门**：任何通路都要过信任矩阵 + 自主级别，批准权归 `ui-broker`。
+- **`tool-gate.ts` 是工具执行的闸门**：任何通路都要过信任矩阵 + 自主级别，批准权归 `ui-broker`。**"本会话内总是允许"必须真的生效**（`sessionAllowed`）——否则用户的选择形同虚设，同一件事会被反复追问。
+- **`plan` 档是结构性只读，不只是拦**：把改动类工具从工具集里摘掉（`setActiveTools`），模型根本看不到，而不是每次调用都被拒一次；命令类工具保留、由只读白名单逐条判定（`read-only-command.ts`，词表照搬基座官方 `plan-mode` 示例）。两道并存：结构性那道挡"模型看得见"，闸门那道挡"命令与第三方工具"。
 - **`ui-broker` 承载人类交互**：阻塞式/通知式、超时与降级策略、广播路由与去重。无法承载的交互请求走**降级而非挂起**；超时/无人承载时回调核心层给 agent 追一条"按最佳判断继续"（用户主动取消不触发）。
 - **无人值守的持久化待决交互**：核心层自建状态机（基座没有现成挂起态，V-8），落盘 `ui.pending` / `ui.resolved`，应答后转达 agent。
 - **会话正在跑时 `prompt` 排队进下一轮，不拒绝**：多端共用一个会话时"另一端正在跑"是常态，拒绝会让用户在两个壳之间来回试。排队用基座既有的 `followUp`（`clear_queue` 可撤销），队列条数随 `status` 事件广播给该会话的所有 attachment。
@@ -131,6 +132,7 @@ uhub ──▶ protocol, branding
 - **密钥只写本地文件、绝不入库**：模型供应商密钥写进数据层 `models.json`（pi 生态同一份定义）。**协议层的回读形状里没有密钥本身**——`ProviderSummary` 只有 `hasApiKey`，因此一次 `provider.list` 不会把明文送到每个控制层、进日志、进屏幕；覆盖写时"没给新密钥就保留原来那把"，否则改一下模型列表会把凭据抹掉。
 - **SSH 连接注册表（`ssh.json`）刻意不存密钥与口令**：认证交给 ssh 自己（config / agent / IdentityFile），只记"连哪台机/用哪个用户/端口/私钥路径"；拒绝主机名与用户名里的 shell 元字符；远端命令按 **argv 单参**传递、不经本地 shell 拼接，`BatchMode=yes` 保证无 TTY 时不挂死。
 - **hooks 只从可信数据层读**（`<数据层>/hooks.json`），**绝不读项目本地 hooks**——否则 clone 一个仓库就会执行其中定义的钩子。
+- **项目本地资源默认不加载**（`<cwd>/.pi/{settings.json,extensions,skills,prompts,themes,SYSTEM.md}`、向上查找的 `.agents/skills`）：基座 `SettingsManager` 的 `projectTrusted` **默认为真**，因此装配 loader 时必须显式过 `resolveProjectTrust`，否则"clone 一个仓库就执行其中代码"是默认行为。我们的决定是**默认拒绝**，授信记录写在数据层 `trust.json`（与基座同一份文件、同一套语义），出口是 CLI 的 `trust` 子命令。未授信时不静默——要给出用户能照着做的提醒。
 - **支持包导出前必须脱敏**（`insights/redact.ts`）：键名像密钥就抹、值像密钥也抹、日志文本按 `sk-` / `Bearer` / `key=` 形状抹，且**不带会话正文**。
 - **OS 凭据只在加密可用时存**（桌面壳 `safeStorage`）：加密不可用就**拒存**（宁可不存也不落明文），明文不落盘、不进日志。
 - **工作区/Wiki 读取必须过滤**：跳过依赖/构建产物/敏感文件/二进制/超大文件/**符号链接**（防绕出工作区）；到预算上限要**明说没读完**。

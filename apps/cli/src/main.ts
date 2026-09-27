@@ -10,6 +10,7 @@ import {
   runServiceStatus,
   runServiceStop,
 } from "./commands/service.ts";
+import { runTrust } from "./commands/trust.ts";
 import { runTui } from "./commands/tui.ts";
 import { runWeb } from "./commands/web.ts";
 import { COMMANDS, defaultDataDir, parseCli } from "./options.ts";
@@ -91,6 +92,8 @@ async function main(argv: string[]): Promise<number> {
       return runServiceStop(parsed.options);
     case "service.logs":
       return runServiceLogs(parsed.options);
+    case "trust":
+      return runTrust(parsed.options);
     case "web":
       return runWeb(parsed.options);
     case "tui":

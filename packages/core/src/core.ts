@@ -410,6 +410,9 @@ export async function createCore(config: CoreConfig): Promise<Core> {
           },
         }),
         onEvent: (event: SessionEvent) => bus.broadcastToSession(sessionId, event),
+        onNotice: (level, message) => {
+          bus.broadcastToSession(sessionId, { type: "ui.notify", level, message, sessionId });
+        },
         onStatusChange: () => {
           const current = runtimes.get(sessionId);
           if (current === undefined) return;
@@ -500,12 +503,21 @@ export async function createCore(config: CoreConfig): Promise<Core> {
         }
 
         const repo = await store.createSession({ cwd });
-        // **无条件建运行时**：之前只在"自主级别非默认"时才建，于是新建的会话在界面里
-        // 一直显示"无模型 / 未知目录"（状态来自冷读路径），而第一次发送又要临时承担
-        // 建运行时的延迟。建会话本来就是要用它，提前建没有代价。
-        const created = writable(await openRuntime(repo.id));
-        if (autonomy !== defaultAutonomy) created.runtime.setAutonomy(autonomy);
+        // **先挂 attachment 再建运行时**：运行时装配期会产生面向用户的提醒（例如"项目本地资源
+        // 未授信，未加载"），而提醒是按 attachment 广播的——挂晚了用户就看不到。
+        const previousAttachment = connection.attachmentSessionId;
         connection.attachmentSessionId = repo.id;
+        let created: RuntimeEntry & { runtime: SessionRuntime };
+        try {
+          // **无条件建运行时**：之前只在"自主级别非默认"时才建，于是新建的会话在界面里
+          // 一直显示"无模型 / 未知目录"（状态来自冷读路径），而第一次发送又要临时承担
+          // 建运行时的延迟。建会话本来就是要用它，提前建没有代价。
+          created = writable(await openRuntime(repo.id));
+        } catch (error) {
+          connection.attachmentSessionId = previousAttachment;
+          throw error;
+        }
+        if (autonomy !== defaultAutonomy) created.runtime.setAutonomy(autonomy);
         return okResponse(id, command, { sessionId: repo.id, cwd, autonomy });
       }
 

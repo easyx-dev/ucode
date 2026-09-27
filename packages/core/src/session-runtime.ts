@@ -22,9 +22,10 @@ import { createGoalExtension } from "./goal/extension.ts";
 import { createHooksExtension } from "./hooks/extension.ts";
 import { createImportExtension } from "./import/extension.ts";
 import { createMemoryExtension } from "./memory/extension.ts";
+import { decideProjectTrust } from "./project-trust.ts";
 import { createSshExtension } from "./ssh/extension.ts";
 import { createSubagentsExtension } from "./subagents/extension.ts";
-import { createToolGateExtension } from "./tool-gate.ts";
+import { createToolGateExtension, planModeToolNames } from "./tool-gate.ts";
 import { createUndoExtension } from "./undo/extension.ts";
 import { createWikiExtension } from "./wiki/extension.ts";
 
@@ -63,6 +64,8 @@ export type SessionRuntimeOptions = {
   attachments: () => number;
   /** 降级/拦截等需要记录在案的决策。 */
   onDecision?: (decision: { toolName: string; approved: boolean; reason: string }) => void;
+  /** 面向用户的提醒（核心层转成 `ui.notify` 广播给该会话的所有 attachment）。 */
+  onNotice?: (level: "info" | "warn" | "error", message: string) => void;
 };
 
 export class SessionRuntime {
@@ -73,6 +76,8 @@ export class SessionRuntime {
   #manager: SessionManager;
   #session: AgentSession | undefined;
   #autonomy: AutonomyLevel;
+  /** `plan` 档摘掉改动类工具前的启用集合（离开该档时原样恢复）。 */
+  #toolsBeforePlan: string[] | undefined;
   /** 决策记忆（F-1.10）：本会话内被"总是允许"的工具。 */
   readonly sessionAllowedTools = new Set<string>();
   #status: SessionState["status"] = "idle";
@@ -160,7 +165,22 @@ export class SessionRuntime {
         }),
       ],
     });
-    await resourceLoader.reload();
+    // 项目本地资源默认不加载：基座的 `projectTrusted` 默认为真，不显式过这道门就等于
+    // "clone 一个仓库就执行其中代码"。传 `resolveProjectTrust` 后，loader 会先以"未授信"
+    // 引导一遍，拿到决定后再正式加载（`resource-loader.js:263-273`）。
+    await resourceLoader.reload({
+      resolveProjectTrust: async () => {
+        const decision = decideProjectTrust(options.dataDir, options.cwd);
+        if (decision.needsDecision) {
+          options.onNotice?.(
+            "warn",
+            `项目本地资源未加载（未授予项目信任）：${options.cwd} 下有 .pi 或 .agents/skills 资源。` +
+              "要启用请先确认来源可信，再执行 `trust` 命令授信该目录。",
+          );
+        }
+        return decision.trusted;
+      },
+    });
 
     const model = await pickModel(options.modelRuntime, options.dataDir);
     this.#modelAvailable = model !== undefined;
@@ -182,6 +202,7 @@ export class SessionRuntime {
     });
 
     this.#session = session;
+    this.#applyAutonomyTools();
     this.#unsubscribe = session.subscribe((event) => {
       void this.#onPiEvent(event as PiEvent).catch(() => {
         // 单个事件转译失败不该让会话崩掉：状态由下一次落盘对账修正。
@@ -201,7 +222,31 @@ export class SessionRuntime {
 
   setAutonomy(level: AutonomyLevel): void {
     this.#autonomy = level;
+    this.#applyAutonomyTools();
     this.#emitStatus();
+  }
+
+  /**
+   * 把自主级别落到**工具集**上：`plan` 档摘掉改动类工具，离开该档时恢复。
+   *
+   * 为什么要有这一层：只在 `tool_call` 上拦，模型依然看得到 `write`/`edit` 并反复尝试，
+   * 每次都要闸门拒绝一次——既浪费轮次，也把"计划模式"变成"每步都被拦"。结构性收窄之后
+   * 它根本不在上下文里。闸门那道仍然保留（命令类工具、第三方注册的工具都靠它兜底）。
+   */
+  #applyAutonomyTools(): void {
+    const session = this.#session;
+    if (session === undefined) return;
+    if (this.#autonomy === "plan") {
+      this.#toolsBeforePlan ??= session.getActiveToolNames();
+      session.setActiveToolsByName(
+        planModeToolNames(session.getAllTools().map((tool) => tool.name)),
+      );
+      return;
+    }
+    if (this.#toolsBeforePlan !== undefined) {
+      session.setActiveToolsByName(this.#toolsBeforePlan);
+      this.#toolsBeforePlan = undefined;
+    }
   }
 
   get status(): SessionState["status"] {
