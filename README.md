@@ -7,7 +7,7 @@
 **步骤 0–5.5 已落地**（Web/TUI/桌面三壳、四种绑定、PTY 通道、多实例跟随、无人值守待决交互）；
 后续功能按"全量补齐"推进，**uhub 与远控除外**（进度见[实现设计 §七 步骤 7](docs/impl/00-实现设计.md)）。
 
-- 单仓多包：`packages/`（库）· `apps/`（cli | web | desktop | tui）· `hub/`（单独部署，可缺省）。
+- 单仓多包：`packages/`（库）· `apps/`（cli | web | desktop | tui）· `hub/`（单独部署，可缺省）；每个包都有自己的 `README.md`，写定位、公开入口与依赖边界。
 - 依赖严格单向（`apps/* → ui → sdk → bindings/* → protocol`；`core → store → data-layer-spec`），由**允许列表门禁**在 CI 拦截。
 - 品牌参数化：产品名、数据层目录名等一律从 `@ucode/branding` 读取，源码里禁止出现字面量（同样有门禁）。
 - 已落地：协议 C 的 Zod schema · 协议 D 的参考实现 + 一致性套件（18 例）· 核心层（握手 / 会话运行时 / 交互中转 / 工具闸门 / 工作区查询）· 四种绑定（stdio / rpc / http+SSE / ws）· headless SDK · CLI · TUI（Ink）· Web 壳（React + Tailwind）。

@@ -196,6 +196,9 @@ docs/spec/               定稿需求与架构（基线 spec-baseline）
   03-假设与验证.md       技术假设 V-n、业务输入 B-n、风险登记（唯一台账）
 docs/impl/
   00-实现设计.md         仓库组织、包职责、依赖图、运行方式、构建测试、实现步骤、落地记录 I-n
+packages/*/README.md     各包定位、公开入口与依赖边界（从属文档：与代码冲突以代码为准）
+apps/*/README.md         各壳的运行方式与构建产物
+hub/README.md            骨架说明（可整包删除）
 ```
 
 - **规则/禁令 → AGENTS.md；机制与设计解释 → `docs/`（人类向，分 spec / impl / process 三类）**。归属判定沿用这一条，不在多处重复同一约定。
