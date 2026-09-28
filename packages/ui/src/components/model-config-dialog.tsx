@@ -47,7 +47,7 @@ export function ModelConfigDialog({ onClose }: { onClose: () => void }): ReactNo
   };
 
   return (
-    <Modal title="模型配置">
+    <Modal title="模型配置" onClose={onClose}>
       <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
         <section>
           <h3 className="mb-1.5 text-xs font-medium text-[var(--color-content-muted)]">
@@ -171,7 +171,7 @@ export function ModelConfigDialog({ onClose }: { onClose: () => void }): ReactNo
           </p>
         )}
         {providers.error !== null && (
-          <p className="rounded bg-[oklch(0.3_0.06_25)] px-2 py-1.5 text-[11px] text-[var(--color-danger)]">
+          <p className="rounded-md bg-[var(--color-danger-soft)] px-2.5 py-1.5 text-[11px] text-[var(--color-danger)]">
             {providers.error}
           </p>
         )}

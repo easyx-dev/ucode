@@ -2,7 +2,8 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAgentStore } from "../context.ts";
-import { Button } from "./primitives.tsx";
+import { CloseIcon, TerminalIcon } from "./icons.tsx";
+import { IconButton } from "./primitives.tsx";
 
 /**
  * 终端面板（xterm.js，ZCode 的终端标签页同款交互）。
@@ -31,7 +32,12 @@ export function TerminalPanel({
     const terminal = new Terminal({
       fontSize: 12,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-      theme: { background: "#17171d", foreground: "#e8e8ee", cursor: "#7ab6e8" },
+      theme: {
+        background: "#0d0d0d",
+        foreground: "#ededed",
+        cursor: "#0ea5e9",
+        selectionBackground: "#264f78",
+      },
       cursorBlink: true,
     });
     const fit = new FitAddon();
@@ -83,13 +89,12 @@ export function TerminalPanel({
   }, [sdk, sessionId]);
 
   return (
-    <div className="flex h-64 shrink-0 flex-col border-t border-[var(--color-border-subtle)]">
+    <div className="flex h-64 shrink-0 flex-col border-t border-[var(--color-border-subtle)] bg-[var(--color-surface-code)]">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 text-[11px] text-[var(--color-content-muted)]">
-        <span>终端（{sessionId.slice(0, 12)} 的工作区）</span>
+        <TerminalIcon className="size-3.5" />
+        <span>终端 · {sessionId.slice(0, 12)} 的工作区</span>
         <span className="ml-auto" />
-        <Button size="sm" onClick={onClose}>
-          关闭
-        </Button>
+        <IconButton icon={<CloseIcon />} label="关闭终端" onClick={onClose} />
       </div>
       {error !== null ? (
         <p className="p-3 text-xs text-[var(--color-danger)]">终端打开失败：{error}</p>

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useAgentStore } from "../context.ts";
+import { FolderIcon, RefreshIcon } from "./icons.tsx";
 import { Markdown } from "./markdown.tsx";
-import { Badge, Button, Card } from "./primitives.tsx";
+import { Badge, Button, Card, IconButton, Panel, Segmented } from "./primitives.tsx";
 import {
   buildTreeRows,
   changeStatusLabel,
@@ -46,40 +47,40 @@ export function WorkspacePanel({
   const file = state?.file ?? null;
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--color-border-subtle)] px-3">
-        <div className="flex gap-1">
-          {(["tree", "changes", "history"] as const).map((candidate) => (
-            <Button
-              key={candidate}
-              size="sm"
-              variant={tab === candidate ? "primary" : "ghost"}
-              onClick={() => setTab(candidate)}
-            >
-              {candidate === "tree" ? "文件" : candidate === "changes" ? "变更" : "历史"}
-            </Button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" title="刷新" onClick={() => void loadWorkspace(sessionId)}>
-            刷新
-          </Button>
-          <Button size="sm" title="关闭" onClick={onClose}>
-            ×
-          </Button>
-        </div>
-      </header>
-
+    <Panel
+      title="工作区"
+      icon={<FolderIcon />}
+      onClose={onClose}
+      actions={
+        <>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "tree", label: "文件" },
+              { value: "changes", label: "变更" },
+              { value: "history", label: "历史" },
+            ]}
+          />
+          <IconButton
+            icon={<RefreshIcon />}
+            label="刷新工作区"
+            onClick={() => void loadWorkspace(sessionId)}
+          />
+        </>
+      }
+      bodyClassName="p-2 font-[var(--font-mono)] text-[12px]"
+    >
       {state?.error != null && (
-        <div className="border-b border-[var(--color-border-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-danger)]">
+        <div className="mb-2 rounded-md bg-[var(--color-danger-soft)] px-2.5 py-1.5 font-[inherit] text-[11px] text-[var(--color-danger)]">
           {state.error}
         </div>
       )}
 
       {tab === "tree" && (
-        <div className="border-b border-[var(--color-border-subtle)] p-2">
+        <div className="mb-2">
           <input
-            className="w-full rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-overlay)] px-2 py-1 text-[12px]"
+            className="w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-overlay)] px-2 py-1 text-[12px] outline-none placeholder:text-[var(--color-content-faint)] focus:border-[var(--color-border-active)]"
             placeholder="筛选文件（含路径）"
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
@@ -87,7 +88,7 @@ export function WorkspacePanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-2 font-[var(--font-mono)] text-[12px]">
+      <div>
         {state?.loading === true && (
           <p className="p-2 text-[11px] text-[var(--color-content-muted)]">加载中…</p>
         )}
@@ -164,7 +165,7 @@ export function WorkspacePanel({
           onClose={() => closeFile(sessionId)}
         />
       )}
-    </aside>
+    </Panel>
   );
 }
 

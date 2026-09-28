@@ -1,37 +1,46 @@
 @import "tailwindcss";
 
 /*
- * 主题 token（shadcn 的写法：CSS 变量 + Tailwind 的 @theme 映射）。
+ * 主题 token（ZCode 的深色一套：neutral 阶梯 + sky 品牌色）。
  *
- * 色值取自 zcode Web 的 `.dark` 一套（`packages/ui/src/styles.css` 的 `--color-*`），
- * 语义名沿用我们自己的那套，因此组件类名不用改：对齐的是**同一套色板**，
- * 而不是"看起来差不多"。对应关系（左边我们，右边 zcode）：
+ * 四级"面"由暗到亮，组件只认语义、不认色值：
+ *   surface          壳底与侧栏（最暗）
+ *   surface-raised   卡片 / 输入区 / 右侧面板
+ *   surface-overlay  悬停、选中项、弹层
+ *   surface-code     代码与终端输出（比壳底更暗，避免大块亮色反光）
+ * 文字三级：content（正文）/ content-muted（次要）/ content-faint（提示、分隔）
  *
- *   surface        ← --color-sidebar / --color-menu   （neutral-950，最暗一层）
- *   surface-raised ← --color-background / --color-card（neutral-900/800）
- *   surface-overlay← --color-popover / --color-input   （neutral-800）
- *   border-subtle  ← --color-border                    （neutral-50 @10%）
- *   content        ← --color-foreground                （neutral-200）
- *   accent         ← --color-brand                     （sky-500）
- *   danger/warn    ← --color-destructive / --color-warning
+ * 语义色成对出现：`-soft` 是同一色相的低透明底，用于徽标与告警条——
+ * 组件里因此不再出现硬编码色值（`oklch(...)`），换主题只改这一处。
  */
 @theme {
-  --color-surface: #0a0a0a; /* zcode --color-sidebar */
-  --color-surface-raised: #262626; /* zcode --color-background */
-  --color-surface-overlay: #404040; /* zcode --color-card / --color-popover */
-  --color-surface-user: #303030; /* 略深的用户气泡底 */
-  --color-border-subtle: #3a3a3a; /* zcode --color-border（neutral-50 @10%） */
-  --color-border: #4d4d4d; /* zcode --color-border-hover（@30%） */
-  --color-border-active: #0ea5e9; /* zcode --color-input-border-focused */
-  --color-content: #e5e5e5; /* zcode --color-foreground */
-  --color-content-muted: #9b9b9b; /* zcode --color-foreground-subtle */
-  --color-accent: #0ea5e9; /* zcode --color-brand */
-  --color-accent-soft: color-mix(in oklab, #0ea5e9 22%, transparent);
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #171717;
+  --color-surface-overlay: #262626;
+  --color-surface-code: #0d0d0d;
+  --color-surface-user: #202020;
+  --color-border-subtle: #262626;
+  --color-border: #3d3d3d;
+  --color-border-active: #0ea5e9;
+
+  --color-content: #ededed;
+  --color-content-muted: #a1a1a1;
+  --color-content-faint: #737373;
+
+  --color-accent: #0ea5e9;
+  --color-accent-soft: color-mix(in oklab, #0ea5e9 16%, transparent);
+  --color-accent-foreground: #06141d;
+  --color-accent-hover: #38bdf8;
+
   --color-secondary: #a1a1a1;
-  --color-success: #22c55e; /* zcode --color-success */
   --color-info: #38bdf8;
-  --color-warn: #eab308; /* zcode --color-warning */
-  --color-danger: #ef4444; /* zcode --color-destructive */
+  --color-success: #22c55e;
+  --color-success-soft: color-mix(in oklab, #22c55e 16%, transparent);
+  --color-warn: #eab308;
+  --color-warn-soft: color-mix(in oklab, #eab308 16%, transparent);
+  --color-danger: #ef4444;
+  --color-danger-soft: color-mix(in oklab, #ef4444 16%, transparent);
+
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -46,54 +55,52 @@ body {
   margin: 0;
   background-color: var(--color-surface);
   color: var(--color-content);
+  color-scheme: dark;
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-/*
- * 窄屏适配（F-6.2 的移动端控制面）。
- *
- * 取舍：**不另做一个移动端应用**——控制层共用同一份 ui，手机上要的是"能用"：
- * - 侧栏（会话列表）收窄成一条，不再占掉半屏；
- * - 右侧面板（工作区/自动化/插件/用量）改成全屏覆盖，点 × 关闭；
- * - 顶栏换成可换行的一列：那一排按钮 + 两个下拉框在窄屏下总宽超过视口，
- *   不换行就会被挤出屏幕（实测 420px 时右侧控件跑到 x≈695，完全点不到）；
- * - 触屏设备上悬浮才出现的"追问这段"按钮改为常显（没有 hover）。
- */
-@media (max-width: 720px) {
-  aside {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    width: 100% !important;
-  }
-  /* 会话侧栏不是覆盖层：手机上也常驻，但只留窄条 */
-  aside:first-of-type {
-    position: static;
-    width: 7rem !important;
-  }
-  header {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 3rem;
-    row-gap: 0.25rem;
-    padding-block: 0.25rem;
-  }
-  .topbar-actions {
-    width: 100%;
-    margin-left: 0;
-    flex-wrap: wrap;
-    row-gap: 0.25rem;
-  }
+::selection {
+  background: var(--color-accent-soft);
 }
 
-/* 悬停才出现的操作（如"追问这段"）：默认隐藏，悬停或触屏时常显 */
+/* 滚动条：默认的浅色滚动条在深色壳子里很扎眼；细一点，让内容占主导。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-overlay) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-surface-overlay);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 键盘用户看得见焦点，鼠标用户不被打扰。 */
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 65%, transparent);
+  outline-offset: 1px;
+}
+
+/* 悬停才出现的行内操作（如"追问这段"）：触屏没有 hover，改为常显。 */
 .reveal-hover {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.group:hover .reveal-hover {
+.group:hover .reveal-hover,
+.group:focus-within .reveal-hover {
   opacity: 1;
 }
 @media (hover: none) {
@@ -102,7 +109,32 @@ body {
   }
 }
 
-/* 滚动条：默认的浅色滚动条在深色壳子里很扎眼 */
-* {
-  scrollbar-color: var(--color-border-subtle) transparent;
+/*
+ * 窄屏适配（F-6.2 的移动端控制面）。
+ *
+ * 取舍：**不另做一个移动端应用**——控制层共用同一份 ui，手机上要的是"能用"：
+ * 会话侧栏与右侧面板改成覆盖层（由顶栏的按钮开关），主列不再被挤成一条。
+ */
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: 17rem;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease-out;
+  }
+  .app-sidebar[data-open="true"] {
+    transform: none;
+    box-shadow: 0 0 0 100vmax rgb(0 0 0 / 55%);
+  }
+  .app-rail {
+    position: fixed;
+    inset: 3rem 0 0 0;
+    z-index: 40;
+    width: auto !important;
+  }
+  .app-topbar-actions {
+    gap: 0.125rem;
+  }
 }

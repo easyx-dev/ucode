@@ -1,12 +1,13 @@
 import { type ReactNode, useState } from "react";
 import { useAgentStore } from "../context.ts";
+import { GaugeIcon, RefreshIcon } from "./icons.tsx";
 import {
   describePreflight,
   describeVersions,
   formatTokenCount,
   topModelRows,
 } from "./insights-format.ts";
-import { Badge, Button, Card } from "./primitives.tsx";
+import { Badge, Button, Card, IconButton, Panel } from "./primitives.tsx";
 
 /**
  * 用量 / 支持包 / 迁移面板（F-5.6~5.8）。
@@ -29,20 +30,18 @@ export function InsightsPanel({ onClose }: { onClose: () => void }): ReactNode {
   const usage = insights.usage;
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--color-border-subtle)] px-3">
-        <h2 className="text-sm font-medium">用量与数据</h2>
-        {insights.loading && <Badge tone="muted">处理中</Badge>}
-        <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" onClick={() => void loadUsage()}>
-            刷新
-          </Button>
-          <Button size="sm" onClick={onClose}>
-            ×
-          </Button>
-        </div>
-      </header>
-
+    <Panel
+      title="用量与数据"
+      icon={<GaugeIcon />}
+      onClose={onClose}
+      actions={
+        <>
+          {insights.loading && <Badge tone="muted">处理中</Badge>}
+          <IconButton icon={<RefreshIcon />} label="刷新用量" onClick={() => void loadUsage()} />
+        </>
+      }
+      bodyClassName="p-3"
+    >
       {(insights.error !== null || insights.note !== null) && (
         <div
           className={`border-b border-[var(--color-border-subtle)] px-3 py-1.5 text-[11px] ${
@@ -156,6 +155,6 @@ export function InsightsPanel({ onClose }: { onClose: () => void }): ReactNode {
           </Card>
         </section>
       </div>
-    </aside>
+    </Panel>
   );
 }

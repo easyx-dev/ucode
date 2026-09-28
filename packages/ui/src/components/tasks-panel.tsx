@@ -1,7 +1,8 @@
 import type { TaskSummary } from "@ucode/sdk";
 import { type ReactNode, useState } from "react";
 import { useAgentStore } from "../context.ts";
-import { Badge, Button, Card } from "./primitives.tsx";
+import { BoltIcon, RefreshIcon } from "./icons.tsx";
+import { Badge, Button, Card, IconButton, Panel } from "./primitives.tsx";
 import {
   describeNextRun,
   describeRuns,
@@ -62,20 +63,22 @@ export function TasksPanel({ onClose }: { onClose: () => void }): ReactNode {
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--color-border-subtle)] px-3">
-        <h2 className="text-sm font-medium">自动化</h2>
-        {keepAwake && <Badge tone="accent">保持唤醒</Badge>}
-        <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" title="刷新" onClick={() => void loadTasks()}>
-            刷新
-          </Button>
-          <Button size="sm" title="关闭" onClick={onClose}>
-            ×
-          </Button>
-        </div>
-      </header>
-
+    <Panel
+      title="自动化"
+      icon={<BoltIcon />}
+      onClose={onClose}
+      actions={
+        <>
+          {keepAwake && <Badge tone="accent">保持唤醒</Badge>}
+          <IconButton
+            icon={<RefreshIcon />}
+            label="刷新任务列表"
+            onClick={() => void loadTasks()}
+          />
+        </>
+      }
+      bodyClassName="p-2"
+    >
       <div className="border-b border-[var(--color-border-subtle)] p-2">
         {composing ? (
           <div className="flex flex-col gap-2">
@@ -171,7 +174,7 @@ export function TasksPanel({ onClose }: { onClose: () => void }): ReactNode {
           </div>
         )}
       </div>
-    </aside>
+    </Panel>
   );
 }
 

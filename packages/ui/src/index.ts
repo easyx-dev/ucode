@@ -7,6 +7,13 @@
  * - 宿主差异（窗口、托盘、通知、端口映射）留在各自的 `apps/*` 里。
  */
 export { AgentShell } from "./app.tsx";
+export {
+  AUTONOMY_ITEMS,
+  autonomyLabel,
+  Composer,
+  type ComposerPanel,
+} from "./components/composer.tsx";
+export { EmptyState, greetingFor } from "./components/empty-state.tsx";
 export { ErrorBoundary } from "./components/error-boundary.tsx";
 export {
   composeFollowUpPrompt,
@@ -22,6 +29,7 @@ export {
   topModelRows,
 } from "./components/insights-format.ts";
 export { InsightsPanel } from "./components/insights-panel.tsx";
+export { InteractionDialog } from "./components/interaction-dialog.tsx";
 export {
   componentKindLabel,
   describeCatalogEntry,
@@ -30,7 +38,32 @@ export {
   summarizeInstallReport,
 } from "./components/marketplace-format.ts";
 export { MarketplacePanel } from "./components/marketplace-panel.tsx";
-export { Badge, Button, Card, Modal, Spinner } from "./components/primitives.tsx";
+export {
+  Badge,
+  Button,
+  Card,
+  IconButton,
+  Kbd,
+  Menu,
+  type MenuItem,
+  Modal,
+  Panel,
+  Segmented,
+  Spinner,
+} from "./components/primitives.tsx";
+export {
+  filterSessions,
+  formatRelativeTime,
+  groupSessionsByProject,
+  type ProjectGroup,
+  projectLabel,
+  type SessionTone,
+  sessionSubtitle,
+  sessionTitle,
+  sessionTone,
+} from "./components/session-format.ts";
+export { SessionSidebar, type SessionSidebarProps } from "./components/session-sidebar.tsx";
+export { StatusBar } from "./components/status-bar.tsx";
 export {
   describeNextRun,
   describeRuns,
@@ -41,6 +74,14 @@ export {
 } from "./components/task-format.ts";
 export { TasksPanel } from "./components/tasks-panel.tsx";
 export { TerminalPanel } from "./components/terminal-panel.tsx";
+export {
+  toolContentPreview,
+  toolLabel,
+  toolOutputPreview,
+  toolSummary,
+} from "./components/tool-format.ts";
+export { type ShellPanel, TopBar, type TopBarProps } from "./components/top-bar.tsx";
+export { Transcript } from "./components/transcript.tsx";
 export {
   buildTreeRows,
   changeStatusLabel,
@@ -67,12 +108,3 @@ export {
   emptyMarketplace,
   emptyWorkspace,
 } from "./store.ts";
-export {
-  Composer,
-  EmptyState,
-  InteractionDialog,
-  SessionSidebar,
-  StatusBar,
-  TopBar,
-  Transcript,
-} from "./views.tsx";

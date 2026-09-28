@@ -31,7 +31,7 @@ export function CommandHints({
 
   return (
     <div
-      className="mb-1.5 overflow-hidden rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-overlay)] shadow-lg"
+      className="mb-1.5 overflow-hidden rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-overlay)] shadow-lg"
       role="listbox"
       aria-label={COMMAND_PANEL_TITLE}
     >
@@ -43,7 +43,7 @@ export function CommandHints({
         <button
           type="button"
           onClick={onDismiss}
-          className="ml-auto text-[10px] text-[var(--color-content-muted)] hover:text-[var(--color-content)]"
+          className="ml-auto text-[10px] text-[var(--color-content-faint)] hover:text-[var(--color-content)]"
         >
           Esc 关闭
         </button>

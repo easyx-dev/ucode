@@ -32,12 +32,12 @@ function CodeBlock({ children }: { children?: ReactNode }): ReactNode {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="my-2 overflow-hidden rounded-md border border-[var(--color-border-subtle)] bg-[oklch(0.19_0.01_260)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-2.5 py-1 text-[11px] text-[var(--color-content-muted)]">
+    <div className="my-2 overflow-hidden rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-code)]">
+      <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-2.5 py-1 text-[11px] text-[var(--color-content-faint)]">
         <span className="font-[var(--font-mono)]">{language}</span>
         <button
           type="button"
-          className="rounded px-1.5 py-0.5 hover:bg-[var(--color-surface-overlay)]"
+          className="rounded px-1.5 py-0.5 transition-colors hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-content)]"
           onClick={() => {
             void navigator.clipboard?.writeText(text).then(() => {
               setCopied(true);
@@ -69,7 +69,7 @@ export function Markdown({ children }: { children: string }): ReactNode {
               );
             }
             return (
-              <code className="rounded bg-[var(--color-surface-overlay)] px-1 py-0.5 font-[var(--font-mono)] text-[12px]">
+              <code className="rounded bg-[var(--color-surface-overlay)] px-1 py-0.5 font-[var(--font-mono)] text-[12px] text-[var(--color-content)]">
                 {children}
               </code>
             );

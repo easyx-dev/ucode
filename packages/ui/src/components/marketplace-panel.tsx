@@ -1,12 +1,13 @@
 import { type ReactNode, useState } from "react";
 import { useAgentStore } from "../context.ts";
+import { PackageIcon, RefreshIcon } from "./icons.tsx";
 import {
   componentKindLabel,
   describeCatalogEntry,
   groupInstalled,
   summarizeInstallReport,
 } from "./marketplace-format.ts";
-import { Badge, Button, Card } from "./primitives.tsx";
+import { Badge, Button, Card, IconButton, Panel } from "./primitives.tsx";
 
 /**
  * 插件市场面板（F-3.6）。
@@ -54,32 +55,34 @@ export function MarketplacePanel({ onClose }: { onClose: () => void }): ReactNod
   }
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--color-border-subtle)] px-3">
-        <h2 className="text-sm font-medium">插件与市场</h2>
-        {marketplace.loading && <Badge tone="muted">加载中</Badge>}
-        <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" onClick={() => void loadMarketplace()}>
-            刷新
-          </Button>
-          <Button size="sm" onClick={onClose}>
-            ×
-          </Button>
-        </div>
-      </header>
-
+    <Panel
+      title="插件与市场"
+      icon={<PackageIcon />}
+      onClose={onClose}
+      actions={
+        <>
+          {marketplace.loading && <Badge tone="muted">加载中</Badge>}
+          <IconButton
+            icon={<RefreshIcon />}
+            label="刷新市场"
+            onClick={() => void loadMarketplace()}
+          />
+        </>
+      }
+      bodyClassName="p-2"
+    >
       {marketplace.error !== null && (
-        <div className="border-b border-[var(--color-border-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-danger)]">
+        <div className="mb-2 rounded-md bg-[var(--color-danger-soft)] px-2.5 py-1.5 text-[11px] text-[var(--color-danger)]">
           {marketplace.error}
         </div>
       )}
       {note !== null && (
-        <div className="border-b border-[var(--color-border-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-content-muted)]">
+        <div className="mb-2 rounded-md bg-[var(--color-surface-overlay)] px-2.5 py-1.5 text-[11px] text-[var(--color-content-muted)]">
           {note}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div>
         <section className="mb-3">
           <div className="mb-1 flex items-center gap-2 px-1">
             <span className="text-[11px] font-medium text-[var(--color-content-muted)]">
@@ -224,7 +227,7 @@ export function MarketplacePanel({ onClose }: { onClose: () => void }): ReactNod
           )}
         </section>
       </div>
-    </aside>
+    </Panel>
   );
 }
 
