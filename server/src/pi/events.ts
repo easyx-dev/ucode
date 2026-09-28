@@ -1,0 +1,119 @@
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+
+import { messageToDTO, type MessageDTO } from "./serialize";
+
+export type SseEvent = { event: string; data: unknown };
+
+const textFromResult = (result: unknown): string => {
+  if (result === null || result === undefined) return "";
+  if (typeof result === "string") return result;
+  if (typeof result !== "object") return String(result);
+
+  const record = result as Record<string, unknown>;
+  const content = record.content;
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) =>
+        typeof part === "object" && part !== null && typeof (part as { text?: unknown }).text === "string"
+          ? (part as { text: string }).text
+          : "",
+      )
+      .join("");
+    if (text) return text;
+  }
+  if (typeof record.text === "string") return record.text;
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+};
+
+/** 把 pi 的 AgentSessionEvent 映射为 SSE 事件（不需要发的返回空数组） */
+export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
+  switch (event.type) {
+    case "message_start":
+      return [{ event: "message_start", data: { role: (event.message as { role?: string }).role } }];
+
+    case "message_update": {
+      const inner = event.assistantMessageEvent;
+      switch (inner.type) {
+        case "text_delta":
+          return [{ event: "text_delta", data: { delta: inner.delta } }];
+        case "thinking_delta":
+          return [{ event: "thinking_delta", data: { delta: inner.delta } }];
+        case "toolcall_end":
+          return [
+            {
+              event: "tool_call",
+              data: {
+                toolCallId: inner.toolCall.id,
+                toolName: inner.toolCall.name,
+                args: inner.toolCall.arguments,
+              },
+            },
+          ];
+        default:
+          return [];
+      }
+    }
+
+    case "message_end": {
+      const dto = messageToDTO(event.message, `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
+      return dto ? [{ event: "message_end", data: dto }] : [];
+    }
+
+    case "tool_execution_start":
+      return [
+        {
+          event: "tool_start",
+          data: { toolCallId: event.toolCallId, toolName: event.toolName, args: event.args },
+        },
+      ];
+
+    case "tool_execution_update":
+      return [
+        {
+          event: "tool_update",
+          data: {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            text: textFromResult(event.partialResult),
+          },
+        },
+      ];
+
+    case "tool_execution_end":
+      return [
+        {
+          event: "tool_end",
+          data: {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            isError: event.isError,
+            text: textFromResult(event.result),
+          },
+        },
+      ];
+
+    case "queue_update":
+      return [
+        { event: "queue_update", data: { steering: event.steering, followUp: event.followUp } },
+      ];
+
+    case "compaction_start":
+      return [{ event: "compaction_start", data: { reason: event.reason } }];
+
+    case "compaction_end":
+      return [{ event: "compaction_end", data: {} }];
+
+    case "session_info_changed":
+      return [{ event: "session_info_changed", data: { name: event.name ?? null } }];
+
+    case "agent_settled":
+      return [{ event: "agent_settled", data: {} }];
+
+    default:
+      return [];
+  }
+};

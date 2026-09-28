@@ -1,0 +1,13 @@
+packages:
+  - "server"
+  - "apps/web"
+
+# 允许执行安装脚本的依赖（pnpm 默认阻止）
+allowBuilds:
+  "@google/genai": true
+  esbuild: true
+  protobufjs: true
+  "@earendil-works/photon-node": true
+
+minimumReleaseAgeExclude:
+  - hono@4.13.10
