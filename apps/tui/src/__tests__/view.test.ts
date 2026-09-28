@@ -1,17 +1,35 @@
+import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type { DisplayItem, SessionSummary, SessionView } from "@ucode/sdk";
 import { describe, expect, it } from "vitest";
 import {
+  bannerBox,
   bannerFor,
+  buildLine,
   COMMAND_SPECS,
   commandSuggestions,
-  formatItem,
+  compactionLine,
+  emptyLine,
+  footerLine,
+  formatDuration,
+  formatTokens,
   helpText,
-  hintLine,
   interactionPrompt,
+  isStreaming,
+  noticeLine,
+  padLine,
+  pendingBlock,
+  promptHint,
   sessionItems,
-  statusLine,
-  transcriptLines,
+  shortenCwd,
+  thinkingLine,
+  toolBlock,
+  toolHead,
+  turnStartedAt,
+  userBlock,
 } from "../view.ts";
+
+/** 去掉 ANSI 只看文字（断言内容时不受配色影响）。 */
+const plain = (text: string): string => stripTerminalSequences(text);
 
 function emptyView(over: Partial<SessionView> = {}): SessionView {
   return {
@@ -32,66 +50,435 @@ function emptyView(over: Partial<SessionView> = {}): SessionView {
   };
 }
 
-describe("formatItem", () => {
-  it("用户与助手消息带角色前缀", () => {
-    const user: DisplayItem = { kind: "user", id: "1", seq: 1, text: "你好", timestamp: "" };
-    const assistant: DisplayItem = {
-      kind: "assistant",
-      id: "2",
-      seq: 2,
-      markdown: "**在**",
-      timestamp: "",
-    };
-    expect(formatItem(user)).toBe("你 > 你好");
-    expect(formatItem(assistant)).toBe("助手 > **在**");
+type ToolItem = Extract<DisplayItem, { kind: "tool" }>;
+
+function tool(over: Partial<ToolItem> = {}): ToolItem {
+  return {
+    kind: "tool",
+    id: "t1",
+    seq: 1,
+    callId: "c1",
+    toolName: "bash",
+    args: { command: "ls -la" },
+    status: "done",
+    output: "",
+    timestamp: "",
+    ...over,
+  };
+}
+
+describe("padLine", () => {
+  it("按可见宽度补齐（方框右边框才对得齐）", () => {
+    expect(padLine("ab", 5)).toBe("ab   ");
   });
 
-  it("工具卡片带状态标记与参数摘要，有输出时缩进附在下面", () => {
-    const running: DisplayItem = {
-      kind: "tool",
-      id: "3",
-      seq: 3,
-      callId: "c1",
-      toolName: "read",
-      args: { path: "/tmp/a.ts" },
-      status: "running",
-      output: "",
-      timestamp: "",
-    };
-    expect(formatItem(running)).toContain("[工具 ...] read");
-    expect(formatItem(running)).toContain("path=/tmp/a.ts");
-
-    const done: DisplayItem = { ...running, status: "done", output: "第一行\n第二行" };
-    const text = formatItem(done);
-    expect(text).toContain("[工具 v] read");
-    expect(text).toContain("    第一行");
-    expect(text).toContain("    第二行");
-
-    const error: DisplayItem = { ...running, status: "error", output: "boom" };
-    expect(formatItem(error)).toContain("[工具 x] read");
+  it("超宽就截断，不会把方框撑破", () => {
+    expect(visibleWidth(padLine("abcdef", 3))).toBe(3);
   });
 
-  it("思考、通知、压缩、待决交互各有前缀", () => {
-    expect(formatItem({ kind: "thinking", id: "t", seq: 1, text: "嗯", timestamp: "" })).toBe(
-      "(思考) 嗯",
+  it("中文按两列算", () => {
+    expect(visibleWidth(padLine("中文", 6))).toBe(6);
+  });
+});
+
+describe("userBlock", () => {
+  it("每行带左侧色条", () => {
+    const lines = userBlock("你好", 40);
+    expect(lines).toHaveLength(1);
+    expect(plain(lines[0] ?? "")).toBe("▌ 你好");
+  });
+
+  it("多行输入逐行保持色条（粘贴的代码块不会歪）", () => {
+    const lines = userBlock("第一行\n第二行", 40);
+    expect(lines.map(plain)).toEqual(["▌ 第一行", "▌ 第二行"]);
+  });
+
+  it("超长行折行后仍然每行都有色条", () => {
+    const lines = userBlock("字".repeat(60), 20);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(plain(line).startsWith("▌")).toBe(true);
+  });
+});
+
+describe("toolHead", () => {
+  it("命令类带 $ 前缀", () => {
+    expect(toolHead(tool())).toBe("$ ls -la");
+  });
+
+  it("文件类给路径", () => {
+    expect(toolHead(tool({ toolName: "read", args: { path: "/a/b.ts" } }))).toBe("/a/b.ts");
+  });
+
+  it("搜索类给出模式与范围", () => {
+    expect(toolHead(tool({ toolName: "grep", args: { pattern: "TODO", path: "src" } }))).toBe(
+      "TODO · src",
     );
-    expect(formatItem({ kind: "notice", id: "n", seq: 1, text: "提示", timestamp: "" })).toBe(
-      "· 提示",
+  });
+
+  it("不认识的参数退化成参数名列表", () => {
+    expect(toolHead(tool({ toolName: "custom", args: { a: 1, b: 2 } }))).toBe("a · b");
+  });
+
+  it("完全没有参数时退回工具名（不能是空行）", () => {
+    expect(toolHead(tool({ toolName: "custom", args: {} }))).toBe("custom");
+  });
+});
+
+describe("toolBlock", () => {
+  it("画成方框：顶边带工具名与状态，底边闭合", () => {
+    const lines = toolBlock(tool({ output: "a.ts" }), 40);
+    expect(plain(lines[0] ?? "")).toContain("bash");
+    expect(plain(lines[0] ?? "")).toContain("完成");
+    expect(plain(lines[0] ?? "").startsWith("╭")).toBe(true);
+    expect(plain(lines.at(-1) ?? "").startsWith("╰")).toBe(true);
+  });
+
+  it("每一行的可见宽度都一样（终端里方框才不会斜）", () => {
+    const lines = toolBlock(tool({ output: "第一行\n第二行" }), 40);
+    for (const line of lines) expect(visibleWidth(line)).toBe(40);
+  });
+
+  it("输出只留尾部，并说出省掉了多少行", () => {
+    const output = Array.from({ length: 20 }, (_, index) => `第${index}行`).join("\n");
+    const text = plain(toolBlock(tool({ output }), 40).join("\n"));
+    expect(text).toContain("省略前 8 行");
+    expect(text).toContain("第19行");
+    expect(text).not.toContain("第0行");
+  });
+
+  it("出错时右上角标出错，不装成成功", () => {
+    const text = plain(toolBlock(tool({ status: "error", output: "boom" }), 40).join("\n"));
+    expect(text).toContain("出错");
+    expect(text).toContain("boom");
+  });
+
+  it("运行中给出运行态（还没有输出也能看出在跑）", () => {
+    expect(plain(toolBlock(tool({ status: "running" }), 40).join("\n"))).toContain("运行中");
+  });
+});
+
+describe("thinkingLine", () => {
+  it("压成一行并给出总行数", () => {
+    const line = plain(
+      thinkingLine({ kind: "thinking", id: "t", seq: 1, text: "甲\n乙\n丙", timestamp: "" }, 60),
     );
-    expect(
-      formatItem({ kind: "compaction", id: "c", seq: 1, summary: "摘要", timestamp: "" }),
-    ).toBe("(上下文已压缩) 摘要");
-    expect(
-      formatItem({
-        kind: "pending",
-        id: "p",
-        seq: 1,
-        interactionId: "i",
-        method: "confirm",
-        params: { title: "允许？" },
-        timestamp: "",
-      }),
-    ).toContain("[待决交互] confirm");
+    expect(line).toContain("思考");
+    expect(line).toContain("3 行");
+    expect(line).toContain("甲");
+  });
+
+  it("超出宽度时截断而不是撑破布局", () => {
+    const item = {
+      kind: "thinking" as const,
+      id: "t",
+      seq: 1,
+      text: "字".repeat(200),
+      timestamp: "",
+    };
+    expect(visibleWidth(thinkingLine(item, 30))).toBeLessThanOrEqual(30);
+  });
+});
+
+describe("noticeLine", () => {
+  it("按级别换标记与颜色", () => {
+    expect(plain(noticeLine("好了", 40, "info"))).toBe("· 好了");
+    expect(plain(noticeLine("当心", 40, "warn"))).toBe("! 当心");
+    expect(plain(noticeLine("炸了", 40, "error"))).toBe("✗ 炸了");
+  });
+});
+
+describe("compactionLine", () => {
+  it("作为分隔线呈现，带上摘要", () => {
+    const line = plain(compactionLine("前面聊了很多", 40));
+    expect(line).toContain("上下文已压缩");
+    expect(line).toContain("前面聊了很多");
+  });
+});
+
+describe("pendingBlock", () => {
+  it("列出选项，而不是把 JSON 倒在屏幕上", () => {
+    const text = plain(
+      pendingBlock(
+        {
+          kind: "pending",
+          id: "p",
+          seq: 1,
+          interactionId: "i1",
+          method: "select",
+          params: { title: "允许执行 bash？", options: ["允许一次", "拒绝"] },
+          timestamp: "",
+        },
+        50,
+      ).join("\n"),
+    );
+    expect(text).toContain("允许执行 bash？");
+    expect(text).toContain("允许一次 / 拒绝");
+    expect(text).toContain("待决交互");
+  });
+
+  it("缺字段也不崩（用 method 兜底）", () => {
+    const text = plain(
+      pendingBlock(
+        {
+          kind: "pending",
+          id: "p",
+          seq: 1,
+          interactionId: "i",
+          method: "confirm",
+          params: {},
+          timestamp: "",
+        },
+        40,
+      ).join("\n"),
+    );
+    expect(text).toContain("confirm");
+  });
+});
+
+describe("formatDuration", () => {
+  it("一分钟以内报秒（带一位小数）", () => {
+    expect(formatDuration(12_340)).toBe("12.3s");
+  });
+
+  it("超过一分钟报分秒", () => {
+    expect(formatDuration(123_000)).toBe("2分03秒");
+  });
+
+  it("非法值给空串（宁可少显示，也不显示 NaN）", () => {
+    expect(formatDuration(Number.NaN)).toBe("");
+    expect(formatDuration(-1)).toBe("");
+  });
+});
+
+describe("formatTokens", () => {
+  it("大数缩写", () => {
+    expect(formatTokens(950)).toBe("950");
+    expect(formatTokens(12_345)).toBe("12.3k");
+    expect(formatTokens(2_345_678)).toBe("2.35M");
+  });
+
+  it("零与非法值都给 0", () => {
+    expect(formatTokens(0)).toBe("0");
+    expect(formatTokens(Number.NaN)).toBe("0");
+  });
+});
+
+describe("buildLine", () => {
+  it("给出模型、耗时与队列", () => {
+    const line = plain(
+      buildLine(
+        {
+          model: "deepseek-v4-flash",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          now: Date.parse("2026-01-01T00:00:12.300Z"),
+          queued: 2,
+          streaming: true,
+        },
+        80,
+      ),
+    );
+    expect(line).toContain("生成中");
+    expect(line).toContain("deepseek-v4-flash");
+    expect(line).toContain("12.3s");
+    expect(line).toContain("队列 2");
+  });
+
+  it("没有开始时间就不显示耗时（不猜）", () => {
+    const line = plain(
+      buildLine({ model: null, startedAt: null, now: Date.now(), queued: 0, streaming: false }, 80),
+    );
+    expect(line).toContain("运行中");
+    expect(line).not.toContain("s ·");
+  });
+});
+
+describe("footerLine", () => {
+  it("左对齐目录、右对齐模型与用量，总宽不超过终端", () => {
+    const line = footerLine(
+      {
+        cwd: "/Users/lyy/code/demo-app",
+        autonomy: "full-access",
+        model: "deepseek-v4-flash",
+        tokens: 419_100,
+        sessionCount: 3,
+        connected: true,
+        trustLevel: "local",
+        readOnly: false,
+        hint: "/ 命令",
+      },
+      100,
+    );
+    const text = plain(line);
+    expect(visibleWidth(line)).toBeLessThanOrEqual(100);
+    expect(text.startsWith("/Users/lyy/code/demo-app")).toBe(true);
+    expect(text.trimEnd().endsWith("/ 命令")).toBe(true);
+    expect(text).toContain("完全访问");
+    expect(text).toContain("419.1k tokens");
+  });
+
+  it("未连接与只读挂载必须显式（否则「发了没反应」会被当成 bug）", () => {
+    const text = plain(
+      footerLine(
+        {
+          cwd: "/w",
+          autonomy: null,
+          model: null,
+          tokens: null,
+          sessionCount: 0,
+          connected: false,
+          trustLevel: null,
+          readOnly: true,
+        },
+        80,
+      ),
+    );
+    expect(text).toContain("未连接");
+    expect(text).toContain("只读挂载");
+  });
+
+  it("窄屏时先丢装饰（会话数、信任级别），保住路径与用量", () => {
+    const line = footerLine(
+      {
+        cwd: "/very/long/path/to/the/project/directory",
+        autonomy: "confirm",
+        model: "some-model",
+        tokens: 1234,
+        sessionCount: 9,
+        connected: true,
+        trustLevel: "local",
+        readOnly: false,
+        hint: "/ 命令",
+      },
+      60,
+    );
+    const text = plain(line);
+    expect(visibleWidth(line)).toBeLessThanOrEqual(60);
+    expect(text).toContain("/very/long");
+    expect(text).not.toContain("9 会话");
+    // 模型是"我到底在用哪个"的答案，比执行模式更该留住。
+    expect(text).toContain("some-model");
+  });
+
+  it("极窄屏：截路径也要留下命令入口（否则用户不知道还能输命令）", () => {
+    const line = footerLine(
+      {
+        cwd: "/very/long/path/to/the/project/directory",
+        home: "/very",
+        autonomy: "confirm",
+        model: "some-model",
+        tokens: 1234,
+        sessionCount: 9,
+        connected: true,
+        trustLevel: "local",
+        readOnly: false,
+        hint: "/ 命令",
+      },
+      40,
+    );
+    expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    expect(plain(line)).toContain("/ 命令");
+  });
+
+  it("家目录缩写成 ~（省下的宽度给用量）", () => {
+    const line = footerLine(
+      {
+        cwd: "/Users/lyy/code/demo-app",
+        home: "/Users/lyy",
+        autonomy: null,
+        model: null,
+        tokens: null,
+        sessionCount: 0,
+        connected: true,
+        trustLevel: "local",
+        readOnly: false,
+      },
+      80,
+    );
+    expect(plain(line).startsWith("~/code/demo-app")).toBe(true);
+  });
+});
+
+describe("shortenCwd", () => {
+  it("家目录前缀换成 ~", () => {
+    expect(shortenCwd("/Users/lyy/code/demo-app", "/Users/lyy")).toBe("~/code/demo-app");
+  });
+
+  it("就是家目录本身时是单个 ~", () => {
+    expect(shortenCwd("/Users/lyy", "/Users/lyy")).toBe("~");
+  });
+
+  it("不在家目录下就原样返回（不猜）", () => {
+    expect(shortenCwd("/srv/app", "/Users/lyy")).toBe("/srv/app");
+  });
+
+  it("拿不到家目录时不动路径", () => {
+    expect(shortenCwd("/Users/lyy/code/demo-app", undefined)).toBe("/Users/lyy/code/demo-app");
+  });
+});
+
+describe("bannerBox", () => {
+  it("画成一个醒目的方框，长文本折行", () => {
+    const lines = bannerBox("还没有可用的模型：用 /provider 添加一个供应商。", 40);
+    expect(plain(lines[0] ?? "")).toContain("注意");
+    for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    expect(lines.length).toBeGreaterThan(2);
+  });
+});
+
+describe("emptyLine", () => {
+  it("空会话给出引导语", () => {
+    expect(plain(emptyLine(60))).toContain("还没有对话");
+  });
+});
+
+describe("promptHint", () => {
+  it("忙时只提示还能按什么", () => {
+    expect(promptHint({ running: true, answering: false })).toContain("排队");
+    expect(promptHint({ running: true, answering: false })).not.toContain("Tab 补全");
+  });
+
+  it("回答提问时提示回车是提交", () => {
+    expect(promptHint({ running: false, answering: true })).toContain("提交回答");
+  });
+
+  it("闲时给完整键位", () => {
+    expect(promptHint({ running: false, answering: false })).toContain("Shift+Enter");
+  });
+});
+
+describe("turnStartedAt", () => {
+  it("取最后一条用户消息的时间戳", () => {
+    const view = emptyView({
+      entries: [
+        {
+          id: "u1",
+          timestamp: "2026-01-01T00:00:01.000Z",
+          type: "message",
+          message: { role: "user", content: "第一句" },
+        } as unknown as SessionView["entries"][number],
+        {
+          id: "u2",
+          timestamp: "2026-01-01T00:00:09.000Z",
+          type: "message",
+          message: { role: "user", content: "第二句" },
+        } as unknown as SessionView["entries"][number],
+      ],
+      seqByEntryId: { u1: 1, u2: 2 },
+      maxSeq: 2,
+    });
+    expect(turnStartedAt(view)).toBe("2026-01-01T00:00:09.000Z");
+  });
+
+  it("没有用户消息时返回 null（不编造耗时）", () => {
+    expect(turnStartedAt(emptyView())).toBeNull();
+    expect(turnStartedAt(null)).toBeNull();
+  });
+});
+
+describe("isStreaming", () => {
+  it("有流式正文时为真", () => {
+    expect(isStreaming(emptyView({ streaming: { text: "在写", thinking: "" } }))).toBe(true);
+    expect(isStreaming(emptyView())).toBe(false);
   });
 });
 
@@ -107,14 +494,11 @@ describe("interactionPrompt", () => {
     }) as never;
 
   it("select 出选项列表（工具批准就是这一档）", () => {
-    const prompt = interactionPrompt(
-      request("select", { title: "允许执行 bash？", options: ["允许一次", "拒绝"] }),
-    );
-    expect(prompt).toEqual({
-      kind: "select",
-      title: "允许执行 bash？",
-      options: ["允许一次", "拒绝"],
-    });
+    expect(
+      interactionPrompt(
+        request("select", { title: "允许执行 bash？", options: ["允许一次", "拒绝"] }),
+      ),
+    ).toEqual({ kind: "select", title: "允许执行 bash？", options: ["允许一次", "拒绝"] });
   });
 
   it("select 没给选项就不弹（避免弹出空列表）", () => {
@@ -151,108 +535,8 @@ describe("interactionPrompt", () => {
   });
 });
 
-describe("transcriptLines", () => {
-  it("空会话给出引导语", () => {
-    expect(transcriptLines(emptyView(), { width: 80 }).join("\n")).toContain("还没有对话");
-  });
-
-  it("渲染未落盘的流式内容", () => {
-    const lines = transcriptLines(
-      emptyView({ streaming: { text: "正在生成", thinking: "想想" } }),
-      { width: 80 },
-    ).join("\n");
-    expect(lines).toContain("助手 > 正在生成");
-    expect(lines).toContain("(思考) 想想");
-  });
-
-  it("错误被显式展示（不吞）", () => {
-    const lines = transcriptLines(
-      emptyView({
-        lastError: { code: "internal_error", message: "爆了", details: undefined } as never,
-      }),
-      { width: 80 },
-    ).join("\n");
-    expect(lines).toContain("[错误] 爆了");
-  });
-
-  it("助手消息含 thinking + text 两段时，正文照样渲染（真实模型形状）", () => {
-    const entry = {
-      type: "message",
-      id: "a1",
-      parentId: null,
-      timestamp: "2026-01-01T00:00:00.000Z",
-      message: {
-        role: "assistant",
-        content: [
-          { type: "thinking", thinking: "想一想" },
-          { type: "text", text: "ZEBRA-5301" },
-        ],
-      },
-    } as unknown as SessionView["entries"][number];
-    const rendered = transcriptLines(
-      emptyView({ entries: [entry], seqByEntryId: { a1: 1 }, maxSeq: 1 }),
-      { width: 80 },
-    ).join("\n");
-    expect(rendered).toContain("助手 > ZEBRA-5301");
-  });
-
-  it("超长时按宽度换行（交给 pi-tui 的 Text）", () => {
-    const long = "字".repeat(200);
-    const lines = transcriptLines(emptyView({ streaming: { text: long, thinking: "" } }), {
-      width: 40,
-    });
-    expect(lines.length).toBeGreaterThan(3);
-    for (const line of lines) expect(line.length).toBeLessThanOrEqual(41);
-  });
-});
-
-describe("statusLine", () => {
-  it("拼接产品名、连接、目录、模型、状态与会话数", () => {
-    const line = statusLine({
-      productName: "测试产品",
-      connected: true,
-      trustLevel: "local",
-      sessionCount: 2,
-      view: emptyView({
-        state: {
-          sessionId: "s1",
-          name: null,
-          cwd: "/work",
-          model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
-          thinkingLevel: null,
-          autonomy: "confirm",
-          status: "idle",
-          cursor: 0,
-          pendingMessages: 0,
-          pendingInteractions: 0,
-          attachments: 1,
-          modelAvailable: true,
-        },
-      }),
-      model: "deepseek-v4-flash",
-    });
-    expect(line).toContain("测试产品");
-    expect(line).toContain("已连接(local)");
-    expect(line).toContain("/work");
-    expect(line).toContain("deepseek-v4-flash");
-    expect(line).toContain("会话 2");
-  });
-
-  it("只读挂载被显式标出（否则「发了没反应」会被当成 bug）", () => {
-    const line = statusLine({
-      productName: "测试产品",
-      connected: true,
-      trustLevel: "local",
-      sessionCount: 1,
-      view: emptyView({ readOnly: true }),
-      model: null,
-    });
-    expect(line).toContain("只读挂载");
-  });
-});
-
 describe("sessionItems", () => {
-  it("标出当前会话", () => {
+  it("标出当前会话并带上目录", () => {
     const sessions: SessionSummary[] = [
       {
         id: "a",
@@ -276,8 +560,8 @@ describe("sessionItems", () => {
       },
     ];
     const items = sessionItems(sessions, "b");
-    expect(items[0]?.label.startsWith("*")).toBe(false);
-    expect(items[1]?.label.startsWith("*")).toBe(true);
+    expect(items[0]?.label.startsWith("▸")).toBe(false);
+    expect(items[1]?.label.startsWith("▸")).toBe(true);
     expect(items[1]?.label).toContain("/b");
   });
 });
@@ -313,13 +597,6 @@ describe("commandSuggestions", () => {
   });
 });
 
-describe("hintLine", () => {
-  it("键位提示随忙闲切换", () => {
-    expect(hintLine({ running: false, streaming: false })).toContain("输入 / 查看命令");
-    expect(hintLine({ running: true, streaming: true })).toContain("生成中");
-  });
-});
-
 describe("bannerFor", () => {
   it("没有可用模型时显式说出该怎么办（这正是「发了没反应」的成因之一）", () => {
     const text = bannerFor({
@@ -348,27 +625,5 @@ describe("bannerFor", () => {
         notices: [],
       }),
     ).toBeNull();
-  });
-});
-
-describe("transcriptLines", () => {
-  it("不重复渲染：总量由 toDisplayItems 决定，本层不再补一遍", () => {
-    const view = emptyView({
-      entries: [
-        {
-          id: "a1",
-          timestamp: "t",
-          type: "message",
-          message: { role: "assistant", content: [{ type: "text", text: "已经落盘的答复" }] },
-        } as unknown as SessionView["entries"][number],
-      ],
-      seqByEntryId: { a1: 1 },
-      maxSeq: 1,
-      streaming: { text: "还没落盘的尾巴", thinking: "" },
-    });
-    const rendered = transcriptLines(view, { width: 80 }).join("\n");
-    // 落盘的那条只出现一次；流式尾巴各出现一次。
-    expect(rendered.split("已经落盘的答复").length - 1).toBe(1);
-    expect(rendered.split("还没落盘的尾巴").length - 1).toBe(1);
   });
 });
