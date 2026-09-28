@@ -6,8 +6,15 @@
 
 ### 新增
 
+- 引入 Biome 作为格式化与 lint 入口（`biome.json`），根脚本新增 `pnpm check`
+  （`biome check .` + `pnpm -r typecheck`，作为强制校验入口）与 `pnpm format`。
 - 添加 `AGENTS.md`：开发边界、提交流程、注释与编码约定、验证命令、目录约定、生成代码豁免与安全规则。
 - 添加本文件。
+
+### 变更
+
+- 按 Biome 规则统一现有源码的排版与 import 顺序，清理未使用导入、非空断言与表达式内赋值；
+  新增 `@biomejs/biome` 根开发依赖。
 
 ## [0.1.0] - 2026-09-29
 

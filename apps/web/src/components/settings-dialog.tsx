@@ -23,9 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { api, ApiRequestError } from "@/lib/api";
-import { API_TYPES, THINKING_LEVELS } from "@/lib/types";
+import { ApiRequestError, api } from "@/lib/api";
 import type { ApiType, ProviderModelView, ThinkingLevel } from "@/lib/types";
+import { API_TYPES, THINKING_LEVELS } from "@/lib/types";
 
 type DraftModel = {
   key: string;
@@ -50,7 +50,10 @@ type DraftProvider = {
 };
 
 let keySeed = 0;
-const nextKey = (): string => `k${(keySeed += 1)}`;
+const nextKey = (): string => {
+  keySeed += 1;
+  return `k${keySeed}`;
+};
 
 const toDraftProvider = (provider: {
   id: string;
@@ -290,7 +293,9 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
                     <Label className="text-xs">名称</Label>
                     <Input
                       value={provider.name}
-                      onChange={(event) => patchProvider(provider.key, { name: event.target.value })}
+                      onChange={(event) =>
+                        patchProvider(provider.key, { name: event.target.value })
+                      }
                       placeholder="Local Gateway"
                     />
                   </div>
@@ -366,7 +371,9 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
                         <Input
                           value={model.contextWindow}
                           onChange={(event) =>
-                            patchModel(provider.key, model.key, { contextWindow: event.target.value })
+                            patchModel(provider.key, model.key, {
+                              contextWindow: event.target.value,
+                            })
                           }
                         />
                       </div>
@@ -433,7 +440,10 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
               </div>
             ))}
 
-            <Button variant="outline" onClick={() => setProviders((prev) => [...prev, emptyProvider()])}>
+            <Button
+              variant="outline"
+              onClick={() => setProviders((prev) => [...prev, emptyProvider()])}
+            >
               <Plus className="size-4" />
               添加 provider
             </Button>
@@ -444,7 +454,9 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
               <div className="space-y-1.5">
                 <Label className="text-xs">默认模型</Label>
                 <Select
-                  value={options.some((option) => option.value === defaultModel) ? defaultModel : ""}
+                  value={
+                    options.some((option) => option.value === defaultModel) ? defaultModel : ""
+                  }
                   onValueChange={setDefaultModel}
                 >
                   <SelectTrigger className="w-full">

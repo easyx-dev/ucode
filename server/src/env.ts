@@ -43,11 +43,6 @@ export const env = {
   corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",
 };
 
-for (const dir of new Set([
-  env.workspaceDir,
-  env.agentDir,
-  env.dataDir,
-  env.sessionsRoot,
-])) {
+for (const dir of new Set([env.workspaceDir, env.agentDir, env.dataDir, env.sessionsRoot])) {
   mkdirSync(dir, { recursive: true });
 }

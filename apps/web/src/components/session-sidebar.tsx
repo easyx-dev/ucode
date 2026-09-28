@@ -19,8 +19,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { sessionTitle } from "@/lib/session";
-import { cn } from "@/lib/utils";
 import type { SessionSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type SessionSidebarProps = {
   sessions: SessionSummary[];
@@ -114,7 +114,11 @@ export function SessionSidebar({
                 <div className="truncate text-xs font-medium">{titleOf(session)}</div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <span>{session.messageCount} 条</span>
-                  {session.model ? <Badge variant="secondary" className="h-4 px-1 text-[9px]">{session.model.split("/").pop()}</Badge> : null}
+                  {session.model ? (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px]">
+                      {session.model.split("/").pop()}
+                    </Badge>
+                  ) : null}
                 </div>
               </button>
 

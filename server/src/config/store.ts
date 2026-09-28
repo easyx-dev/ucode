@@ -2,7 +2,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { env } from "../env";
 import { AppError } from "../lib/result";
-import { appConfigSchema, providerSchema, type AppConfig, type AppConfigPatch } from "./schema";
+import { type AppConfig, type AppConfigPatch, appConfigSchema, providerSchema } from "./schema";
 
 export const emptyConfig = (): AppConfig => ({
   providers: [],
@@ -60,9 +60,13 @@ export class ConfigStore {
       return parsed.data;
     });
 
+    // patch 显式给出 defaultModel（含 null）时以 patch 为准
+    const defaultModel =
+      "defaultModel" in patch ? (patch.defaultModel ?? null) : this.config.defaultModel;
+
     return this.set({
       providers: providers ?? this.config.providers,
-      defaultModel: "defaultModel" in patch ? patch.defaultModel! : this.config.defaultModel,
+      defaultModel,
       thinkingLevel: patch.thinkingLevel ?? this.config.thinkingLevel,
     });
   }

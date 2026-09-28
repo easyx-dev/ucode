@@ -65,7 +65,10 @@ app.onError((error, c) => {
     );
   }
   console.error("[ucode] 未处理异常:", error);
-  return c.json(fail("internal_error", error instanceof Error ? error.message : String(error)), 500);
+  return c.json(
+    fail("internal_error", error instanceof Error ? error.message : String(error)),
+    500,
+  );
 });
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
@@ -77,7 +80,9 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
       : `[ucode] 模型未配置：${status.error}（POST /api/v1/config/update 配置）`,
   );
   console.log(
-    webBuildExists() ? "[ucode] 已托管 apps/web/dist" : "[ucode] 未发现 web 构建产物（开发时用 vite）",
+    webBuildExists()
+      ? "[ucode] 已托管 apps/web/dist"
+      : "[ucode] 未发现 web 构建产物（开发时用 vite）",
   );
 });
 

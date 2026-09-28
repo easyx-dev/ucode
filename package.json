@@ -9,9 +9,12 @@
     "build": "pnpm -F @ucode/web build",
     "start": "pnpm -F @ucode/server start",
     "typecheck": "pnpm -r typecheck",
+    "check": "biome check . && pnpm -r typecheck",
+    "format": "biome format --write .",
     "smoke": "pnpm -F @ucode/server smoke"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
     "concurrently": "^10.0.5"
   }
 }

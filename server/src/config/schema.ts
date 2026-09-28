@@ -23,7 +23,10 @@ export const providerModelSchema = z.object({
   name: z.string().min(1).optional(),
   api: z.enum(API_TYPES).optional(),
   reasoning: z.boolean().default(false),
-  input: z.array(z.enum(["text", "image"])).min(1).default(["text"]),
+  input: z
+    .array(z.enum(["text", "image"]))
+    .min(1)
+    .default(["text"]),
   contextWindow: z.number().int().positive().default(128000),
   maxTokens: z.number().int().positive().default(8192),
   cost: modelCostSchema.default({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }),

@@ -1,10 +1,6 @@
 import { CheckCircle2, ChevronRight, CircleDashed, TriangleAlert, Wrench } from "lucide-react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 type ToolCallCardProps = {

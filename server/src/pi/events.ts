@@ -1,6 +1,6 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
-import { messageToDTO, type MessageDTO } from "./serialize";
+import { messageToDTO } from "./serialize";
 
 export type SseEvent = { event: string; data: unknown };
 
@@ -14,7 +14,9 @@ const textFromResult = (result: unknown): string => {
   if (Array.isArray(content)) {
     const text = content
       .map((part) =>
-        typeof part === "object" && part !== null && typeof (part as { text?: unknown }).text === "string"
+        typeof part === "object" &&
+        part !== null &&
+        typeof (part as { text?: unknown }).text === "string"
           ? (part as { text: string }).text
           : "",
       )
@@ -33,7 +35,9 @@ const textFromResult = (result: unknown): string => {
 export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
   switch (event.type) {
     case "message_start":
-      return [{ event: "message_start", data: { role: (event.message as { role?: string }).role } }];
+      return [
+        { event: "message_start", data: { role: (event.message as { role?: string }).role } },
+      ];
 
     case "message_update": {
       const inner = event.assistantMessageEvent;
@@ -59,7 +63,10 @@ export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
     }
 
     case "message_end": {
-      const dto = messageToDTO(event.message, `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
+      const dto = messageToDTO(
+        event.message,
+        `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      );
       return dto ? [{ event: "message_end", data: dto }] : [];
     }
 

@@ -31,7 +31,10 @@ const unwrap = async <T>(response: Response): Promise<T> => {
   try {
     payload = await response.json();
   } catch {
-    throw new ApiRequestError("invalid_response", `服务返回了非 JSON 响应（HTTP ${response.status}）`);
+    throw new ApiRequestError(
+      "invalid_response",
+      `服务返回了非 JSON 响应（HTTP ${response.status}）`,
+    );
   }
 
   const record = payload as { ok?: boolean; data?: T; error?: ApiErrorBody };
@@ -65,7 +68,8 @@ export const api = {
   },
   config: {
     info: () => post<{ config: ConfigView; status: RuntimeStatus }>("config/info"),
-    update: (patch: unknown) => post<{ config: ConfigView; status: RuntimeStatus }>("config/update", patch),
+    update: (patch: unknown) =>
+      post<{ config: ConfigView; status: RuntimeStatus }>("config/update", patch),
     test: (input: {
       baseUrl: string;
       apiKey?: string;
@@ -77,19 +81,29 @@ export const api = {
   sessions: {
     list: (body: { q?: string; limit?: number } = {}) =>
       post<{ sessions: SessionSummary[]; total: number }>("sessions/list", body),
-    create: (body: { name?: string; cwd?: string; model?: string; thinkingLevel?: ThinkingLevel } = {}) =>
-      post<SessionSummary>("sessions/create", body),
+    create: (
+      body: { name?: string; cwd?: string; model?: string; thinkingLevel?: ThinkingLevel } = {},
+    ) => post<SessionSummary>("sessions/create", body),
     info: (sessionId: string) =>
-      post<{ session: SessionSummary; persisted: boolean; entries: number }>("sessions/info", { sessionId }),
-    update: (body: { sessionId: string; name?: string; model?: string; thinkingLevel?: ThinkingLevel }) =>
-      post<SessionSummary>("sessions/update", body),
+      post<{ session: SessionSummary; persisted: boolean; entries: number }>("sessions/info", {
+        sessionId,
+      }),
+    update: (body: {
+      sessionId: string;
+      name?: string;
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    }) => post<SessionSummary>("sessions/update", body),
     remove: (sessionId: string) => post<{ deleted: boolean }>("sessions/delete", { sessionId }),
   },
   messages: {
     list: (sessionId: string) =>
-      post<{ sessionId: string; messages: MessageDTO[]; persisted: boolean; cwd: string }>("messages/list", {
-        sessionId,
-      }),
+      post<{ sessionId: string; messages: MessageDTO[]; persisted: boolean; cwd: string }>(
+        "messages/list",
+        {
+          sessionId,
+        },
+      ),
     interrupt: (sessionId: string) =>
       post<{ sessionId: string; aborted: boolean }>("messages/interrupt", { sessionId }),
   },

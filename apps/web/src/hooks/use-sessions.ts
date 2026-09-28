@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { api, ApiRequestError } from "@/lib/api";
+import { ApiRequestError, api } from "@/lib/api";
 import type { SessionSummary, ThinkingLevel } from "@/lib/types";
 
 const describeError = (error: unknown): string =>

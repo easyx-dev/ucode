@@ -68,7 +68,9 @@ export function ChatHeader({
 
         {!modelsLoading && options.length > 0 ? (
           <Select
-            value={options.some((option) => option.value === currentModel) ? currentModel : undefined}
+            value={
+              options.some((option) => option.value === currentModel) ? currentModel : undefined
+            }
             onValueChange={onSelectModel}
             disabled={!session}
           >
@@ -106,7 +108,13 @@ export function ChatHeader({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" onClick={onReloadModels} title="重建运行时">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={onReloadModels}
+              title="重建运行时"
+            >
               <RefreshCw className="size-4" />
             </Button>
           </TooltipTrigger>

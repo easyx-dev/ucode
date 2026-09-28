@@ -1,9 +1,9 @@
 import {
+  type AgentSession,
   createAgentSession,
+  type SessionInfo,
   SessionManager,
   SettingsManager,
-  type AgentSession,
-  type SessionInfo,
 } from "@earendil-works/pi-coding-agent";
 
 import type { SessionStateStore } from "../config/session-state";

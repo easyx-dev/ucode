@@ -53,7 +53,12 @@ export function Composer({ onSend, onStop, streaming, disabled }: ComposerProps)
             <Square className="size-4" />
           </Button>
         ) : (
-          <Button size="icon" onClick={submit} disabled={disabled || value.trim().length === 0} title="发送">
+          <Button
+            size="icon"
+            onClick={submit}
+            disabled={disabled || value.trim().length === 0}
+            title="发送"
+          >
             <ArrowUp className="size-4" />
           </Button>
         )}

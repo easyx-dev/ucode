@@ -4,8 +4,8 @@ import remarkGfm from "remark-gfm";
 
 import { ToolCallCard } from "@/components/tool-call-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
 import type { ChatItem, MessageBlock } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const timestampLabel = (value?: number): string =>
   value ? new Date(value).toLocaleTimeString("zh-CN", { hour12: false }) : "";
@@ -35,7 +35,9 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
   return (
     <div className="md-content">
       <Markdown remarkPlugins={[remarkGfm]}>{block.text}</Markdown>
-      {live ? <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse bg-foreground align-text-bottom" /> : null}
+      {live ? (
+        <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse bg-foreground align-text-bottom" />
+      ) : null}
     </div>
   );
 }
@@ -76,6 +78,7 @@ export function MessageItem({ item }: { item: ChatItem }) {
   return (
     <div className="space-y-1">
       {item.blocks.map((block, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
         <BlockView key={`${item.id}-${index}`} block={block} live={item.live} />
       ))}
       {item.live && item.blocks.length === 0 ? (

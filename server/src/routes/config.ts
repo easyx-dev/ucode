@@ -9,10 +9,7 @@ import { jsonBody } from "../lib/validate";
 
 const emptyBody = z.object({}).default({});
 
-const testConnection = async (
-  input: z.infer<typeof configTestSchema>,
-  services: Services,
-) => {
+const testConnection = async (input: z.infer<typeof configTestSchema>, services: Services) => {
   if (input.api !== "openai-completions") {
     throw new AppError(
       "unsupported_api",
@@ -54,7 +51,12 @@ const testConnection = async (
 
   const text = await response.text();
   if (!response.ok) {
-    throw new AppError("upstream_error", `上游返回 HTTP ${response.status}`, 400, text.slice(0, 800));
+    throw new AppError(
+      "upstream_error",
+      `上游返回 HTTP ${response.status}`,
+      400,
+      text.slice(0, 800),
+    );
   }
 
   let modelEcho: string | null = null;

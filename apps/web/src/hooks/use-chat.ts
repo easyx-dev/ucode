@@ -1,3 +1,4 @@
+/** 会话消息流：历史加载 + SSE 增量渲染 */
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, sendMessageUrl } from "@/lib/api";
@@ -7,10 +8,16 @@ import type { ChatItem, MessageBlock, MessageDTO, MessageRole } from "@/lib/type
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 
+let localId = 0;
+const nextLocalId = (): number => {
+  localId += 1;
+  return localId;
+};
+
 const lastLiveIndex = (items: ChatItem[], role: MessageRole): number => {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    if (item && item.live && item.role === role) return index;
+    if (item?.live && item.role === role) return index;
   }
   return -1;
 };
@@ -27,7 +34,103 @@ const appendBlock = (item: ChatItem, type: "text" | "thinking", delta: string): 
   return { ...item, blocks };
 };
 
-let localId = 0;
+const replaceAt = (items: ChatItem[], index: number, item: ChatItem): ChatItem[] => {
+  const next = [...items];
+  next[index] = item;
+  return next;
+};
+
+/** 把一条 SSE 事件并入消息列表（纯函数；id 与时间戳在进入前生成） */
+const reduceEvent = (items: ChatItem[], event: string, payload: unknown): ChatItem[] => {
+  const data = asRecord(payload);
+
+  switch (event) {
+    case "message_start": {
+      if (data.role !== "assistant") return items;
+      const item: ChatItem = {
+        id: `live-assistant-${nextLocalId()}`,
+        role: "assistant",
+        blocks: [],
+        live: true,
+        timestamp: Date.now(),
+      };
+      return [...items, item];
+    }
+
+    case "text_delta":
+    case "thinking_delta": {
+      const index = lastLiveIndex(items, "assistant");
+      const item = items[index];
+      if (index < 0 || !item) return items;
+      const type = event === "text_delta" ? "text" : "thinking";
+      return replaceAt(items, index, appendBlock(item, type, String(data.delta ?? "")));
+    }
+
+    case "tool_call": {
+      const index = lastLiveIndex(items, "assistant");
+      const item = items[index];
+      if (index < 0 || !item) return items;
+      const block: MessageBlock = {
+        type: "toolCall",
+        id: String(data.toolCallId ?? ""),
+        name: String(data.toolName ?? "tool"),
+        args: data.args,
+      };
+      return replaceAt(items, index, { ...item, blocks: [...item.blocks, block] });
+    }
+
+    case "tool_start": {
+      const item: ChatItem = {
+        id: `live-tool-${String(data.toolCallId ?? nextLocalId())}`,
+        role: "tool",
+        blocks: [{ type: "text", text: "" }],
+        toolName: String(data.toolName ?? "tool"),
+        isError: false,
+        live: true,
+        timestamp: Date.now(),
+      };
+      return [...items, item];
+    }
+
+    case "tool_update":
+    case "tool_end": {
+      const target = `live-tool-${String(data.toolCallId ?? "")}`;
+      const index = items.findIndex((item) => item.id === target);
+      const item = items[index];
+      if (index < 0 || !item) return items;
+      return replaceAt(items, index, {
+        ...item,
+        blocks: [{ type: "text", text: String(data.text ?? "") }],
+        isError: Boolean(data.isError),
+      });
+    }
+
+    case "message_end": {
+      const message = payload as MessageDTO;
+      const { role } = message;
+
+      // 工具结果优先用 toolCallId 精确匹配（pi 默认并发执行工具，按「最后一个」会错位）
+      if (role === "tool" && message.toolCallId) {
+        const target = `live-tool-${message.toolCallId}`;
+        const exact = items.findIndex((item) => item.id === target);
+        if (exact >= 0) return replaceAt(items, exact, { ...message, live: false });
+      }
+
+      if (role === "assistant" || role === "tool" || role === "user") {
+        const index = lastLiveIndex(items, role);
+        if (index >= 0) return replaceAt(items, index, { ...message, live: false });
+      }
+
+      return [...items, { ...message, live: false }];
+    }
+
+    default:
+      return items;
+  }
+};
+
+const settle = (items: ChatItem[]): ChatItem[] =>
+  items.map((item) => (item.live ? { ...item, live: false } : item));
 
 /** 流还没开始就失败（如 409 未配置模型）时，尽量把服务端的原因透出来 */
 const describeHttpError = async (response: Response): Promise<string> => {
@@ -40,7 +143,6 @@ const describeHttpError = async (response: Response): Promise<string> => {
   return `发送失败（HTTP ${response.status}）`;
 };
 
-/** 会话消息流：历史加载 + SSE 增量渲染 */
 export function useChat(sessionId: string | null, onSettled?: () => void) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -50,12 +152,22 @@ export function useChat(sessionId: string | null, onSettled?: () => void) {
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
 
+  /**
+   * 消息列表以 ref 为准：SSE 回调在 React 状态更新之外推进列表，
+   * 这样事件归并只跑一次，不必把「生成 id / 取时间戳」塞进 setState updater。
+   */
+  const itemsRef = useRef<ChatItem[]>([]);
+  const replaceItems = useCallback((next: ChatItem[]) => {
+    itemsRef.current = next;
+    setItems(next);
+  }, []);
+
   useEffect(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
     setError(null);
-    setItems([]);
+    replaceItems([]);
 
     if (!sessionId) return;
 
@@ -64,7 +176,9 @@ export function useChat(sessionId: string | null, onSettled?: () => void) {
     void (async () => {
       try {
         const data = await api.messages.list(sessionId);
-        if (!cancelled) setItems(data.messages.map((message) => ({ ...message, live: false })));
+        if (!cancelled) {
+          replaceItems(data.messages.map((message) => ({ ...message, live: false })));
+        }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
       } finally {
@@ -75,125 +189,21 @@ export function useChat(sessionId: string | null, onSettled?: () => void) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
-
-  const reduce = useCallback((items: ChatItem[], event: string, payload: unknown): ChatItem[] => {
-    const data = asRecord(payload);
-    const next = [...items];
-
-    switch (event) {
-      case "message_start": {
-        if (data.role === "assistant") {
-          next.push({
-            id: `live-assistant-${Date.now()}`,
-            role: "assistant",
-            blocks: [],
-            live: true,
-            timestamp: Date.now(),
-          });
-        }
-        return next;
-      }
-
-      case "text_delta": {
-        const index = lastLiveIndex(next, "assistant");
-        if (index < 0) return next;
-        next[index] = appendBlock(next[index]!, "text", String(data.delta ?? ""));
-        return next;
-      }
-
-      case "thinking_delta": {
-        const index = lastLiveIndex(next, "assistant");
-        if (index < 0) return next;
-        next[index] = appendBlock(next[index]!, "thinking", String(data.delta ?? ""));
-        return next;
-      }
-
-      case "tool_call": {
-        const index = lastLiveIndex(next, "assistant");
-        if (index < 0) return next;
-        const item = next[index]!;
-        const block: MessageBlock = {
-          type: "toolCall",
-          id: String(data.toolCallId ?? ""),
-          name: String(data.toolName ?? "tool"),
-          args: data.args,
-        };
-        next[index] = { ...item, blocks: [...item.blocks, block] };
-        return next;
-      }
-
-      case "tool_start": {
-        next.push({
-          id: `live-tool-${String(data.toolCallId ?? Date.now())}`,
-          role: "tool",
-          blocks: [{ type: "text", text: "" }],
-          toolName: String(data.toolName ?? "tool"),
-          isError: false,
-          live: true,
-          timestamp: Date.now(),
-        });
-        return next;
-      }
-
-      case "tool_update":
-      case "tool_end": {
-        const target = `live-tool-${String(data.toolCallId ?? "")}`;
-        const index = next.findIndex((item) => item.id === target);
-        if (index < 0) return next;
-        next[index] = {
-          ...next[index]!,
-          blocks: [{ type: "text", text: String(data.text ?? "") }],
-          isError: Boolean(data.isError),
-        };
-        return next;
-      }
-
-      case "message_end": {
-        const message = payload as MessageDTO;
-        const role = message.role;
-
-        // 工具结果优先用 toolCallId 精确匹配（pi 默认并发执行工具，按“最后一个”会错位）
-        if (role === "tool" && message.toolCallId) {
-          const target = `live-tool-${message.toolCallId}`;
-          const exact = next.findIndex((item) => item.id === target);
-          if (exact >= 0) {
-            next[exact] = { ...message, live: false };
-            return next;
-          }
-        }
-
-        if (role === "assistant" || role === "tool" || role === "user") {
-          const index = lastLiveIndex(next, role);
-          if (index >= 0) {
-            next[index] = { ...message, live: false };
-            return next;
-          }
-        }
-        next.push({ ...message, live: false });
-        return next;
-      }
-
-      default:
-        return next;
-    }
-  }, []);
+  }, [replaceItems, sessionId]);
 
   const send = useCallback(
     async (text: string) => {
       if (!sessionId || streaming) return;
       setError(null);
 
-      setItems((prev) => [
-        ...prev,
-        {
-          id: `live-user-${(localId += 1)}`,
-          role: "user",
-          blocks: [{ type: "text", text }],
-          live: true,
-          timestamp: Date.now(),
-        },
-      ]);
+      const userItem: ChatItem = {
+        id: `live-user-${nextLocalId()}`,
+        role: "user",
+        blocks: [{ type: "text", text }],
+        live: true,
+        timestamp: Date.now(),
+      };
+      replaceItems([...itemsRef.current, userItem]);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -224,10 +234,10 @@ export function useChat(sessionId: string | null, onSettled?: () => void) {
               return;
             }
             if (event === "done" || event === "agent_settled") {
-              setItems((prev) => prev.map((item) => (item.live ? { ...item, live: false } : item)));
+              replaceItems(settle(itemsRef.current));
               return;
             }
-            setItems((prev) => reduce(prev, event, payload));
+            replaceItems(reduceEvent(itemsRef.current, event, payload));
           },
           controller.signal,
         );
@@ -238,11 +248,11 @@ export function useChat(sessionId: string | null, onSettled?: () => void) {
       } finally {
         setStreaming(false);
         abortRef.current = null;
-        setItems((prev) => prev.map((item) => (item.live ? { ...item, live: false } : item)));
+        replaceItems(settle(itemsRef.current));
         settledRef.current?.();
       }
     },
-    [reduce, sessionId, streaming],
+    [replaceItems, sessionId, streaming],
   );
 
   const stop = useCallback(async () => {

@@ -8,7 +8,7 @@ import { env } from "../env";
 import { AppError, ok } from "../lib/result";
 import { sessionIdSchema } from "../lib/schemas";
 import { jsonBody } from "../lib/validate";
-import { toSseEvents, type SseEvent } from "../pi/events";
+import { type SseEvent, toSseEvents } from "../pi/events";
 import { entriesToDTO } from "../pi/serialize";
 
 const sessionIdBodySchema = z.object({ sessionId: sessionIdSchema });

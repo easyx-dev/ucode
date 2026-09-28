@@ -54,7 +54,8 @@ export const blocksOf = (content: unknown): MessageBlock[] => {
         if (typeof part.text === "string") blocks.push({ type: "text", text: part.text });
         break;
       case "thinking":
-        if (typeof part.thinking === "string") blocks.push({ type: "thinking", text: part.thinking });
+        if (typeof part.thinking === "string")
+          blocks.push({ type: "thinking", text: part.thinking });
         break;
       case "toolCall":
         if (typeof part.name === "string") {

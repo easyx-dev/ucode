@@ -94,7 +94,8 @@ session.subscribe((event) => {
     case "message_update": {
       const inner = event.assistantMessageEvent;
       if (inner.type === "text_delta") process.stdout.write(inner.delta);
-      else if (inner.type === "thinking_delta") process.stdout.write(`\x1b[2m${inner.delta}\x1b[0m`);
+      else if (inner.type === "thinking_delta")
+        process.stdout.write(`\x1b[2m${inner.delta}\x1b[0m`);
       break;
     }
     case "tool_execution_start":

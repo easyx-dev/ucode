@@ -89,6 +89,16 @@
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
 - `.tmp/.ucode/config.json`、`agent/models.json` 由服务根据 `POST /api/v1/config/update` 生成，不要手工改。
 
+### Biome 配置
+
+`biome.json` 有意保持**纯 JSON**：带注释会让 Biome 静默回退到默认配置（缩进变 tab、排除规则失效）。
+两处非默认设置的原因记在这里，不要在配置文件里加注释：
+
+- `files.includes` 排除 `apps/web/src/components/ui`（shadcn 生成物）与 `**/*.css`
+  ——后者只有 Tailwind v4 入口，其 `@theme` / `@apply` / `@custom-variant` 语法 Biome 的 CSS parser 不支持。
+- `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：本仓库有几处 effect 的依赖是
+  「触发条件」而不是在效果体内直接读取（随 `value` 变化重算 textarea 高度、随 `items` 变化滚动到底部）。
+
 ### 生成代码豁免
 
 `apps/web/src/components/ui/**` 由 shadcn CLI 生成（配置见 `apps/web/components.json`），不适用本文件的
