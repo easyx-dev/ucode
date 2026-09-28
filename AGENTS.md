@@ -142,14 +142,3 @@
 **归档规则**：`CHANGELOG.md` 只保留「未发布」+ 最近 3 个已发布版本；更早的按发布年份移到
 `docs/changelog/<YYYY>.md`（同年合并，最新在上），原位置留一行
 `- 更早版本见 [docs/changelog/2026.md](docs/changelog/2026.md)`。
-
-## 存量例外
-
-引入本约定时已存在的偏差，按「编码原则」的强制阈值整改后删除本小节：
-
-- 函数超过 60 行：`apps/web/src/components/settings-dialog.tsx` 的 `SettingsDialog`（384）、
-  `server/src/routes/sessions.ts` 的 `createSessionsRoute`（166）、
-  `apps/web/src/components/session-sidebar.tsx` 的 `SessionSidebar`（163）、
-  `server/src/routes/messages.ts` 的 `createMessagesRoute`（139）、
-  `apps/web/src/App.tsx` 的 `App`（121）、`apps/web/src/components/chat-header.tsx` 的 `ChatHeader`（94）。
-- 缺文件级注释：`server/src/**` 下 18 个文件首行均无模块注释（多数已有声明级 doc 注释）。

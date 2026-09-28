@@ -1,3 +1,4 @@
+/** config.json 的读写与对外视图（apiKey 脱敏），并转换成 pi 的 models.json */
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { env } from "../env";

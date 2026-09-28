@@ -1,3 +1,4 @@
+/** AgentSession 池：懒加载、同会话串行、空闲回收 */
 import {
   type AgentSession,
   createAgentSession,

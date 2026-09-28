@@ -1,3 +1,4 @@
+/** 服务装配：配置、ModelRuntime、会话池，以及配置热重载的编排 */
 import type { AppConfigPatch } from "./config/schema";
 import { SessionStateStore } from "./config/session-state";
 import { ConfigStore } from "./config/store";

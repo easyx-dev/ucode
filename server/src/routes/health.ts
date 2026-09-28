@@ -1,3 +1,4 @@
+/** /api/v1/health：存活与运行时状态 */
 import { Hono } from "hono";
 
 import type { Services } from "../app";

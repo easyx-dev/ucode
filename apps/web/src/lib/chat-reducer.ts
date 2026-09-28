@@ -1,0 +1,162 @@
+/** 会话消息列表的事件归并（纯函数，便于复用与单测） */
+import type { ChatItem, MessageBlock, MessageDTO, MessageRole } from "./types";
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+
+let localId = 0;
+const nextLocalId = (): number => {
+  localId += 1;
+  return localId;
+};
+
+const lastLiveIndex = (items: ChatItem[], role: MessageRole): number => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item?.live && item.role === role) return index;
+  }
+  return -1;
+};
+
+const appendBlock = (item: ChatItem, type: "text" | "thinking", delta: string): ChatItem => {
+  const blocks = [...item.blocks];
+  const last = blocks[blocks.length - 1];
+
+  if (last && last.type === type) {
+    blocks[blocks.length - 1] = { type, text: last.text + delta };
+  } else {
+    blocks.push({ type, text: delta });
+  }
+  return { ...item, blocks };
+};
+
+const replaceAt = (items: ChatItem[], index: number, item: ChatItem): ChatItem[] => {
+  const next = [...items];
+  next[index] = item;
+  return next;
+};
+
+/** 收尾：所有还在流式生成中的条目去掉 live 标记 */
+export const settle = (items: ChatItem[]): ChatItem[] =>
+  items.map((item) => (item.live ? { ...item, live: false } : item));
+
+/** 乐观插入一条用户消息，等服务端回传权威消息后再合并 */
+export const appendUserItem = (items: ChatItem[], text: string): ChatItem[] => {
+  localId += 1;
+  return [
+    ...items,
+    {
+      id: `live-user-${localId}`,
+      role: "user",
+      blocks: [{ type: "text", text }],
+      live: true,
+      timestamp: Date.now(),
+    },
+  ];
+};
+
+/** 新建一条待填充的 assistant 消息（message_start） */
+export const appendAssistantItem = (items: ChatItem[]): ChatItem[] => [
+  ...items,
+  {
+    id: `live-assistant-${nextLocalId()}`,
+    role: "assistant",
+    blocks: [],
+    live: true,
+    timestamp: Date.now(),
+  },
+];
+
+/** 正文 / 思考增量：追加到最近一条 live 的 assistant 消息 */
+export const appendDelta = (
+  items: ChatItem[],
+  type: "text" | "thinking",
+  delta: string,
+): ChatItem[] => {
+  const index = lastLiveIndex(items, "assistant");
+  const item = items[index];
+  if (index < 0 || !item) return items;
+  return replaceAt(items, index, appendBlock(item, type, delta));
+};
+
+/** 工具调用被模型声明：追加到最近一条 live 的 assistant 消息 */
+export const appendToolCall = (items: ChatItem[], block: MessageBlock): ChatItem[] => {
+  const index = lastLiveIndex(items, "assistant");
+  const item = items[index];
+  if (index < 0 || !item) return items;
+  return replaceAt(items, index, { ...item, blocks: [...item.blocks, block] });
+};
+
+/** 工具开始执行：插入一张待填充的结果卡片 */
+export const startToolItem = (items: ChatItem[], data: Record<string, unknown>): ChatItem[] => [
+  ...items,
+  {
+    id: `live-tool-${String(data.toolCallId ?? nextLocalId())}`,
+    role: "tool",
+    blocks: [{ type: "text", text: "" }],
+    toolName: String(data.toolName ?? "tool"),
+    isError: false,
+    live: true,
+    timestamp: Date.now(),
+  },
+];
+
+/** 工具执行中 / 结束：刷新对应卡片的内容 */
+export const updateToolItem = (items: ChatItem[], data: Record<string, unknown>): ChatItem[] => {
+  const target = `live-tool-${String(data.toolCallId ?? "")}`;
+  const index = items.findIndex((item) => item.id === target);
+  const item = items[index];
+  if (index < 0 || !item) return items;
+  return replaceAt(items, index, {
+    ...item,
+    blocks: [{ type: "text", text: String(data.text ?? "") }],
+    isError: Boolean(data.isError),
+  });
+};
+
+/** 权威消息：优先按 toolCallId 精确替换（pi 默认并发执行工具，按「最后一个」会错位） */
+export const mergeMessage = (items: ChatItem[], message: MessageDTO): ChatItem[] => {
+  const { role } = message;
+
+  if (role === "tool" && message.toolCallId) {
+    const exact = items.findIndex((item) => item.id === `live-tool-${message.toolCallId}`);
+    if (exact >= 0) return replaceAt(items, exact, { ...message, live: false });
+  }
+
+  if (role === "assistant" || role === "tool" || role === "user") {
+    const index = lastLiveIndex(items, role);
+    if (index >= 0) return replaceAt(items, index, { ...message, live: false });
+  }
+
+  return [...items, { ...message, live: false }];
+};
+
+/** 一条 SSE 事件 → 新的消息列表 */
+export const reduceEvent = (items: ChatItem[], event: string, payload: unknown): ChatItem[] => {
+  const data = asRecord(payload);
+
+  switch (event) {
+    case "message_start":
+      return data.role === "assistant" ? appendAssistantItem(items) : items;
+    case "text_delta":
+      return appendDelta(items, "text", String(data.delta ?? ""));
+    case "thinking_delta":
+      return appendDelta(items, "thinking", String(data.delta ?? ""));
+    case "tool_call":
+      return appendToolCall(items, {
+        type: "toolCall",
+        id: String(data.toolCallId ?? ""),
+        name: String(data.toolName ?? "tool"),
+        args: data.args,
+      });
+    case "tool_start":
+      return startToolItem(items, data);
+    case "tool_update":
+    case "tool_end":
+      return updateToolItem(items, data);
+    case "message_end":
+      return mergeMessage(items, payload as MessageDTO);
+    default:
+      return items;
+  }
+};

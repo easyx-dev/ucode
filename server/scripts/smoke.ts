@@ -31,7 +31,7 @@ const thinkingLevel = readArg("thinking", "medium") as ThinkingLevel;
 const providerId = "local";
 
 const root = resolve(import.meta.dirname, "..");
-const workDir = resolve(root, ".tmp/smoke");
+const workDir = resolve(root, "../.tmp/smoke");
 const agentDir = resolve(workDir, "agent");
 mkdirSync(agentDir, { recursive: true });
 

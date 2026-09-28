@@ -1,3 +1,4 @@
+/** /api/v1/config：读取、更新（热重载）、连通性测试 */
 import { Hono } from "hono";
 import { z } from "zod";
 

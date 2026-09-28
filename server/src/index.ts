@@ -1,3 +1,4 @@
+/** 服务入口：装配路由、同源托管 web 构建产物、优雅退出 */
 import "./env";
 
 import { existsSync, readFileSync } from "node:fs";

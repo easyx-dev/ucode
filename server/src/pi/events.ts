@@ -1,8 +1,12 @@
+/** pi 的 AgentSessionEvent → 对外 SSE 事件 */
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 import { messageToDTO } from "./serialize";
 
 export type SseEvent = { event: string; data: unknown };
+
+type MessageUpdateEvent = Extract<AgentSessionEvent, { type: "message_update" }>;
+type AssistantEvent = MessageUpdateEvent["assistantMessageEvent"];
 
 const textFromResult = (result: unknown): string => {
   if (result === null || result === undefined) return "";
@@ -31,36 +35,39 @@ const textFromResult = (result: unknown): string => {
   }
 };
 
-/** 把 pi 的 AgentSessionEvent 映射为 SSE 事件（不需要发的返回空数组） */
-export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
+/** 流式增量：正文、思考、工具调用参数 */
+const toDeltaEvents = (inner: AssistantEvent): SseEvent[] => {
+  switch (inner.type) {
+    case "text_delta":
+      return [{ event: "text_delta", data: { delta: inner.delta } }];
+    case "thinking_delta":
+      return [{ event: "thinking_delta", data: { delta: inner.delta } }];
+    case "toolcall_end":
+      return [
+        {
+          event: "tool_call",
+          data: {
+            toolCallId: inner.toolCall.id,
+            toolName: inner.toolCall.name,
+            args: inner.toolCall.arguments,
+          },
+        },
+      ];
+    default:
+      return [];
+  }
+};
+
+/** 消息相关事件 */
+const toMessageEvents = (event: AgentSessionEvent): SseEvent[] | null => {
   switch (event.type) {
     case "message_start":
       return [
         { event: "message_start", data: { role: (event.message as { role?: string }).role } },
       ];
 
-    case "message_update": {
-      const inner = event.assistantMessageEvent;
-      switch (inner.type) {
-        case "text_delta":
-          return [{ event: "text_delta", data: { delta: inner.delta } }];
-        case "thinking_delta":
-          return [{ event: "thinking_delta", data: { delta: inner.delta } }];
-        case "toolcall_end":
-          return [
-            {
-              event: "tool_call",
-              data: {
-                toolCallId: inner.toolCall.id,
-                toolName: inner.toolCall.name,
-                args: inner.toolCall.arguments,
-              },
-            },
-          ];
-        default:
-          return [];
-      }
-    }
+    case "message_update":
+      return toDeltaEvents(event.assistantMessageEvent);
 
     case "message_end": {
       const dto = messageToDTO(
@@ -70,6 +77,14 @@ export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
       return dto ? [{ event: "message_end", data: dto }] : [];
     }
 
+    default:
+      return null;
+  }
+};
+
+/** 工具执行事件 */
+const toToolEvents = (event: AgentSessionEvent): SseEvent[] | null => {
+  switch (event.type) {
     case "tool_execution_start":
       return [
         {
@@ -103,24 +118,30 @@ export const toSseEvents = (event: AgentSessionEvent): SseEvent[] => {
         },
       ];
 
+    default:
+      return null;
+  }
+};
+
+/** 队列、压缩、会话信息与收尾事件 */
+const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
+  switch (event.type) {
     case "queue_update":
       return [
         { event: "queue_update", data: { steering: event.steering, followUp: event.followUp } },
       ];
-
     case "compaction_start":
       return [{ event: "compaction_start", data: { reason: event.reason } }];
-
     case "compaction_end":
       return [{ event: "compaction_end", data: {} }];
-
     case "session_info_changed":
       return [{ event: "session_info_changed", data: { name: event.name ?? null } }];
-
     case "agent_settled":
       return [{ event: "agent_settled", data: {} }];
-
     default:
-      return [];
+      return null;
   }
 };
+
+export const toSseEvents = (event: AgentSessionEvent): SseEvent[] =>
+  toMessageEvents(event) ?? toToolEvents(event) ?? toSessionEvents(event) ?? [];

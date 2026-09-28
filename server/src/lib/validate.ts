@@ -1,3 +1,4 @@
+/** POST + JSON 请求体校验的薄封装 */
 import { zValidator } from "@hono/zod-validator";
 import type { ZodType } from "zod";
 

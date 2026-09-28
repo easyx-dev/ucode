@@ -1,3 +1,4 @@
+/** 应用配置（provider / 模型 / 默认值）的 zod 模型 */
 import { z } from "zod";
 
 /** pi 支持的 API 类型（pi-ai 的 KnownApi 子集，够用即可） */

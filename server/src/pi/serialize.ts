@@ -1,3 +1,4 @@
+/** pi 的会话条目与消息 → 对外 DTO */
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 
 import type { ThinkingLevel } from "../config/schema";

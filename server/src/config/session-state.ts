@@ -1,3 +1,4 @@
+/** 会话级覆盖（名称 / 工作目录 / 模型 / thinking level）的持久化 */
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import { THINKING_LEVELS } from "../config/schema";

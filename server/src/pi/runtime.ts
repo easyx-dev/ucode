@@ -1,3 +1,4 @@
+/** ModelRuntime 的生命周期：按配置重建、解析模型引用、导出模型目录 */
 import { writeFileSync } from "node:fs";
 
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";

@@ -1,3 +1,4 @@
+/** /api/v1/models：模型目录与运行时重建 */
 import { Hono } from "hono";
 import { z } from "zod";
 

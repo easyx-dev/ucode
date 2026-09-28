@@ -1,3 +1,4 @@
+/** 统一响应体与业务异常 */
 export type ApiError = {
   code: string;
   message: string;
