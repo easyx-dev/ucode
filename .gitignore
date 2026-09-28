@@ -15,3 +15,7 @@ results/
 
 # 门禁自测写入的临时探针文件
 **/__gate_probe*
+
+# 编码工具的本地文件：会话计划与它自己的忽略清单，不属于产品
+.zcode/
+.zcodeignore
