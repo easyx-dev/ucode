@@ -90,6 +90,19 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   logger.info(webBuildExists() ? "已托管 apps/web/dist" : "未发现 web 构建产物（开发时用 vite）");
 });
 
+// 没有这个监听时，端口占用会以 Unhandled 'error' event 崩掉，只留一段原始堆栈
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    logger.error(
+      `端口 ${env.port} 已被占用：多半是另一个 dev 实例还在跑` +
+        `（lsof -i tcp:${env.port} 查是谁），或改 .env 的 APP_PORT 与 vite 代理目标`,
+    );
+  } else {
+    logger.error({ err: error }, "HTTP 服务启动失败");
+  }
+  process.exit(1);
+});
+
 const shutdown = () => {
   logger.info("关闭中…");
   services.pool.disposeAll();
