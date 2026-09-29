@@ -1,11 +1,12 @@
 /**
- * 约定校验入口：migrations / contracts / tokens。
+ * 约定校验入口：migrations / contracts / tokens / brand。
  *
  * 由根 `pnpm check` 调用（`biome check . && pnpm -r typecheck && node scripts/verify/index.ts`）。
  * 任一检查不通过即非零退出，输出处会用「文件:行」定位。
  */
 import { resolve } from "node:path";
 
+import { run as runBrand } from "../../packages/brand/scripts/verify.ts";
 import { run as runContracts } from "./checks/contracts.ts";
 import { run as runMigrations } from "./checks/migrations.ts";
 import { run as runTokens } from "./checks/tokens.ts";
@@ -16,6 +17,7 @@ const CHECKS: Array<{ name: string; run: (root: string) => string[] }> = [
   { name: "migrations", run: runMigrations },
   { name: "contracts", run: runContracts },
   { name: "tokens", run: runTokens },
+  { name: "brand", run: runBrand },
 ];
 
 let failures = 0;

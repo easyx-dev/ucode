@@ -35,6 +35,7 @@ export default function App() {
               configured={configured}
               defaultModel={models.data?.defaultModel ?? null}
               hasSessions={sessions.sessions.length > 0}
+              workspace={workspace.workspaceDir}
               onCreate={() => void workspace.createSession()}
               onOpenSettings={() => workspace.setSettingsOpen(true)}
             />

@@ -1,7 +1,7 @@
 /**
  * SQLite 连接与 schema 迁移。
  *
- * 数据库放 `$APP_HOME/app/ucode.db`，只保存应用自己的会话元数据与索引；
+ * 数据库放 `$APP_HOME/app/app.db`，只保存应用自己的会话元数据与索引；
  * 消息正文仍由 pi 写在 JSONL 里。schema 版本记在 `PRAGMA user_version`。
  *
  * 迁移只追加：已发布版本的 DDL 不得再改，改 schema 就加新版本项。

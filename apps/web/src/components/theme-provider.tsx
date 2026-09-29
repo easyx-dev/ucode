@@ -1,4 +1,5 @@
 /** 主题提供者：固定 next-themes 的属性名、默认值与存储键，调用处只关心子节点 */
+import { themeStorageKey } from "@ucode/brand";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import type { ComponentProps } from "react";
 
@@ -8,7 +9,7 @@ export function ThemeProvider({ children, ...props }: ComponentProps<typeof Next
       attribute="class"
       defaultTheme="system"
       enableSystem
-      storageKey="ucode-theme"
+      storageKey={themeStorageKey}
       disableTransitionOnChange
       {...props}
     >

@@ -1,5 +1,8 @@
 /** 空态：未配置模型 / 还没有会话 / 已选会话但没有消息 */
+import { brand } from "@ucode/brand";
+
 import { Button } from "@/components/ui/button";
+import { abbreviateHome } from "@/lib/path";
 
 type WelcomePanelProps = {
   configured: boolean;
@@ -7,6 +10,8 @@ type WelcomePanelProps = {
   defaultModel: string | null;
   /** 是否已有任何会话 */
   hasSessions: boolean;
+  /** agent 工作目录，来自 health；未取到时退回通用文案 */
+  workspace: string | null;
   onCreate: () => void;
   onOpenSettings: () => void;
 };
@@ -23,6 +28,7 @@ export function WelcomePanel({
   configured,
   defaultModel,
   hasSessions,
+  workspace,
   onCreate,
   onOpenSettings,
 }: WelcomePanelProps) {
@@ -44,7 +50,13 @@ export function WelcomePanel({
         <h2 className="text-xl font-semibold">开始第一个会话</h2>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
           模型已就绪：{defaultModel ?? "-"}。会话里的 agent 可以读写
-          <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs">.tmp/.ucode</code>
+          {workspace ? (
+            <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
+              {abbreviateHome(workspace)}
+            </code>
+          ) : (
+            "工作目录"
+          )}
           下的文件并执行命令。
         </p>
         <Button onClick={onCreate}>新建会话</Button>
@@ -59,7 +71,7 @@ export function WelcomePanel({
         aria-hidden
         className="pointer-events-none text-7xl font-semibold leading-none tracking-tighter text-foreground/5 select-none"
       >
-        ucode
+        {brand.name}
       </span>
       <h2 className="text-xl font-semibold">{greeting()}</h2>
     </section>

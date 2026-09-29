@@ -6,7 +6,13 @@
 
 ### 新增
 
-- 新增 `POST /api/v1/events`：全局 SSE 事件流，承载所有会话的实时事件，带 `seq` 会话内序号与 15s 心跳；
+- 新增 `packages/brand`（`@ucode/brand`）：品牌名（`name` / `title` / `slug`）与图片资源（浅色 / 深色 logo、favicon）的单一来源，
+  图片以 `src/assets.ts` 的 import 暴露（格式任意，换格式只改扩展名）；web 构建期由 `apps/web/plugins/brand-html.ts`
+  注入浏览器标题与主题存储键，侧栏标识、空态水印也改读品牌包。
+- 新增品牌校验（`packages/brand/scripts/verify.ts`，作为第 4 项接入 `scripts/verify`，随 `pnpm check` 执行）：
+  品牌值合法、资源齐备、源码无硬编码品牌名；另加应急脚本 `packages/brand/scripts/replace.ts`（`pnpm brand:replace`）。
+- 品牌包新增 `appHomeDirname`（默认 `~/.<slug>`，由品牌 slug 派生）：`APP_HOME` 未设置时用它作为主目录名；
+  SQLite 文件名改为通用名 `app.db`（放 server 常量，与品牌无关）。- 新增 `POST /api/v1/events`：全局 SSE 事件流，承载所有会话的实时事件，带 `seq` 会话内序号与 15s 心跳；
   生成生命周期与调用方连接解耦，刷新 / 断线后重取快照即可接续。
 - `messages/list` 响应新增 `running`（是否有活跃生成）、`seq`（快照序号）与 `liveMessageId`（在途消息 id），
   并用活跃会话的 `streamingMessage` 投影正在生成的正文，刷新后不再丢失在途内容。
@@ -35,6 +41,7 @@
 
 ### 变更
 
+- `APP_HOME` 默认值由仓库内 `.tmp/.ucode` 改为用户主目录 `~/.ucode`；SQLite 数据库文件名由 `ucode.db` 改为通用名 `app.db`。
 - `sessions/list` / `sessions/info` 改为读 SQLite 索引，不再每次 `SessionManager.listAll()` 全量扫描解析 JSONL；
   列表的过滤与排序下推到 SQL。启动时 `reconcile()` 以 JSONL 为准对齐索引，每轮生成落定后回写一次。
 - 会话覆盖值从 `session-state.json` 迁到 SQLite（`config/session-state.ts` 移除），写入由整文件重写变为单行更新。

@@ -5,7 +5,8 @@
 - **server/**：Hono + TypeScript，端口 `2048`，全部接口前缀 `/api/v1`（`health` 之外都是 `POST`）
 - **apps/web/**：Vite + React 19 + Tailwind v4 + shadcn/ui，开发时跑 `5173`，生产由 server 同源托管
 - **packages/contracts/**：`@ucode/contracts`，接口的请求校验与响应类型，server 与 web 共用同一份定义
-- 会话正文沿用 pi 的 JSONL；`$APP_HOME/app/ucode.db`（SQLite）保存应用自己的会话元数据与索引
+- **packages/brand/**：`@ucode/brand`，品牌名与 logo / favicon 的单一来源，B 端定制只改这里
+- 会话正文沿用 pi 的 JSONL；`$APP_HOME/app/app.db`（SQLite）保存应用自己的会话元数据与索引
 
 项目规范：设计系统见 [`DESIGN.md`](./DESIGN.md)，数据库 / 接口 / 组件规范见 [`docs/`](./docs)；
 仓库级约定与验证命令见 [`AGENTS.md`](./AGENTS.md)。
@@ -30,31 +31,56 @@ pnpm build && pnpm start
 
 ### 环境变量（`.env`）
 
-`.env` 只放基础设施配置，**模型 / 端点 / API Key 不在这里**，而是通过接口写入 `.tmp/.ucode/app/config.json`：
+`.env` 只放基础设施配置，**模型 / 端点 / API Key 不在这里**，而是通过接口写入 `$APP_HOME/app/config.json`：
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_PORT` | `2048` | HTTP 端口 |
-| `APP_HOME` | `.tmp/.ucode` | 工作 / 配置主目录：agent 工作目录，以及 `pi/`、`app/` 两个数据子目录 |
+| `APP_HOME` | `~/.ucode` | 工作 / 配置主目录：agent 工作目录，以及 `pi/`、`app/` 两个数据子目录 |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
 | `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
 
+> `APP_HOME` 不设置时默认落在用户主目录（`~/.<品牌 slug>`，默认品牌即 `~/.ucode`）；
+> 显式指定请用绝对路径，相对路径会按仓库根解析。
+
 `APP_HOME` 派生出的路径（无需单独配置），按「谁的资产」分两层：
 
 ```
-$APP_HOME/                 # 默认 .tmp/.ucode
+$APP_HOME/                 # 默认 ~/.ucode
 ├── pi/                    # pi 私有：models.json / auth.json / sessions/
-└── app/                   # 应用自有：config.json / ucode.db（SQLite）
+└── app/                   # 应用自有：config.json / app.db（SQLite）
 ```
 
 工作目录 = `$APP_HOME`、配置 = `$APP_HOME/app/config.json`、
 pi 的 agent 目录 = `$APP_HOME/pi`（`models.json` / `auth.json` / `sessions/`）、
-会话元数据与索引 = `$APP_HOME/app/ucode.db`。
+会话元数据与索引 = `$APP_HOME/app/app.db`。
 
 > SQLite 用 Node 内置的 `node:sqlite`（`DatabaseSync`），需要 **Node ≥ 24**；它是实验特性，启动时会打印一条 `ExperimentalWarning`，不影响使用。
 
-> agent 具备 `read` / `write` / `edit` / `bash` 工具，实际执行范围就是 `APP_HOME`，默认 `.tmp/.ucode`（已在 `.gitignore` 里）。想让它改真实代码仓库，把它指向目标目录。
+> agent 具备 `read` / `write` / `edit` / `bash` 工具，实际执行范围就是 `APP_HOME`，默认 `~/.ucode`。想让它改真实代码仓库，把它指向目标目录。
+
+---
+
+## 品牌定制
+
+品牌名、浏览器标题与 logo / favicon 统一放在 `packages/brand/`（`@ucode/brand`），B 端交付只改这一处：
+
+- `src/brand.ts`：`name`（侧栏、空态水印）、`title`（浏览器标题）、`slug`（主题存储键、默认数据目录等命名空间）
+- `src/assets.ts`：`logoLight` / `logoDark` / `favicon` 三个图片引用，从 `assets/` 下的文件 import；
+  换 logo 就替换文件，换格式就改这里的 import 扩展名（svg / png / jpg / webp … 都行）；
+  只想要一套通用的 logo 时，把 `logoLight` / `logoDark` 指向同一个文件即可
+- 标题与主题存储键由 `apps/web/plugins/brand-html.ts` 在构建时注入 `index.html`，避免首屏闪烁
+- 默认数据目录名由 `slug` 派生（`~/.<slug>`，默认即 `~/.ucode`）
+
+改完跑 `pnpm check`：其中的 brand 校验会检查品牌值合法、资源齐备，并拦下源码里残留的硬编码品牌名。历史遗留或不在品牌包覆盖范围内的文件，可用应急脚本批量矫正：
+
+```bash
+# 预演（默认不落盘）
+node packages/brand/scripts/replace.ts --from 旧品牌 --to 新品牌
+# 落盘；--paths 指定范围，--regex 让 --from 按正则解释
+node packages/brand/scripts/replace.ts --from 旧品牌 --to 新品牌 --write
+```
 
 ---
 
@@ -210,7 +236,7 @@ docs/
   database.md              # 数据库规范
   api.md                   # 接口与字段规范
   components.md            # 组件规范
-scripts/verify/            # 约定校验（migrations / contracts / tokens），由 pnpm check 调用
+scripts/verify/            # 约定校验（migrations / contracts / tokens / brand），由 pnpm check 调用
 packages/contracts/
   src/
     envelope.ts            # { success, code, message, data } 封套与错误码
@@ -220,6 +246,12 @@ packages/contracts/
     events.ts              # 事件名与帧结构
     health/output.ts
     {models,sessions,messages,config}/{input,output}.ts
+packages/brand/
+  src/brand.ts             # 品牌唯一入口：name / title / slug（B 端定制只改这里）
+  src/assets.ts            # logoLight / logoDark / favicon 的图片引用（换格式改这里的 import）
+  assets/                  # logo-light.svg / logo-dark.svg / favicon.svg
+  scripts/verify.ts        # 品牌校验（品牌值 / 图片引用 / 硬编码品牌名）
+  scripts/replace.ts       # 应急：批量替换残留的旧品牌串
 server/src/
   env.ts                   # APP_HOME 派生 pi/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
@@ -256,12 +288,12 @@ apps/web/src/
 
 ### 实现要点
 
-- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/pi/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/ucode.db`。
+- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/pi/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
 - **索引同步**：启动时 `reconcile()` 以 JSONL 为准对齐索引（补齐外部新增、清理已删文件），每轮生成落定后再回写一次；列表 / 详情直接读 SQLite，不再扫描 JSONL 目录。
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型先落在 SQLite 的草稿行（`persisted = 0`），首次回复后索引对齐。
-- **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `ucode.db` 重建即可。
+- **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `app.db` 重建即可。
 - **删除会话**：先停用运行中的资源（`pool.dispose` / `events.remove`），再删 SQLite 行，最后删 JSONL 文件；顺序不能颠倒，见 `docs/database.md`。
 - **主题**：`next-themes` + `.dark` class，浅色 / 深色 / 跟随系统三态；首屏由 `index.html` 的内联脚本定色以避免闪白。颜色与圆角全部走语义 token（`DESIGN.md`），`scripts/verify` 会拦下裸色值。
 

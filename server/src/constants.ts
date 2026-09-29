@@ -1,8 +1,5 @@
 /** server 侧常量：默认值与固定目录名集中于此，避免散落在 env / logger 中 */
 
-/** 应用主目录（相对 repoRoot），APP_HOME 未设置时使用 */
-export const DEFAULT_HOME = ".tmp/.ucode";
-
 export const DEFAULT_PORT = 2048;
 
 /** AgentSession 空闲多久后被回收 */
@@ -17,8 +14,8 @@ export const APP_DIRNAME = "app";
 /** 会话 JSONL 目录名（位于 pi 目录下） */
 export const SESSIONS_DIRNAME = "sessions";
 
-/** SQLite 数据库文件名（位于 app 目录下） */
-export const DB_FILENAME = "ucode.db";
+/** SQLite 数据库文件名（位于 app 目录下），与品牌无关，保持稳定 */
+export const DB_FILENAME = "app.db";
 
 /** 单个 /events 订阅者的待发队列上限；溢出即断开，由客户端重连补齐 */
 export const SUBSCRIBER_QUEUE_MAX = 256;

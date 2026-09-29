@@ -1,6 +1,8 @@
-/** 侧栏头部：产品名、新建会话入口与搜索框 */
+/** 侧栏头部：品牌标识、新建会话入口与搜索框 */
+import { brand } from "@ucode/brand";
 import { MessageSquarePlus, Search } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -21,7 +23,8 @@ export function SessionSidebarHeader({
   return (
     <>
       <div className="flex items-center gap-2 px-3 py-3">
-        <span className="text-sm font-semibold tracking-tight">ucode</span>
+        <BrandLogo className="size-5" />
+        <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
         <Button
           variant="outline"
           size="sm"

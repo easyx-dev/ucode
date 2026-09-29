@@ -91,8 +91,8 @@
 | 命令 | 作用 |
 | --- | --- |
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm verify` |
-| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens） |
-| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `server` / `apps/web`） |
+| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand） |
+| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
@@ -118,12 +118,16 @@
 
 - `packages/contracts/`（`@ucode/contracts`）是接口契约的单一事实源：请求 zod schema、响应类型、封套与跨端常量，
   server 与 web 共用；改动对外接口时先改这里。
+- `packages/brand/`（`@ucode/brand`）是品牌名与 logo / favicon 的单一事实源，B 端定制只改 `src/brand.ts`
+  与 `assets/`（资源引用在 `src/assets.ts`，换格式改 import 扩展名即可）；默认数据目录名 `appHomeDirname`
+  也由它派生（`~/.<slug>`），server 用包的 node 入口 `@ucode/brand/values` 取值。
+  源码里禁止硬编码品牌名，`pnpm check` 的 brand 校验会拦下。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
-- `.tmp/.ucode/` 是 pi agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
-  `pi/`（`models.json` / `auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `ucode.db`）。
+- `$APP_HOME`（默认 `~/.ucode`）是 pi agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
+  `pi/`（`models.json` / `auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
-- `.tmp/.ucode/app/config.json`、`pi/models.json` 由服务根据 `POST /api/v1/config/update` 生成，
-  `app/ucode.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
+- `$APP_HOME/app/config.json`、`pi/models.json` 由服务根据 `POST /api/v1/config/update` 生成，
+  `app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
 - 需要调整 `APP_HOME` 下的目录布局时走一次性迁移，不加版本目录（演进靠 SQLite 的 `user_version`）。
 
 ### Biome 配置
@@ -138,6 +142,7 @@
   关闭时 `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。打开后 CSS 正常纳入检查。
 - `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：本仓库有几处 effect 的依赖是
   「触发条件」而不是在效果体内直接读取（随 `value` 变化重算 textarea 高度、随 `items` 变化滚动到底部）。
+- `security.noDangerouslySetInnerHtml` 降级为 `warn`：保留提示但不阻断构建，本仓库偶有内联第一方静态标记的正当场景。
 
 ### 组件来源
 

@@ -26,6 +26,9 @@
             "reportUnnecessaryDependencies": false
           }
         }
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
       }
     }
   },

@@ -3,12 +3,14 @@ import { useMemo, useState } from "react";
 
 import { useActiveSession } from "@/hooks/use-active-session";
 import { useChat } from "@/hooks/use-chat";
+import { useHealth } from "@/hooks/use-health";
 import { useModels } from "@/hooks/use-models";
 import { useSessions } from "@/hooks/use-sessions";
 
 export function useWorkspace() {
   const sessions = useSessions();
   const models = useModels();
+  const health = useHealth();
   const { activeId, setActiveId } = useActiveSession(sessions.sessions);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -42,6 +44,8 @@ export function useWorkspace() {
     sessions: { ...sessions, sessions: sessionsView },
     models,
     configured,
+    /** agent 工作目录（health 未就绪时为 null） */
+    workspaceDir: health?.workspace ?? null,
     activeId,
     setActiveId,
     activeSession,
