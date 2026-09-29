@@ -9,7 +9,8 @@
     "build": "pnpm -F @ucode/web build",
     "start": "pnpm -F @ucode/server start",
     "typecheck": "pnpm -r typecheck",
-    "check": "biome check . && pnpm -r typecheck",
+    "check": "biome check . && pnpm -r typecheck && node scripts/verify/index.ts",
+    "verify": "node scripts/verify/index.ts",
     "format": "biome format --write .",
     "smoke": "pnpm -F @ucode/server smoke"
   },

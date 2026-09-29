@@ -72,11 +72,26 @@
 
 ## 仓库落位
 
+### 规范索引
+
+项目规范按域拆分，`AGENTS.md` 只记仓库级约定，正文在下列文档里。改一处实现前先看对应规范：
+
+| 文档 | 覆盖范围 |
+| --- | --- |
+| [`DESIGN.md`](./DESIGN.md) | 设计系统：品牌、主题、颜色 / 圆角 / 字号 token、深色模式、动效 |
+| [`docs/database.md`](./docs/database.md) | 数据库：迁移、命名、类型映射、SQL 约束、删除语义 |
+| [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
+| [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
+
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值），
+文档与校验冲突时以校验为准并同步改文档。
+
 ### 验证命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` |
+| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm verify` |
+| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
@@ -84,17 +99,11 @@
 
 ### 接口规范（server）
 
-- 出参统一封套 `{ success, code, message, data }`：成功 `code: "ok"`、`message: ""`；失败沿用字符串错误码
-  （登记在 `packages/contracts/src/envelope.ts` 的 `ERROR_CODES`），HTTP 状态保留语义（400 / 404 / 409 / 500），
-  错误详情放 `data`。
-- 除 `GET /api/v1/health` 外，接口一律 `POST` + JSON body；**请求参数只放 body，不进路径**。
-- `messages/prompt` 只返回受理 ack；`/events` 是 SSE 事件流，不套封套。
-- 请求校验 schema 与响应类型统一放 `packages/contracts/src/<domain>/{input,output}.ts`，由 `@ucode/contracts`
-  单入口导出（子路径已取消，前端允许打到 zod）。新增接口先落契约，再写路由。
-- **响应类型必须与实现编译期绑定**：响应生产点显式标注契约类型（如 `describeSession(): Promise<SessionInfoResponse>`），
-  内联字面量用 `satisfies XxxResponse`；契约改字段后 server 必须编译失败，禁止让响应体停在推断状态。
-- 请求类型分两档：客户端载荷用 `*Request`（`z.input`，带默认值的字段可省），server handler 用 `*Input`
-  （`z.infer`，默认值已填充）。新增请求 schema 时同时导出这两个类型。
+完整规则见 [`docs/api.md`](./docs/api.md)。server 侧只强调三点：
+
+- 出参统一走 `lib/response` 的 `ok()` / `fail()`，不手写封套；错误码从 `ERROR_CODES` 取，不写字面量。
+- 响应生产点必须显式标注契约类型（或 `satisfies`），契约改字段要让 server 编译失败。
+- 请求校验 schema 与响应类型放 `packages/contracts/src/<domain>/{input,output}.ts`，先落契约再写路由。
 
 ### server 目录约定
 
@@ -120,17 +129,23 @@
 ### Biome 配置
 
 `biome.json` 有意保持**纯 JSON**：带注释会让 Biome 静默回退到默认配置（缩进变 tab、排除规则失效）。
-两处非默认设置的原因记在这里，不要在配置文件里加注释：
+非默认设置的原因记在这里，不要在配置文件里加注释：
 
-- `files.includes` 排除 `apps/web/src/components/ui`（shadcn 生成物）与 `**/*.css`
-  ——后者只有 Tailwind v4 入口，其 `@theme` / `@apply` / `@custom-variant` 语法 Biome 的 CSS parser 不支持。
+- **没有排除任何路径**（`files.includes: ["**"]`）。曾经排除过三类文件，都已消除：
+  `components/ui` 现在归我们维护（见「组件来源」），CSS 靠下面的 `tailwindDirectives` 解决，
+  `index.html` 的内联脚本改成顶层 `try` / `catch {}` 后不再触发 lint。
+- `css.parser.tailwindDirectives: true`：Biome 的 CSS parser 默认**关闭** Tailwind 语法，
+  关闭时 `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。打开后 CSS 正常纳入检查。
 - `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：本仓库有几处 effect 的依赖是
   「触发条件」而不是在效果体内直接读取（随 `value` 变化重算 textarea 高度、随 `items` 变化滚动到底部）。
 
-### 生成代码豁免
+### 组件来源
 
-`apps/web/src/components/ui/**` 由 shadcn CLI 生成（配置见 `apps/web/components.json`），不适用本文件的
-注释语言、命名与行数规则；需要调整时优先通过 CLI 重新生成，或在调用处封装而不是改生成物。
+`apps/web/src/components/ui/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
+同样适用本文件的命名、行数、颜色 token 与格式化规则。
+
+- 唯一豁免：不要求写文件级注释（都是对 Radix 的薄封装）
+- 新增基础组件仍可用 CLI 生成，生成后按本仓库规则整理；对已改过的组件再跑 CLI 会覆盖改动，需手工合并
 
 ### 已知边界
 
