@@ -2,39 +2,20 @@
 import { writeFileSync } from "node:fs";
 
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import {
+  type AppConfig,
+  type CatalogModel,
+  type CatalogProvider,
+  ERROR_CODES,
+  type RuntimeStatus,
+} from "@ucode/contracts";
 
-import type { AppConfig, ThinkingLevel } from "../config/schema";
 import { toModelsJson } from "../config/store";
 import { env } from "../env";
-import { AppError } from "../lib/result";
+import { AppError } from "../lib/response";
 
 /** pi 的 Model 类型（避免直接依赖 @earendil-works/pi-ai） */
 export type PiModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
-
-export type RuntimeStatus = {
-  configured: boolean;
-  /** 实际生效的 "provider/model" */
-  defaultModel: string | null;
-  thinkingLevel: ThinkingLevel;
-  error: string | null;
-};
-
-export type CatalogModel = {
-  id: string;
-  name: string;
-  reasoning: boolean;
-  contextWindow: number;
-  maxTokens: number;
-};
-
-export type CatalogProvider = {
-  id: string;
-  name: string;
-  baseUrl: string;
-  api: string;
-  available: boolean;
-  models: CatalogModel[];
-};
 
 export const firstModelRef = (config: AppConfig): string | null => {
   const provider = config.providers[0];
@@ -110,7 +91,7 @@ export class PiRuntime {
 
   requireRuntime(): ModelRuntime {
     if (!this.runtime) {
-      throw new AppError("model_not_configured", this.status.error ?? "模型未配置", 409);
+      throw new AppError(ERROR_CODES.modelNotConfigured, this.status.error ?? "模型未配置", 409);
     }
     return this.runtime;
   }
@@ -134,13 +115,15 @@ export class PiRuntime {
       baseUrl: provider.baseUrl,
       api: provider.api,
       available: this.runtime ? this.runtime.hasConfiguredAuth(provider.id) : false,
-      models: provider.models.map((model) => ({
-        id: model.id,
-        name: model.name ?? model.id,
-        reasoning: model.reasoning,
-        contextWindow: model.contextWindow,
-        maxTokens: model.maxTokens,
-      })),
+      models: provider.models.map(
+        (model): CatalogModel => ({
+          id: model.id,
+          name: model.name ?? model.id,
+          reasoning: model.reasoning,
+          contextWindow: model.contextWindow,
+          maxTokens: model.maxTokens,
+        }),
+      ),
     }));
   }
 }

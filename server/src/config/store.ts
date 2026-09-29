@@ -1,9 +1,17 @@
 /** config.json 的读写与对外视图（apiKey 脱敏），并转换成 pi 的 models.json */
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
+import {
+  type AppConfig,
+  type AppConfigPatch,
+  appConfigSchema,
+  type ConfigView,
+  ERROR_CODES,
+  providerSchema,
+} from "@ucode/contracts";
+
 import { env } from "../env";
-import { AppError } from "../lib/result";
-import { type AppConfig, type AppConfigPatch, appConfigSchema, providerSchema } from "./schema";
+import { AppError } from "../lib/response";
 
 export const emptyConfig = (): AppConfig => ({
   providers: [],
@@ -24,7 +32,12 @@ export class ConfigStore {
     try {
       this.config = appConfigSchema.parse(JSON.parse(readFileSync(this.path, "utf8")));
     } catch (error) {
-      throw new AppError("invalid_config", `配置文件解析失败：${this.path}`, 500, String(error));
+      throw new AppError(
+        ERROR_CODES.invalidConfig,
+        `配置文件解析失败：${this.path}`,
+        500,
+        String(error),
+      );
     }
     return this.config;
   }
@@ -52,7 +65,7 @@ export class ConfigStore {
       });
       if (!parsed.success) {
         throw new AppError(
-          "invalid_request",
+          ERROR_CODES.invalidRequest,
           `provider "${provider.id}" 配置不完整`,
           400,
           parsed.error.issues,
@@ -76,8 +89,8 @@ export class ConfigStore {
 export const maskApiKey = (apiKey: string): string =>
   apiKey.length <= 4 ? "****" : `****${apiKey.slice(-4)}`;
 
-/** 对外返回的配置视图：apiKey 脱敏 */
-export const publicConfig = (config: AppConfig) => ({
+/** 对外返回的配置视图：apiKey 脱敏；不下发 provider 级 headers（可能含鉴权信息） */
+export const publicConfig = (config: AppConfig): ConfigView => ({
   defaultModel: config.defaultModel,
   thinkingLevel: config.thinkingLevel,
   providers: config.providers.map((provider) => ({
@@ -85,7 +98,6 @@ export const publicConfig = (config: AppConfig) => ({
     name: provider.name ?? provider.id,
     baseUrl: provider.baseUrl,
     api: provider.api,
-    headers: provider.headers,
     apiKeyMasked: maskApiKey(provider.apiKey),
     models: provider.models,
   })),

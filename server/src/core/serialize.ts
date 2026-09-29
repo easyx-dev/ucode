@@ -1,45 +1,9 @@
 /** pi 的会话条目与消息 → 对外 DTO */
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
+import type { MessageBlock, MessageDTO, SessionSummary, ThinkingLevel } from "@ucode/contracts";
 
-import type { ThinkingLevel } from "../config/schema";
 import type { SessionOverride } from "../config/session-state";
-
-export type MessageBlock =
-  | { type: "text"; text: string }
-  | { type: "thinking"; text: string }
-  | { type: "toolCall"; id: string; name: string; args: unknown };
-
-export type MessageRole = "user" | "assistant" | "tool" | "custom" | "summary";
-
-export type MessageDTO = {
-  id: string;
-  role: MessageRole;
-  blocks: MessageBlock[];
-  /** assistant 专用 */
-  model?: string;
-  /** tool 专用：与 toolCall block 的 id 对应，便于前端精确合并 */
-  toolCallId?: string;
-  /** tool 专用 */
-  toolName?: string;
-  isError?: boolean;
-  /** 毫秒时间戳 */
-  timestamp?: number;
-};
-
-export type SessionSummaryDTO = {
-  id: string;
-  name: string | null;
-  cwd: string;
-  createdAt: string;
-  updatedAt: string;
-  messageCount: number;
-  preview: string;
-  model: string | null;
-  thinkingLevel: ThinkingLevel;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+import { isRecord } from "../utils/object";
 
 export const blocksOf = (content: unknown): MessageBlock[] => {
   if (typeof content === "string") {
@@ -157,7 +121,7 @@ export const sessionInfoToDTO = (
   override: SessionOverride,
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
-): SessionSummaryDTO => ({
+): SessionSummary => ({
   id: info.id,
   name: info.name ?? override.name ?? null,
   cwd: info.cwd,
@@ -176,7 +140,7 @@ export const draftSessionSummary = (
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
   fallbackCwd: string,
-): SessionSummaryDTO => {
+): SessionSummary => {
   const now = new Date().toISOString();
   return {
     id: sessionId,

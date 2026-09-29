@@ -1,16 +1,7 @@
-/** 应用配置（provider / 模型 / 默认值）的 zod 模型 */
+/** 应用配置（provider / 模型 / 默认值）的请求侧 zod 模型，同时是 config.json 的持久化结构 */
 import { z } from "zod";
 
-/** pi 支持的 API 类型（pi-ai 的 KnownApi 子集，够用即可） */
-export const API_TYPES = [
-  "openai-completions",
-  "openai-responses",
-  "anthropic-messages",
-  "google-generative-ai",
-] as const;
-
-/** pi-agent-core 的 ThinkingLevel */
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+import { API_TYPES, THINKING_LEVELS } from "../constants";
 
 export const modelCostSchema = z.object({
   input: z.number().nonnegative().default(0),
@@ -76,7 +67,10 @@ export const configTestSchema = z.object({
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
 export type AppConfigPatch = z.infer<typeof appConfigPatchSchema>;
+/** 客户端发送的配置更新载荷（模型字段的默认值可省） */
+export type AppConfigPatchRequest = z.input<typeof appConfigPatchSchema>;
 export type ProviderConfig = z.infer<typeof providerSchema>;
 export type ProviderModel = z.infer<typeof providerModelSchema>;
-export type ApiType = (typeof API_TYPES)[number];
-export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+export type ConfigTestInput = z.infer<typeof configTestSchema>;
+/** 客户端发送的连通性测试载荷（api 默认 openai-completions，可省） */
+export type ConfigTestRequest = z.input<typeof configTestSchema>;

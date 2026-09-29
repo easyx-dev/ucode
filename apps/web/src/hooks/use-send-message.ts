@@ -2,7 +2,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { useInterrupt } from "@/hooks/use-interrupt";
-import { describeError, sendMessageStream } from "@/lib/api";
+import { describeError, promptStream } from "@/lib/api";
 import { appendUserItem, reduceEvent, settle } from "@/lib/chat-reducer";
 import type { ChatItem } from "@/lib/types";
 
@@ -53,7 +53,7 @@ export function useSendMessage({
       setStreaming(true);
 
       try {
-        await sendMessageStream(sessionId, text, handleEvent, controller.signal);
+        await promptStream(sessionId, text, handleEvent, controller.signal);
       } catch (error) {
         if (!controller.signal.aborted) onError(describeError(error));
       } finally {

@@ -77,13 +77,38 @@
 | 命令 | 作用 |
 | --- | --- |
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` |
-| `pnpm typecheck` | 两个包各自 `tsc --noEmit` |
+| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
 
+### 接口规范（server）
+
+- 出参统一封套 `{ success, code, message, data }`：成功 `code: "ok"`、`message: ""`；失败沿用字符串错误码
+  （登记在 `packages/contracts/src/envelope.ts` 的 `ERROR_CODES`），HTTP 状态保留语义（400 / 404 / 409 / 500），
+  错误详情放 `data`。
+- 除 `GET /api/v1/health` 外，接口一律 `POST` + JSON body；**请求参数只放 body，不进路径**。
+- `messages/prompt` 返回 SSE，事件流不套封套。
+- 请求校验 schema 与响应类型统一放 `packages/contracts/src/<domain>/{input,output}.ts`，由 `@ucode/contracts`
+  单入口导出（子路径已取消，前端允许打到 zod）。新增接口先落契约，再写路由。
+- **响应类型必须与实现编译期绑定**：响应生产点显式标注契约类型（如 `describeSession(): Promise<SessionInfoResponse>`），
+  内联字面量用 `satisfies XxxResponse`；契约改字段后 server 必须编译失败，禁止让响应体停在推断状态。
+- 请求类型分两档：客户端载荷用 `*Request`（`z.input`，带默认值的字段可省），server handler 用 `*Input`
+  （`z.infer`，默认值已填充）。新增请求 schema 时同时导出这两个类型。
+
+### server 目录约定
+
+- `routes/` 与 `lib/` 下一级一律是文件夹（`routes/health/index.ts`、`lib/response/index.ts`），
+  不直接放 `.ts` 文件；`core/`、`utils/`、`constants.ts` 保持单文件。
+- `core/` 是 pi SDK 封装；`lib/` 是服务端基建（封套 / 校验中间件 / 日志）；`utils/` 只放无业务语义的纯函数；
+  默认值与固定目录名放 `constants.ts`。
+- 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
+- 日志统一走 `lib/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
+
 ### 目录与临时文件
 
+- `packages/contracts/`（`@ucode/contracts`）是接口契约的单一事实源：请求 zod schema、响应类型、封套与跨端常量，
+  server 与 web 共用；改动对外接口时先改这里。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
 - `.tmp/.ucode/` 是 pi agent 的运行时目录（`config.json`、`agent/sessions/*.jsonl`）与默认工作目录，
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。

@@ -1,24 +1,15 @@
 /** 把一次会话运行（含生成中的 steer / follow-up 投递）以 SSE 事件流写回响应 */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { ERROR_CODES, type PromptInput } from "@ucode/contracts";
 import type { Context } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 
 import type { Services } from "../app";
-import { AppError } from "../lib/result";
+import { AppError } from "../lib/response";
+import { sleep } from "../utils/time";
 import { type SseEvent, toSseEvents } from "./events";
 
-export type SessionRunInput = {
-  sessionId: string;
-  text: string;
-  /** 生成中再发消息时的投递方式 */
-  behavior: "follow-up" | "steer";
-  /** 仅新建会话时生效的工作目录 */
-  cwd?: string;
-};
-
 type SendEvent = (event: string, data: unknown) => Promise<void>;
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** SSE 写出器：客户端断开后静默丢弃后续事件，不再抛错 */
 export const createSseWriter = (stream: SSEStreamingApi): SendEvent => {
@@ -96,14 +87,14 @@ const dispatchPrompt = async (options: {
   session: AgentSession;
   sessionId: string;
   text: string;
-  behavior: SessionRunInput["behavior"];
+  behavior: PromptInput["behavior"];
   send: SendEvent;
 }): Promise<void> => {
   const { services, session, sessionId, text, behavior, send } = options;
 
   const startRun = async () => {
     if (!services.pool.beginRun(sessionId)) {
-      throw new AppError("session_busy", "会话正忙，请稍后重试或改用 steer", 409);
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请稍后重试或改用 steer", 409);
     }
     try {
       await session.prompt(text);
@@ -133,7 +124,7 @@ const dispatchPrompt = async (options: {
 export const streamSessionRun = async (
   c: Context,
   services: Services,
-  input: SessionRunInput,
+  input: PromptInput,
 ): Promise<Response> => {
   const { sessionId, text, behavior, cwd } = input;
 
@@ -161,7 +152,7 @@ export const streamSessionRun = async (
     } catch (error) {
       await send("error", {
         sessionId,
-        code: error instanceof AppError ? error.code : "internal_error",
+        code: error instanceof AppError ? error.code : ERROR_CODES.internal,
         message: error instanceof Error ? error.message : String(error),
       });
       await send("done", { sessionId, error: true });

@@ -15,7 +15,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-import type { ThinkingLevel } from "../src/config/schema";
+import type { ThinkingLevel } from "@ucode/contracts";
 
 const args = process.argv.slice(2);
 const readArg = (name: string, fallback: string): string => {

@@ -1,10 +1,12 @@
 /** 服务装配：配置、ModelRuntime、会话池，以及配置热重载的编排 */
-import type { AppConfigPatch } from "./config/schema";
+import type { AppConfigPatch } from "@ucode/contracts";
+import { ERROR_CODES } from "@ucode/contracts";
+
 import { SessionStateStore } from "./config/session-state";
 import { ConfigStore } from "./config/store";
-import { AppError } from "./lib/result";
-import { SessionPool } from "./pi/pool";
-import { PiRuntime } from "./pi/runtime";
+import { SessionPool } from "./core/pool";
+import { PiRuntime } from "./core/runtime";
+import { AppError } from "./lib/response";
 
 export type Services = {
   config: ConfigStore;
@@ -30,7 +32,7 @@ export const createServices = async (): Promise<Services> => {
 
   const guardIdle = (): void => {
     if (pool.hasActiveRun()) {
-      throw new AppError("session_busy", "有会话正在生成，请先中断再更新配置", 409);
+      throw new AppError(ERROR_CODES.sessionBusy, "有会话正在生成，请先中断再更新配置", 409);
     }
   };
 

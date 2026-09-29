@@ -1,5 +1,19 @@
+/** 环境变量解析：由 APP_HOME 一个主目录派生工作目录与全部配置路径 */
 import { mkdirSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+
+import {
+  AGENT_DIRNAME,
+  AUTH_FILENAME,
+  CONFIG_FILENAME,
+  DEFAULT_HOME,
+  DEFAULT_POOL_IDLE_MS,
+  DEFAULT_PORT,
+  LOG_LEVELS,
+  MODELS_FILENAME,
+  SESSION_STATE_FILENAME,
+  SESSIONS_DIRNAME,
+} from "./constants";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 
@@ -19,30 +33,44 @@ const resolveNum = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
-const workspaceDir = resolveDir(process.env.PI_WORKSPACE_DIR, ".tmp/.ucode");
-const agentDir = resolveDir(process.env.PI_AGENT_DIR, ".tmp/.ucode/agent");
-const dataDir = resolveDir(process.env.PI_DATA_DIR, ".tmp/.ucode");
+/** 非法级别会让 pino 在构造时抛错、直接拖垮启动，所以这里只接受白名单内的值 */
+const resolveLogLevel = (value: string | undefined, fallback: string): string => {
+  const raw = value?.trim().toLowerCase();
+  return raw && (LOG_LEVELS as readonly string[]).includes(raw) ? raw : fallback;
+};
+
+/**
+ * 工作 / 配置主目录：agent 的工作目录、config.json、agent 目录都在它下面。
+ * 只有一个 APP_HOME，不再分别声明工作目录与数据目录。
+ */
+const homeDir = resolveDir(process.env.APP_HOME, DEFAULT_HOME);
+const agentDir = resolve(homeDir, AGENT_DIRNAME);
+const isProduction = process.env.NODE_ENV === "production";
 
 export const env = {
   repoRoot,
-  port: resolveNum(process.env.PORT, 2048),
-  /** pi agent 的工作目录（工具读写文件、会话分组） */
-  workspaceDir,
-  /** pi agent 目录：models.json / auth.json 放这里 */
+  isProduction,
+  /** 工作与配置主目录 */
+  homeDir,
+  port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
+  /** agent 的工作目录（工具读写文件、会话分组） */
+  workspaceDir: homeDir,
+  /** pi agent 目录：models.json / auth.json / sessions 放这里 */
   agentDir,
   /** 应用数据目录：config.json 等 */
-  dataDir,
+  dataDir: homeDir,
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
-  sessionsRoot: resolve(agentDir, "sessions"),
-  modelsPath: resolve(agentDir, "models.json"),
-  authPath: resolve(agentDir, "auth.json"),
-  configPath: resolve(dataDir, "config.json"),
-  sessionStatePath: resolve(dataDir, "session-state.json"),
+  sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
+  modelsPath: resolve(agentDir, MODELS_FILENAME),
+  authPath: resolve(agentDir, AUTH_FILENAME),
+  configPath: resolve(homeDir, CONFIG_FILENAME),
+  sessionStatePath: resolve(homeDir, SESSION_STATE_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
-  poolIdleMs: resolveNum(process.env.POOL_IDLE_MS, 10 * 60 * 1000),
-  corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",
+  poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
+  corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
+  logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
 };
 
-for (const dir of new Set([env.workspaceDir, env.agentDir, env.dataDir, env.sessionsRoot])) {
+for (const dir of new Set([env.workspaceDir, env.agentDir, env.sessionsRoot])) {
   mkdirSync(dir, { recursive: true });
 }

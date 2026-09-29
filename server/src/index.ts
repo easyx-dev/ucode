@@ -1,19 +1,18 @@
 /** 服务入口：装配路由、同源托管 web 构建产物、优雅退出 */
-import "./env";
-
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { API_BASE_PATH, ERROR_CODES } from "@ucode/contracts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { createServices } from "./app";
 import { env } from "./env";
-import { AppError, fail } from "./lib/result";
+import { logger, requestLogger } from "./lib/logger";
+import { AppError, fail } from "./lib/response";
 import { createConfigRoute } from "./routes/config";
 import { createHealthRoute } from "./routes/health";
 import { createMessagesRoute } from "./routes/messages";
@@ -25,7 +24,7 @@ const services = await createServices();
 const app = new Hono();
 
 app.use("*", cors({ origin: env.corsOrigin }));
-app.use("*", logger());
+app.use("*", requestLogger());
 
 const v1 = new Hono();
 v1.route("/health", createHealthRoute(services));
@@ -34,7 +33,7 @@ v1.route("/config", createConfigRoute(services));
 v1.route("/sessions", createSessionsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
 
-app.route("/api/v1", v1);
+app.route(API_BASE_PATH, v1);
 
 // 生产模式：同源托管 web 构建产物。
 // 注册在 API 路由之后；dist 不存在时 serveStatic 会直接放行走 notFound，
@@ -47,10 +46,10 @@ app.use("*", serveStatic({ root: relative(process.cwd(), env.webDistDir) || "." 
 app.notFound((c) => {
   const path = c.req.path;
   if (path.startsWith("/api/")) {
-    return c.json(fail("not_found", `接口不存在：${path}`), 404);
+    return c.json(fail(ERROR_CODES.notFound, `接口不存在：${path}`), 404);
   }
   if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-    return c.json(fail("not_found", `路由不存在：${path}`), 404);
+    return c.json(fail(ERROR_CODES.notFound, `路由不存在：${path}`), 404);
   }
   if (!webBuildExists()) {
     return c.text("web 未构建：请运行 pnpm build（开发时请访问 vite 端口）", 404);
@@ -65,30 +64,26 @@ app.onError((error, c) => {
       error.status as ContentfulStatusCode,
     );
   }
-  console.error("[ucode] 未处理异常:", error);
+  logger.error({ err: error }, "未处理异常");
   return c.json(
-    fail("internal_error", error instanceof Error ? error.message : String(error)),
+    fail(ERROR_CODES.internal, error instanceof Error ? error.message : String(error)),
     500,
   );
 });
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   const status = services.runtime.getStatus();
-  console.log(`[ucode] http://localhost:${info.port}  (workspace: ${env.workspaceDir})`);
-  console.log(
-    status.configured
-      ? `[ucode] 模型: ${status.defaultModel}   thinking: ${status.thinkingLevel}`
-      : `[ucode] 模型未配置：${status.error}（POST /api/v1/config/update 配置）`,
-  );
-  console.log(
-    webBuildExists()
-      ? "[ucode] 已托管 apps/web/dist"
-      : "[ucode] 未发现 web 构建产物（开发时用 vite）",
-  );
+  logger.info(`http://localhost:${info.port}  (workspace: ${env.workspaceDir})`);
+  if (status.configured) {
+    logger.info(`模型: ${status.defaultModel}   thinking: ${status.thinkingLevel}`);
+  } else {
+    logger.warn(`模型未配置：${status.error}（POST ${API_BASE_PATH}/config/update 配置）`);
+  }
+  logger.info(webBuildExists() ? "已托管 apps/web/dist" : "未发现 web 构建产物（开发时用 vite）");
 });
 
 const shutdown = () => {
-  console.log("\n[ucode] 关闭中…");
+  logger.info("关闭中…");
   services.pool.disposeAll();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1500).unref();

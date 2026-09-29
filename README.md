@@ -4,6 +4,7 @@
 
 - **server/**：Hono + TypeScript，端口 `2048`，全部接口前缀 `/api/v1`（`health` 之外都是 `POST`）
 - **apps/web/**：Vite + React 19 + Tailwind v4 + shadcn/ui，开发时跑 `5173`，生产由 server 同源托管
+- **packages/contracts/**：`@ucode/contracts`，接口的请求校验与响应类型，server 与 web 共用同一份定义
 - 会话历史不需要数据库：直接复用 pi 的 JSONL 会话文件
 
 ---
@@ -30,20 +31,22 @@ pnpm build && pnpm start
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `PORT` | `2048` | HTTP 端口 |
-| `PI_WORKSPACE_DIR` | `.tmp/.ucode` | agent 的工作目录（读写文件、会话分组） |
-| `PI_AGENT_DIR` | `.tmp/.ucode/agent` | pi 的 agent 目录（`models.json` / `auth.json` / `sessions/`） |
-| `PI_DATA_DIR` | `.tmp/.ucode` | 应用配置目录（`config.json`） |
-| `POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
-| `CORS_ORIGIN` | `*` | 开发模式跨域来源 |
+| `APP_PORT` | `2048` | HTTP 端口 |
+| `APP_HOME` | `.tmp/.ucode` | 工作 / 配置主目录：agent 工作目录、`config.json`、`agent/` 都在它下面 |
+| `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
+| `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
+| `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
 
-> agent 具备 `read` / `write` / `edit` / `bash` 工具，实际执行范围就是 `PI_WORKSPACE_DIR`，默认 `.tmp/.ucode`（已在 `.gitignore` 里）。想让它改真实代码仓库，把它指向目标目录。
+`APP_HOME` 派生出的路径（无需单独配置）：工作目录 = `APP_HOME`、配置 = `APP_HOME/config.json`、
+pi 的 agent 目录 = `APP_HOME/agent`（`models.json` / `auth.json` / `sessions/`）。
+
+> agent 具备 `read` / `write` / `edit` / `bash` 工具，实际执行范围就是 `APP_HOME`，默认 `.tmp/.ucode`（已在 `.gitignore` 里）。想让它改真实代码仓库，把它指向目标目录。
 
 ---
 
 ## 模型配置
 
-配置持久化在 `$PI_DATA_DIR/config.json`，通过接口或界面管理，保存后自动重建 pi 的 `ModelRuntime`（内存中的会话会被丢弃，历史文件不受影响）。
+配置持久化在 `$APP_HOME/config.json`，通过接口或界面管理，保存后自动重建 pi 的 `ModelRuntime`（内存中的会话会被丢弃，历史文件不受影响）。
 
 ### 本项目开发时用的测试端点
 
@@ -108,8 +111,10 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 
 ## HTTP 接口
 
-统一响应体：`{ "ok": true, "data": ... }` 或 `{ "ok": false, "error": { code, message, details } }`。
-除 `GET /api/v1/health` 外，所有接口都是 `POST` + JSON body。
+统一响应体：`{ "success": true, "code": "ok", "message": "", "data": ... }`；
+失败为 `{ "success": false, "code": "invalid_request", "message": "...", "data": <详情> }`（HTTP 状态仍保留语义，如 400 / 404 / 409）。
+除 `GET /api/v1/health` 外，所有接口都是 `POST` + JSON body，参数一律放在 body、不出现在路径里。
+请求校验与响应结构定义在 `@ucode/contracts`（`packages/contracts/`），web 直接引用同一份类型。
 
 | 方法 | 路径 | body | 说明 |
 | --- | --- | --- | --- |
@@ -125,13 +130,13 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel? }` | 重命名 / 换模型 |
 | POST | `/api/v1/sessions/delete` | `{ sessionId }` | 删除会话（含会话文件） |
 | POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史（compaction 感知） |
-| POST | `/api/v1/messages/send` | `{ sessionId, text, behavior? }` | 发送消息，返回 `text/event-stream` |
+| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 发起生成，返回 `text/event-stream` |
 | POST | `/api/v1/messages/interrupt` | `{ sessionId }` | 中断当前生成 |
 
-### 发消息（SSE）
+### 发起生成（SSE）
 
 ```bash
-curl -N -X POST http://localhost:2048/api/v1/messages/send \
+curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
   -H 'content-type: application/json' \
   -d '{"sessionId":"<uuid>","text":"列一下当前目录"}'
 ```
@@ -166,7 +171,7 @@ curl -N -X POST http://localhost:2048/api/v1/messages/send \
 
 ### 生成中继续发消息
 
-`messages/send` 默认不会占用「会话锁」（只有创建 `AgentSession` 那一步串行），所以并发请求是安全的：
+`messages/prompt` 默认不会占用「会话锁」（只有创建 `AgentSession` 那一步串行），所以并发请求是安全的：
 
 - 会话空闲时 → 直接开启新一轮（`prompt`）。
 - 会话正在生成时 → 按 `behavior` 投递：`"follow-up"`（默认）在当前这一轮（含工具调用）结束后处理；`"steer"` 在当前 assistant turn 的工具调用执行完之后、下一次 LLM 调用之前插入。投递后会先发 `queued` 事件，然后继续推流直到会话重新空闲。
@@ -177,32 +182,43 @@ curl -N -X POST http://localhost:2048/api/v1/messages/send \
 ## 结构
 
 ```
-server/
+packages/contracts/
   src/
-    env.ts                 # 环境变量 + 目录初始化
-    app.ts                 # Services 装配、配置热重载
-    config/
-      schema.ts            # zod 配置模型
-      store.ts             # config.json 读写、apiKey 脱敏、生成 pi 的 models.json
-      session-state.ts     # 每会话的 name / cwd / model / thinkingLevel 覆盖
-    pi/
-      runtime.ts           # ModelRuntime 单例、模型解析、模型目录
-      pool.ts              # sessionId -> AgentSession 池、按会话串行、空闲回收
-      serialize.ts         # pi 会话条目 -> MessageDTO
-      events.ts            # AgentSessionEvent -> SSE 事件
-    routes/                # health / models / config / sessions / messages
-    index.ts               # Hono 装配、静态托管 web、优雅退出
+    envelope.ts            # { success, code, message, data } 封套与错误码
+    constants.ts           # API_TYPES / THINKING_LEVELS / API 前缀
+    runtime.ts             # RuntimeStatus
+    {health,models}/{input,output}.ts
+    {config,sessions,messages}/{input,output}.ts
+server/src/
+  env.ts                   # APP_HOME 派生全部路径
+  app.ts                   # Services 装配、配置热重载
+  constants.ts             # 默认值与固定目录名
+  utils/                   # 纯函数工具（time / object）
+  lib/                     # 服务端基建
+    response/              # 统一封套 + AppError
+    validate/              # jsonBody 中间件
+    logger/                # pino 实例 + 请求日志
+  config/
+    store.ts               # config.json 读写、apiKey 脱敏、生成 pi 的 models.json
+    session-state.ts       # 每会话的 name / cwd / model / thinkingLevel 覆盖
+  core/                    # pi SDK 封装
+    runtime.ts             # ModelRuntime 单例、模型解析、模型目录
+    pool.ts                # sessionId -> AgentSession 池、按会话串行、空闲回收
+    serialize.ts           # pi 会话条目 -> MessageDTO
+    events.ts              # AgentSessionEvent -> SSE 事件
+  routes/                  # health / models / config / sessions / messages（一级均为文件夹）
+  index.ts                 # Hono 装配、静态托管 web、优雅退出
   scripts/smoke.ts         # 不经 HTTP 的 SDK 冒烟测试
 apps/web/src/
-  lib/{api,types,sse}.ts   # 接口封装、类型、SSE 解析
+  lib/{api,types,sse}.ts   # 接口封装、类型（引用 @ucode/contracts）、SSE 解析
   hooks/{use-sessions,use-chat,use-models}.ts
   components/              # 侧栏、消息列表、工具卡片、输入框、设置对话框
 ```
 
 ### 实现要点
 
-- **会话持久化**：交给 pi 的 `SessionManager`，落在 `$PI_AGENT_DIR/sessions/*.jsonl`；服务不引入数据库。
-- **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
+- **会话持久化**：交给 pi 的 `SessionManager`，落在 `$APP_HOME/agent/sessions/*.jsonl`；服务不引入数据库。
+- **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型暂存在 `session-state.json`，首次回复后视图自动对齐。
 
@@ -222,5 +238,5 @@ pnpm -F @ucode/server smoke -- --base-url http://localhost:8317/v1 --api-key dev
 - **模型列表为空**：`models/list` 只列出配置里有凭证的 provider，检查 `baseUrl` / `apiKey`。
 - **`sessionId` 报 400**：id 只接受 `^[A-Za-z0-9][A-Za-z0-9._-]*$`（与 pi 的会话 id 规则一致），新建会话用返回的 UUID。
 - **调用上游报 400 `invalid_request`**：多为网关兼容性差异。先用 `config/test` 二分定位，必要时通过模型的 `compat` 关掉 `supportsDeveloperRole`、`supportsStore`、`supportsReasoningEffort` 等开关。
-- **端口被占用**：改 `.env` 的 `PORT`，同时改 `apps/web/vite.config.ts` 里的代理目标。
+- **端口被占用**：改 `.env` 的 `APP_PORT`，同时改 `apps/web/vite.config.ts` 里的代理目标。
 - **⚠️ 安全**：当前版本没有 HTTP 鉴权、默认监听所有网卡，且背后的 agent 有 `bash` 权限。**不要把它暴露到公网或不可信网络**。待办与整改方案见 [`TODO.md`](./TODO.md)。

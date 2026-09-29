@@ -1,19 +1,27 @@
 /** /api/v1/config：读取、更新（热重载）、连通性测试 */
+import {
+  appConfigPatchSchema,
+  type ConfigSnapshot,
+  type ConfigTestInput,
+  type ConfigTestResponse,
+  configTestSchema,
+  ERROR_CODES,
+  emptyInputSchema,
+} from "@ucode/contracts";
 import { Hono } from "hono";
-import { z } from "zod";
 
-import type { Services } from "../app";
-import { appConfigPatchSchema, configTestSchema } from "../config/schema";
-import { publicConfig } from "../config/store";
-import { AppError, ok } from "../lib/result";
-import { jsonBody } from "../lib/validate";
+import type { Services } from "../../app";
+import { publicConfig } from "../../config/store";
+import { AppError, ok } from "../../lib/response";
+import { jsonBody } from "../../lib/validate";
 
-const emptyBody = z.object({}).default({});
-
-const testConnection = async (input: z.infer<typeof configTestSchema>, services: Services) => {
+const testConnection = async (
+  input: ConfigTestInput,
+  services: Services,
+): Promise<ConfigTestResponse> => {
   if (input.api !== "openai-completions") {
     throw new AppError(
-      "unsupported_api",
+      ERROR_CODES.unsupportedApi,
       `连通性测试目前只支持 openai-completions，当前为 ${input.api}`,
       400,
     );
@@ -24,7 +32,11 @@ const testConnection = async (input: z.infer<typeof configTestSchema>, services:
     services.config.get().providers.find((item) => item.id === input.providerId)?.apiKey;
 
   if (!apiKey) {
-    throw new AppError("invalid_request", "缺少 apiKey（未保存过该 provider 的 key）", 400);
+    throw new AppError(
+      ERROR_CODES.invalidRequest,
+      "缺少 apiKey（未保存过该 provider 的 key）",
+      400,
+    );
   }
 
   const url = `${input.baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -47,13 +59,13 @@ const testConnection = async (input: z.infer<typeof configTestSchema>, services:
       signal: AbortSignal.timeout(20_000),
     });
   } catch (error) {
-    throw new AppError("upstream_unreachable", `无法连接 ${url}`, 400, String(error));
+    throw new AppError(ERROR_CODES.upstreamUnreachable, `无法连接 ${url}`, 400, String(error));
   }
 
   const text = await response.text();
   if (!response.ok) {
     throw new AppError(
-      "upstream_error",
+      ERROR_CODES.upstreamError,
       `上游返回 HTTP ${response.status}`,
       400,
       text.slice(0, 800),
@@ -74,12 +86,12 @@ const testConnection = async (input: z.infer<typeof configTestSchema>, services:
 export const createConfigRoute = (services: Services) => {
   const router = new Hono();
 
-  const snapshot = () => ({
+  const snapshot = (): ConfigSnapshot => ({
     config: publicConfig(services.config.get()),
     status: services.runtime.getStatus(),
   });
 
-  router.post("/info", jsonBody(emptyBody), (c) => c.json(ok(snapshot())));
+  router.post("/info", jsonBody(emptyInputSchema), (c) => c.json(ok(snapshot())));
 
   router.post("/update", jsonBody(appConfigPatchSchema), async (c) => {
     await services.applyConfig(c.req.valid("json"));
