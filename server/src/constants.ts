@@ -14,6 +14,12 @@ export const AGENT_DIRNAME = "agent";
 /** 会话 JSONL 目录名（位于 agent 目录下） */
 export const SESSIONS_DIRNAME = "sessions";
 
+/** 单个 /events 订阅者的待发队列上限；溢出即断开，由客户端重连补齐 */
+export const SUBSCRIBER_QUEUE_MAX = 256;
+
+/** /events 的心跳间隔（毫秒），防止中间代理掐掉空闲连接 */
+export const EVENTS_HEARTBEAT_MS = 15_000;
+
 export const CONFIG_FILENAME = "config.json";
 
 export const SESSION_STATE_FILENAME = "session-state.json";

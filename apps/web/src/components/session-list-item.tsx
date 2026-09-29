@@ -1,5 +1,5 @@
 /** 会话列表的一行：标题、消息数与模型标记、重命名 / 删除入口 */
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,12 @@ export function SessionListItem({
         <div className="truncate text-xs font-medium">{sessionTitle(session)}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span>{session.messageCount} 条</span>
+          {session.running ? (
+            <span className="flex items-center gap-1 text-primary">
+              <Loader2 className="size-2.5 animate-spin" />
+              生成中
+            </span>
+          ) : null}
           {session.model ? (
             <Badge variant="secondary" className="h-4 px-1 text-[9px]">
               {session.model.split("/").pop()}

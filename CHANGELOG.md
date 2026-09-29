@@ -4,6 +4,26 @@
 
 ## [未发布]
 
+### 新增
+
+- 新增 `POST /api/v1/events`：全局 SSE 事件流，承载所有会话的实时事件，带 `seq` 会话内序号与 15s 心跳；
+  生成生命周期与调用方连接解耦，刷新 / 断线后重取快照即可接续。
+- `messages/list` 响应新增 `running`（是否有活跃生成）、`seq`（快照序号）与 `liveMessageId`（在途消息 id），
+  并用活跃会话的 `streamingMessage` 投影正在生成的正文，刷新后不再丢失在途内容。
+- `sessions/list` / `sessions/info` 的会话摘要新增 `running` 字段。
+- web 新增 `lib/event-stream.ts`（全局事件流单例连接 + 指数退避重连）与 `hooks/use-session-stream.ts`
+  （快照 + 按 `seq` 切分接续实时帧），会话侧栏与对话区头部显示「生成中」。
+- 新增项目内命令 `/review`（`.agents/commands/review.md`，经 `.opencode/commands/review.md` 软链被 OpenCode 发现）：
+  按输入判定审查范围（未提交改动 / 提交 / 分支 / PR），产出可执行的代码审查反馈。
+
+### 变更
+
+- `POST /api/v1/messages/prompt` 改为投递语义：返回 `{ sessionId, admitted }` 回执，生成在服务端后台继续，
+  事件统一走 `/events`（原请求级 SSE 流移除）。
+- server `core/` 新增 `event-bus.ts`（会话事件总线，`AgentSession` 入池即常驻订阅）、`projection.ts`
+  （在途投影）与 `run.ts`（后台运行），移除 `run-stream.ts`。
+- web 的 `hooks/use-session-history.ts` 由 `use-session-stream.ts` 取代；`use-send-message` 不再消费 SSE。
+
 ## [0.2.0] - 2026-09-29
 
 ### 新增

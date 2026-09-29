@@ -5,7 +5,7 @@ import { sessionIdSchema } from "../sessions/input";
 
 export const messageListInputSchema = z.object({ sessionId: sessionIdSchema });
 
-/** 发起一轮生成；SSE 流式返回 */
+/** 发起一轮生成；服务端受理后返回 ack，生成在后台继续、结果走 /events */
 export const promptInputSchema = z.object({
   sessionId: sessionIdSchema,
   text: z.string().min(1),

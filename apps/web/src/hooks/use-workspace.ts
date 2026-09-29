@@ -1,5 +1,5 @@
 /** 应用的组合根：把会话、模型、当前会话与消息流接在一起 */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useActiveSession } from "@/hooks/use-active-session";
 import { useChat } from "@/hooks/use-chat";
@@ -13,10 +13,19 @@ export function useWorkspace() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const configured = models.data?.configured ?? false;
-  const activeSession = sessions.sessions.find((item) => item.id === activeId) ?? null;
   const chat = useChat(activeId, () => {
     void sessions.refresh();
   });
+
+  // 本页正在生成时无需等服务端刷新，列表项就能显示运行态
+  const sessionsView = useMemo(
+    () =>
+      sessions.sessions.map((session) =>
+        session.id === activeId && chat.streaming ? { ...session, running: true } : session,
+      ),
+    [activeId, chat.streaming, sessions.sessions],
+  );
+  const activeSession = sessionsView.find((item) => item.id === activeId) ?? null;
 
   const createSession = async () => {
     const session = await sessions.create();
@@ -30,7 +39,7 @@ export function useWorkspace() {
   };
 
   return {
-    sessions,
+    sessions: { ...sessions, sessions: sessionsView },
     models,
     configured,
     activeId,

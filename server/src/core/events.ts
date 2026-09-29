@@ -1,9 +1,11 @@
-/** pi 的 AgentSessionEvent → 对外 SSE 事件 */
+/** pi 的 AgentSessionEvent → 对外事件流帧 */
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { EventName } from "@ucode/contracts";
 
 import { messageToDTO } from "./serialize";
 
-export type SseEvent = { event: string; data: unknown };
+/** 事件名与数据的组合；总线负责补 sessionId 与 seq */
+export type SseEvent = { event: EventName; data: Record<string, unknown> };
 
 type MessageUpdateEvent = Extract<AgentSessionEvent, { type: "message_update" }>;
 type AssistantEvent = MessageUpdateEvent["assistantMessageEvent"];

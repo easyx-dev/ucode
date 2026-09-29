@@ -9,6 +9,7 @@ import {
 
 import type { SessionStateStore } from "../config/session-state";
 import { env } from "../env";
+import type { SessionEventBus } from "./event-bus";
 import type { PiRuntime } from "./runtime";
 
 type PooledSession = {
@@ -30,6 +31,7 @@ export class SessionPool {
   constructor(
     private readonly runtime: PiRuntime,
     private readonly sessionState: SessionStateStore,
+    private readonly events: SessionEventBus,
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -98,6 +100,9 @@ export class SessionPool {
 
     const entry: PooledSession = { session, lastUsed: Date.now() };
     this.entries.set(sessionId, entry);
+    // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
+    // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧。
+    this.events.attach(sessionId, session);
     return session;
   }
 
@@ -107,6 +112,11 @@ export class SessionPool {
 
   isRunning(sessionId: string): boolean {
     return this.running.has(sessionId);
+  }
+
+  /** 是否有活跃生成：池内占位的 run，或会话本身处于流式中 */
+  isActive(sessionId: string): boolean {
+    return this.isRunning(sessionId) || this.get(sessionId)?.isStreaming === true;
   }
 
   /**
@@ -137,6 +147,7 @@ export class SessionPool {
     this.entries.delete(sessionId);
     this.locks.delete(sessionId);
     this.running.delete(sessionId);
+    this.events.detach(sessionId);
     try {
       entry.session.dispose();
     } catch {

@@ -121,6 +121,7 @@ export const sessionInfoToDTO = (
   override: SessionOverride,
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
+  running: boolean,
 ): SessionSummary => ({
   id: info.id,
   name: info.name ?? override.name ?? null,
@@ -131,15 +132,17 @@ export const sessionInfoToDTO = (
   preview: info.firstMessage ?? "",
   model: override.model ?? defaultModel,
   thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+  running,
 });
 
-/** 还没落盘（没有 assistant 回复）的草稿会话 */
+/** 还没落盘（没有 assistant 回复）的草稿会话；草稿也可能正在生成首轮回复 */
 export const draftSessionSummary = (
   sessionId: string,
   override: SessionOverride,
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
   fallbackCwd: string,
+  running: boolean,
 ): SessionSummary => {
   const now = new Date().toISOString();
   return {
@@ -152,5 +155,6 @@ export const draftSessionSummary = (
     preview: "",
     model: override.model ?? defaultModel,
     thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+    running,
   };
 };

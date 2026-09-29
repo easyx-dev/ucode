@@ -1,8 +1,9 @@
-/** 会话消息流：持有消息列表，装配历史加载与发送 */
-import { useCallback, useRef, useState } from "react";
+/** 会话消息流：持有消息列表，装配快照/接续与发送 */
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useInterrupt } from "@/hooks/use-interrupt";
 import { useSendMessage } from "@/hooks/use-send-message";
-import { useSessionHistory } from "@/hooks/use-session-history";
+import { useSessionStream } from "@/hooks/use-session-stream";
 import type { ChatItem } from "@/lib/types";
 
 export type ChatController = {
@@ -29,14 +30,28 @@ export function useChat(sessionId: string | null, onSettled?: () => void): ChatC
   }, []);
 
   const readItems = useCallback(() => itemsRef.current, []);
-  const { loadingHistory } = useSessionHistory({ sessionId, apply, onError: setError });
-  const { streaming, send, stop } = useSendMessage({
+  const { loadingHistory, running } = useSessionStream({
     sessionId,
     readItems,
     apply,
     onError: setError,
-    onSettled,
   });
+  const { sending, send } = useSendMessage({ sessionId, readItems, apply, onError: setError });
+  const stop = useInterrupt(sessionId);
 
-  return { items, streaming, error, loadingHistory, send, stop };
+  // 一轮生成结束（running 由真变假）后刷新会话列表的标题与更新时间
+  const wasRunningRef = useRef(false);
+  useEffect(() => {
+    if (wasRunningRef.current && !running) onSettled?.();
+    wasRunningRef.current = running;
+  }, [onSettled, running]);
+
+  return {
+    items,
+    streaming: running || sending,
+    error,
+    loadingHistory,
+    send,
+    stop,
+  };
 }

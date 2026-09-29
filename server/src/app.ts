@@ -4,6 +4,7 @@ import { ERROR_CODES } from "@ucode/contracts";
 
 import { SessionStateStore } from "./config/session-state";
 import { ConfigStore } from "./config/store";
+import { SessionEventBus } from "./core/event-bus";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { AppError } from "./lib/response";
@@ -13,6 +14,8 @@ export type Services = {
   sessionState: SessionStateStore;
   runtime: PiRuntime;
   pool: SessionPool;
+  /** 会话事件总线：/events 的唯一数据源 */
+  events: SessionEventBus;
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
   applyConfig(patch: AppConfigPatch): Promise<void>;
   /** 用当前配置重建运行时 */
@@ -23,7 +26,8 @@ export const createServices = async (): Promise<Services> => {
   const config = new ConfigStore();
   const sessionState = new SessionStateStore();
   const runtime = new PiRuntime();
-  const pool = new SessionPool(runtime, sessionState);
+  const events = new SessionEventBus();
+  const pool = new SessionPool(runtime, sessionState, events);
 
   config.load();
   sessionState.load();
@@ -41,6 +45,7 @@ export const createServices = async (): Promise<Services> => {
     sessionState,
     runtime,
     pool,
+    events,
     async applyConfig(patch: AppConfigPatch) {
       guardIdle();
       // 先校验并落盘，避免 patch 非法时白白丢掉内存会话

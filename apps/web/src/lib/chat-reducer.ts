@@ -137,7 +137,10 @@ export const reduceEvent = (items: ChatItem[], event: string, payload: unknown):
 
   switch (event) {
     case "message_start":
-      return data.role === "assistant" ? appendAssistantItem(items) : items;
+      // 投影可能已经带着这条在途 assistant 消息，避免重复插入
+      return data.role === "assistant" && lastLiveIndex(items, "assistant") < 0
+        ? appendAssistantItem(items)
+        : items;
     case "text_delta":
       return appendDelta(items, "text", String(data.delta ?? ""));
     case "thinking_delta":
@@ -150,7 +153,10 @@ export const reduceEvent = (items: ChatItem[], event: string, payload: unknown):
         args: data.args,
       });
     case "tool_start":
-      return startToolItem(items, data);
+      // 同一次调用声明重复到达时按 toolCallId 幂等，避免出现两张卡片
+      return items.some((item) => item.id === `live-tool-${String(data.toolCallId ?? "")}`)
+        ? items
+        : startToolItem(items, data);
     case "tool_update":
     case "tool_end":
       return updateToolItem(items, data);

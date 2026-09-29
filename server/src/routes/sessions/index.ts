@@ -30,9 +30,6 @@ const runtimeDefaults = (services: Services) => {
   return { model: status.defaultModel, thinkingLevel: status.thinkingLevel };
 };
 
-const isBusy = (services: Services, sessionId: string): boolean =>
-  services.pool.isRunning(sessionId) || services.pool.get(sessionId)?.isStreaming === true;
-
 const assertModel = (services: Services, ref: string): void => {
   if (!services.runtime.resolveModelRef(ref)) {
     throw new AppError(ERROR_CODES.unknownModel, `模型不可用：${ref}`, 400);
@@ -50,7 +47,14 @@ const describeSession = async (
 
   if (!info) {
     return {
-      session: draftSessionSummary(sessionId, override, model, thinkingLevel, env.workspaceDir),
+      session: draftSessionSummary(
+        sessionId,
+        override,
+        model,
+        thinkingLevel,
+        env.workspaceDir,
+        services.pool.isActive(sessionId),
+      ),
       persisted: false,
       entries: 0,
     };
@@ -58,7 +62,13 @@ const describeSession = async (
 
   const manager = SessionManager.open(info.path, env.sessionsRoot, info.cwd);
   return {
-    session: sessionInfoToDTO(info, override, model, thinkingLevel),
+    session: sessionInfoToDTO(
+      info,
+      override,
+      model,
+      thinkingLevel,
+      services.pool.isActive(sessionId),
+    ),
     persisted: true,
     entries: manager.getEntries().length,
   };
@@ -72,7 +82,13 @@ const listSessions = async (
   const infos = await services.pool.listInfos();
 
   let sessions = infos.map((info) =>
-    sessionInfoToDTO(info, services.sessionState.get(info.id), model, thinkingLevel),
+    sessionInfoToDTO(
+      info,
+      services.sessionState.get(info.id),
+      model,
+      thinkingLevel,
+      services.pool.isActive(info.id),
+    ),
   );
 
   const needle = query.q?.trim().toLowerCase();
@@ -115,6 +131,7 @@ const createSession = (services: Services, input: SessionCreateInput): SessionSu
     model,
     thinkingLevel,
     env.workspaceDir,
+    false,
   );
 };
 
@@ -136,7 +153,7 @@ const updateSession = async (
   patch: SessionUpdateInput,
 ): Promise<SessionSummary> => {
   if (patch.model) assertModel(services, patch.model);
-  if ((patch.model || patch.thinkingLevel) && isBusy(services, patch.sessionId)) {
+  if ((patch.model || patch.thinkingLevel) && services.pool.isActive(patch.sessionId)) {
     throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断", 409);
   }
 
@@ -158,13 +175,14 @@ const deleteSession = async (
   services: Services,
   sessionId: string,
 ): Promise<SessionDeleteResponse> => {
-  if (isBusy(services, sessionId)) {
+  if (services.pool.isActive(sessionId)) {
     throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断", 409);
   }
 
   const info = await services.pool.findInfo(sessionId);
   services.pool.dispose(sessionId);
   services.sessionState.delete(sessionId);
+  services.events.remove(sessionId);
   if (info) rmSync(info.path, { force: true });
 
   return { deleted: true, sessionId };

@@ -14,6 +14,7 @@ import { env } from "./env";
 import { logger, requestLogger } from "./lib/logger";
 import { AppError, fail } from "./lib/response";
 import { createConfigRoute } from "./routes/config";
+import { createEventsRoute } from "./routes/events";
 import { createHealthRoute } from "./routes/health";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
@@ -32,6 +33,7 @@ v1.route("/models", createModelsRoute(services));
 v1.route("/config", createConfigRoute(services));
 v1.route("/sessions", createSessionsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
+v1.route("/events", createEventsRoute(services));
 
 app.route(API_BASE_PATH, v1);
 

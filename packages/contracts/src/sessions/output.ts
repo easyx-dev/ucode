@@ -14,6 +14,8 @@ export type SessionSummary = {
   /** 生效的 "provider/model" */
   model: string | null;
   thinkingLevel: ThinkingLevel;
+  /** 是否有活跃生成（进程内的 run 或流式会话） */
+  running: boolean;
 };
 
 export type SessionListResponse = {

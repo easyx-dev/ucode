@@ -88,7 +88,7 @@
   （登记在 `packages/contracts/src/envelope.ts` 的 `ERROR_CODES`），HTTP 状态保留语义（400 / 404 / 409 / 500），
   错误详情放 `data`。
 - 除 `GET /api/v1/health` 外，接口一律 `POST` + JSON body；**请求参数只放 body，不进路径**。
-- `messages/prompt` 返回 SSE，事件流不套封套。
+- `messages/prompt` 只返回受理 ack；`/events` 是 SSE 事件流，不套封套。
 - 请求校验 schema 与响应类型统一放 `packages/contracts/src/<domain>/{input,output}.ts`，由 `@ucode/contracts`
   单入口导出（子路径已取消，前端允许打到 zod）。新增接口先落契约，再写路由。
 - **响应类型必须与实现编译期绑定**：响应生产点显式标注契约类型（如 `describeSession(): Promise<SessionInfoResponse>`），

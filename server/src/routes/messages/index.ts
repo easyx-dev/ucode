@@ -1,17 +1,18 @@
-/** /api/v1/messages：会话历史的读取，以及发起生成（SSE 流式）与中断 */
+/** /api/v1/messages：会话历史读取，以及发起生成（投递）与中断 */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   type MessageInterruptResponse,
   type MessageListResponse,
   messageListInputSchema,
+  type PromptAdmittedResponse,
   promptInputSchema,
   sessionIdInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
 import type { Services } from "../../app";
-import { streamSessionRun } from "../../core/run-stream";
-import { entriesToDTO } from "../../core/serialize";
+import { projectMessages } from "../../core/projection";
+import { admitPrompt } from "../../core/run";
 import { env } from "../../env";
 import { ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
@@ -22,34 +23,35 @@ export const createMessagesRoute = (services: Services) => {
   router.post("/list", jsonBody(messageListInputSchema), async (c) => {
     const { sessionId } = c.req.valid("json");
     const info = await services.pool.findInfo(sessionId);
+    const manager = info ? SessionManager.open(info.path, env.sessionsRoot, info.cwd) : null;
+    const entries = manager ? manager.buildContextEntries() : [];
 
-    if (!info) {
-      return c.json(
-        ok({
-          sessionId,
-          messages: [],
-          persisted: false,
-          cwd: env.workspaceDir,
-        } satisfies MessageListResponse),
-      );
-    }
-
-    const manager = SessionManager.open(info.path, env.sessionsRoot, info.cwd);
-    const entries = manager.buildContextEntries();
+    // 序号与投影必须在同一同步块内取：中间一旦插入事件，
+    // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量。
+    // 会话尚未落盘（首轮回复完成前）时 entries 为空，投影仍能给出在途消息。
+    const seq = services.events.latestSeq(sessionId);
+    const projection = projectMessages(sessionId, services.pool.get(sessionId), entries);
 
     return c.json(
       ok({
         sessionId,
-        cwd: info.cwd,
-        persisted: true,
-        messages: entriesToDTO(entries),
+        cwd: info?.cwd ?? env.workspaceDir,
+        persisted: info !== undefined,
+        running: services.pool.isActive(sessionId),
+        seq,
+        ...projection,
       } satisfies MessageListResponse),
     );
   });
 
-  router.post("/prompt", jsonBody(promptInputSchema), (c) =>
-    streamSessionRun(c, services, c.req.valid("json")),
-  );
+  // 只做受理：真正的生成在服务端后台推进，结果统一走 /events
+  router.post("/prompt", jsonBody(promptInputSchema), async (c) => {
+    const input = c.req.valid("json");
+    await admitPrompt(services, input);
+    return c.json(
+      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+    );
+  });
 
   router.post("/interrupt", jsonBody(sessionIdInputSchema), async (c) => {
     const { sessionId } = c.req.valid("json");

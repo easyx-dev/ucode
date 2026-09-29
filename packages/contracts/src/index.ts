@@ -4,6 +4,7 @@ export * from "./config/input";
 export * from "./config/output";
 export * from "./constants";
 export * from "./envelope";
+export * from "./events";
 export * from "./health/output";
 export * from "./messages/input";
 export * from "./messages/output";

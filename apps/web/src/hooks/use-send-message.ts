@@ -1,9 +1,8 @@
-/** 发送消息并消费流式响应：乐观插入用户消息，事件归并交给 chat-reducer */
-import { useCallback, useRef, useState } from "react";
+/** 发送消息：乐观插入用户消息并向服务端投递，生成结果由全局事件流回传 */
+import { useCallback, useState } from "react";
 
-import { useInterrupt } from "@/hooks/use-interrupt";
-import { describeError, promptStream } from "@/lib/api";
-import { appendUserItem, reduceEvent, settle } from "@/lib/chat-reducer";
+import { api, describeError } from "@/lib/api";
+import { appendUserItem } from "@/lib/chat-reducer";
 import type { ChatItem } from "@/lib/types";
 
 type SendMessageOptions = {
@@ -12,61 +11,28 @@ type SendMessageOptions = {
   readItems: () => ChatItem[];
   apply: (items: ChatItem[]) => void;
   onError: (message: string | null) => void;
-  /** 一轮结束后触发（用于刷新会话列表里的标题与更新时间） */
-  onSettled?: () => void;
 };
 
-export function useSendMessage({
-  sessionId,
-  readItems,
-  apply,
-  onError,
-  onSettled,
-}: SendMessageOptions) {
-  const [streaming, setStreaming] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const handleEvent = useCallback(
-    (event: string, payload: unknown) => {
-      if (event === "error") {
-        const data = payload as { message?: string };
-        onError(data?.message ?? "生成失败");
-        return;
-      }
-      if (event === "done" || event === "agent_settled") {
-        apply(settle(readItems()));
-        return;
-      }
-      apply(reduceEvent(readItems(), event, payload));
-    },
-    [apply, onError, readItems],
-  );
+export function useSendMessage({ sessionId, readItems, apply, onError }: SendMessageOptions) {
+  /** prompt 请求本身的在途状态；生成是否结束看 running */
+  const [sending, setSending] = useState(false);
 
   const send = useCallback(
     async (text: string) => {
-      if (!sessionId || streaming) return;
+      if (!sessionId) return;
       onError(null);
       apply(appendUserItem(readItems(), text));
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setStreaming(true);
-
+      setSending(true);
       try {
-        await promptStream(sessionId, text, handleEvent, controller.signal);
+        await api.messages.prompt({ sessionId, text });
       } catch (error) {
-        if (!controller.signal.aborted) onError(describeError(error));
+        onError(describeError(error));
       } finally {
-        setStreaming(false);
-        abortRef.current = null;
-        apply(settle(readItems()));
-        onSettled?.();
+        setSending(false);
       }
     },
-    [apply, handleEvent, onError, onSettled, readItems, sessionId, streaming],
+    [apply, onError, readItems, sessionId],
   );
 
-  const stop = useInterrupt(sessionId, abortRef);
-
-  return { streaming, send, stop };
+  return { sending, send };
 }
