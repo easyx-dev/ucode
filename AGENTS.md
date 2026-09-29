@@ -124,10 +124,10 @@
   源码里禁止硬编码品牌名，`pnpm check` 的 brand 校验会拦下。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
 - `$APP_HOME`（默认 `~/.ucode`）是 pi agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
-  `pi/`（`models.json` / `auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。
+  `pi/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
-- `$APP_HOME/app/config.json`、`pi/models.json` 由服务根据 `POST /api/v1/config/update` 生成，
-  `app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
+- `$APP_HOME/app/config.json` 由服务根据 `POST /api/v1/config/update` 生成（模型 provider 与 apiKey 只存这一份，
+  不再派生 `pi/models.json`），`app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
 - 需要调整 `APP_HOME` 下的目录布局时走一次性迁移，不加版本目录（演进靠 SQLite 的 `user_version`）。
 
 ### Biome 配置

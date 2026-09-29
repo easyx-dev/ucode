@@ -48,12 +48,12 @@ pnpm build && pnpm start
 
 ```
 $APP_HOME/                 # 默认 ~/.ucode
-├── pi/                    # pi 私有：models.json / auth.json / sessions/
+├── pi/                    # pi 私有：auth.json / sessions/
 └── app/                   # 应用自有：config.json / app.db（SQLite）
 ```
 
 工作目录 = `$APP_HOME`、配置 = `$APP_HOME/app/config.json`、
-pi 的 agent 目录 = `$APP_HOME/pi`（`models.json` / `auth.json` / `sessions/`）、
+pi 的 agent 目录 = `$APP_HOME/pi`（`auth.json` / `sessions/`）、
 会话元数据与索引 = `$APP_HOME/app/app.db`。
 
 > SQLite 用 Node 内置的 `node:sqlite`（`DatabaseSync`），需要 **Node ≥ 24**；它是实验特性，启动时会打印一条 `ExperimentalWarning`，不影响使用。
@@ -100,7 +100,7 @@ node packages/brand/scripts/replace.ts --from 旧品牌 --to 新品牌 --write
 已实测该端点支持：SSE 流式、`tool_calls`、`reasoning_content`、`reasoning_effort`。
 
 **注意**：这个网关不接受 `role: "developer"`（部分自建/代理网关的常见限制），
-所以服务在生成 pi 的 `models.json` 时默认给每个模型补上
+所以服务把 provider 与模型注入 pi 的 `ModelRuntime` 时，默认给每个模型补上
 `"compat": { "supportsDeveloperRole": false }`，让 pi 改用 `system` role。
 如果换成官方 OpenAI 端点且想用 `developer`，在设置里把该模型的 `compat` 覆盖掉即可。
 
@@ -261,12 +261,13 @@ server/src/
     response/              # 统一封套 + AppError
     validate/              # jsonBody 中间件
     logger/                # pino 实例 + 请求日志
-  config/store.ts          # config.json 读写、apiKey 脱敏、生成 pi 的 models.json
+  config/store.ts          # config.json 读写、apiKey 脱敏
   db/                      # SQLite（node:sqlite）
     index.ts               # 连接、PRAGMA、user_version 迁移
     session-repository.ts  # 会话元数据与索引的读写
   core/                    # pi SDK 封装
     runtime.ts             # ModelRuntime 单例、模型解析、模型目录
+    provider-config.ts     # provider 配置 → pi registerProvider 入参
     pool.ts                # sessionId -> AgentSession 池、按会话串行、空闲回收
     event-bus.ts           # 会话事件总线（/events 的唯一数据源）
     run.ts                 # 后台推进一轮生成
@@ -292,6 +293,7 @@ apps/web/src/
 - **索引同步**：启动时 `reconcile()` 以 JSONL 为准对齐索引（补齐外部新增、清理已删文件），每轮生成落定后再回写一次；列表 / 详情直接读 SQLite，不再扫描 JSONL 目录。
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
+- **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `pi/models.json`；`config.json` 是模型配置的唯一事实源。
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型先落在 SQLite 的草稿行（`persisted = 0`），首次回复后索引对齐。
 - **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `app.db` 重建即可。
 - **删除会话**：先停用运行中的资源（`pool.dispose` / `events.remove`），再删 SQLite 行，最后删 JSONL 文件；顺序不能颠倒，见 `docs/database.md`。

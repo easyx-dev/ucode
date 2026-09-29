@@ -72,8 +72,16 @@
 - `scripts/verify` 的 tokens 检查纳入 `apps/web/src/components/ui`，并收紧裸色值判定：
   只认后面直接跟数值的颜色函数，允许 `color-mix(in oklch, var(--a), var(--b))` 这类对语义变量的合成。
 
+### 修复
+
+- 修复 `models/list` 的 `available` 恒为 `false`：`ModelRuntime.create({ refreshOnCreate: false })` 后从未刷新鉴权快照，
+  `hasConfiguredAuth()` 一直是空集；改为按 provider 注入 apiKey 时会同步该 provider 的鉴权状态。
+
 ### 移除
 
+- 不再生成 `$APP_HOME/pi/models.json`：provider 目录与 apiKey 改为经 pi 的 `registerProvider` / `setRuntimeApiKey`
+  注入内存，`$APP_HOME/app/config.json` 成为模型配置的唯一事实源，`pi/` 下不再出现明文凭证。
+  升级后手工删掉遗留的 `pi/models.json` 即可（不会再被读取）。
 - 移除未再引用的基础组件 `ui/card.tsx` 与 `ui/textarea.tsx`：空态改用纯排版，Composer 改为自绘输入卡
   （带边框的 `Textarea` / `Card` 与其内表面冲突，改用语义 token 直接拼装）。
 - `useModels()` 不再返回 `loading`：调用处改用 `data` 是否为空表达加载态。

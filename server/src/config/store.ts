@@ -1,4 +1,4 @@
-/** config.json 的读写与对外视图（apiKey 脱敏），并转换成 pi 的 models.json */
+/** config.json 的读写与对外视图（apiKey 脱敏） */
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import {
@@ -101,33 +101,4 @@ export const publicConfig = (config: AppConfig): ConfigView => ({
     apiKeyMasked: maskApiKey(provider.apiKey),
     models: provider.models,
   })),
-});
-
-/** 转成 pi 的 models.json 结构（含真实 apiKey，仅落在 .tmp 下） */
-export const toModelsJson = (config: AppConfig) => ({
-  providers: Object.fromEntries(
-    config.providers.map((provider) => [
-      provider.id,
-      {
-        name: provider.name ?? provider.id,
-        baseUrl: provider.baseUrl,
-        api: provider.api,
-        apiKey: provider.apiKey,
-        ...(provider.headers ? { headers: provider.headers } : {}),
-        models: provider.models.map((model) => ({
-          id: model.id,
-          name: model.name ?? model.id,
-          ...(model.api ? { api: model.api } : {}),
-          reasoning: model.reasoning,
-          input: model.input,
-          cost: model.cost,
-          contextWindow: model.contextWindow,
-          maxTokens: model.maxTokens,
-          headers: model.headers,
-          // 默认关闭 developer role：不少自建/代理网关只接受 system
-          compat: { supportsDeveloperRole: false, ...(model.compat ?? {}) },
-        })),
-      },
-    ]),
-  ),
 });

@@ -1,31 +1,5 @@
 # TODO
 
-## 待查 · `.tmp/.ucode/app/config.json` 与 `.tmp/.ucode/pi/models.json` 为什么各存一份模型配置
-
-两者是**源文件与派生产物**的关系，不是互为备份：
-
-- `app/config.json`：应用配置的唯一事实源，由 `ConfigStore`（`server/src/config/store.ts`）读写，`POST /api/v1/config/update` 落盘。内容含 `providers` / `defaultModel` / `thinkingLevel`——后两项是应用自己的概念，pi 不认。
-- `pi/models.json`：pi `ModelRuntime` 认的模型目录格式，由 `PiRuntime.apply()`（`server/src/core/runtime.ts:40`）在每次配置变更时用 `toModelsJson()` 全量重写，再交给 `ModelRuntime.create({ modelsPath })` 加载。
-
-所以是单向派生：`config.json --toModelsJson()--> models.json`。两份都要，是因为 pi SDK 没有「直接注入 provider 配置」的入口——`ModelRuntime.create()` 只接受 `modelsPath`（模型目录文件）与 `authPath`（凭证），provider 的 `baseUrl` / `apiKey` / `models` 只能从 models.json 读（内部走 `ModelConfig.load(modelsPath)`）。`create()` 上的 `modelsStore` 选项缓存的是远端目录（按 provider id 存 `Model<Api>[]`），不能替代 provider 配置。
-
-两份文件的差异：
-
-| 字段 | `app/config.json` | `pi/models.json` |
-| --- | --- | --- |
-| `providers` | 数组 | 以 id 为键的对象 |
-| `defaultModel` / `thinkingLevel` | 有 | 无（pi 不需要，由应用消费） |
-| `compat` | 不写 | 每个模型补 `supportsDeveloperRole: false` |
-| provider 级 `headers` | 有 | 透传 |
-
-**待办**：
-
-1. 确认 pi 是否真的没有「内存注入 provider 配置」的入口（`getRegisteredProviderConfig` / `nativeExtensionProviders` 一带）。若有，就不必落第二份文件，顺带少一份明文 `apiKey`。
-2. `PiRuntime.apply()` 用 `writeFileSync` 直接覆写 `models.json`，没有 `config.json` 那样的 `tmp + rename` 原子写；进程中断或并发时可能留下半截 JSON，pi 下次启动解析失败。考虑对齐 `ConfigStore.set()` 的原子写。
-3. 两份文件都在 `APP_HOME`（同时是 agent 的工作目录）内且含明文 `apiKey`，agent 自带 `read` 权限即可读到自己的 key。是否改用 pi 的 `authPath` / `setRuntimeApiKey` 把凭证从 models.json 挪走，需要评估。
-
----
-
 ## P0 · 给 `/api/v1` 加鉴权，并默认只监听回环地址
 
 **现状（已在真实运行实例上验证）**：`server/src/index.ts` 的 `serve({ fetch: app.fetch, port: env.port })` 未指定 `hostname`，Node 绑定 `::`（所有网卡）；`app.use("*", cors({ origin: env.corsOrigin }))` 的默认值是 `*`；整个 `server/src` 没有任何请求级鉴权（只有 pi 自己的 `authPath`）。

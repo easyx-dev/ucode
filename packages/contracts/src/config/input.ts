@@ -24,7 +24,7 @@ export const providerModelSchema = z.object({
   cost: modelCostSchema.default({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }),
   headers: z.record(z.string(), z.string()).optional(),
   /**
-   * pi 的 OpenAICompletionsCompat 等兼容开关，透传给 models.json。
+   * pi 的 OpenAICompletionsCompat 等兼容开关，原样透传给 pi 的 provider 配置。
    * 应用默认会补上 supportsDeveloperRole: false（部分网关只认 system role）。
    */
   compat: z.record(z.string(), z.unknown()).optional(),

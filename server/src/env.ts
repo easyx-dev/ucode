@@ -13,7 +13,6 @@ import {
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   LOG_LEVELS,
-  MODELS_FILENAME,
   PI_DIRNAME,
   SESSIONS_DIRNAME,
 } from "./constants";
@@ -45,7 +44,7 @@ const resolveLogLevel = (value: string | undefined, fallback: string): string =>
 /**
  * 应用主目录，同时是 agent 的工作目录。
  * 默认落在用户主目录下（`~/` + `appHomeDirname`），可用 `APP_HOME` 指向别处。
- * 下面按「谁的资产」分成两层：pi 的私有数据（models / auth / sessions）与
+ * 下面按「谁的资产」分成两层：pi 的私有数据（auth / sessions）与
  * 应用自有数据（config.json / SQLite），互不混放。
  */
 const homeDir = resolveDir(process.env.APP_HOME, resolve(homedir(), appHomeDirname));
@@ -69,7 +68,7 @@ export const env = {
   port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
   /** agent 的工作目录（工具读写文件、会话分组） */
   workspaceDir: homeDir,
-  /** pi 私有数据目录：models.json / auth.json / sessions 放这里 */
+  /** pi 私有数据目录：auth.json / sessions 放这里 */
   piDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
   appDir,
@@ -77,7 +76,6 @@ export const env = {
   legacyLayout,
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
   sessionsRoot: resolve(piDir, SESSIONS_DIRNAME),
-  modelsPath: resolve(piDir, MODELS_FILENAME),
   authPath: resolve(piDir, AUTH_FILENAME),
   configPath: resolve(appDir, CONFIG_FILENAME),
   dbPath: resolve(appDir, DB_FILENAME),

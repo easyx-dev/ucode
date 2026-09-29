@@ -1,6 +1,4 @@
 /** ModelRuntime 的生命周期：按配置重建、解析模型引用、导出模型目录 */
-import { writeFileSync } from "node:fs";
-
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import {
   type AppConfig,
@@ -10,9 +8,9 @@ import {
   type RuntimeStatus,
 } from "@ucode/contracts";
 
-import { toModelsJson } from "../config/store";
 import { env } from "../env";
 import { AppError } from "../lib/response";
+import { toProviderConfigInput } from "./provider-config";
 
 /** pi 的 Model 类型（避免直接依赖 @earendil-works/pi-ai） */
 export type PiModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
@@ -24,7 +22,10 @@ export const firstModelRef = (config: AppConfig): string | null => {
 };
 
 /**
- * 管理 pi 的 ModelRuntime：配置变更时重建，并把配置写成 pi 的 models.json。
+ * 管理 pi 的 ModelRuntime：配置变更时重建，并把 provider 目录与凭证注入内存。
+ *
+ * 不落 `pi/models.json`：pi 的 `registerProvider` / `setRuntimeApiKey` 足以覆盖
+ * 原先从 models.json 读取的全部内容，省掉一份派生文件与一份明文 `apiKey`。
  */
 export class PiRuntime {
   private runtime: ModelRuntime | null = null;
@@ -37,8 +38,6 @@ export class PiRuntime {
   };
 
   async apply(config: AppConfig): Promise<RuntimeStatus> {
-    writeFileSync(env.modelsPath, `${JSON.stringify(toModelsJson(config), null, 2)}\n`, "utf8");
-
     this.providers = config.providers;
     this.runtime = null;
     this.status = { ...this.status, configured: false, defaultModel: null, error: null };
@@ -53,11 +52,21 @@ export class PiRuntime {
       return this.status;
     }
 
+    // modelsPath: null 让 pi 跳过读取模型目录文件，provider 全部由下面的注入决定
     const runtime = await ModelRuntime.create({
       authPath: env.authPath,
-      modelsPath: env.modelsPath,
+      modelsPath: null,
       refreshOnCreate: false,
     });
+
+    for (const provider of config.providers) {
+      runtime.registerProvider(provider.id, toProviderConfigInput(provider));
+    }
+    // 凭证必须在注册之后注入：setRuntimeApiKey 会顺带同步该 provider 的鉴权状态，
+    // 而 getCatalog() 的 available 取自 hasConfiguredAuth()
+    for (const provider of config.providers) {
+      await runtime.setRuntimeApiKey(provider.id, provider.apiKey);
+    }
     this.runtime = runtime;
 
     const wantedRef = config.defaultModel ?? firstModelRef(config);

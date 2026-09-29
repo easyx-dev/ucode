@@ -5,7 +5,7 @@ export const DEFAULT_PORT = 2048;
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
-/** pi 私有数据目录名（位于 APP_HOME 下）：models / auth / sessions */
+/** pi 私有数据目录名（位于 APP_HOME 下）：auth / sessions */
 export const PI_DIRNAME = "pi";
 
 /** 应用自有数据目录名（位于 APP_HOME 下）：config.json / SQLite */
@@ -24,9 +24,6 @@ export const SUBSCRIBER_QUEUE_MAX = 256;
 export const EVENTS_HEARTBEAT_MS = 15_000;
 
 export const CONFIG_FILENAME = "config.json";
-
-/** pi 的模型注册文件 */
-export const MODELS_FILENAME = "models.json";
 
 /** pi 的鉴权文件 */
 export const AUTH_FILENAME = "auth.json";
