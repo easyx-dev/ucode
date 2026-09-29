@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { ConfigDraft } from "@/hooks/use-config-draft";
 import { api, describeError } from "@/lib/api";
-import { type DraftProvider, toUpdatePayload } from "@/lib/config-draft";
+import { type DraftProvider, toUpdatePayload, validateDrafts } from "@/lib/config-draft";
 
 export type ConfigSave = {
   saving: boolean;
@@ -19,6 +19,12 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
   const [testingKey, setTestingKey] = useState<string | null>(null);
 
   const save = async (): Promise<boolean> => {
+    const invalid = validateDrafts(draft.providers);
+    if (invalid) {
+      toast.error(invalid);
+      return false;
+    }
+
     setSaving(true);
     try {
       await api.config.update(
@@ -36,8 +42,10 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
   };
 
   const test = async (provider: DraftProvider): Promise<void> => {
-    const model = provider.models[0]?.id.trim();
-    if (!provider.baseUrl.trim() || !model) {
+    const model = provider.inheritedModels[0]?.id ?? provider.models[0]?.id.trim();
+    // 自定义供应商以表单值为准（resolvedBaseUrl 是加载时的快照），内置供应商回落到目录端点
+    const baseUrl = provider.baseUrl.trim() || provider.resolvedBaseUrl.trim();
+    if (!baseUrl || !model) {
       toast.error("先填写 baseUrl 和至少一个模型 id");
       return;
     }
@@ -45,7 +53,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
     setTestingKey(provider.key);
     try {
       const result = await api.config.test({
-        baseUrl: provider.baseUrl.trim(),
+        baseUrl,
         providerId: provider.id.trim() || undefined,
         ...(provider.apiKey.trim() ? { apiKey: provider.apiKey.trim() } : {}),
         api: provider.api,

@@ -88,23 +88,27 @@ node packages/brand/scripts/replace.ts --from 旧品牌 --to 新品牌 --write
 
 配置持久化在 `$APP_HOME/app/config.json`，通过接口或界面管理，保存后自动重建 pi 的 `ModelRuntime`（内存中的会话会被丢弃，历史文件不受影响）。
 
-### 本项目开发时用的测试端点
+### 接入 pi 内置供应商（推荐）
 
-| 项 | 值 |
-| --- | --- |
-| baseUrl | `http://localhost:8317/v1` |
-| api | `openai-completions` |
-| apiKey | `devtest` |
-| 可用模型 | `deepseek-v4-flash`（推荐）、`deepseek-v4-pro`、`glm-5.2`、`kimi` |
+pi 自带一份供应商目录（`pi-ai` 的 `providers/all`）。设置页的「接入内置供应商」会列出其中
+**可用一把 API key 直接接入**的那些（32 个：deepseek / minimax / zai / kimi-coding / xiaomi / qwen-token-plan /
+openai / anthropic / xai / openrouter / google / groq / mistral / together …），选中后只需填 apiKey。
 
-已实测该端点支持：SSE 流式、`tool_calls`、`reasoning_content`、`reasoning_effort`。
+这类条目在 `config.json` 里**只记 `id` 与 `apiKey`**，端点与模型清单都由 pi 提供：
 
-**注意**：这个网关不接受 `role: "developer"`（部分自建/代理网关的常见限制），
-所以服务把 provider 与模型注入 pi 的 `ModelRuntime` 时，默认给每个模型补上
-`"compat": { "supportsDeveloperRole": false }`，让 pi 改用 `system` role。
-如果换成官方 OpenAI 端点且想用 `developer`，在设置里把该模型的 `compat` 覆盖掉即可。
+```jsonc
+{ "providers": [ { "id": "deepseek", "api": "openai-completions", "apiKey": "sk-..." } ] }
+```
 
-### 直接调用接口配置
+好处是 pi 升级（新增模型、调整上下文窗口）会自动生效，不用重配。
+
+以下两类不在此列，需要显式配置：端点为 null（随凭证解析，如 `amazon-bedrock` / `google-vertex` /
+`cloudflare-*` / `azure-openai-responses` / `opencode`）与只有 OAuth 的（`openai-codex`）。
+它们的凭证也可以直接来自环境变量（如 `DEEPSEEK_API_KEY`），此时目录里会显示为已接入。
+
+### 自定义供应商
+
+pi 不认识的端点用「添加自定义供应商」，必须同时给出 `baseUrl` 与 `models`：
 
 ```bash
 curl -X POST http://localhost:2048/api/v1/config/update \
@@ -126,7 +130,26 @@ curl -X POST http://localhost:2048/api/v1/config/update \
   }'
 ```
 
-想先确认端点通不通：
+自定义供应商也可以给 `models` 覆盖内置供应商的模型清单——**一旦给出即为整体替换**（不是按 id 合并），
+此后该供应商不再跟随 pi 内置目录更新。
+
+### 本项目开发时用的测试端点
+
+| 项 | 值 |
+| --- | --- |
+| baseUrl | `http://localhost:8317/v1` |
+| api | `openai-completions` |
+| apiKey | `devtest` |
+| 可用模型 | `deepseek-v4-flash`（推荐）、`deepseek-v4-pro`、`glm-5.2`、`kimi` |
+
+已实测该端点支持：SSE 流式、`tool_calls`、`reasoning_content`、`reasoning_effort`。
+
+**注意**：这个网关不接受 `role: "developer"`（部分自建/代理网关的常见限制），
+所以服务把 provider 与模型注入 pi 的 `ModelRuntime` 时，默认给每个模型补上
+`"compat": { "supportsDeveloperRole": false }`，让 pi 改用 `system` role。
+如果换成官方 OpenAI 端点且想用 `developer`，在设置里把该模型的 `compat` 覆盖掉即可。
+
+### 连通性测试
 
 ```bash
 curl -X POST http://localhost:2048/api/v1/config/test \
@@ -134,18 +157,31 @@ curl -X POST http://localhost:2048/api/v1/config/test \
   -d '{"baseUrl":"http://localhost:8317/v1","apiKey":"devtest","model":"deepseek-v4-flash"}'
 ```
 
-模型字段（对应 pi 的 `ProviderModelConfig`）：
+（只支持 `openai-completions`。）
+
+### 模型字段（对应 pi 的 `Model`）
+
+`provider.models[]` 的常用字段：
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
 | `id` | 必填 | 模型 id |
 | `name` | = `id` | 显示名 |
+| `api` | provider 级值 | 覆盖该模型的 API 格式 |
+| `baseUrl` | provider 级值 | 覆盖该模型的端点 |
 | `reasoning` | `false` | 是否支持思考，配合 `thinkingLevel` |
-| `input` | `["text"]` | 支持的输入类型 |
+| `thinkingLevelMap` | 厂商默认 | pi 的 7 档 `off`…`max` → 厂商取值；`null` 表示该档不支持 |
+| `input` | `["text"]` | 支持的输入类型（`text` / `image`） |
+| `inputLimits` | 无 | 请求体积上限与图片缩放 / 每消息 / 每请求上限 |
 | `contextWindow` | `128000` | 上下文窗口 |
 | `maxTokens` | `8192` | 最大输出 |
-| `cost` | 全 0 | 成本统计用 |
-| `compat` | `{ supportsDeveloperRole: false }` | pi 的 `OpenAICompletionsCompat`，透传 |
+| `cost` | 全 0 | 计价；`tiers` 支持按输入 token 分档 |
+| `promptCache` | 无 | 提示缓存时长（`short` / `long`） |
+| `samplingParams` | 无 | 该模型的默认采样参数，单次请求可覆盖 |
+| `headers` | 无 | 该模型的请求头 |
+| `compat` | `{ supportsDeveloperRole: false }` | pi 的 `*Compat` 开关，按 `api` 收窄，原样透传 |
+
+`thinkingLevel` 取值与 pi 一致：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
 
 ---
 
@@ -159,10 +195,10 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | 方法 | 路径 | body | 说明 |
 | --- | --- | --- | --- |
 | GET | `/api/v1/health` | — | 存活 + `configured` / 当前模型 |
-| POST | `/api/v1/models/list` | `{}` | 模型目录（含 provider 凭证状态） |
+| POST | `/api/v1/models/list` | `{}` | 供应商目录（pi 内置 + 自定义）与各自的模型、接入状态 |
 | POST | `/api/v1/models/refresh` | `{}` | 丢弃内存会话、按当前配置重建运行时 |
 | POST | `/api/v1/config/info` | `{}` | 当前配置（apiKey 脱敏） |
-| POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的 |
+| POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的，内置供应商只需 `id` + `apiKey` |
 | POST | `/api/v1/config/test` | `{ baseUrl, apiKey?, providerId?, api?, model }` | 连通性测试 |
 | POST | `/api/v1/sessions/list` | `{ q?, limit? }` | 会话列表（含每个会话生效的 `model` / `thinkingLevel`） |
 | POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel? }` | 新建会话（返回 id；首次回复后才落盘） |

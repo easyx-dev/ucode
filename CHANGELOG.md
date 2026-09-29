@@ -6,6 +6,17 @@
 
 ### 新增
 
+- 新增 pi 内置供应商目录：`models/list` 返回 pi `providers/all` 里可用一把 API key 接入的 32 个供应商
+  （deepseek / minimax / zai / kimi-coding / xiaomi / qwen-token-plan / openai / anthropic / xai / openrouter …），
+  以及它们完整的模型参数（`reasoning` / `thinkingLevelMap` / `contextWindow` / `maxTokens` / `cost` / `compat` 等）。
+  设置页新增「接入内置供应商」目录，选中后只需填 apiKey。
+- 内置供应商在 `config.json` 里只记 `id` 与 `apiKey`，端点与模型清单由 pi 提供，pi 升级后自动生效。
+- 模型字段补齐到 pi 的 `Model`：新增 `thinkingLevelMap`、`samplingParams`、`inputLimits`、`promptCache`、
+  `baseUrl`、`cost.tiers`；provider 级新增 `compat` 与 `authHeader`。
+  设置页的模型表单同步暴露输入类型（文本 / 图片）与推理等级映射（按需添加某档并指定厂商取值，
+  留空表示该档不支持，未添加的档位按厂商默认）；
+  其余字段（`promptCache` / `samplingParams` / `headers` / `inputLimits` / `compat`）不进表单，
+  仍可手写 `config.json` 或走接口，编辑模型时原样保留。
 - 新增 `packages/brand`（`@ucode/brand`）：品牌名（`name` / `title` / `slug`）与图片资源（浅色 / 深色 logo、favicon）的单一来源，
   图片以 `src/assets.ts` 的 import 暴露（格式任意，换格式只改扩展名）；web 构建期由 `apps/web/plugins/brand-html.ts`
   注入浏览器标题与主题存储键，侧栏标识、空态水印也改读品牌包。
@@ -71,9 +82,28 @@
   `try` / `catch {}`，不再触发现代 JS 规则；`components/ui` 视为项目自有代码，一并纳入格式化与 lint。
 - `scripts/verify` 的 tokens 检查纳入 `apps/web/src/components/ui`，并收紧裸色值判定：
   只认后面直接跟数值的颜色函数，允许 `color-mix(in oklch, var(--a), var(--b))` 这类对语义变量的合成。
+- `config/update` 的 provider 条目放宽：`baseUrl` 与 `models` 变为可选——缺省表示沿用 pi 内置目录的同名
+  供应商（端点与模型清单都由 pi 提供）。非内置 provider 仍必须同时给出两者，否则返回 400 且不落盘。
+- 环境变量提供的凭证现在也会被识别为已接入（`available: true`、`authSource: "environment"`）：
+  此前「刷新鉴权快照」从未执行，环境变量实际不生效。服务端存在 `DEEPSEEK_API_KEY` 这类变量时，
+  即使 `config.json` 里没有任何 provider，状态也是已配置并回落到该供应商的首个模型。
+- `API_TYPES` 从 4 个扩到 pi `KnownApi` 全集（补 `mistral-conversations` / `azure-openai-responses` /
+  `openai-codex-responses` / `bedrock-converse-stream` / `google-vertex` / `pi-messages`），
+  否则内置目录里部分供应商的 api 无法落盘。
 
 ### 修复
 
+- 聊天区的模型选择器只列已接入的供应商：目录里还有 32 个未配凭证的内置供应商，
+  选了必然报 `Provider is not configured`。
+- 内置供应商被注册（写了 `baseUrl` 或 `models`）时，显示名不再从 pi 的 `DeepSeek` 退化成 id `deepseek`
+  ——pi 的 `name` 取值里扩展层优先级最高，只在显式命名时才提交该字段。
+- 带 `models` 的内置供应商不再因 `baseUrl` 为空而保存失败：空值不再提交（契约里它是可选的），
+  内置卡片会提示「模型清单已被自定义」并提供「恢复默认」回到跟随 pi 的状态。
+- 连通性测试改用表单里的 `baseUrl`：此前用的是加载时的快照，改完地址仍会测旧地址。
+- `models/refresh` 与启动都会校验配置能否落地：refresh 返回 400 并说明原因，启动打一条告警但不阻断
+  （此前手改 config.json 留下的坏条目被静默忽略，只在下次保存时才暴露）。
+- 修复整体替换 providers 时 `defaultModel` 变成悬空引用：patch 未显式给出 `defaultModel` 时，
+  若旧值指向的 provider 已被替换掉，清空并回落到「第一个可用模型」，避免保存成功但运行时不可用。
 - 修复 `models/list` 的 `available` 恒为 `false`：`ModelRuntime.create({ refreshOnCreate: false })` 后从未刷新鉴权快照，
   `hasConfiguredAuth()` 一直是空集；改为按 provider 注入 apiKey 时会同步该 provider 的鉴权状态。
 

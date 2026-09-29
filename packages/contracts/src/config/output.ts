@@ -9,11 +9,13 @@ export type ProviderModelView = ProviderModel;
 export type ProviderConfigView = {
   id: string;
   name: string;
-  baseUrl: string;
+  /** 留空表示继承 pi 内置目录的同名 provider */
+  baseUrl?: string;
   api: ApiType;
   /** 脱敏后的 key，仅用于回显「已保存」 */
   apiKeyMasked: string;
-  models: ProviderModelView[];
+  /** 留空表示模型清单继承 pi 内置目录 */
+  models?: ProviderModelView[];
 };
 
 export type ConfigView = {

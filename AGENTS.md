@@ -97,6 +97,12 @@
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
 
+UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机已装 `agent-browser`
+（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:2048`，
+或 `pnpm dev` 后开 `:5173`。两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接
+`ERR_UNSAFE_PORT`，换端口即可；弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，
+否则坐标会落到遮罩上把弹层关掉。
+
 ### 接口规范（server）
 
 完整规则见 [`docs/api.md`](./docs/api.md)。server 侧只强调三点：

@@ -7,6 +7,7 @@ import { SessionEventBus } from "./core/event-bus";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { SessionRepository } from "./db/session-repository";
+import { logger } from "./lib/logger";
 import { AppError } from "./lib/response";
 
 export type Services = {
@@ -34,6 +35,15 @@ export const createServices = async (): Promise<Services> => {
   // 以 JSONL 为准对齐索引：补齐外部新增、清理文件已消失的行
   await sessions.reconcile();
   await runtime.apply(config.get());
+  // 内置 provider 集合要在首次 apply 之后才拿到，所以这里才能判断条目是否可落地；
+  // 手改 config.json 留下的坏条目会被 pi 静默忽略，至少让它可见（不阻断启动）
+  try {
+    runtime.assertUsable(config.get());
+  } catch (error) {
+    logger.warn(
+      `配置里有无法落地的 provider（会被忽略）：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   pool.startSweeper();
 
   const guardIdle = (): void => {
@@ -50,15 +60,19 @@ export const createServices = async (): Promise<Services> => {
     events,
     async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
-      // 先校验并落盘，避免 patch 非法时白白丢掉内存会话
-      const next = config.update(patch);
+      // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json
+      const next = config.merge(patch);
+      runtime.assertUsable(next);
+      config.set(next);
       pool.disposeAll();
       await runtime.apply(next);
     },
     async reload() {
       guardIdle();
+      const next = config.get();
+      runtime.assertUsable(next);
       pool.disposeAll();
-      await runtime.apply(config.get());
+      await runtime.apply(next);
     },
   };
 };

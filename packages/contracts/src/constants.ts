@@ -1,11 +1,17 @@
 /** 跨端共享常量：模型目录与校验都从这里取值，避免前后端各写一份枚举 */
 
-/** pi 支持的 API 类型（pi-ai 的 KnownApi 子集，够用即可） */
+/** pi 支持的 API 类型（与 pi-ai 的 KnownApi 对齐，pi 的供应商目录里都会出现） */
 export const API_TYPES = [
   "openai-completions",
   "openai-responses",
   "anthropic-messages",
   "google-generative-ai",
+  "mistral-conversations",
+  "azure-openai-responses",
+  "openai-codex-responses",
+  "bedrock-converse-stream",
+  "google-vertex",
+  "pi-messages",
 ] as const;
 
 export type ApiType = (typeof API_TYPES)[number];

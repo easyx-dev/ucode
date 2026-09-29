@@ -1,10 +1,12 @@
-/** 一个 provider 的配置卡片：连接信息 + 模型列表 + 连通性测试 / 删除 */
+/** 一个 provider 的配置卡片：内置供应商只需填 key，自定义供应商才编辑端点与模型 */
 import { Loader2, Trash2, Zap } from "lucide-react";
 
 import { ProviderFields } from "@/components/settings/provider-fields";
 import { ProviderModels } from "@/components/settings/provider-models";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import type { DraftModel, DraftProvider } from "@/lib/config-draft";
 
@@ -19,6 +21,43 @@ type ProviderCardProps = {
   onTest: () => void;
 };
 
+/** 内置供应商：端点与模型清单来自 pi 内置目录，这里只需要一把 key */
+function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider" | "onPatch">) {
+  // 配置里给出了 models 即为整体替换，此后不再跟随内置目录更新
+  const customized = provider.models.length > 0;
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">apiKey</Label>
+      <Input
+        type="password"
+        value={provider.apiKey}
+        onChange={(event) => onPatch({ apiKey: event.target.value })}
+        placeholder={provider.apiKeyMasked || "sk-..."}
+      />
+      {customized ? (
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] text-muted-foreground">
+            模型清单已被自定义（{provider.models.length} 个），不再随 pi 升级更新。
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-2 text-[11px]"
+            onClick={() => onPatch({ models: [] })}
+          >
+            恢复默认
+          </Button>
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          端点与 {provider.inheritedModels.length} 个模型来自 pi 内置目录，随 pi 升级自动更新。
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ProviderCard({
   provider,
   testing,
@@ -29,10 +68,13 @@ export function ProviderCard({
   onRemove,
   onTest,
 }: ProviderCardProps) {
+  const builtin = provider.source === "builtin";
+
   return (
     <div className="space-y-3 rounded-xl p-3 ring-1 ring-foreground/10">
       <div className="flex items-center gap-2">
-        <Badge variant="outline">provider</Badge>
+        <Badge variant="outline">{builtin ? "内置" : "自定义"}</Badge>
+        <span className="text-sm font-medium">{provider.name || provider.id}</span>
         <span className="text-xs text-muted-foreground">
           {provider.apiKeyMasked ? `已保存 key ${provider.apiKeyMasked}` : "未保存 key"}
         </span>
@@ -45,16 +87,20 @@ export function ProviderCard({
         </Button>
       </div>
 
-      <ProviderFields provider={provider} onPatch={onPatch} />
-
-      <Separator />
-
-      <ProviderModels
-        models={provider.models}
-        onPatch={onModelPatch}
-        onAdd={onAddModel}
-        onRemove={onRemoveModel}
-      />
+      {builtin ? (
+        <BuiltinFields provider={provider} onPatch={onPatch} />
+      ) : (
+        <>
+          <ProviderFields provider={provider} onPatch={onPatch} />
+          <Separator />
+          <ProviderModels
+            models={provider.models}
+            onPatch={onModelPatch}
+            onAdd={onAddModel}
+            onRemove={onRemoveModel}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -1,8 +1,9 @@
-/** 设置对话框的表单主体：外观 / 模型 provider / 全局默认值 */
+/** 设置对话框的表单主体：外观 / 模型供应商 / 全局默认值 */
 import { Loader2, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ProviderCard } from "@/components/settings/provider-card";
+import { ProviderCatalog } from "@/components/settings/provider-catalog";
 import { SettingsAppearance } from "@/components/settings/settings-appearance";
 import { SettingsDefaults } from "@/components/settings/settings-defaults";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
 
           {!draft.loading && draft.providers.length === 0 ? (
             <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
-              还没有配置 provider，点击下面「添加 provider」。
+              还没有接入供应商，从下面的目录里选一个，或添加自定义供应商。
             </p>
           ) : null}
 
@@ -63,9 +64,15 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
             />
           ))}
 
+          <ProviderCatalog
+            catalog={draft.catalog}
+            configuredIds={draft.configuredIds}
+            onPick={draft.addFromCatalog}
+          />
+
           <Button variant="outline" onClick={draft.addProvider}>
             <Plus className="size-4" />
-            添加 provider
+            添加自定义供应商
           </Button>
         </div>
       </Section>

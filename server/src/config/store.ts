@@ -19,6 +19,18 @@ export const emptyConfig = (): AppConfig => ({
   thinkingLevel: "off",
 });
 
+/** defaultModel 指向的 provider 已被替换掉时返回 null，让它回落到「第一个可用模型」 */
+const reconcileDefaultModel = (
+  ref: string | null,
+  providers: AppConfig["providers"],
+): string | null => {
+  if (!ref) return null;
+  const separator = ref.indexOf("/");
+  if (separator <= 0) return null;
+  const providerId = ref.slice(0, separator);
+  return providers.some((provider) => provider.id === providerId) ? ref : null;
+};
+
 export class ConfigStore {
   private config: AppConfig = emptyConfig();
 
@@ -55,7 +67,8 @@ export class ConfigStore {
     return parsed;
   }
 
-  update(patch: AppConfigPatchInput): AppConfig {
+  /** 合并 patch，不落盘；调用方校验通过后再 `set()` */
+  merge(patch: AppConfigPatchInput): AppConfig {
     const providers = patch.providers?.map((provider) => {
       const existing = this.config.providers.find((item) => item.id === provider.id);
       const parsed = providerSchema.safeParse({
@@ -74,11 +87,14 @@ export class ConfigStore {
       return parsed.data;
     });
 
-    // patch 显式给出 defaultModel（含 null）时以 patch 为准
+    // patch 显式给出 defaultModel（含 null）时以 patch 为准；否则沿用旧值，
+    // 但旧值指向的 provider 已被这次替换掉时清空，避免留下悬空引用
     const defaultModel =
-      "defaultModel" in patch ? (patch.defaultModel ?? null) : this.config.defaultModel;
+      "defaultModel" in patch
+        ? (patch.defaultModel ?? null)
+        : reconcileDefaultModel(this.config.defaultModel, providers ?? this.config.providers);
 
-    return this.set({
+    return appConfigSchema.parse({
       providers: providers ?? this.config.providers,
       defaultModel,
       thinkingLevel: patch.thinkingLevel ?? this.config.thinkingLevel,
@@ -96,9 +112,9 @@ export const publicConfig = (config: AppConfig): ConfigView => ({
   providers: config.providers.map((provider) => ({
     id: provider.id,
     name: provider.name ?? provider.id,
-    baseUrl: provider.baseUrl,
+    ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
     api: provider.api,
     apiKeyMasked: maskApiKey(provider.apiKey),
-    models: provider.models,
+    ...(provider.models ? { models: provider.models } : {}),
   })),
 });

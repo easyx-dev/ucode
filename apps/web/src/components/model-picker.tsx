@@ -16,7 +16,9 @@ type ModelPickerProps = {
 
 /** 条目说明：上下文与输出上限、是否支持思考，用于区分同名模型 */
 const describeModel = (model: CatalogModel): string => {
-  const parts = [`${model.contextWindow} 上下文`, `${model.maxTokens} 输出`];
+  const parts: string[] = [];
+  if (model.contextWindow) parts.push(`${model.contextWindow} 上下文`);
+  if (model.maxTokens) parts.push(`${model.maxTokens} 输出`);
   if (model.reasoning) parts.push("思考");
   return parts.join(" · ");
 };

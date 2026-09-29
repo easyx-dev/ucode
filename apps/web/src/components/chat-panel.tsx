@@ -36,7 +36,8 @@ export function ChatPanel({
   onSelectThinkingLevel,
   onOpenSettings,
 }: ChatPanelProps) {
-  const providers = models?.providers ?? [];
+  // 模型选择器只列已接入的供应商：目录里还有大量没配凭证的内置供应商，选了必然报错
+  const providers = (models?.providers ?? []).filter((provider) => provider.available);
 
   return (
     <main className="m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
