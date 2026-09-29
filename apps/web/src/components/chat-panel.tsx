@@ -1,4 +1,4 @@
-/** 对话区：头部 + 错误提示 + 消息列表 + 输入框 */
+/** 对话区：头部 + 错误提示 + 消息列表 + 输入区 */
 import type { ReactNode } from "react";
 
 import { ChatHeader } from "@/components/chat-header";
@@ -7,10 +7,16 @@ import { MessageList } from "@/components/message-list";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ModelsResponse, SessionSummary, ThinkingLevel } from "@/lib/types";
 
+/** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
+const SUGGESTIONS = ["了解这个项目", "排查构建报错", "补充单元测试", "重构这段代码"] as const;
+
+/** 只有「已选会话且历史加载完、没有任何消息」才展示起步建议 */
+const showSuggestions = (session: SessionSummary | null, chat: ChatController): boolean =>
+  Boolean(session) && !chat.loadingHistory && chat.items.length === 0;
+
 type ChatPanelProps = {
   session: SessionSummary | null;
   models: ModelsResponse | null;
-  modelsLoading: boolean;
   chat: ChatController;
   /** 没有消息时展示的内容 */
   empty: ReactNode;
@@ -23,7 +29,6 @@ type ChatPanelProps = {
 export function ChatPanel({
   session,
   models,
-  modelsLoading,
   chat,
   empty,
   onReloadModels,
@@ -31,20 +36,19 @@ export function ChatPanel({
   onSelectThinkingLevel,
   onOpenSettings,
 }: ChatPanelProps) {
+  const providers = models?.providers ?? [];
+
   return (
-    <main className="flex min-w-0 flex-1 flex-col">
+    <main className="m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
       <ChatHeader
         session={session}
         models={models}
-        modelsLoading={modelsLoading}
         onReloadModels={onReloadModels}
-        onSelectModel={onSelectModel}
-        onSelectThinkingLevel={onSelectThinkingLevel}
         onOpenSettings={onOpenSettings}
       />
 
       {chat.error ? (
-        <div className="border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
+        <div className="border-b border-border bg-destructive/10 px-4 py-2 text-xs text-destructive">
           {chat.error}
         </div>
       ) : null}
@@ -56,6 +60,13 @@ export function ChatPanel({
         disabled={!session}
         onSend={(text) => void chat.send(text)}
         onStop={() => void chat.stop()}
+        suggestions={showSuggestions(session, chat) ? SUGGESTIONS : undefined}
+        cwd={session?.cwd}
+        providers={providers}
+        model={session?.model ?? models?.defaultModel ?? ""}
+        thinkingLevel={session?.thinkingLevel ?? models?.thinkingLevel ?? "off"}
+        onSelectModel={onSelectModel}
+        onSelectThinkingLevel={onSelectThinkingLevel}
       />
     </main>
   );

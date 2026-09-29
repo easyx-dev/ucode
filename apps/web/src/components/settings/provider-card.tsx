@@ -30,7 +30,7 @@ export function ProviderCard({
   onTest,
 }: ProviderCardProps) {
   return (
-    <div className="space-y-3 rounded-lg border p-3">
+    <div className="space-y-3 rounded-xl p-3 ring-1 ring-foreground/10">
       <div className="flex items-center gap-2">
         <Badge variant="outline">provider</Badge>
         <span className="text-xs text-muted-foreground">

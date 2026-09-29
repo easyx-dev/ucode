@@ -38,7 +38,7 @@ export function SessionSidebar({
   const filtered = useSessionFilter(sessions, query);
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r bg-muted/20">
+    <aside className="flex h-full w-72 shrink-0 flex-col">
       <SessionSidebarHeader
         query={query}
         canCreate={configured}
@@ -60,7 +60,7 @@ export function SessionSidebar({
       <div className="border-t p-2">
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onOpenSettings}>
           <Settings2 className="size-4" />
-          模型设置
+          设置
         </Button>
       </div>
 

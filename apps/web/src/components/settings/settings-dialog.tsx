@@ -34,9 +34,9 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>模型设置</DialogTitle>
+          <DialogTitle>设置</DialogTitle>
           <DialogDescription>
-            配置 OpenAI 兼容端点。保存后会重建 pi 运行时；apiKey 留空表示沿用已保存的 key。
+            外观与模型配置。保存后会重建 pi 运行时；apiKey 留空表示沿用已保存的 key。
           </DialogDescription>
         </DialogHeader>
 

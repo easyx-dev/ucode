@@ -1,7 +1,6 @@
-/** 会话列表的一行：标题、消息数与模型标记、重命名 / 删除入口 */
+/** 会话列表的一行：标题、相对时间与重命名 / 删除入口 */
 import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sessionTitle } from "@/lib/session";
+import { relativeTimeLabel } from "@/lib/time";
 import type { SessionSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -31,35 +31,32 @@ export function SessionListItem({
   return (
     <div
       className={cn(
-        "group flex items-center gap-1 rounded-md px-2 py-1.5",
-        active ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+        "group relative flex h-9 items-center rounded-lg pr-1 pl-2 transition-colors",
+        active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
       )}
     >
-      <button type="button" className="min-w-0 flex-1 text-left" onClick={onSelect}>
-        <div className="truncate text-xs font-medium">{sessionTitle(session)}</div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span>{session.messageCount} 条</span>
-          {session.running ? (
-            <span className="flex items-center gap-1 text-primary">
-              <Loader2 className="size-2.5 animate-spin" />
-              生成中
-            </span>
-          ) : null}
-          {session.model ? (
-            <Badge variant="secondary" className="h-4 px-1 text-[9px]">
-              {session.model.split("/").pop()}
-            </Badge>
-          ) : null}
-        </div>
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        onClick={onSelect}
+      >
+        {session.running ? (
+          <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" />
+        ) : null}
+        <span className="truncate text-sm">{sessionTitle(session)}</span>
       </button>
+
+      <span className="shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+        {relativeTimeLabel(session.updatedAt)}
+      </span>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            className="size-6 opacity-0 group-hover:opacity-100"
-            title="更多"
+            className="pointer-events-none absolute right-0.5 size-6 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+            title="更多操作"
           >
             <MoreHorizontal className="size-3.5" />
           </Button>

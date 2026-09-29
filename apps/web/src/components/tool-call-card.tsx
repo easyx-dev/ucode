@@ -15,7 +15,7 @@ export function ToolCallCard({ name, args, result, isError, running }: ToolCallC
   const hasBody = args !== undefined || (result !== undefined && result !== "");
 
   return (
-    <Collapsible className="my-2 rounded-lg border bg-muted/40">
+    <Collapsible className="my-2 rounded-lg bg-muted/50 ring-1 ring-foreground/10">
       <CollapsibleTrigger
         className="group flex w-full items-center gap-2 px-3 py-2 text-left"
         disabled={!hasBody}
@@ -50,14 +50,14 @@ export function ToolCallCard({ name, args, result, isError, running }: ToolCallC
       </CollapsibleTrigger>
 
       <CollapsibleContent>
-        <div className="space-y-2 border-t px-3 py-2">
+        <div className="space-y-2 border-t border-border px-3 py-2">
           {args !== undefined ? (
-            <pre className="max-h-48 overflow-auto rounded bg-background/70 p-2 font-mono text-[11px] leading-relaxed">
+            <pre className="max-h-48 overflow-auto rounded-md bg-card p-2 font-mono text-xs leading-relaxed">
               {JSON.stringify(args, null, 2)}
             </pre>
           ) : null}
           {result !== undefined && result !== "" ? (
-            <pre className="max-h-72 overflow-auto rounded bg-background/70 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+            <pre className="max-h-72 overflow-auto rounded-md bg-card p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">
               {result}
             </pre>
           ) : null}

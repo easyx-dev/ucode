@@ -29,7 +29,6 @@ export default function App() {
         <ChatPanel
           session={activeSession}
           models={models.data}
-          modelsLoading={models.loading}
           chat={chat}
           empty={
             <WelcomePanel

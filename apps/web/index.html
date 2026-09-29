@@ -3,7 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>ucode · AI 对话</title>
+    <script>
+      // 首屏渲染前定主题，避免深色用户看到闪白；键与 ThemeProvider 的 storageKey 一致。
+      // 这段脚本在打包前执行，只能用它自带的朴素写法；不用 IIFE、不用 var。
+      try {
+        const stored = localStorage.getItem("ucode-theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const followsSystem = stored !== "light" && stored !== "dark";
+        document.documentElement.classList.toggle("dark", stored === "dark" || (followsSystem && prefersDark));
+      } catch {
+        // localStorage 不可用时按浅色渲染，交给 React 侧纠正
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
