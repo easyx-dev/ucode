@@ -2,7 +2,7 @@
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import type { MessageBlock, MessageDTO, SessionSummary, ThinkingLevel } from "@ucode/contracts";
 
-import type { SessionOverride } from "../config/session-state";
+import type { SessionOverride } from "../db/session-repository";
 import { isRecord } from "../utils/object";
 
 export const blocksOf = (content: unknown): MessageBlock[] => {

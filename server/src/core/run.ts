@@ -44,7 +44,11 @@ const startRun = (
   void session
     .prompt(text)
     .catch((error) => report(services, sessionId, error))
-    .finally(() => services.pool.endRun(sessionId));
+    .finally(() => {
+      services.pool.endRun(sessionId);
+      // 生成落定后立即刷新 SQLite 索引，列表 / 详情不必再读 JSONL
+      services.pool.refreshIndex(sessionId);
+    });
 };
 
 /**

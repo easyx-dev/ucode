@@ -15,9 +15,20 @@
   （快照 + 按 `seq` 切分接续实时帧），会话侧栏与对话区头部显示「生成中」。
 - 新增项目内命令 `/review`（`.agents/commands/review.md`，经 `.opencode/commands/review.md` 软链被 OpenCode 发现）：
   按输入判定审查范围（未提交改动 / 提交 / 分支 / PR），产出可执行的代码审查反馈。
+- server 引入 SQLite（Node 内置 `node:sqlite` 的 `DatabaseSync`，无新增依赖）：新增 `db/` 模块，
+  用 `PRAGMA user_version` 管理 schema；`session-repository` 保存会话元数据（name / cwd / model / thinkingLevel 覆盖值）
+  与列表索引（名称、预览、条目数、消息数、创建/更新时间、JSONL 路径）。需 Node ≥ 24，启动会打印一条实验特性警告。
+- `APP_HOME` 目录按「谁的资产」分两层：`pi/`（pi 私有：`models.json` / `auth.json` / `sessions/`）与
+  `app/`（应用自有：`config.json` / `ucode.db`）；不再使用 `agent/` 与根目录的 `config.json`。
 
 ### 变更
 
+- `sessions/list` / `sessions/info` 改为读 SQLite 索引，不再每次 `SessionManager.listAll()` 全量扫描解析 JSONL；
+  列表的过滤与排序下推到 SQL。启动时 `reconcile()` 以 JSONL 为准对齐索引，每轮生成落定后回写一次。
+- 会话覆盖值从 `session-state.json` 迁到 SQLite（`config/session-state.ts` 移除），写入由整文件重写变为单行更新。
+- 移除 `SessionStateStore` 与池上的 `findInfo` / `listInfos`（原每次调用都 `SessionManager.listAll()` 全量扫描）；
+  `sessions` 与 `messages` 路由改为直接读 `SessionRepository`，`messages/list` 按索引里的 `source_path` 打开 JSONL。
+- `core/` 新增 `session-index.ts`（pi 会话对象 ↔ 入库索引 / `SessionInfo` 的转换）。
 - `POST /api/v1/messages/prompt` 改为投递语义：返回 `{ sessionId, admitted }` 回执，生成在服务端后台继续，
   事件统一走 `/events`（原请求级 SSE 流移除）。
 - server `core/` 新增 `event-bus.ts`（会话事件总线，`AgentSession` 入池即常驻订阅）、`projection.ts`

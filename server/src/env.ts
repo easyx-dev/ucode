@@ -1,17 +1,18 @@
 /** 环境变量解析：由 APP_HOME 一个主目录派生工作目录与全部配置路径 */
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 import {
-  AGENT_DIRNAME,
+  APP_DIRNAME,
   AUTH_FILENAME,
   CONFIG_FILENAME,
+  DB_FILENAME,
   DEFAULT_HOME,
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   LOG_LEVELS,
   MODELS_FILENAME,
-  SESSION_STATE_FILENAME,
+  PI_DIRNAME,
   SESSIONS_DIRNAME,
 } from "./constants";
 
@@ -40,12 +41,22 @@ const resolveLogLevel = (value: string | undefined, fallback: string): string =>
 };
 
 /**
- * 工作 / 配置主目录：agent 的工作目录、config.json、agent 目录都在它下面。
- * 只有一个 APP_HOME，不再分别声明工作目录与数据目录。
+ * 应用主目录，同时是 agent 的工作目录。
+ * 下面按「谁的资产」分成两层：pi 的私有数据（models / auth / sessions）与
+ * 应用自有数据（config.json / SQLite），互不混放。
  */
 const homeDir = resolveDir(process.env.APP_HOME, DEFAULT_HOME);
-const agentDir = resolve(homeDir, AGENT_DIRNAME);
+const piDir = resolve(homeDir, PI_DIRNAME);
+const appDir = resolve(homeDir, APP_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
+
+/**
+ * 旧布局标记：`agent/` 或根目录下的 `config.json` / `session-state.json`。
+ * 只用于启动提示，不做迁移——这些路径不会被读取。
+ */
+const legacyLayout =
+  !existsSync(piDir) &&
+  ["config.json", "session-state.json", "agent"].some((name) => existsSync(resolve(homeDir, name)));
 
 export const env = {
   repoRoot,
@@ -55,22 +66,24 @@ export const env = {
   port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
   /** agent 的工作目录（工具读写文件、会话分组） */
   workspaceDir: homeDir,
-  /** pi agent 目录：models.json / auth.json / sessions 放这里 */
-  agentDir,
-  /** 应用数据目录：config.json 等 */
-  dataDir: homeDir,
+  /** pi 私有数据目录：models.json / auth.json / sessions 放这里 */
+  piDir,
+  /** 应用自有数据目录：config.json 与 SQLite 数据库 */
+  appDir,
+  /** 是否检测到旧布局（仅在启动日志提示，不迁移） */
+  legacyLayout,
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
-  sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
-  modelsPath: resolve(agentDir, MODELS_FILENAME),
-  authPath: resolve(agentDir, AUTH_FILENAME),
-  configPath: resolve(homeDir, CONFIG_FILENAME),
-  sessionStatePath: resolve(homeDir, SESSION_STATE_FILENAME),
+  sessionsRoot: resolve(piDir, SESSIONS_DIRNAME),
+  modelsPath: resolve(piDir, MODELS_FILENAME),
+  authPath: resolve(piDir, AUTH_FILENAME),
+  configPath: resolve(appDir, CONFIG_FILENAME),
+  dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
   corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
   logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
 };
 
-for (const dir of new Set([env.workspaceDir, env.agentDir, env.sessionsRoot])) {
+for (const dir of new Set([env.workspaceDir, env.piDir, env.appDir, env.sessionsRoot])) {
   mkdirSync(dir, { recursive: true });
 }

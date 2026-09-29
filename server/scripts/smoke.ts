@@ -32,7 +32,7 @@ const providerId = "local";
 
 const root = resolve(import.meta.dirname, "..");
 const workDir = resolve(root, "../.tmp/smoke");
-const agentDir = resolve(workDir, "agent");
+const agentDir = resolve(workDir, "pi");
 mkdirSync(agentDir, { recursive: true });
 
 const modelsPath = resolve(agentDir, "models.json");

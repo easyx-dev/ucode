@@ -22,8 +22,14 @@ export const createMessagesRoute = (services: Services) => {
 
   router.post("/list", jsonBody(messageListInputSchema), async (c) => {
     const { sessionId } = c.req.valid("json");
-    const info = await services.pool.findInfo(sessionId);
-    const manager = info ? SessionManager.open(info.path, env.sessionsRoot, info.cwd) : null;
+    const record = services.sessions.find(sessionId);
+    const manager = record?.sourcePath
+      ? SessionManager.open(
+          record.sourcePath,
+          env.sessionsRoot,
+          record.piCwd || record.cwd || env.workspaceDir,
+        )
+      : null;
     const entries = manager ? manager.buildContextEntries() : [];
 
     // 序号与投影必须在同一同步块内取：中间一旦插入事件，
@@ -35,8 +41,8 @@ export const createMessagesRoute = (services: Services) => {
     return c.json(
       ok({
         sessionId,
-        cwd: info?.cwd ?? env.workspaceDir,
-        persisted: info !== undefined,
+        cwd: record?.piCwd || env.workspaceDir,
+        persisted: Boolean(record?.sourcePath),
         running: services.pool.isActive(sessionId),
         seq,
         ...projection,

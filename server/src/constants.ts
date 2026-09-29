@@ -1,6 +1,6 @@
 /** server 侧常量：默认值与固定目录名集中于此，避免散落在 env / logger 中 */
 
-/** agent 主目录（相对 repoRoot），APP_HOME 未设置时使用 */
+/** 应用主目录（相对 repoRoot），APP_HOME 未设置时使用 */
 export const DEFAULT_HOME = ".tmp/.ucode";
 
 export const DEFAULT_PORT = 2048;
@@ -8,11 +8,17 @@ export const DEFAULT_PORT = 2048;
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
-/** agent 目录名（位于 APP_HOME 下） */
-export const AGENT_DIRNAME = "agent";
+/** pi 私有数据目录名（位于 APP_HOME 下）：models / auth / sessions */
+export const PI_DIRNAME = "pi";
 
-/** 会话 JSONL 目录名（位于 agent 目录下） */
+/** 应用自有数据目录名（位于 APP_HOME 下）：config.json / SQLite */
+export const APP_DIRNAME = "app";
+
+/** 会话 JSONL 目录名（位于 pi 目录下） */
 export const SESSIONS_DIRNAME = "sessions";
+
+/** SQLite 数据库文件名（位于 app 目录下） */
+export const DB_FILENAME = "ucode.db";
 
 /** 单个 /events 订阅者的待发队列上限；溢出即断开，由客户端重连补齐 */
 export const SUBSCRIBER_QUEUE_MAX = 256;
@@ -21,8 +27,6 @@ export const SUBSCRIBER_QUEUE_MAX = 256;
 export const EVENTS_HEARTBEAT_MS = 15_000;
 
 export const CONFIG_FILENAME = "config.json";
-
-export const SESSION_STATE_FILENAME = "session-state.json";
 
 /** pi 的模型注册文件 */
 export const MODELS_FILENAME = "models.json";

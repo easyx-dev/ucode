@@ -2,15 +2,15 @@
 import {
   type AgentSession,
   createAgentSession,
-  type SessionInfo,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-import type { SessionStateStore } from "../config/session-state";
+import { overrideOf, type SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import type { SessionEventBus } from "./event-bus";
 import type { PiRuntime } from "./runtime";
+import { indexFromManager } from "./session-index";
 
 type PooledSession = {
   session: AgentSession;
@@ -19,7 +19,8 @@ type PooledSession = {
 
 /**
  * 内存中的 AgentSession 池。
- * 会话历史由 pi 持久化到 JSONL，这里只保留活跃进程状态，空闲后回收。
+ * 会话历史由 pi 持久化到 JSONL，这里只保留活跃进程状态，空闲后回收；
+ * 列表与详情所需的索引字段由 `SessionRepository` 从 SQLite 直接读取。
  */
 export class SessionPool {
   private readonly entries = new Map<string, PooledSession>();
@@ -30,7 +31,7 @@ export class SessionPool {
 
   constructor(
     private readonly runtime: PiRuntime,
-    private readonly sessionState: SessionStateStore,
+    private readonly repository: SessionRepository,
     private readonly events: SessionEventBus,
   ) {}
 
@@ -60,13 +61,12 @@ export class SessionPool {
     return next;
   }
 
-  async findInfo(sessionId: string): Promise<SessionInfo | undefined> {
-    const sessions = await SessionManager.listAll(env.sessionsRoot);
-    return sessions.find((info) => info.id === sessionId);
-  }
-
-  async listInfos(): Promise<SessionInfo[]> {
-    return SessionManager.listAll(env.sessionsRoot);
+  /** 生成落定后回写索引（名称 / 条目数 / 预览 / 时间） */
+  refreshIndex(sessionId: string): void {
+    const session = this.entries.get(sessionId)?.session;
+    if (!session) return;
+    const index = indexFromManager(session.sessionManager);
+    if (index) this.repository.refresh(sessionId, index);
   }
 
   async ensure(sessionId: string, cwdOverride?: string): Promise<AgentSession> {
@@ -76,12 +76,12 @@ export class SessionPool {
       return existing.session;
     }
 
-    const info = await this.findInfo(sessionId);
-    const override = this.sessionState.get(sessionId);
-    const cwd = info?.cwd || override.cwd || cwdOverride || env.workspaceDir;
+    const record = this.repository.find(sessionId);
+    const override = overrideOf(record);
+    const cwd = record?.piCwd || record?.cwd || cwdOverride || env.workspaceDir;
 
-    const manager = info
-      ? SessionManager.open(info.path, env.sessionsRoot, cwd)
+    const manager = record?.sourcePath
+      ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
     const model =
@@ -90,7 +90,7 @@ export class SessionPool {
 
     const { session } = await createAgentSession({
       cwd,
-      agentDir: env.agentDir,
+      agentDir: env.piDir,
       modelRuntime: this.runtime.requireRuntime(),
       ...(model ? { model } : {}),
       thinkingLevel,
