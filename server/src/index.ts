@@ -62,7 +62,7 @@ app.notFound((c) => {
 app.onError((error, c) => {
   if (error instanceof AppError) {
     return c.json(
-      fail(error.code, error.message, error.details),
+      fail(error.code, error.message, error.details, error.params),
       error.status as ContentfulStatusCode,
     );
   }

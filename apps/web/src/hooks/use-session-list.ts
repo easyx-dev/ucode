@@ -1,5 +1,6 @@
 /** 会话列表：服务端数据与本地草稿会话的合并、刷新与乐观更新 */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { api, describeError } from "@/lib/api";
@@ -17,24 +18,28 @@ export type SessionListController = {
 };
 
 export function useSessionList(): SessionListController {
+  const { t } = useTranslation();
   const [server, setServer] = useState<SessionSummary[]>([]);
   const [local, setLocal] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async (query?: string) => {
-    setLoading(true);
-    try {
-      const data = await api.sessions.list({ q: query, limit: 200 });
-      const ids = new Set(data.sessions.map((item) => item.id));
-      setServer(data.sessions);
-      // 已落盘的草稿会话交给服务端数据
-      setLocal((prev) => prev.filter((item) => !ids.has(item.id)));
-    } catch (error) {
-      toast.error(`会话列表加载失败：${describeError(error)}`);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refresh = useCallback(
+    async (query?: string) => {
+      setLoading(true);
+      try {
+        const data = await api.sessions.list({ q: query, limit: 200 });
+        const ids = new Set(data.sessions.map((item) => item.id));
+        setServer(data.sessions);
+        // 已落盘的草稿会话交给服务端数据
+        setLocal((prev) => prev.filter((item) => !ids.has(item.id)));
+      } catch (error) {
+        toast.error(t("失败提示", { label: t("会话列表加载失败"), reason: describeError(error) }));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     void refresh();

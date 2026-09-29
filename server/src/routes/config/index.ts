@@ -24,6 +24,8 @@ const testConnection = async (
       ERROR_CODES.unsupportedApi,
       `连通性测试目前只支持 openai-completions，当前为 ${input.api}`,
       400,
+      undefined,
+      { api: input.api },
     );
   }
 
@@ -59,7 +61,9 @@ const testConnection = async (
       signal: AbortSignal.timeout(20_000),
     });
   } catch (error) {
-    throw new AppError(ERROR_CODES.upstreamUnreachable, `无法连接 ${url}`, 400, String(error));
+    throw new AppError(ERROR_CODES.upstreamUnreachable, `无法连接 ${url}`, 400, String(error), {
+      url,
+    });
   }
 
   const text = await response.text();
@@ -69,6 +73,7 @@ const testConnection = async (
       `上游返回 HTTP ${response.status}`,
       400,
       text.slice(0, 800),
+      { status: String(response.status) },
     );
   }
 

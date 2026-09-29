@@ -23,5 +23,8 @@ export type Brand = typeof brand;
 /** 主题存储键：首屏内联脚本与运行时 ThemeProvider 必须一致，由 slug 派生避免重名 */
 export const themeStorageKey = `${brand.slug}-theme`;
 
+/** 语言存储键：与主题同理，首屏内联脚本（设 `<html lang>`）与运行时切换共用 */
+export const localeStorageKey = `${brand.slug}-locale`;
+
 /** 应用主目录名：默认落在用户主目录下（`~/<appHomeDirname>`），随品牌 slug 变化 */
 export const appHomeDirname = `.${brand.slug}`;

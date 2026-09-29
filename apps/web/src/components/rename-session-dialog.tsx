@@ -1,5 +1,6 @@
 /** 重命名会话对话框 */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ type RenameSessionDialogProps = {
 };
 
 export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSessionDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSe
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>重命名会话</DialogTitle>
+          <DialogTitle>{t("重命名会话")}</DialogTitle>
         </DialogHeader>
         <Input
           autoFocus
@@ -48,10 +50,10 @@ export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSe
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
+            {t("取消")}
           </Button>
           <Button disabled={!name.trim()} onClick={submit}>
-            保存
+            {t("保存")}
           </Button>
         </DialogFooter>
       </DialogContent>

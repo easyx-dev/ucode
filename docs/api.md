@@ -22,11 +22,13 @@
 // 成功
 { success: true,  code: "ok", message: "",    data: <业务数据> }
 // 失败
-{ success: false, code: "<错误码>", message: "<面向用户的文案>", data: <错误详情或 null> }
+{ success: false, code: "<错误码>", message: "<中文兜底文案>", data: <错误详情或 null>, params?: { … } }
 ```
 
-- 前端按 `code` 分支，不依赖 HTTP 状态
+- 客户端按 `code` 分支，不依赖 HTTP 状态
 - 错误详情（校验 issues、上游响应片段等）放 `data`
+- **服务端不做本地化**：`message` 是固定中文，供日志、`curl` 与未登记错误码兜底；
+  客户端用 `code` 查 `@ucode/i18n` 的 `errorMessageKeys` 渲染当前语言，`params` 是渲染所需的插值值
 - 由 `lib/response` 的 `ok()` / `fail()` 生产，禁止各处手写封套
 
 ## 错误码与 HTTP 状态
@@ -72,6 +74,21 @@
 - **响应**里资源自身的 id 用 `id`（如 `SessionSummary.id`、`MessageDTO.id`）
 - 布尔字段用肯定语义，不加 `is` 前缀之外的装饰：`running`、`configured`、`deleted`、`admitted`
 - 列表字段用资源的复数名，而不是 `items`：`sessions`、`messages`、`providers`
+
+## 语言与本地化
+
+- **服务端不做本地化**：封套的 `message`、`RuntimeStatus.error`、SSE 错误帧的 `message` 都是固定中文，
+  只作为日志 / `curl` 可读性与未登记错误码的兜底。
+- **客户端按 `code` 渲染**：`@ucode/i18n` 的 `errorMessageKeys` 把每个 `ERROR_CODES` 映射到一个文案 key，
+  客户端用 `t(key, params)` 得到当前语言；映射不到时直接用 `message`。插值所需的 `url` / `status` /
+  `ref` / `path` / `api` 走封套与错误帧的 `params`。
+- 前端仍以 `code` 分支决定行为。
+- 文案目录：`@ucode/i18n` 的 `common`（协议级）、`domain`（错误码文案）、`ui`（产品界面词汇，各端共用）
+  都在 `packages/i18n/src/locales/`；各端补充文案走 `createI18n` 的 `appCatalogs`。
+  key 用中文原文（长文案用中文摘要 key），同组中英 key 必须齐平、组间不得重名，
+  `pnpm check` 的 i18n 校验会拦下漂移、重名、错误码映射缺失与（web 侧的）硬编码中文。
+- i18n 运行时（house 配置 `createI18n`、目录合并）在 `@ucode/i18n`，只依赖 `i18next`，
+  供 web / 未来的 TUI、Electron 复用；各端自持存储（localStorage / 配置）。
 
 ## 通用参数
 

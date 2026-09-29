@@ -1,6 +1,7 @@
 /** 输入区：白卡容器，顶部上下文行 + 无边框输入 + 底部工具栏（模型 / 思考档位 / 发送） */
 import { ArrowUp, FolderOpen, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ModelPicker } from "@/components/model-picker";
 import { ThinkingPicker } from "@/components/thinking-picker";
@@ -38,6 +39,7 @@ export function Composer({
   onSelectModel,
   onSelectThinkingLevel,
 }: ComposerProps) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -105,7 +107,7 @@ export function Composer({
               }
             }}
             rows={1}
-            placeholder={disabled ? "先新建一个会话" : "输入消息，Enter 发送，Shift+Enter 换行"}
+            placeholder={disabled ? t("先新建一个会话") : t("输入消息占位")}
             className="max-h-[220px] min-h-11 w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           />
 
@@ -127,7 +129,7 @@ export function Composer({
               />
 
               {streaming ? (
-                <Button size="icon" variant="outline" onClick={onStop} title="停止生成">
+                <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
                   <Square className="size-3.5" />
                 </Button>
               ) : (
@@ -135,7 +137,7 @@ export function Composer({
                   size="icon"
                   onClick={submit}
                   disabled={disabled || value.trim().length === 0}
-                  title="发送"
+                  title={t("发送")}
                 >
                   <ArrowUp className="size-4" />
                 </Button>

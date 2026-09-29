@@ -191,6 +191,7 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 失败为 `{ "success": false, "code": "invalid_request", "message": "...", "data": <详情> }`（HTTP 状态仍保留语义，如 400 / 404 / 409）。
 除 `GET /api/v1/health` 外，所有接口都是 `POST` + JSON body，参数一律放在 body、不出现在路径里。
 请求校验与响应结构定义在 `@ucode/contracts`（`packages/contracts/`），web 直接引用同一份类型。
+失败响应带 `code` + 中文兜底 `message` + 插值 `params`，客户端按 `code` 渲染当前语言（见 `docs/api.md`「语言与本地化」）。
 
 | 方法 | 路径 | body | 说明 |
 | --- | --- | --- | --- |
@@ -272,11 +273,12 @@ docs/
   database.md              # 数据库规范
   api.md                   # 接口与字段规范
   components.md            # 组件规范
-scripts/verify/            # 约定校验（migrations / contracts / tokens / brand），由 pnpm check 调用
+scripts/verify/            # 约定校验（migrations / contracts / tokens / brand / i18n），由 pnpm check 调用
 packages/contracts/
   src/
     envelope.ts            # { success, code, message, data } 封套与错误码
     constants.ts           # API_VERSION / API_TYPES / THINKING_LEVELS / MESSAGE_ROLES
+    locale.ts              # LOCALES / Locale / DEFAULT_LOCALE / isLocale
     common.ts              # emptyInputSchema、ListResult、SessionScoped
     runtime.ts             # RuntimeStatus
     events.ts              # 事件名与帧结构
@@ -288,13 +290,20 @@ packages/brand/
   assets/                  # logo-light.svg / logo-dark.svg / favicon.svg
   scripts/verify.ts        # 品牌校验（品牌值 / 图片引用 / 硬编码品牌名）
   scripts/replace.ts       # 应急：批量替换残留的旧品牌串
+packages/i18n/             # 跨端 i18n 运行时与共享文案（只依赖 i18next）
+  src/index.ts             # createI18n / 共享目录，不导出全局单例
+  src/config.ts            # house i18next 配置（key 即文案，无 key / ns 分隔符）
+  src/error-messages.ts    # ERROR_CODES → 文案 key（客户端按 code 渲染错误）
+  src/locales/common/      # 协议级通用文案（中英）
+  src/locales/domain/      # 错误码文案（中英）
+  src/locales/ui/          # 产品界面文案（web / Electron / TUI 共用，中英）
 server/src/
   env.ts                   # APP_HOME 派生 pi/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
   constants.ts             # 默认值与固定目录名
   utils/                   # 纯函数工具（time / object）
   lib/                     # 服务端基建
-    response/              # 统一封套 + AppError
+    response/              # 统一封套 + AppError（message 为中文兜底，params 给客户端插值）
     validate/              # jsonBody 中间件
     logger/                # pino 实例 + 请求日志
   config/store.ts          # config.json 读写、apiKey 脱敏
@@ -316,6 +325,7 @@ server/src/
   scripts/smoke.ts         # 不经 HTTP 的 SDK 冒烟测试
 apps/web/src/
   lib/                     # 接口封装、契约类型出口、SSE 与事件流、消息归并、纯函数
+    i18n.ts                # i18next 接线与语言切换（文案在 @ucode/i18n）
   hooks/                   # 数据获取与订阅（use-chat / use-session-list / use-models …）
   components/
     ui/                    # 基础组件（shadcn 生成后归我们维护）

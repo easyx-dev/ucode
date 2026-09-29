@@ -1,5 +1,6 @@
 /** 一个 provider 的配置卡片：内置供应商只需填 key，自定义供应商才编辑端点与模型 */
 import { Loader2, Trash2, Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ProviderFields } from "@/components/settings/provider-fields";
 import { ProviderModels } from "@/components/settings/provider-models";
@@ -23,6 +24,7 @@ type ProviderCardProps = {
 
 /** 内置供应商：端点与模型清单来自 pi 内置目录，这里只需要一把 key */
 function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider" | "onPatch">) {
+  const { t } = useTranslation();
   // 配置里给出了 models 即为整体替换，此后不再跟随内置目录更新
   const customized = provider.models.length > 0;
 
@@ -38,7 +40,7 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider"
       {customized ? (
         <div className="flex items-center gap-2">
           <p className="text-[11px] text-muted-foreground">
-            模型清单已被自定义（{provider.models.length} 个），不再随 pi 升级更新。
+            {t("模型清单.自定义", { n: provider.models.length })}
           </p>
           <Button
             variant="ghost"
@@ -46,12 +48,12 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider"
             className="h-6 shrink-0 px-2 text-[11px]"
             onClick={() => onPatch({ models: [] })}
           >
-            恢复默认
+            {t("恢复默认")}
           </Button>
         </div>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          端点与 {provider.inheritedModels.length} 个模型来自 pi 内置目录，随 pi 升级自动更新。
+          {t("模型清单.继承", { n: provider.inheritedModels.length })}
         </p>
       )}
     </div>
@@ -68,21 +70,24 @@ export function ProviderCard({
   onRemove,
   onTest,
 }: ProviderCardProps) {
+  const { t } = useTranslation();
   const builtin = provider.source === "builtin";
 
   return (
     <div className="space-y-3 rounded-xl p-3 ring-1 ring-foreground/10">
       <div className="flex items-center gap-2">
-        <Badge variant="outline">{builtin ? "内置" : "自定义"}</Badge>
+        <Badge variant="outline">{builtin ? t("内置") : t("自定义")}</Badge>
         <span className="text-sm font-medium">{provider.name || provider.id}</span>
         <span className="text-xs text-muted-foreground">
-          {provider.apiKeyMasked ? `已保存 key ${provider.apiKeyMasked}` : "未保存 key"}
+          {provider.apiKeyMasked
+            ? t("已保存key", { masked: provider.apiKeyMasked })
+            : t("未保存 key")}
         </span>
         <Button variant="ghost" size="sm" className="ml-auto" onClick={onTest} disabled={testing}>
           {testing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
-          测试连接
+          {t("测试连接")}
         </Button>
-        <Button variant="ghost" size="icon-sm" onClick={onRemove} title="删除 provider">
+        <Button variant="ghost" size="icon-sm" onClick={onRemove} title={t("删除 provider")}>
           <Trash2 className="size-4 text-destructive" />
         </Button>
       </div>

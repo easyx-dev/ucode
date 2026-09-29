@@ -37,7 +37,7 @@ const runtimeDefaults = (
 
 const assertModel = (services: Services, ref: string): void => {
   if (!services.runtime.resolveModelRef(ref)) {
-    throw new AppError(ERROR_CODES.unknownModel, `模型不可用：${ref}`, 400);
+    throw new AppError(ERROR_CODES.unknownModel, `模型不可用：${ref}`, 400, undefined, { ref });
   }
 };
 

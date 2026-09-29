@@ -6,6 +6,7 @@ export * from "./constants";
 export * from "./envelope";
 export * from "./events";
 export * from "./health/output";
+export * from "./locale";
 export * from "./messages/input";
 export * from "./messages/output";
 export * from "./models/output";

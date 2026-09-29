@@ -1,7 +1,9 @@
 /** 模型选择器：弹出层里按 provider 分组，顶部可搜索，条目带上下文说明 */
+import type { TFunction } from "i18next";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogModel, CatalogProvider } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -15,15 +17,16 @@ type ModelPickerProps = {
 };
 
 /** 条目说明：上下文与输出上限、是否支持思考，用于区分同名模型 */
-const describeModel = (model: CatalogModel): string => {
+const describeModel = (model: CatalogModel, t: TFunction): string => {
   const parts: string[] = [];
-  if (model.contextWindow) parts.push(`${model.contextWindow} 上下文`);
-  if (model.maxTokens) parts.push(`${model.maxTokens} 输出`);
-  if (model.reasoning) parts.push("思考");
+  if (model.contextWindow) parts.push(t("上下文", { n: model.contextWindow }));
+  if (model.maxTokens) parts.push(t("输出", { n: model.maxTokens }));
+  if (model.reasoning) parts.push(t("思考"));
   return parts.join(" · ");
 };
 
 export function ModelPicker({ providers, value, disabled, onSelect }: ModelPickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -60,9 +63,9 @@ export function ModelPicker({ providers, value, disabled, onSelect }: ModelPicke
             "outline-none transition-colors hover:bg-muted hover:text-foreground",
             "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
           )}
-          title="切换模型"
+          title={t("切换模型")}
         >
-          <span className="max-w-48 truncate">{value || "选择模型"}</span>
+          <span className="max-w-48 truncate">{value || t("选择模型")}</span>
           <ChevronDown className="size-3.5 shrink-0" />
         </button>
       </Popover.Trigger>
@@ -85,14 +88,16 @@ export function ModelPicker({ providers, value, disabled, onSelect }: ModelPicke
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索模型"
+              placeholder={t("搜索模型")}
               className="h-7 w-full rounded-md bg-transparent pr-2 pl-7 text-xs outline-none placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="max-h-72 overflow-y-auto p-1">
             {groups.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-muted-foreground">没有匹配的模型</p>
+              <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                {t("没有匹配的模型")}
+              </p>
             ) : null}
 
             {groups.map(({ provider, models }) => (
@@ -118,7 +123,7 @@ export function ModelPicker({ providers, value, disabled, onSelect }: ModelPicke
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">{model.name}</span>
                         <span className="block truncate text-xs text-muted-foreground">
-                          {describeModel(model)}
+                          {describeModel(model, t)}
                         </span>
                       </span>
                       {selected ? <Check className="size-3.5 shrink-0" /> : null}

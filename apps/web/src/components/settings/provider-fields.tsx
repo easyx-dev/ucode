@@ -1,4 +1,6 @@
 /** provider 的连接信息字段：id、名称、baseUrl、api 类型与 apiKey */
+import { useTranslation } from "react-i18next";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,6 +19,8 @@ type ProviderFieldsProps = {
 };
 
 export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
@@ -29,7 +33,7 @@ export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">名称</Label>
+        <Label className="text-xs">{t("名称")}</Label>
         <Input
           value={provider.name}
           onChange={(event) => onPatch({ name: event.target.value })}

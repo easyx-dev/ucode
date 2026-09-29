@@ -1,14 +1,12 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区 */
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ChatHeader } from "@/components/chat-header";
 import { Composer } from "@/components/composer";
 import { MessageList } from "@/components/message-list";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ModelsResponse, SessionSummary, ThinkingLevel } from "@/lib/types";
-
-/** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
-const SUGGESTIONS = ["了解这个项目", "排查构建报错", "补充单元测试", "重构这段代码"] as const;
 
 /** 只有「已选会话且历史加载完、没有任何消息」才展示起步建议 */
 const showSuggestions = (session: SessionSummary | null, chat: ChatController): boolean =>
@@ -36,8 +34,11 @@ export function ChatPanel({
   onSelectThinkingLevel,
   onOpenSettings,
 }: ChatPanelProps) {
+  const { t } = useTranslation();
   // 模型选择器只列已接入的供应商：目录里还有大量没配凭证的内置供应商，选了必然报错
   const providers = (models?.providers ?? []).filter((provider) => provider.available);
+  /** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
+  const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
   return (
     <main className="m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -61,7 +62,7 @@ export function ChatPanel({
         disabled={!session}
         onSend={(text) => void chat.send(text)}
         onStop={() => void chat.stop()}
-        suggestions={showSuggestions(session, chat) ? SUGGESTIONS : undefined}
+        suggestions={showSuggestions(session, chat) ? suggestions : undefined}
         cwd={session?.cwd}
         providers={providers}
         model={session?.model ?? models?.defaultModel ?? ""}

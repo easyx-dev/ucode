@@ -25,7 +25,12 @@ const waitForBusy = async (
 const report = (services: Services, sessionId: string, error: unknown): void => {
   const code = error instanceof AppError ? error.code : ERROR_CODES.internal;
   const message = error instanceof Error ? error.message : String(error);
-  services.events.emitError(sessionId, code, message);
+  services.events.emitError(
+    sessionId,
+    code,
+    message,
+    error instanceof AppError ? error.params : undefined,
+  );
 };
 
 /**

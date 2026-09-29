@@ -1,4 +1,6 @@
 /** 全局默认值：默认模型与 thinking 档位，按「设置行」排布 */
+import { useTranslation } from "react-i18next";
+
 import { SettingsGroup, SettingsRow } from "@/components/settings/settings-row";
 import {
   Select,
@@ -8,17 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { THINKING_LEVELS, type ThinkingLevel } from "@/lib/types";
-
-/** 与 ThinkingPicker 保持同一套中文档位名 */
-const THINKING_LABELS: Record<ThinkingLevel, string> = {
-  off: "关闭",
-  minimal: "极少",
-  low: "低",
-  medium: "中",
-  high: "高",
-  xhigh: "极高",
-  max: "最高",
-};
 
 type SettingsDefaultsProps = {
   options: Array<{ value: string; label: string }>;
@@ -35,18 +26,31 @@ export function SettingsDefaults({
   onSelectDefaultModel,
   onSelectThinkingLevel,
 }: SettingsDefaultsProps) {
+  const { t } = useTranslation();
+
+  /** 与 ThinkingPicker 保持同一套中文档位名 */
+  const labels: Record<ThinkingLevel, string> = {
+    off: t("关闭"),
+    minimal: t("极少"),
+    low: t("低"),
+    medium: t("中"),
+    high: t("高"),
+    xhigh: t("极高"),
+    max: t("最高"),
+  };
+
   return (
     <SettingsGroup>
       <SettingsRow
-        title="默认模型"
-        description="新建会话时使用的模型；会话内可以单独覆盖。"
+        title={t("默认模型")}
+        description={t("默认模型.说明")}
         control={
           <Select
             value={options.some((option) => option.value === defaultModel) ? defaultModel : ""}
             onValueChange={onSelectDefaultModel}
           >
             <SelectTrigger className="w-56">
-              <SelectValue placeholder="选择默认模型" />
+              <SelectValue placeholder={t("选择默认模型")} />
             </SelectTrigger>
             <SelectContent>
               {options.map((option) => (
@@ -60,8 +64,8 @@ export function SettingsDefaults({
       />
 
       <SettingsRow
-        title="默认思考档位"
-        description="未单独设置档位的会话使用该值；模型本身需支持思考。"
+        title={t("默认思考档位")}
+        description={t("默认思考档位.说明")}
         control={
           <Select
             value={thinkingLevel}
@@ -73,7 +77,7 @@ export function SettingsDefaults({
             <SelectContent>
               {THINKING_LEVELS.map((level) => (
                 <SelectItem key={level} value={level}>
-                  {THINKING_LABELS[level]}
+                  {labels[level]}
                 </SelectItem>
               ))}
             </SelectContent>

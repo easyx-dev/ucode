@@ -1,6 +1,7 @@
 /** pi 内置供应商目录：搜索并选中一个，即加入一条待填 key 的配置 */
 import { ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -15,6 +16,7 @@ type ProviderCatalogProps = {
 };
 
 export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCatalogProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -38,8 +40,10 @@ export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCata
             className={`size-4 transition-transform ${open ? "rotate-90" : ""}`}
             aria-hidden
           />
-          接入内置供应商
-          <span className="ml-auto text-xs text-muted-foreground">{builtins.length} 个可选</span>
+          {t("接入内置供应商")}
+          <span className="ml-auto text-xs text-muted-foreground">
+            {t("可选数量", { n: builtins.length })}
+          </span>
         </Button>
       </CollapsibleTrigger>
 
@@ -53,13 +57,13 @@ export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCata
             className="pl-8"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索供应商，如 deepseek"
+            placeholder={t("搜索供应商，如 deepseek")}
           />
         </div>
 
         {builtins.length === 0 ? (
           <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
-            没有匹配的供应商。
+            {t("没有匹配的供应商。")}
           </p>
         ) : null}
 
@@ -77,11 +81,11 @@ export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCata
                 <span className="flex w-full items-center gap-1.5 text-sm">
                   {item.name}
                   {configured ? (
-                    <span className="ml-auto text-[11px] text-muted-foreground">已加入</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground">{t("已加入")}</span>
                   ) : null}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {configured ? `${item.models.length} 个模型` : item.authName || item.id}
+                  {configured ? t("模型数量", { n: item.models.length }) : item.authName || item.id}
                 </span>
               </button>
             );

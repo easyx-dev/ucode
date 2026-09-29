@@ -1,5 +1,6 @@
 /** 空态：未配置模型 / 还没有会话 / 已选会话但没有消息 */
 import { brand } from "@ucode/brand";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { abbreviateHome } from "@/lib/path";
@@ -16,14 +17,6 @@ type WelcomePanelProps = {
   onOpenSettings: () => void;
 };
 
-/** 按当前时段问候；空对话是唯一用到「大标题 + 水印」的场合 */
-const greeting = (hour: number = new Date().getHours()): string => {
-  if (hour < 6) return "夜深了，接下来交给我吧";
-  if (hour < 12) return "早上好，接下来交给我吧";
-  if (hour < 18) return "下午好，接下来交给我吧";
-  return "晚上好，接下来交给我吧";
-};
-
 export function WelcomePanel({
   configured,
   defaultModel,
@@ -32,14 +25,23 @@ export function WelcomePanel({
   onCreate,
   onOpenSettings,
 }: WelcomePanelProps) {
+  const { t } = useTranslation();
+
+  /** 按当前时段问候；空对话是唯一用到「大标题 + 水印」的场合 */
+  const greeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 6) return t("夜深了，接下来交给我吧");
+    if (hour < 12) return t("早上好，接下来交给我吧");
+    if (hour < 18) return t("下午好，接下来交给我吧");
+    return t("晚上好，接下来交给我吧");
+  };
+
   if (!configured) {
     return (
       <section className="flex flex-col items-center gap-3 py-12 text-center">
-        <h2 className="text-xl font-semibold">还没有配置模型</h2>
-        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-          填入一个 OpenAI 兼容端点（baseUrl / apiKey / 模型 id）后即可开始对话。
-        </p>
-        <Button onClick={onOpenSettings}>打开设置</Button>
+        <h2 className="text-xl font-semibold">{t("还没有配置模型")}</h2>
+        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{t("未配置.说明")}</p>
+        <Button onClick={onOpenSettings}>{t("打开设置")}</Button>
       </section>
     );
   }
@@ -47,19 +49,19 @@ export function WelcomePanel({
   if (!hasSessions) {
     return (
       <section className="flex flex-col items-center gap-3 py-12 text-center">
-        <h2 className="text-xl font-semibold">开始第一个会话</h2>
+        <h2 className="text-xl font-semibold">{t("开始第一个会话")}</h2>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-          模型已就绪：{defaultModel ?? "-"}。会话里的 agent 可以读写
+          {t("就绪.说明", { model: defaultModel ?? "-" })}
           {workspace ? (
             <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
               {abbreviateHome(workspace)}
             </code>
           ) : (
-            "工作目录"
+            t("工作目录")
           )}
-          下的文件并执行命令。
+          {t("就绪.说明.后缀")}
         </p>
-        <Button onClick={onCreate}>新建会话</Button>
+        <Button onClick={onCreate}>{t("新建会话")}</Button>
       </section>
     );
   }

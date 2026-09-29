@@ -1,5 +1,6 @@
 /** 模型设置的两个动作：提交配置、测试 provider 连通性 */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { ConfigDraft } from "@/hooks/use-config-draft";
 import { api, describeError } from "@/lib/api";
@@ -15,11 +16,12 @@ export type ConfigSave = {
 };
 
 export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSave {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [testingKey, setTestingKey] = useState<string | null>(null);
 
   const save = async (): Promise<boolean> => {
-    const invalid = validateDrafts(draft.providers);
+    const invalid = validateDrafts(draft.providers, t);
     if (invalid) {
       toast.error(invalid);
       return false;
@@ -30,11 +32,11 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
       await api.config.update(
         toUpdatePayload(draft.providers, draft.defaultModel || null, draft.thinkingLevel),
       );
-      toast.success("配置已保存");
+      toast.success(t("配置已保存"));
       onSaved();
       return true;
     } catch (error) {
-      toast.error(`保存失败：${describeError(error)}`);
+      toast.error(t("失败提示", { label: t("保存失败"), reason: describeError(error) }));
       return false;
     } finally {
       setSaving(false);
@@ -46,7 +48,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
     // 自定义供应商以表单值为准（resolvedBaseUrl 是加载时的快照），内置供应商回落到目录端点
     const baseUrl = provider.baseUrl.trim() || provider.resolvedBaseUrl.trim();
     if (!baseUrl || !model) {
-      toast.error("先填写 baseUrl 和至少一个模型 id");
+      toast.error(t("先填写供应商信息"));
       return;
     }
 
@@ -59,9 +61,9 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
         api: provider.api,
         model,
       });
-      toast.success(`连接成功 · ${result.latencyMs}ms · ${result.modelEcho ?? "-"}`);
+      toast.success(t("连接成功", { latency: result.latencyMs, model: result.modelEcho ?? "-" }));
     } catch (error) {
-      toast.error(`连接失败：${describeError(error)}`);
+      toast.error(t("失败提示", { label: t("连接失败"), reason: describeError(error) }));
     } finally {
       setTestingKey(null);
     }

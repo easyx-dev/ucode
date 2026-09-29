@@ -1,4 +1,6 @@
 /** 模型设置对话框的草稿数据，以及「草稿 ↔ 配置接口」的双向转换 */
+
+import type { TFunction } from "i18next";
 import type {
   ApiType,
   CatalogProvider,
@@ -150,13 +152,13 @@ export const toDraftProvider = (
 });
 
 /** 保存前校验：自定义 provider 要有端点与模型，且每个模型都要有 id */
-export const validateDrafts = (drafts: DraftProvider[]): string | null => {
+export const validateDrafts = (drafts: DraftProvider[], t: TFunction): string | null => {
   for (const provider of drafts) {
-    const label = provider.name || provider.id || "(未命名)";
+    const label = provider.name || provider.id || t("(未命名)");
     if (provider.source === "builtin") continue;
-    if (!provider.baseUrl.trim()) return `${label} 缺少 baseUrl`;
-    if (provider.models.length === 0) return `${label} 至少要有一个模型`;
-    if (provider.models.some((model) => !model.id.trim())) return `${label} 里有模型没填 id`;
+    if (!provider.baseUrl.trim()) return t("校验.缺baseUrl", { label });
+    if (provider.models.length === 0) return t("校验.缺模型", { label });
+    if (provider.models.some((model) => !model.id.trim())) return t("校验.缺模型id", { label });
   }
   return null;
 };

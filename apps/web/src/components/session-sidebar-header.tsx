@@ -1,6 +1,7 @@
 /** 侧栏头部：品牌标识、新建会话入口与搜索框 */
 import { brand } from "@ucode/brand";
 import { MessageSquarePlus, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ export function SessionSidebarHeader({
   onQueryChange,
   onCreate,
 }: SessionSidebarHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="flex items-center gap-2 px-3 py-3">
@@ -31,10 +34,10 @@ export function SessionSidebarHeader({
           className="ml-auto"
           onClick={onCreate}
           disabled={!canCreate}
-          title="新建会话"
+          title={t("新建会话")}
         >
           <MessageSquarePlus className="size-4" />
-          新建
+          {t("新建")}
         </Button>
       </div>
 
@@ -43,7 +46,7 @@ export function SessionSidebarHeader({
         <Input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="搜索会话"
+          placeholder={t("搜索会话")}
           className="h-8 pl-7 text-xs"
         />
       </div>

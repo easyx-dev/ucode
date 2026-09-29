@@ -1,10 +1,18 @@
-/** 会话列表用的相对时间标签（基于 dayjs，中文 locale） */
+/** 会话列表用的相对时间标签（基于 dayjs），展示语言跟随界面语言 */
+import type { Locale } from "@ucode/contracts";
 import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/en";
 import "dayjs/locale/zh-cn";
+import relativeTime from "dayjs/plugin/relativeTime";
 
 dayjs.extend(relativeTime);
-dayjs.locale("zh-cn");
+
+/** 把 dayjs 的展示语言切到界面语言；locale 码用 dayjs 的小写写法 */
+export const setDayjsLocale = (locale: Locale): void => {
+  dayjs.locale(locale === "en" ? "en" : "zh-cn");
+};
+
+setDayjsLocale("zh-CN");
 
 /**
  * 距离现在的粗粒度描述，如「几秒前」「55 分钟前」「1 天前」。

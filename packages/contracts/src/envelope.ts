@@ -13,12 +13,17 @@ export type ApiSuccess<T> = {
 export type ApiFailure = {
   /** 业务成功标记，失败恒为 false */
   success: false;
-  /** 业务错误码，前端按此分支而不依赖 HTTP 状态 */
+  /** 业务错误码，客户端按此分支而不依赖 HTTP 状态 */
   code: string;
-  /** 面向用户的错误文案 */
+  /**
+   * 面向用户的中文兜底文案（服务端不本地化）。
+   * 客户端按 `code` 查 `@ucode/i18n` 的 errorMessageKeys 自行渲染；查不到时用它。
+   */
   message: string;
   /** 错误详情（校验 issues、上游响应片段等），无详情时为 null */
   data: unknown;
+  /** 渲染 `message` 所需的插值值（如 url / status / ref），由客户端按 code 的文案使用 */
+  params?: Record<string, string>;
 };
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
@@ -57,3 +62,5 @@ export const ERROR_CODES = {
   /** 配置文件解析失败 */
   invalidConfig: "invalid_config",
 } as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

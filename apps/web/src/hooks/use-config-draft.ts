@@ -1,5 +1,6 @@
 /** 模型设置的草稿状态：读取当前配置与 pi 供应商目录，组合 provider 级与模型级编辑 */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { useConfigModels } from "@/hooks/use-config-models";
@@ -16,6 +17,7 @@ import type { CatalogProvider, ThinkingLevel } from "@/lib/types";
 export type ConfigDraft = ReturnType<typeof useConfigDraft>;
 
 export function useConfigDraft(open: boolean) {
+  const { t } = useTranslation();
   const [providers, setProviders] = useState<DraftProvider[]>([]);
   const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
@@ -40,15 +42,24 @@ export function useConfigDraft(open: boolean) {
       setDefaultModel(config.defaultModel ?? "");
       setThinkingLevel(config.thinkingLevel);
     } catch (error) {
-      toast.error(`配置加载失败：${describeError(error)}`);
+      toast.error(t("失败提示", { label: t("配置加载失败"), reason: describeError(error) }));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
+
+  /**
+   * 语言切换只该换文案：`load` 的依赖含 `t`，若让 effect 直接依赖它，切语言会重跑 `load`，
+   * 用服务端配置覆盖对话框里未保存的草稿。改成只在 `open` 变化时触发，`load` 走 ref。
+   */
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
-    if (open) void load();
-  }, [load, open]);
+    if (open) void loadRef.current();
+  }, [open]);
 
   const patchProvider = useCallback(
     (key: string, patch: Partial<DraftProvider>) => {

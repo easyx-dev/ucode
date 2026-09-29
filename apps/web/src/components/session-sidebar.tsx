@@ -1,6 +1,7 @@
 /** 会话侧栏：装配头部、列表与设置入口 */
 import { Settings2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { RenameSessionDialog } from "@/components/rename-session-dialog";
 import { SessionList } from "@/components/session-list";
@@ -33,6 +34,7 @@ export function SessionSidebar({
   onDelete,
   onOpenSettings,
 }: SessionSidebarProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
   const filtered = useSessionFilter(sessions, query);
@@ -51,16 +53,18 @@ export function SessionSidebar({
         activeId={activeId}
         loading={loading}
         onSelect={onSelect}
-        onRename={(session) => setRenaming({ sessionId: session.id, name: sessionTitle(session) })}
+        onRename={(session) =>
+          setRenaming({ sessionId: session.id, name: sessionTitle(session, t("新会话")) })
+        }
         onDelete={(session) => {
-          if (confirmDeleteSession(session)) onDelete(session.id);
+          if (confirmDeleteSession(session, t)) onDelete(session.id);
         }}
       />
 
       <div className="border-t p-2">
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onOpenSettings}>
           <Settings2 className="size-4" />
-          设置
+          {t("设置")}
         </Button>
       </div>
 

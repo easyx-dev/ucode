@@ -19,6 +19,9 @@
 ## 语言规范
 
 - 代码注释、文档、页面显示文字、git commit 信息，均使用简体中文。
+- 界面文案走 i18n：key 用中文原文（长文案用中文摘要 key），中英两份目录的 key 必须齐平；
+  新文案一律 `t("…")`，硬编码中文由 `pnpm check` 的 i18n 校验拦下（见 `docs/api.md`「语言与本地化」）。
+  错误文案由客户端按 `ERROR_CODES` 渲染，服务端只出中文兜底与插值。
 - 注释只写代码无法表达的信息（意图、业务规则、约束、反直觉实现的理由）；函数体内的注释严禁复述代码本身——不写标识符名的中文翻译，不复述显而易见的赋值/渲染/流程，只保留无法从代码读出的信息（为什么这么写、边界、副作用）。
 - TS 类型从宽：`interface` / `type` / `Props` 的字段注释逐字段写即可，与字段名同义、略显冗余都可以接受，不必纠结「算不算复述」；要保证的是内容为业务口径而非错误含义。
 - 文件级注释：概述文件或模块职责，位于文件第一行（import 之前），不要复述文件名；职责与路径同名的文件可不加。
@@ -83,7 +86,7 @@
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值、i18n 目录齐平/错误码映射/禁止硬编码中文），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令
@@ -91,7 +94,7 @@
 | 命令 | 作用 |
 | --- | --- |
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm verify` |
-| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand） |
+| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand / i18n） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
@@ -128,6 +131,14 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
   与 `assets/`（资源引用在 `src/assets.ts`，换格式改 import 扩展名即可）；默认数据目录名 `appHomeDirname`
   也由它派生（`~/.<slug>`），server 用包的 node 入口 `@ucode/brand/values` 取值。
   源码里禁止硬编码品牌名，`pnpm check` 的 brand 校验会拦下。
+- `packages/i18n/`（`@ucode/i18n`）是跨端 i18n 运行时与共享文案的单一事实源：house i18next 配置
+  （`createI18n`）、协议级通用文案（`common`）、错误码文案（`domain`）、产品界面文案
+  （`ui`，web / Electron / TUI 共用），以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射。
+  只依赖 `i18next`，不依赖 React / DOM（`react-i18next` 与 dayjs 留在 web）。各端如需补充自己的文案，
+  走 `createI18n` 的 `appCatalogs`，与共享目录扁平合并、组间不得重名；
+  `pnpm check` 的 i18n 校验会拦下漂移、重名、错误码映射缺失与硬编码中文。
+- 服务端**不做本地化**：失败封套与 SSE 错误帧只给 `code` + 固定中文兜底 `message` + 插值 `params`，
+  由客户端按 `code` 查表渲染（见 `docs/api.md`「语言与本地化」）。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
 - `$APP_HOME`（默认 `~/.ucode`）是 pi agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
   `pi/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。

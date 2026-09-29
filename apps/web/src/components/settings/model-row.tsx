@@ -1,5 +1,6 @@
 /** 模型设置里的一条模型：基础字段 + 输入类型 + 推理等级映射 */
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ModelThinkingLevels } from "@/components/settings/model-thinking-levels";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ type ModelRowProps = {
 };
 
 export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
+  const { t } = useTranslation();
+
   const toggleImage = (enabled: boolean) => {
     // 文本恒在，只有图片可增删
     onChange({ input: enabled ? ["text", "image"] : ["text"] });
@@ -23,7 +26,7 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
     <div className="space-y-2 rounded-lg p-2 ring-1 ring-foreground/10">
       <div className="grid items-end gap-2 sm:grid-cols-12">
         <div className="space-y-1.5 sm:col-span-3">
-          <Label className="text-[11px] text-muted-foreground">模型 id</Label>
+          <Label className="text-[11px] text-muted-foreground">{t("模型 id")}</Label>
           <Input
             value={model.id}
             onChange={(event) => onChange({ id: event.target.value })}
@@ -31,18 +34,18 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
           />
         </div>
         <div className="space-y-1.5 sm:col-span-3">
-          <Label className="text-[11px] text-muted-foreground">显示名</Label>
+          <Label className="text-[11px] text-muted-foreground">{t("显示名")}</Label>
           <Input value={model.name} onChange={(event) => onChange({ name: event.target.value })} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-[11px] text-muted-foreground">上下文窗口</Label>
+          <Label className="text-[11px] text-muted-foreground">{t("上下文窗口")}</Label>
           <Input
             value={model.contextWindow}
             onChange={(event) => onChange({ contextWindow: event.target.value })}
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-[11px] text-muted-foreground">最大输出</Label>
+          <Label className="text-[11px] text-muted-foreground">{t("最大输出")}</Label>
           <Input
             value={model.maxTokens}
             onChange={(event) => onChange({ maxTokens: event.target.value })}
@@ -55,14 +58,14 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
             checked={model.reasoning}
             onChange={(event) => onChange({ reasoning: event.target.checked })}
           />
-          思考
+          {t("思考")}
         </label>
         <Button
           variant="ghost"
           size="icon-sm"
           className="sm:col-span-1"
           onClick={onRemove}
-          title="删除模型"
+          title={t("删除模型")}
         >
           <Trash2 className="size-3.5 text-destructive" />
         </Button>
@@ -70,13 +73,13 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <fieldset className="flex items-center gap-3">
-          <legend className="sr-only">输入类型</legend>
+          <legend className="sr-only">{t("输入类型")}</legend>
           <span aria-hidden className="text-[11px] text-muted-foreground">
-            输入类型
+            {t("输入类型")}
           </span>
           <label className="flex items-center gap-1.5 text-xs">
             <input type="checkbox" className="size-3.5 accent-primary" defaultChecked disabled />
-            文本
+            {t("文本")}
           </label>
           <label className="flex items-center gap-1.5 text-xs">
             <input
@@ -85,7 +88,7 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
               checked={model.input.includes("image")}
               onChange={(event) => toggleImage(event.target.checked)}
             />
-            图片
+            {t("图片")}
           </label>
         </fieldset>
 

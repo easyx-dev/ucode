@@ -6,6 +6,25 @@
 
 ### 新增
 
+- 新增国际化（基于 i18next）：web 设置 → 外观新增「语言」切换（中文 / English，母语名展示），
+  偏好存 `localStorage`，首屏由 `index.html` 内联脚本同步 `<html lang>`，dayjs 的展示语言随之切换。
+- 新增 `packages/i18n`（`@ucode/i18n`）：跨端 i18n 运行时与共享文案的单一事实源，只依赖 `i18next`
+  （不依赖 React / DOM）。提供 house 配置 `createI18n`（`i18next.createInstance`，不导出全局单例）、
+  共享目录（`common` 协议级 / `domain` 错误码 / `ui` 产品界面词汇，web / Electron / TUI 共用）、
+  以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射；各端补充文案走 `appCatalogs`。
+- 服务端**不做本地化**：失败封套与 SSE 错误帧只给 `code` + 固定中文兜底 `message` + 插值 `params`；
+  客户端（`describeError` 与对话区错误条）按 `code` 查 `errorMessageKeys` 渲染当前语言，查不到时回落 `message`。
+  web 不再发送 `X-Locale`。
+- 新增 `packages/contracts/src/locale.ts`：`LOCALES` / `Locale` / `DEFAULT_LOCALE` / `isLocale`；
+  `ApiFailure` 与 SSE 错误帧新增可选 `params`，新增 `ErrorCode` 类型。
+- 文案分层：共享文案都在 `packages/i18n/src/locales/`（`common` / `domain` / `ui`）；
+  key 用中文原文（长文案用中文摘要 key + 完整值），插值用 `{{占位名}}`，运行时按语言扁平合并、组间不得重名。
+- 新增 i18n 校验（`scripts/verify/checks/i18n.ts`，作为第 5 项接入 `scripts/verify`）：每组中英 key 齐平、
+  组间无重复 key、`errorMessageKeys` 映射到的 key 必须在目录里、`apps/web/src` 与 `packages/i18n/src`
+  禁止硬编码中文（注释、`logger` / `console` 日志与 `i18n-ignore` 除外）。
+- `@ucode/brand` 新增 `localeStorageKey`（由 slug 派生）；`apps/web/plugins/brand-html.ts` 注入 `%BRAND_LOCALE_KEY%`。
+- 新增依赖 `i18next`（web / `@ucode/i18n`）与 `react-i18next`（web）；server 不引入 i18n 依赖。
+
 - 新增 pi 内置供应商目录：`models/list` 返回 pi `providers/all` 里可用一把 API key 接入的 32 个供应商
   （deepseek / minimax / zai / kimi-coding / xiaomi / qwen-token-plan / openai / anthropic / xai / openrouter …），
   以及它们完整的模型参数（`reasoning` / `thinkingLevelMap` / `contextWindow` / `maxTokens` / `cost` / `compat` 等）。
@@ -52,6 +71,7 @@
 
 ### 变更
 
+- 失败封套与 SSE 错误帧新增可选 `params`（错误文案的插值值）；前端仍按 `code` 分支。
 - `APP_HOME` 默认值由仓库内 `.tmp/.ucode` 改为用户主目录 `~/.ucode`；SQLite 数据库文件名由 `ucode.db` 改为通用名 `app.db`。
 - `sessions/list` / `sessions/info` 改为读 SQLite 索引，不再每次 `SessionManager.listAll()` 全量扫描解析 JSONL；
   列表的过滤与排序下推到 SQL。启动时 `reconcile()` 以 JSONL 为准对齐索引，每轮生成落定后回写一次。

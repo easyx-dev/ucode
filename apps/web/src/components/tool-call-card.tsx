@@ -1,4 +1,5 @@
 import { CheckCircle2, ChevronRight, CircleDashed, TriangleAlert, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ type ToolCallCardProps = {
 };
 
 export function ToolCallCard({ name, args, result, isError, running }: ToolCallCardProps) {
+  const { t } = useTranslation();
   const hasBody = args !== undefined || (result !== undefined && result !== "");
 
   return (
@@ -33,17 +35,17 @@ export function ToolCallCard({ name, args, result, isError, running }: ToolCallC
           {running ? (
             <>
               <CircleDashed className="size-3 animate-spin" />
-              执行中
+              {t("执行中")}
             </>
           ) : isError ? (
             <>
               <TriangleAlert className="size-3 text-destructive" />
-              失败
+              {t("失败")}
             </>
           ) : (
             <>
               <CheckCircle2 className="size-3" />
-              完成
+              {t("完成")}
             </>
           )}
         </span>

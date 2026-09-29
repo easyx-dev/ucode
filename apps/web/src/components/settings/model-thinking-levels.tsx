@@ -3,6 +3,7 @@
  * 行不存在 = 用厂商默认；行存在且填值 = 映射到该值；行存在但留空 = 该档不支持。
  */
 import { Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,23 +17,23 @@ import {
 import type { DraftModel } from "@/lib/config-draft";
 import { THINKING_LEVELS, type ThinkingLevel } from "@/lib/types";
 
-/** 档位的中文名，仅用于界面；写进配置的始终是 pi 的英文档位 */
-const LEVEL_LABELS: Record<ThinkingLevel, string> = {
-  off: "关闭",
-  minimal: "最低",
-  low: "低",
-  medium: "中",
-  high: "高",
-  xhigh: "很高",
-  max: "最高",
-};
-
 type ModelThinkingLevelsProps = {
   model: DraftModel;
   onChange: (patch: Partial<DraftModel>) => void;
 };
 
 export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProps) {
+  const { t } = useTranslation();
+  /** 档位的中文名，仅用于界面；写进配置的始终是 pi 的英文档位 */
+  const levelLabels: Record<ThinkingLevel, string> = {
+    off: t("关闭"),
+    minimal: t("最低"),
+    low: t("低"),
+    medium: t("中"),
+    high: t("高"),
+    xhigh: t("很高"),
+    max: t("最高"),
+  };
   const mapped = model.thinkingLevelMap;
   const rows = THINKING_LEVELS.filter((level) => level in mapped);
   const unused = THINKING_LEVELS.filter((level) => !(level in mapped));
@@ -62,7 +63,7 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
   return (
     <div className="w-full space-y-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">推理等级映射</span>
+        <span className="text-[11px] text-muted-foreground">{t("推理等级映射")}</span>
         <Button
           variant="ghost"
           size="sm"
@@ -71,14 +72,12 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
           disabled={unused.length === 0}
         >
           <Plus className="size-3" />
-          添加等级
+          {t("添加等级")}
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          未指定时按厂商默认处理，pi 的 7 档都能用。
-        </p>
+        <p className="text-[11px] text-muted-foreground">{t("推理等级.空态")}</p>
       ) : (
         <div className="space-y-1.5">
           {rows.map((level) => (
@@ -87,13 +86,13 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
                 value={level}
                 onValueChange={(value) => changeLevel(level, value as ThinkingLevel)}
               >
-                <SelectTrigger className="h-7 w-24 text-xs" aria-label="推理等级">
+                <SelectTrigger className="h-7 w-24 text-xs" aria-label={t("推理等级")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {[level, ...unused].map((option) => (
                     <SelectItem key={option} value={option}>
-                      {LEVEL_LABELS[option]}
+                      {levelLabels[option]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -102,8 +101,8 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
               <Input
                 className="h-7 flex-1 text-xs"
                 value={mapped[level] ?? ""}
-                placeholder="厂商取值；留空 = 该档不支持"
-                aria-label={`${LEVEL_LABELS[level]}档的厂商取值`}
+                placeholder={t("厂商取值")}
+                aria-label={t("厂商取值.aria", { level: levelLabels[level] })}
                 onChange={(event) => changeValue(level, event.target.value)}
               />
 
@@ -111,7 +110,7 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => removeRow(level)}
-                title="删除该档映射"
+                title={t("删除该档映射")}
               >
                 <Trash2 className="size-3.5 text-destructive" />
               </Button>

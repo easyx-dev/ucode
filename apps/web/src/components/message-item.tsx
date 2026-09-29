@@ -1,4 +1,5 @@
 import { Brain, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -8,12 +9,14 @@ import { clockLabel } from "@/lib/time";
 import type { ChatItem, MessageBlock } from "@/lib/types";
 
 function ThinkingBlock({ text }: { text: string }) {
+  const { t } = useTranslation();
+
   return (
     <Collapsible className="my-2">
       <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
         <ChevronRight className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
         <Brain className="size-3.5" />
-        思考过程
+        {t("思考过程")}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 border-l-2 border-muted pl-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -40,6 +43,7 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
 }
 
 export function MessageItem({ item }: { item: ChatItem }) {
+  const { t } = useTranslation();
   if (item.role === "user") {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
@@ -67,7 +71,7 @@ export function MessageItem({ item }: { item: ChatItem }) {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
       <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
-        {item.role === "summary" ? "（上下文已压缩）" : "（扩展消息）"} {text.slice(0, 400)}
+        {item.role === "summary" ? t("上下文已压缩") : t("扩展消息")} {text.slice(0, 400)}
       </div>
     );
   }
@@ -81,7 +85,7 @@ export function MessageItem({ item }: { item: ChatItem }) {
       {item.live && item.blocks.length === 0 ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="size-1.5 animate-pulse rounded-full bg-current" />
-          思考中…
+          {t("思考中…")}
         </div>
       ) : null}
       {!item.live && item.model ? (

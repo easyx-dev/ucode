@@ -36,6 +36,14 @@ export type ServerEventPayload = {
 /** 控制帧：连接建立与服务端错误，不承载会话事件 */
 export type ServerControlEvent =
   | { type: "server.connected" }
-  | { type: "error"; sessionId?: string; code: string; message: string };
+  | {
+      type: "error";
+      sessionId?: string;
+      code: string;
+      /** 中文兜底文案；客户端按 `code` 查 errorMessageKeys 渲染 */
+      message: string;
+      /** 渲染文案所需的插值值 */
+      params?: Record<string, string>;
+    };
 
 export type ServerEvent = ServerControlEvent | ServerEventPayload;

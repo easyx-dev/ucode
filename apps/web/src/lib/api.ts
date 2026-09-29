@@ -23,7 +23,9 @@ import {
   type SessionSummary,
   type SessionUpdateRequest,
 } from "@ucode/contracts";
+import { errorMessageKey } from "@ucode/i18n";
 
+import i18n from "./i18n";
 import { readSseStream } from "./sse";
 
 const BASE = API_BASE_PATH;
@@ -31,12 +33,15 @@ const BASE = API_BASE_PATH;
 export class ApiRequestError extends Error {
   readonly code: string;
   readonly details?: unknown;
+  /** 渲染该错误码文案所需的插值值 */
+  readonly params?: Record<string, string>;
 
-  constructor(code: string, message: string, details?: unknown) {
+  constructor(code: string, message: string, details?: unknown, params?: Record<string, string>) {
     super(message);
     this.name = "ApiRequestError";
     this.code = code;
     this.details = details;
+    this.params = params;
   }
 }
 
@@ -48,7 +53,7 @@ const unwrap = async <T>(response: Response): Promise<T> => {
   } catch {
     throw new ApiRequestError(
       "invalid_response",
-      `服务返回了非 JSON 响应（HTTP ${response.status}）`,
+      i18n.t("响应.非JSON", { status: response.status }),
     );
   }
 
@@ -57,8 +62,9 @@ const unwrap = async <T>(response: Response): Promise<T> => {
 
   throw new ApiRequestError(
     record?.code ?? "unknown_error",
-    record?.message ?? `请求失败（HTTP ${response.status}）`,
+    record?.message ?? i18n.t("请求失败", { status: response.status }),
     record?.data,
+    record?.params,
   );
 };
 
@@ -71,9 +77,21 @@ const post = async <T>(action: string, body: unknown = {}): Promise<T> => {
   return unwrap<T>(response);
 };
 
+/** 按错误码取当前语言的文案；未登记的错误码回落服务端下发的中文兜底 */
+export const describeApiError = (
+  code: string,
+  message: string,
+  params?: Record<string, string>,
+): string => {
+  const key = errorMessageKey(code);
+  return key ? i18n.t(key, params) : message;
+};
+
 /** 把接口异常转成可直接展示的文案 */
 export const describeError = (error: unknown): string =>
-  error instanceof ApiRequestError ? error.message : String(error);
+  error instanceof ApiRequestError
+    ? describeApiError(error.code, error.message, error.params)
+    : String(error);
 
 /** 读取失败响应体里的原因，拿不到就退回状态码 */
 const readErrorMessage = async (response: Response): Promise<string> => {
@@ -83,7 +101,7 @@ const readErrorMessage = async (response: Response): Promise<string> => {
   } catch {
     // 非 JSON，退回状态码
   }
-  return `事件流连接失败（HTTP ${response.status}）`;
+  return i18n.t("事件流失败", { status: response.status });
 };
 
 export const api = {
@@ -134,7 +152,7 @@ export const api = {
         throw new ApiRequestError("events_failed", await readErrorMessage(response));
       }
       if (!response.body) {
-        throw new ApiRequestError("events_failed", "服务未返回流");
+        throw new ApiRequestError("events_failed", i18n.t("服务未返回流"));
       }
 
       await readSseStream(

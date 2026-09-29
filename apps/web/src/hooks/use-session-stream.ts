@@ -1,7 +1,7 @@
 /** 会话消息流：打开会话时取快照（含在途投影），随后由全局事件流驱动 */
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, describeError } from "@/lib/api";
+import { api, describeApiError, describeError } from "@/lib/api";
 import { reduceEvent, settle } from "@/lib/chat-reducer";
 import { eventStream } from "@/lib/event-stream";
 import type { ChatItem, EventName, ServerEventPayload } from "@/lib/types";
@@ -114,7 +114,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
       if (frame.type === "error") {
         if (frame.sessionId && frame.sessionId !== sessionIdRef.current) return;
         if (frame.sessionId) setRunning(false);
-        handlersRef.current.onError(frame.message);
+        handlersRef.current.onError(describeApiError(frame.code, frame.message, frame.params));
         return;
       }
       if (frame.sessionId !== sessionIdRef.current) return;

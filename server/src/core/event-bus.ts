@@ -52,9 +52,14 @@ export class SessionEventBus {
     };
   }
 
-  /** 服务端自身产生的错误帧 */
-  emitError(sessionId: string, code: string, message: string): void {
-    this.publish({ type: "error", sessionId, code, message });
+  /** 服务端自身产生的错误帧；`message` 是中文兜底，客户端按 `code` + `params` 渲染 */
+  emitError(
+    sessionId: string,
+    code: string,
+    message: string,
+    params?: Record<string, string>,
+  ): void {
+    this.publish({ type: "error", sessionId, code, message, ...(params ? { params } : {}) });
   }
 
   /** 快照序号：与 messages/list 的投影同一次同步读取，客户端按它切分实时帧 */

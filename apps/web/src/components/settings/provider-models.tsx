@@ -1,5 +1,6 @@
 /** provider 卡片里的模型列表：逐行编辑 + 增删 */
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ModelRow } from "@/components/settings/model-row";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ type ProviderModelsProps = {
 };
 
 export function ProviderModels({ models, onPatch, onAdd, onRemove }: ProviderModelsProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-2">
       {models.map((model) => (
@@ -26,7 +29,7 @@ export function ProviderModels({ models, onPatch, onAdd, onRemove }: ProviderMod
 
       <Button variant="outline" size="sm" onClick={onAdd}>
         <Plus className="size-4" />
-        添加模型
+        {t("添加模型")}
       </Button>
     </div>
   );
