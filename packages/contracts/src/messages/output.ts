@@ -1,6 +1,6 @@
 /** 消息接口的响应模型；SSE 事件的 data 也复用这里的区块结构 */
 import type { SessionScoped } from "../common";
-import type { MessageRole } from "../constants";
+import type { MessageRole, ThinkingLevel } from "../constants";
 
 export type MessageBlock =
   | { type: "text"; text: string }
@@ -11,8 +11,12 @@ export type MessageDTO = {
   id: string;
   role: MessageRole;
   blocks: MessageBlock[];
-  /** assistant 专用 */
+  /** assistant 专用：产生该回复的模型 id */
   model?: string;
+  /** assistant 专用：模型所属 provider id */
+  provider?: string;
+  /** assistant 专用：产生该回复时生效的推理等级 */
+  thinkingLevel?: ThinkingLevel;
   /** tool 专用：与 toolCall block 的 id 对应，便于前端精确合并 */
   toolCallId?: string;
   /** tool 专用 */

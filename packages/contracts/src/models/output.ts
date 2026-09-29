@@ -3,13 +3,15 @@ import type { RuntimeStatus } from "../runtime";
 
 /**
  * 目录里的模型摘要：供列表展示与默认模型选择使用。
- * 未接入的内置供应商只给 `id` / `name` / `reasoning`——内置目录动辄上百个模型，
+ * 未接入的内置供应商只给 `id` / `name` / `reasoning` / `vision`——内置目录动辄上百个模型，
  * 完整参数（上下文窗口、输出上限）只对已接入的供应商下发，也正好是聊天区模型选择器要的。
  */
 export type CatalogModel = {
   id: string;
   name: string;
   reasoning: boolean;
+  /** 是否接受图片输入（视觉能力） */
+  vision: boolean;
   /** 仅已接入的供应商提供 */
   contextWindow?: number;
   /** 仅已接入的供应商提供 */

@@ -5,6 +5,7 @@ import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Badge } from "@/components/ui/badge";
 import type { CatalogModel, CatalogProvider } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +122,14 @@ export function ModelPicker({ providers, value, disabled, onSelect }: ModelPicke
                       )}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm">{model.name}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-sm">{model.name}</span>
+                          {model.vision ? (
+                            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                              {t("视觉")}
+                            </Badge>
+                          ) : null}
+                        </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {describeModel(model, t)}
                         </span>

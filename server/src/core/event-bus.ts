@@ -22,7 +22,8 @@ export class SessionEventBus {
   attach(sessionId: string, session: AgentSession): void {
     if (this.attached.has(sessionId)) return;
     const unsubscribe = session.subscribe((event) => {
-      for (const item of toSseEvents(event)) {
+      const state = { thinkingLevel: session.thinkingLevel };
+      for (const item of toSseEvents(event, state)) {
         this.publish({
           type: item.event,
           sessionId,

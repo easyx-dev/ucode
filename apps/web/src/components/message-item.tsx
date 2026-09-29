@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { ToolCallCard } from "@/components/tool-call-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { thinkingLevelLabel } from "@/lib/thinking";
 import { clockLabel } from "@/lib/time";
 import type { ChatItem, MessageBlock } from "@/lib/types";
 
@@ -86,7 +87,16 @@ export function MessageItem({ item }: { item: ChatItem }) {
       {item.live && item.blocks.length === 0 ? <ThinkingIndicator /> : null}
       {!item.live && item.model ? (
         <div className="text-xs text-muted-foreground">
-          {item.model} · {clockLabel(item.createdAt)}
+          {[
+            item.provider ? `${item.provider}/${item.model}` : item.model,
+            // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
+            item.thinkingLevel && item.thinkingLevel !== "off"
+              ? thinkingLevelLabel(item.thinkingLevel, t)
+              : "",
+            clockLabel(item.createdAt),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       ) : null}
     </div>

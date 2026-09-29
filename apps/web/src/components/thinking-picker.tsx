@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { thinkingLevelLabel } from "@/lib/thinking";
 import { THINKING_LEVELS, type ThinkingLevel } from "@/lib/types";
 
 type ThinkingPickerProps = {
@@ -19,16 +20,6 @@ type ThinkingPickerProps = {
 
 export function ThinkingPicker({ value, disabled, onSelect }: ThinkingPickerProps) {
   const { t } = useTranslation();
-  /** 档位名 → 界面文案；接口值仍是 THINKING_LEVELS 里的英文标识 */
-  const labels: Record<ThinkingLevel, string> = {
-    off: t("关闭"),
-    minimal: t("极少"),
-    low: t("低"),
-    medium: t("中"),
-    high: t("高"),
-    xhigh: t("极高"),
-    max: t("最高"),
-  };
 
   return (
     <Select
@@ -47,7 +38,7 @@ export function ThinkingPicker({ value, disabled, onSelect }: ThinkingPickerProp
       <SelectContent>
         {THINKING_LEVELS.map((level) => (
           <SelectItem key={level} value={level}>
-            {labels[level]}
+            {thinkingLevelLabel(level, t)}
           </SelectItem>
         ))}
       </SelectContent>

@@ -35,6 +35,7 @@ const toCatalogModel = (model: PiModel, withLimits: boolean): CatalogModel => ({
   id: model.id,
   name: model.name,
   reasoning: model.reasoning,
+  vision: model.input.includes("image"),
   ...(withLimits ? { contextWindow: model.contextWindow, maxTokens: model.maxTokens } : {}),
 });
 

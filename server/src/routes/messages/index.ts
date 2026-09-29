@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
 import { admitPrompt } from "../../core/run";
+import { transcriptStates } from "../../core/serialize";
 import { env } from "../../env";
 import { ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
@@ -36,11 +37,13 @@ export const createMessagesRoute = (services: Services) => {
           )
         : null);
     const entries = manager ? manager.buildContextEntries() : [];
+    // 会话级设置沿完整路径推进：压缩只裁剪展示条目，看裁剪后的列表会让压缩点之后丢档位
+    const states = transcriptStates(manager ? manager.getBranch() : []);
 
     // 序号与投影必须在同一同步块内取：中间一旦插入事件，
     // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量。
     const seq = services.events.latestSeq(sessionId);
-    const projection = projectMessages(sessionId, live, entries);
+    const projection = projectMessages(sessionId, live, entries, states);
 
     return c.json(
       ok({

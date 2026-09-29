@@ -63,12 +63,10 @@ export default {
 
   // Reasoning levels
   关闭: "Off",
-  最低: "Minimal",
   极少: "Minimal",
   低: "Low",
   中: "Medium",
   高: "High",
-  很高: "Very high",
   极高: "Very high",
   最高: "Max",
   推理等级映射: "Reasoning level map",
@@ -122,6 +120,7 @@ export default {
   选择模型: "Select model",
   搜索模型: "Search models",
   没有匹配的模型: "No matching model",
+  视觉: "Vision",
 
   // Composer
   先新建一个会话: "Create a session first",

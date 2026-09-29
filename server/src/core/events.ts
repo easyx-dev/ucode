@@ -2,7 +2,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { EventName } from "@ucode/contracts";
 
-import { messageToDTO } from "./serialize";
+import { messageToDTO, type TranscriptState } from "./serialize";
 
 /** 事件名与数据的组合；总线负责补 sessionId 与 seq */
 export type SseEvent = { event: EventName; data: Record<string, unknown> };
@@ -61,7 +61,7 @@ const toDeltaEvents = (inner: AssistantEvent): SseEvent[] => {
 };
 
 /** 消息相关事件 */
-const toMessageEvents = (event: AgentSessionEvent): SseEvent[] | null => {
+const toMessageEvents = (event: AgentSessionEvent, state: TranscriptState): SseEvent[] | null => {
   switch (event.type) {
     case "message_start":
       return [
@@ -75,6 +75,8 @@ const toMessageEvents = (event: AgentSessionEvent): SseEvent[] | null => {
       const dto = messageToDTO(
         event.message,
         `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        undefined,
+        state,
       );
       return dto ? [{ event: "message_end", data: dto }] : [];
     }
@@ -145,5 +147,5 @@ const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
   }
 };
 
-export const toSseEvents = (event: AgentSessionEvent): SseEvent[] =>
-  toMessageEvents(event) ?? toToolEvents(event) ?? toSessionEvents(event) ?? [];
+export const toSseEvents = (event: AgentSessionEvent, state: TranscriptState = {}): SseEvent[] =>
+  toMessageEvents(event, state) ?? toToolEvents(event) ?? toSessionEvents(event) ?? [];

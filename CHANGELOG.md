@@ -113,6 +113,10 @@
 - `API_TYPES` 从 4 个扩到 pi `KnownApi` 全集（补 `mistral-conversations` / `azure-openai-responses` /
   `openai-codex-responses` / `bedrock-converse-stream` / `google-vertex` / `pi-messages`），
   否则内置目录里部分供应商的 api 无法落盘。
+- `MessageDTO` 为 assistant 消息补充 `provider` 与 `thinkingLevel`（产生该回复的 provider 与当时生效的推理档位，
+  由会话条目里的 `model_change` / `thinking_level_change` 逐条推进）；对话历史底部展示为
+  「provider/model · 推理档位 · 时间」，关闭推理时不显示档位。
+- `CatalogModel` 新增 `vision`（是否接受图片输入）；聊天区的模型选择器对支持图片输入的模型展示「视觉」标签。
 
 ### 修复
 

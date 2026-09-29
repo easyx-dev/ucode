@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { DraftModel } from "@/lib/config-draft";
+import { thinkingLevelLabel } from "@/lib/thinking";
 import { THINKING_LEVELS, type ThinkingLevel } from "@/lib/types";
 
 type ModelThinkingLevelsProps = {
@@ -24,16 +25,6 @@ type ModelThinkingLevelsProps = {
 
 export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProps) {
   const { t } = useTranslation();
-  /** 档位的中文名，仅用于界面；写进配置的始终是 pi 的英文档位 */
-  const levelLabels: Record<ThinkingLevel, string> = {
-    off: t("关闭"),
-    minimal: t("最低"),
-    low: t("低"),
-    medium: t("中"),
-    high: t("高"),
-    xhigh: t("很高"),
-    max: t("最高"),
-  };
   const mapped = model.thinkingLevelMap;
   const rows = THINKING_LEVELS.filter((level) => level in mapped);
   const unused = THINKING_LEVELS.filter((level) => !(level in mapped));
@@ -92,7 +83,7 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
                 <SelectContent>
                   {[level, ...unused].map((option) => (
                     <SelectItem key={option} value={option}>
-                      {levelLabels[option]}
+                      {thinkingLevelLabel(option, t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -102,7 +93,7 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
                 className="h-7 flex-1 text-xs"
                 value={mapped[level] ?? ""}
                 placeholder={t("厂商取值")}
-                aria-label={t("厂商取值.aria", { level: levelLabels[level] })}
+                aria-label={t("厂商取值.aria", { level: thinkingLevelLabel(level, t) })}
                 onChange={(event) => changeValue(level, event.target.value)}
               />
 
