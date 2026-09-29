@@ -20,6 +20,18 @@
   与列表索引（名称、预览、条目数、消息数、创建/更新时间、JSONL 路径）。需 Node ≥ 24，启动会打印一条实验特性警告。
 - `APP_HOME` 目录按「谁的资产」分两层：`pi/`（pi 私有：`models.json` / `auth.json` / `sessions/`）与
   `app/`（应用自有：`config.json` / `ucode.db`）；不再使用 `agent/` 与根目录的 `config.json`。
+- 新增项目规范体系：根 `DESIGN.md`（设计系统）与 `docs/{database,api,components}.md`；
+  `AGENTS.md` 增加「规范索引」并收敛为索引，细则下沉到各文档。
+- 新增 `scripts/verify/`（`pnpm verify`）：SQLite 迁移版本连续性、契约字段命名与 `*Request`/`*Input` 配对、
+  业务组件禁用裸色值与非语义颜色 utility 三项校验，接入根 `pnpm check`。
+- web 新增深色模式：`ThemeProvider`（`next-themes`）、设置里的浅色 / 深色 / 跟随系统切换、
+  `index.html` 首屏防闪脚本。
+- web 新增通用组件 `SegmentedControl`（分段控件）与 `SettingsGroup` / `SettingsRow`（设置行卡片）。
+- 设计 token 新增功能色（`success` / `warning` / `info`）与图表色（`chart-1..5`），与单色品牌色相互独立。
+- 设计 token 新增 `--overlay`（遮罩）：浅色 `oklch(0 0 0 / 10%)`、深色 `oklch(0 0 0 / 40%)`；
+  对话框遮罩由 `bg-black/10` 改用 `bg-overlay`。
+- 前端新增依赖 `dayjs`：会话列表的相对时间与消息时刻改用它（`relativeTime` 插件 + `zh-cn` locale），
+  替换手写的差量计算。列表文案随之变为「几秒前 / 55 分钟前 / 1 天前」。
 
 ### 变更
 
@@ -34,6 +46,30 @@
 - server `core/` 新增 `event-bus.ts`（会话事件总线，`AgentSession` 入池即常驻订阅）、`projection.ts`
   （在途投影）与 `run.ts`（后台运行），移除 `run-stream.ts`。
 - web 的 `hooks/use-session-history.ts` 由 `use-session-stream.ts` 取代；`use-send-message` 不再消费 SSE。
+- 设计 token 改为「灰度外壳 + 白色内容卡」分层：`background` 变为外壳灰、`card` / `popover` 为白面；
+  `--radius` 由 `0.625rem` 提到 `0.75rem`；品牌色固定为浅色近黑（`#181818`）/ 深色近白。
+  全站表面观感随之变化。
+- web 界面重整：侧栏加分组标签与相对时间、会话行改选中 pill（不再显示消息数与模型标记）；模型与思考档位
+  选择器从头部移入 Composer（白卡 + 上下文行 + 底部工具行）；空态改为水印 + 问候语 + 起始建议 chips；
+  模型选择器改为可搜索、按 provider 分组、带说明的弹出层；设置对话框增加「外观」区块。
+- **破坏性**：`MessageDTO.timestamp`（毫秒数字）改为 `createdAt`（ISO 8601 UTC），全站时间口径统一。
+- **破坏性**：`HealthResponse.version` 更名 `apiVersion`，取值来自新增的 `API_VERSION` 常量，与 `API_BASE_PATH` 同源。
+- **破坏性**：契约抽出响应基类型 `ListResult` / `SessionScoped`，会话列表、删除、受理、中断等响应改为组合它们；
+  `MessageRole` 移至 `constants.ts`（`MESSAGE_ROLES`）；`AppConfigPatch` 更名 `AppConfigPatchInput`，
+  并补齐 `SessionIdInput` / `MessageListInput`。
+- 数据库查询改用显式列清单（不再 `SELECT *`）；索引 `idx_session_updated` 更名 `idx_session_updated_at` 对齐命名规范。
+- 根 `pnpm check` 增加约定校验一步（`node scripts/verify/index.ts`），并新增 `pnpm verify` 单独入口。
+- `biome.json` 取消全部路径排除（`files.includes: ["**"]`）：打开 `css.parser.tailwindDirectives`
+  让 Tailwind v4 入口 `index.css` 纳入检查；`apps/web/index.html` 的防闪内联脚本改为顶层
+  `try` / `catch {}`，不再触发现代 JS 规则；`components/ui` 视为项目自有代码，一并纳入格式化与 lint。
+- `scripts/verify` 的 tokens 检查纳入 `apps/web/src/components/ui`，并收紧裸色值判定：
+  只认后面直接跟数值的颜色函数，允许 `color-mix(in oklch, var(--a), var(--b))` 这类对语义变量的合成。
+
+### 移除
+
+- 移除未再引用的基础组件 `ui/card.tsx` 与 `ui/textarea.tsx`：空态改用纯排版，Composer 改为自绘输入卡
+  （带边框的 `Textarea` / `Card` 与其内表面冲突，改用语义 token 直接拼装）。
+- `useModels()` 不再返回 `loading`：调用处改用 `data` 是否为空表达加载态。
 
 ## [0.2.0] - 2026-09-29
 

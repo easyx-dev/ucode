@@ -7,6 +7,9 @@
 - **packages/contracts/**：`@ucode/contracts`，接口的请求校验与响应类型，server 与 web 共用同一份定义
 - 会话正文沿用 pi 的 JSONL；`$APP_HOME/app/ucode.db`（SQLite）保存应用自己的会话元数据与索引
 
+项目规范：设计系统见 [`DESIGN.md`](./DESIGN.md)，数据库 / 接口 / 组件规范见 [`docs/`](./docs)；
+仓库级约定与验证命令见 [`AGENTS.md`](./AGENTS.md)。
+
 ---
 
 ## 快速开始
@@ -23,7 +26,7 @@ pnpm build && pnpm start
 
 打开 `http://localhost:2048`（生产）或 `http://localhost:5173`（开发）。
 
-首次启动会提示「尚未配置模型」，点侧栏底部 **模型设置** 或调用 `POST /api/v1/config/update` 填入端点即可。
+首次启动会提示「尚未配置模型」，点侧栏底部 **设置** 或调用 `POST /api/v1/config/update` 填入端点即可。
 
 ### 环境变量（`.env`）
 
@@ -140,21 +143,30 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | POST | `/api/v1/sessions/info` | `{ sessionId }` | 会话详情 |
 | POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel? }` | 重命名 / 换模型 |
 | POST | `/api/v1/sessions/delete` | `{ sessionId }` | 删除会话（含会话文件） |
-| POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史（compaction 感知） |
-| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 发起生成，返回 `text/event-stream` |
+| POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史快照（compaction 感知，带接续用的 `seq`） |
+| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 投递一轮生成，返回受理 ack；结果走 `/events` |
 | POST | `/api/v1/messages/interrupt` | `{ sessionId }` | 中断当前生成 |
+| POST | `/api/v1/events` | `{}` | 全局 SSE 事件流（所有会话的实时事件） |
 
-### 发起生成（SSE）
+### 全局事件流
+
+生成与连接是解耦的：`messages/prompt` 只负责投递，事件统一从 `POST /api/v1/events` 推送。
 
 ```bash
-curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
-  -H 'content-type: application/json' \
-  -d '{"sessionId":"<uuid>","text":"列一下当前目录"}'
+curl -N -X POST http://localhost:2048/api/v1/events \
+  -H 'content-type: application/json' -d '{}'
 ```
 
-事件（`event:` / `data:` JSON）：
+SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 
-| 事件 | data | 说明 |
+- 会话事件帧：`{ type, sessionId, seq, data }`，`type` 取自 `EVENT_NAMES`，`seq` 是会话内单调序号
+- 控制帧：`{ type: "server.connected" }`、`{ type: "error", sessionId?, code, message }`
+- 心跳为 `: heartbeat` 注释行（15s）
+
+接续方式：先取 `messages/list` 快照（响应里的 `seq` 表示「已包含到该序号为止的全部效果」），
+再连 `/events`，丢弃 `seq <= 快照 seq` 的帧。刷新或断线重连后重复这套流程即可，不会丢在途内容。
+
+| 事件 `type` | data | 说明 |
 | --- | --- | --- |
 | `message_start` | `{ role }` | 新一轮消息开始 |
 | `text_delta` | `{ delta }` | 正文增量 |
@@ -164,8 +176,8 @@ curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
 | `message_end` | `MessageDTO` | 权威消息（前端用它替换流式内容） |
 | `queue_update` | `{ steering, followUp }` | 生成中排队情况 |
 | `compaction_start` / `compaction_end` | `{ reason? }` | 上下文压缩 |
-| `agent_settled` / `done` | `{}` | 本次运行结束 |
-| `error` | `{ code, message }` | 出错 |
+| `session_info_changed` | `{ sessionId }` | 会话名 / 模型等元数据变化 |
+| `agent_settled` | `{}` | 本次运行结束 |
 
 `MessageDTO`：
 
@@ -174,7 +186,7 @@ curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
   id: string
   role: "user" | "assistant" | "tool" | "custom" | "summary"
   blocks: Array<{ type: "text"; text } | { type: "thinking"; text } | { type: "toolCall"; id; name; args }>
-  model?, toolCallId?, toolName?, isError?, timestamp?
+  model?, toolCallId?, toolName?, isError?, createdAt?   // createdAt 为 ISO 8601 UTC
 }
 ```
 
@@ -185,7 +197,7 @@ curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
 `messages/prompt` 默认不会占用「会话锁」（只有创建 `AgentSession` 那一步串行），所以并发请求是安全的：
 
 - 会话空闲时 → 直接开启新一轮（`prompt`）。
-- 会话正在生成时 → 按 `behavior` 投递：`"follow-up"`（默认）在当前这一轮（含工具调用）结束后处理；`"steer"` 在当前 assistant turn 的工具调用执行完之后、下一次 LLM 调用之前插入。投递后会先发 `queued` 事件，然后继续推流直到会话重新空闲。
+- 会话正在生成时 → 按 `behavior` 投递：`"follow-up"`（默认）在当前这一轮（含工具调用）结束后处理；`"steer"` 在当前 assistant turn 的工具调用执行完之后、下一次 LLM 调用之前插入。投递后会先发 `queue_update` 事件，然后继续推流直到会话重新空闲。
 - 极端竞态下（占用者刚结束）会退化成新的一轮；若连占位都拿不到，返回 `409 session_busy`。
 
 ---
@@ -193,13 +205,21 @@ curl -N -X POST http://localhost:2048/api/v1/messages/prompt \
 ## 结构
 
 ```
+DESIGN.md                  # 设计系统（品牌 / 主题 / token / 深浅色）
+docs/
+  database.md              # 数据库规范
+  api.md                   # 接口与字段规范
+  components.md            # 组件规范
+scripts/verify/            # 约定校验（migrations / contracts / tokens），由 pnpm check 调用
 packages/contracts/
   src/
     envelope.ts            # { success, code, message, data } 封套与错误码
-    constants.ts           # API_TYPES / THINKING_LEVELS / API 前缀
+    constants.ts           # API_VERSION / API_TYPES / THINKING_LEVELS / MESSAGE_ROLES
+    common.ts              # emptyInputSchema、ListResult、SessionScoped
     runtime.ts             # RuntimeStatus
-    {health,models}/{input,output}.ts
-    {config,sessions,messages}/{input,output}.ts
+    events.ts              # 事件名与帧结构
+    health/output.ts
+    {models,sessions,messages,config}/{input,output}.ts
 server/src/
   env.ts                   # APP_HOME 派生 pi/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
@@ -209,24 +229,29 @@ server/src/
     response/              # 统一封套 + AppError
     validate/              # jsonBody 中间件
     logger/                # pino 实例 + 请求日志
-  config/
-    store.ts               # config.json 读写、apiKey 脱敏、生成 pi 的 models.json
+  config/store.ts          # config.json 读写、apiKey 脱敏、生成 pi 的 models.json
   db/                      # SQLite（node:sqlite）
     index.ts               # 连接、PRAGMA、user_version 迁移
     session-repository.ts  # 会话元数据与索引的读写
   core/                    # pi SDK 封装
     runtime.ts             # ModelRuntime 单例、模型解析、模型目录
     pool.ts                # sessionId -> AgentSession 池、按会话串行、空闲回收
+    event-bus.ts           # 会话事件总线（/events 的唯一数据源）
+    run.ts                 # 后台推进一轮生成
+    projection.ts          # 在途消息投影（刷新后不丢流式内容）
     session-index.ts       # pi 会话对象 -> 入库索引 / SessionInfo
     serialize.ts           # pi 会话条目 -> MessageDTO
     events.ts              # AgentSessionEvent -> SSE 事件
-  routes/                  # health / models / config / sessions / messages（一级均为文件夹）
+  routes/                  # health / models / config / sessions / messages / events
   index.ts                 # Hono 装配、静态托管 web、优雅退出
   scripts/smoke.ts         # 不经 HTTP 的 SDK 冒烟测试
 apps/web/src/
-  lib/{api,types,sse}.ts   # 接口封装、类型（引用 @ucode/contracts）、SSE 解析
-  hooks/{use-sessions,use-chat,use-models}.ts
-  components/              # 侧栏、消息列表、工具卡片、输入框、设置对话框
+  lib/                     # 接口封装、契约类型出口、SSE 与事件流、消息归并、纯函数
+  hooks/                   # 数据获取与订阅（use-chat / use-session-list / use-models …）
+  components/
+    ui/                    # 基础组件（shadcn 生成后归我们维护）
+    <feature>/             # 业务组件，如 settings/
+    *.tsx                  # 侧栏、消息列表、工具卡片、Composer、主题与分段控件
 ```
 
 ### 实现要点
@@ -236,7 +261,19 @@ apps/web/src/
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型先落在 SQLite 的草稿行（`persisted = 0`），首次回复后索引对齐。
-- **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL。
+- **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `ucode.db` 重建即可。
+- **删除会话**：先停用运行中的资源（`pool.dispose` / `events.remove`），再删 SQLite 行，最后删 JSONL 文件；顺序不能颠倒，见 `docs/database.md`。
+- **主题**：`next-themes` + `.dark` class，浅色 / 深色 / 跟随系统三态；首屏由 `index.html` 的内联脚本定色以避免闪白。颜色与圆角全部走语义 token（`DESIGN.md`），`scripts/verify` 会拦下裸色值。
+
+## 验证
+
+```bash
+pnpm check     # biome check . && pnpm -r typecheck && pnpm verify
+pnpm verify    # 只跑约定校验（scripts/verify）
+```
+
+约定校验覆盖三项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
+业务组件不得出现裸色值或非语义颜色 utility。对应规范见 `docs/` 与 `DESIGN.md`。
 
 ## 冒烟测试
 
