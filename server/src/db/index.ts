@@ -2,8 +2,11 @@
  * SQLite 连接与 schema 迁移。
  *
  * 数据库放 `$APP_HOME/app/ucode.db`，只保存应用自己的会话元数据与索引；
- * 消息正文仍由 pi 写在 JSONL 里。schema 版本记在 `PRAGMA user_version`，
- * 每次新增迁移就补一条并从旧版本依次执行。
+ * 消息正文仍由 pi 写在 JSONL 里。schema 版本记在 `PRAGMA user_version`。
+ *
+ * 迁移只追加：已发布版本的 DDL 不得再改，改 schema 就加新版本项。
+ * 项目处于开发初期，破坏性变更直接改现有版本项、本地删库重建即可，不写数据迁移。
+ * 规则见 `docs/database.md`。
  */
 import { DatabaseSync } from "node:sqlite";
 
@@ -12,7 +15,7 @@ import { env } from "../env";
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
 export const SCHEMA_VERSION = 1;
 
-/** 版本号 -> 该版本要执行的 DDL */
+/** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
   1: `
     CREATE TABLE session (
@@ -31,7 +34,7 @@ const migrations: Record<number, string> = {
       created_at     TEXT NOT NULL,
       updated_at     TEXT NOT NULL
     );
-    CREATE INDEX idx_session_updated ON session(updated_at DESC);
+    CREATE INDEX idx_session_updated_at ON session(updated_at DESC);
   `,
 };
 

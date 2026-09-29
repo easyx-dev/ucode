@@ -4,11 +4,8 @@ import remarkGfm from "remark-gfm";
 
 import { ToolCallCard } from "@/components/tool-call-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { clockLabel } from "@/lib/time";
 import type { ChatItem, MessageBlock } from "@/lib/types";
-import { cn } from "@/lib/utils";
-
-const timestampLabel = (value?: number): string =>
-  value ? new Date(value).toLocaleTimeString("zh-CN", { hour12: false }) : "";
 
 function ThinkingBlock({ text }: { text: string }) {
   return (
@@ -69,7 +66,7 @@ export function MessageItem({ item }: { item: ChatItem }) {
   if (item.role === "summary" || item.role === "custom") {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
-      <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
         {item.role === "summary" ? "（上下文已压缩）" : "（扩展消息）"} {text.slice(0, 400)}
       </div>
     );
@@ -88,8 +85,8 @@ export function MessageItem({ item }: { item: ChatItem }) {
         </div>
       ) : null}
       {!item.live && item.model ? (
-        <div className={cn("text-[10px] text-muted-foreground/70")}>
-          {item.model} · {timestampLabel(item.timestamp)}
+        <div className="text-xs text-muted-foreground">
+          {item.model} · {clockLabel(item.createdAt)}
         </div>
       ) : null}
     </div>

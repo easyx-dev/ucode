@@ -66,7 +66,7 @@ export const configTestSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
-export type AppConfigPatch = z.infer<typeof appConfigPatchSchema>;
+export type AppConfigPatchInput = z.infer<typeof appConfigPatchSchema>;
 /** 客户端发送的配置更新载荷（模型字段的默认值可省） */
 export type AppConfigPatchRequest = z.input<typeof appConfigPatchSchema>;
 export type ProviderConfig = z.infer<typeof providerSchema>;

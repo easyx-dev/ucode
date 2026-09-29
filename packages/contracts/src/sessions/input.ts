@@ -32,6 +32,7 @@ export const sessionUpdateInputSchema = z.object({
 });
 
 export type SessionIdRequest = z.input<typeof sessionIdInputSchema>;
+export type SessionIdInput = z.infer<typeof sessionIdInputSchema>;
 export type SessionListInput = z.infer<typeof sessionListInputSchema>;
 export type SessionListRequest = z.input<typeof sessionListInputSchema>;
 export type SessionCreateInput = z.infer<typeof sessionCreateInputSchema>;

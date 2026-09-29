@@ -1,4 +1,5 @@
 /** 会话接口的响应模型 */
+import type { ListResult, SessionScoped } from "../common";
 import type { ThinkingLevel } from "../constants";
 
 export type SessionSummary = {
@@ -18,10 +19,8 @@ export type SessionSummary = {
   running: boolean;
 };
 
-export type SessionListResponse = {
+export type SessionListResponse = ListResult & {
   sessions: SessionSummary[];
-  /** 过滤后的总数（受 q 影响、未按 limit 截断），用于「显示 n / 共 m」 */
-  total: number;
 };
 
 export type SessionInfoResponse = {
@@ -31,7 +30,6 @@ export type SessionInfoResponse = {
   entries: number;
 };
 
-export type SessionDeleteResponse = {
+export type SessionDeleteResponse = SessionScoped & {
   deleted: boolean;
-  sessionId: string;
 };

@@ -10,6 +10,9 @@ const nextLocalId = (): number => {
   return localId;
 };
 
+/** 本地乐观消息的时间戳，与服务端保持一致用 ISO 8601 */
+const nowIso = (): string => new Date().toISOString();
+
 const lastLiveIndex = (items: ChatItem[], role: MessageRole): number => {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
@@ -50,7 +53,7 @@ export const appendUserItem = (items: ChatItem[], text: string): ChatItem[] => {
       role: "user",
       blocks: [{ type: "text", text }],
       live: true,
-      timestamp: Date.now(),
+      createdAt: nowIso(),
     },
   ];
 };
@@ -63,7 +66,7 @@ export const appendAssistantItem = (items: ChatItem[]): ChatItem[] => [
     role: "assistant",
     blocks: [],
     live: true,
-    timestamp: Date.now(),
+    createdAt: nowIso(),
   },
 ];
 
@@ -97,7 +100,7 @@ export const startToolItem = (items: ChatItem[], data: Record<string, unknown>):
     toolName: String(data.toolName ?? "tool"),
     isError: false,
     live: true,
-    timestamp: Date.now(),
+    createdAt: nowIso(),
   },
 ];
 

@@ -15,5 +15,13 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+/** 消息角色；响应用枚举，与 pi 的 AgentMessage 角色对齐（system 等内部角色不下发） */
+export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] as const;
+
+export type MessageRole = (typeof MESSAGE_ROLES)[number];
+
+/** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
+export const API_VERSION = "v1";
+
 /** 对外 HTTP 接口统一前缀 */
-export const API_BASE_PATH = "/api/v1";
+export const API_BASE_PATH = `/api/${API_VERSION}`;

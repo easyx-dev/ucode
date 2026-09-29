@@ -1,5 +1,5 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
-import type { AppConfigPatch } from "@ucode/contracts";
+import type { AppConfigPatchInput } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
 
 import { ConfigStore } from "./config/store";
@@ -18,7 +18,7 @@ export type Services = {
   /** 会话事件总线：/events 的唯一数据源 */
   events: SessionEventBus;
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
-  applyConfig(patch: AppConfigPatch): Promise<void>;
+  applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
   reload(): Promise<void>;
 };
@@ -48,7 +48,7 @@ export const createServices = async (): Promise<Services> => {
     runtime,
     pool,
     events,
-    async applyConfig(patch: AppConfigPatch) {
+    async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
       // 先校验并落盘，避免 patch 非法时白白丢掉内存会话
       const next = config.update(patch);

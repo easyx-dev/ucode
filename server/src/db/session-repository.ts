@@ -4,6 +4,7 @@
  * 一张 `session` 表同时承担两件事：草稿/覆盖值（`name` / `cwd` / `model` /
  * `thinking_level`）与 JSONL 派生索引（`pi_*` / `source_path` / 计数 / 时间）。
  * 消息正文不在这里，仍由 pi 写在 `sessions/*.jsonl`。
+ * 命名、SQL 与删除规则见 `docs/database.md`。
  */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { THINKING_LEVELS, type ThinkingLevel } from "@ucode/contracts";
@@ -61,6 +62,24 @@ export type SessionSearchResult = {
   /** 过滤后的总数（未按 limit 截断） */
   total: number;
 };
+
+/** session 表的显式列清单。禁止 `SELECT *`：加列不应改变既有查询的结果形状 */
+const SESSION_COLUMNS = [
+  "id",
+  "name",
+  "cwd",
+  "model",
+  "thinking_level",
+  "pi_name",
+  "pi_cwd",
+  "source_path",
+  "persisted",
+  "entry_count",
+  "message_count",
+  "preview",
+  "created_at",
+  "updated_at",
+].join(", ");
 
 const rowSchema = z.object({
   id: z.string(),
@@ -142,7 +161,7 @@ export class SessionRepository {
   }
 
   find(id: string): SessionRecord | undefined {
-    const row = this.db.prepare("SELECT * FROM session WHERE id = ?").get(id);
+    const row = this.db.prepare(`SELECT ${SESSION_COLUMNS} FROM session WHERE id = ?`).get(id);
     return row ? toRecord(rowSchema.parse(row)) : undefined;
   }
 
@@ -175,13 +194,14 @@ export class SessionRepository {
       );
   }
 
+  /** 硬删本表行；关联的内存池、事件订阅与 JSONL 文件由调用方按顺序清理（见 docs/database.md） */
   delete(id: string): void {
     this.db.prepare("DELETE FROM session WHERE id = ?").run(id);
   }
 
   list(): SessionRecord[] {
     return this.db
-      .prepare("SELECT * FROM session ORDER BY updated_at DESC")
+      .prepare(`SELECT ${SESSION_COLUMNS} FROM session ORDER BY updated_at DESC`)
       .all()
       .map((row) => toRecord(rowSchema.parse(row)));
   }
@@ -205,7 +225,9 @@ export class SessionRepository {
       .prepare(`SELECT COUNT(*) AS total FROM session WHERE ${where}`)
       .get(...params) as { total?: number } | undefined;
     const rows = this.db
-      .prepare(`SELECT * FROM session WHERE ${where} ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(
+        `SELECT ${SESSION_COLUMNS} FROM session WHERE ${where} ORDER BY updated_at DESC LIMIT ?`,
+      )
       .all(...params, query.limit);
 
     return {

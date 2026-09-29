@@ -3,7 +3,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import {
   type AppConfig,
-  type AppConfigPatch,
+  type AppConfigPatchInput,
   appConfigSchema,
   type ConfigView,
   ERROR_CODES,
@@ -55,7 +55,7 @@ export class ConfigStore {
     return parsed;
   }
 
-  update(patch: AppConfigPatch): AppConfig {
+  update(patch: AppConfigPatchInput): AppConfig {
     const providers = patch.providers?.map((provider) => {
       const existing = this.config.providers.find((item) => item.id === provider.id);
       const parsed = providerSchema.safeParse({

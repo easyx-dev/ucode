@@ -29,6 +29,7 @@ export const OK_CODE = "ok";
 /**
  * 业务错误码表。HTTP 状态码只表达传输层语义，具体失败原因一律看 code，
  * 因此新增错误时先在这里登记，避免各处散落字符串字面量。
+ * 按域分组、组间空行分隔；码值为 snake_case，取自域名或动作名。
  */
 export const ERROR_CODES = {
   /** 请求参数校验失败 */
@@ -37,18 +38,22 @@ export const ERROR_CODES = {
   notFound: "not_found",
   /** 服务端未预期异常 */
   internal: "internal_error",
+
   /** 会话正在生成，需先中断 */
   sessionBusy: "session_busy",
+
   /** 指定的模型不可用 */
   unknownModel: "unknown_model",
   /** 尚未配置任何可用模型 */
   modelNotConfigured: "model_not_configured",
+
   /** 连通性测试不支持该 api 类型 */
   unsupportedApi: "unsupported_api",
   /** 无法连接上游端点 */
   upstreamUnreachable: "upstream_unreachable",
   /** 上游返回非 2xx */
   upstreamError: "upstream_error",
+
   /** 配置文件解析失败 */
   invalidConfig: "invalid_config",
 } as const;

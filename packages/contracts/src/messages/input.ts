@@ -16,5 +16,6 @@ export const promptInputSchema = z.object({
 });
 
 export type MessageListRequest = z.input<typeof messageListInputSchema>;
+export type MessageListInput = z.infer<typeof messageListInputSchema>;
 export type PromptInput = z.infer<typeof promptInputSchema>;
 export type PromptRequest = z.input<typeof promptInputSchema>;

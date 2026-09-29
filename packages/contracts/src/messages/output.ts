@@ -1,11 +1,11 @@
 /** 消息接口的响应模型；SSE 事件的 data 也复用这里的区块结构 */
+import type { SessionScoped } from "../common";
+import type { MessageRole } from "../constants";
 
 export type MessageBlock =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
   | { type: "toolCall"; id: string; name: string; args: unknown };
-
-export type MessageRole = "user" | "assistant" | "tool" | "custom" | "summary";
 
 export type MessageDTO = {
   id: string;
@@ -18,12 +18,11 @@ export type MessageDTO = {
   /** tool 专用 */
   toolName?: string;
   isError?: boolean;
-  /** 毫秒时间戳 */
-  timestamp?: number;
+  /** 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 */
+  createdAt?: string;
 };
 
-export type MessageListResponse = {
-  sessionId: string;
+export type MessageListResponse = SessionScoped & {
   messages: MessageDTO[];
   /** 是否已有落盘会话文件 */
   persisted: boolean;
@@ -41,13 +40,11 @@ export type MessageListResponse = {
 };
 
 /** prompt 的受理回执：生成本身由服务端后台推进，与本请求无关 */
-export type PromptAdmittedResponse = {
-  sessionId: string;
+export type PromptAdmittedResponse = SessionScoped & {
   admitted: boolean;
 };
 
-export type MessageInterruptResponse = {
-  sessionId: string;
+export type MessageInterruptResponse = SessionScoped & {
   /** 是否真的中断了一个正在跑的 run */
   aborted: boolean;
 };

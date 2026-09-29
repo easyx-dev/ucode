@@ -42,26 +42,37 @@ export const blocksOf = (content: unknown): MessageBlock[] => {
   return blocks;
 };
 
+/**
+ * 条目/消息时间戳 → ISO 8601 字符串；缺失、非数字、越界或非法时返回 undefined。
+ * `Number.isFinite` 拦不住 `1e308` 这类越界值，`toISOString()` 会抛 RangeError，
+ * 所以必须先构造 Date 再用 `getTime()` 判合法。
+ */
+const isoOf = (time: unknown): string | undefined => {
+  if (typeof time !== "number" || !Number.isFinite(time)) return undefined;
+  const date = new Date(time);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 /** 把 pi 的 AgentMessage 转成前端 DTO */
 export const messageToDTO = (
   message: unknown,
   id: string,
-  fallbackTimestamp?: number,
+  fallbackCreatedAt?: string,
 ): MessageDTO | null => {
   if (!isRecord(message)) return null;
   const role = message.role;
-  const timestamp = typeof message.timestamp === "number" ? message.timestamp : fallbackTimestamp;
+  const createdAt = isoOf(message.timestamp) ?? fallbackCreatedAt;
 
   switch (role) {
     case "user":
-      return { id, role: "user", blocks: blocksOf(message.content), timestamp };
+      return { id, role: "user", blocks: blocksOf(message.content), createdAt };
     case "assistant":
       return {
         id,
         role: "assistant",
         blocks: blocksOf(message.content),
         model: typeof message.model === "string" ? message.model : undefined,
-        timestamp,
+        createdAt,
       };
     case "toolResult":
       return {
@@ -71,10 +82,10 @@ export const messageToDTO = (
         toolCallId: typeof message.toolCallId === "string" ? message.toolCallId : undefined,
         toolName: typeof message.toolName === "string" ? message.toolName : undefined,
         isError: message.isError === true,
-        timestamp,
+        createdAt,
       };
     case "custom":
-      return { id, role: "custom", blocks: blocksOf(message.content), timestamp };
+      return { id, role: "custom", blocks: blocksOf(message.content), createdAt };
     default:
       // system / bashExecution / 其他内部消息不展示
       return null;
@@ -83,24 +94,24 @@ export const messageToDTO = (
 
 /** 把会话条目转成前端 DTO；system 提示、usage、label 等内部条目会被过滤掉 */
 export const entryToDTO = (entry: SessionEntry): MessageDTO | null => {
-  const fallback = Date.parse(entry.timestamp);
+  const fallbackCreatedAt = isoOf(Date.parse(entry.timestamp));
 
   switch (entry.type) {
     case "message":
-      return messageToDTO(entry.message, entry.id, fallback);
+      return messageToDTO(entry.message, entry.id, fallbackCreatedAt);
     case "custom_message":
       return {
         id: entry.id,
         role: "custom",
         blocks: blocksOf(entry.content),
-        timestamp: fallback,
+        createdAt: fallbackCreatedAt,
       };
     case "compaction":
       return {
         id: entry.id,
         role: "summary",
         blocks: entry.summary ? [{ type: "text", text: entry.summary }] : [],
-        timestamp: fallback,
+        createdAt: fallbackCreatedAt,
       };
     default:
       return null;
