@@ -9,6 +9,8 @@ import type { ChatItem } from "@/lib/types";
 export type ChatController = {
   items: ChatItem[];
   streaming: boolean;
+  /** 已发送、还没出现任何生成内容：消息区尾部显示等待指示 */
+  pending: boolean;
   error: string | null;
   loadingHistory: boolean;
   send: (text: string) => Promise<void>;
@@ -30,13 +32,20 @@ export function useChat(sessionId: string | null, onSettled?: () => void): ChatC
   }, []);
 
   const readItems = useCallback(() => itemsRef.current, []);
-  const { loadingHistory, running } = useSessionStream({
+  const { loadingHistory, running, pending, markPending, clearPending } = useSessionStream({
     sessionId,
     readItems,
     apply,
     onError: setError,
   });
-  const { sending, send } = useSendMessage({ sessionId, readItems, apply, onError: setError });
+  const { sending, send } = useSendMessage({
+    sessionId,
+    readItems,
+    apply,
+    onError: setError,
+    markPending,
+    clearPending,
+  });
   const stop = useInterrupt(sessionId);
 
   // 一轮生成结束（running 由真变假）后刷新会话列表的标题与更新时间
@@ -48,7 +57,9 @@ export function useChat(sessionId: string | null, onSettled?: () => void): ChatC
 
   return {
     items,
-    streaming: running || sending,
+    streaming: running || sending || pending,
+    // 活动事件可能先于 prompt 回执到达，此时 running 已接手，pending 不应再显示
+    pending: pending && !running,
     error,
     loadingHistory,
     send,

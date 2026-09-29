@@ -57,6 +57,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
         thinkingLevel,
         env.workspaceDir,
         running,
+        record ? { createdAt: record.createdAt, updatedAt: record.updatedAt } : undefined,
       ),
       persisted: false,
       entries: 0,
@@ -74,14 +75,25 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
   const { model, thinkingLevel } = runtimeDefaults(services);
   const { records, total } = services.sessions.search(query);
 
+  // 已落盘行读 JSONL 索引；草稿行只有覆盖值可展示，用行里的真实时间保持排序口径一致
   const sessions = records.map((record) =>
-    sessionInfoToDTO(
-      infoFromRecord(record),
-      overrideOf(record),
-      model,
-      thinkingLevel,
-      services.pool.isActive(record.id),
-    ),
+    record.persisted && record.sourcePath
+      ? sessionInfoToDTO(
+          infoFromRecord(record),
+          overrideOf(record),
+          model,
+          thinkingLevel,
+          services.pool.isActive(record.id),
+        )
+      : draftSessionSummary(
+          record.id,
+          overrideOf(record),
+          model,
+          thinkingLevel,
+          env.workspaceDir,
+          services.pool.isActive(record.id),
+          { createdAt: record.createdAt, updatedAt: record.updatedAt },
+        ),
   );
 
   return { sessions, total };

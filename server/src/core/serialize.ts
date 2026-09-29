@@ -154,14 +154,16 @@ export const draftSessionSummary = (
   defaultThinkingLevel: ThinkingLevel,
   fallbackCwd: string,
   running: boolean,
+  /** 来自数据库行的真实时间；缺省（新建会话刚返回）时用当前时间 */
+  timestamps?: { createdAt: string; updatedAt: string },
 ): SessionSummary => {
   const now = new Date().toISOString();
   return {
     id: sessionId,
     name: override.name ?? null,
     cwd: override.cwd ?? fallbackCwd,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: timestamps?.createdAt ?? now,
+    updatedAt: timestamps?.updatedAt ?? now,
     messageCount: 0,
     preview: "",
     model: override.model ?? defaultModel,

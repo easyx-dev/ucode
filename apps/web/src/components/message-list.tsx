@@ -1,16 +1,19 @@
 import { useEffect, useRef } from "react";
 
 import { MessageItem } from "@/components/message-item";
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatItem } from "@/lib/types";
 
 type MessageListProps = {
   items: ChatItem[];
   loading?: boolean;
+  /** 已发送、首个生成内容未到：尾部显示等待指示 */
+  pending?: boolean;
   empty?: React.ReactNode;
 };
 
-export function MessageList({ items, loading, empty }: MessageListProps) {
+export function MessageList({ items, loading, pending, empty }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -18,7 +21,8 @@ export function MessageList({ items, loading, empty }: MessageListProps) {
   useEffect(() => {
     if (!pinnedRef.current) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [items]);
+    // pending 出现 / 消失也要贴底
+  }, [items, pending]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -43,6 +47,8 @@ export function MessageList({ items, loading, empty }: MessageListProps) {
         {items.map((item) => (
           <MessageItem key={item.id} item={item} />
         ))}
+
+        {pending ? <ThinkingIndicator /> : null}
 
         <div ref={bottomRef} />
       </div>

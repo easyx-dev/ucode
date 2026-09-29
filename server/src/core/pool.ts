@@ -182,5 +182,19 @@ export class SessionPool {
       if (now - entry.lastUsed < env.poolIdleMs) continue;
       this.dispose(sessionId);
     }
+    // 复用同一个心跳顺带清理过期草稿；活跃会话豁免，避免删掉正在推进的会话
+    this.repository.deleteStaleDrafts(
+      new Date(now - env.draftTtlMs).toISOString(),
+      this.activeIds(),
+    );
+  }
+
+  /** 活跃会话 id：有占位 run 或正在流式生成的会话 */
+  private activeIds(): string[] {
+    const ids = new Set(this.running);
+    for (const [sessionId, entry] of this.entries) {
+      if (entry.session.isStreaming) ids.add(sessionId);
+    }
+    return [...ids];
   }
 }

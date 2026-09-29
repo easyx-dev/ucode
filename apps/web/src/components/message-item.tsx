@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { ToolCallCard } from "@/components/tool-call-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { clockLabel } from "@/lib/time";
@@ -82,12 +83,7 @@ export function MessageItem({ item }: { item: ChatItem }) {
         // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
         <BlockView key={`${item.id}-${index}`} block={block} live={item.live} />
       ))}
-      {item.live && item.blocks.length === 0 ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="size-1.5 animate-pulse rounded-full bg-current" />
-          {t("思考中…")}
-        </div>
-      ) : null}
+      {item.live && item.blocks.length === 0 ? <ThinkingIndicator /> : null}
       {!item.live && item.model ? (
         <div className="text-xs text-muted-foreground">
           {item.model} · {clockLabel(item.createdAt)}

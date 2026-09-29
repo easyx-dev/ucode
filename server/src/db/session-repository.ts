@@ -199,6 +199,20 @@ export class SessionRepository {
     this.db.prepare("DELETE FROM session WHERE id = ?").run(id);
   }
 
+  /**
+   * 清理过期草稿：只删 `persisted = 0` 且 `updated_at` 早于 cutoff 的行，
+   * `keepIds` 内的活跃会话豁免（草稿只有覆盖值，没有 JSONL 与事件序号，删行即可）。
+   * 草稿的 `updated_at` 就是创建时间——`set()` 不更新它，所以这里衡量的正是「多久没动过」。
+   */
+  deleteStaleDrafts(cutoffIso: string, keepIds: readonly string[] = []): number {
+    const keepClause =
+      keepIds.length > 0 ? ` AND id NOT IN (${keepIds.map(() => "?").join(", ")})` : "";
+    const result = this.db
+      .prepare(`DELETE FROM session WHERE persisted = 0 AND updated_at < ?${keepClause}`)
+      .run(cutoffIso, ...keepIds);
+    return Number(result.changes);
+  }
+
   list(): SessionRecord[] {
     return this.db
       .prepare(`SELECT ${SESSION_COLUMNS} FROM session ORDER BY updated_at DESC`)
@@ -206,10 +220,14 @@ export class SessionRepository {
       .map((row) => toRecord(rowSchema.parse(row)));
   }
 
-  /** 列表查询：过滤与排序都下推到 SQL，只有已落盘且文件仍在的会话参与 */
+  /**
+   * 列表查询：过滤与排序都下推到 SQL。
+   * 草稿行（`persisted = 0`，尚未落盘）也参与，前端刷新后仍能看到未完成的会话；
+   * 长期未使用的草稿由 `deleteStaleDrafts` 清理，不会无限堆在列表里。
+   */
   search(query: SessionSearchInput): SessionSearchResult {
     const needle = query.q?.trim().toLowerCase();
-    const conditions = ["persisted = 1", "source_path IS NOT NULL"];
+    const conditions = ["(persisted = 0 OR source_path IS NOT NULL)"];
     const params: string[] = [];
 
     if (needle) {

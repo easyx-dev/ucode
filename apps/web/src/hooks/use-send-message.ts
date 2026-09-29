@@ -11,10 +11,21 @@ type SendMessageOptions = {
   readItems: () => ChatItem[];
   apply: (items: ChatItem[]) => void;
   onError: (message: string | null) => void;
+  /** 发送瞬间进入「等首个事件」的 pending 态，避免消息区空窗 */
+  markPending: () => void;
+  /** prompt 请求失败时回收 pending */
+  clearPending: () => void;
 };
 
-export function useSendMessage({ sessionId, readItems, apply, onError }: SendMessageOptions) {
-  /** prompt 请求本身的在途状态；生成是否结束看 running */
+export function useSendMessage({
+  sessionId,
+  readItems,
+  apply,
+  onError,
+  markPending,
+  clearPending,
+}: SendMessageOptions) {
+  /** prompt 请求本身的在途状态；消息区提示由 pending / running 承担 */
   const [sending, setSending] = useState(false);
 
   const send = useCallback(
@@ -23,15 +34,18 @@ export function useSendMessage({ sessionId, readItems, apply, onError }: SendMes
       onError(null);
       apply(appendUserItem(readItems(), text));
       setSending(true);
+      // 立刻给出反馈：建会话 + 首个 token 都算在这段等待里
+      markPending();
       try {
         await api.messages.prompt({ sessionId, text });
       } catch (error) {
         onError(describeError(error));
+        clearPending();
       } finally {
         setSending(false);
       }
     },
-    [apply, onError, readItems, sessionId],
+    [apply, clearPending, markPending, onError, readItems, sessionId],
   );
 
   return { sending, send };

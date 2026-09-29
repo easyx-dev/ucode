@@ -10,6 +10,7 @@ import {
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
+  DEFAULT_DRAFT_TTL_MS,
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   LOG_LEVELS,
@@ -81,6 +82,7 @@ export const env = {
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
+  draftTtlMs: resolveNum(process.env.APP_DRAFT_TTL_MS, DEFAULT_DRAFT_TTL_MS),
   corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
   logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
 };

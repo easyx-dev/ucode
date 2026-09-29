@@ -31,9 +31,16 @@ type SessionStreamOptions = {
 export function useSessionStream({ sessionId, readItems, apply, onError }: SessionStreamOptions): {
   loadingHistory: boolean;
   running: boolean;
+  /** 已受理、还没收到首个活动事件；用来补上「点发送」到「首个事件」之间的空窗 */
+  pending: boolean;
+  /** 发送时调用，立即进入 pending；首个活动事件 / 收尾 / 出错时自动消除 */
+  markPending: () => void;
+  /** prompt 请求本身失败时调用，回收 pending */
+  clearPending: () => void;
 } {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [running, setRunning] = useState(false);
+  const [pending, setPending] = useState(false);
 
   const sessionIdRef = useRef(sessionId);
   const hydratingRef = useRef(false);
@@ -46,15 +53,23 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
     handlersRef.current = { readItems, apply, onError };
   });
 
+  const markPending = useCallback(() => setPending(true), []);
+  const clearPending = useCallback(() => setPending(false), []);
+
   /** 应用一条事件帧：维护 running，再交给 reducer 归并 */
   const applyFrame = useCallback((frame: ServerEventPayload) => {
     const { apply: applyItems, readItems: read } = handlersRef.current;
     if (frame.type === "agent_settled") {
       setRunning(false);
+      setPending(false);
       applyItems(settle(read()));
       return;
     }
-    if (ACTIVITY_EVENTS.has(frame.type)) setRunning(true);
+    // 首个活动事件到达即接手生成态，pending 让位给 running
+    if (ACTIVITY_EVENTS.has(frame.type)) {
+      setRunning(true);
+      setPending(false);
+    }
     applyItems(reduceEvent(read(), frame.type, frame.data));
   }, []);
 
@@ -86,6 +101,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
         })),
       );
       setRunning(snapshot.running);
+      setPending(false);
       report(null);
 
       const buffered = bufferRef.current;
@@ -113,7 +129,10 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
       if (frame.type === "server.connected") return;
       if (frame.type === "error") {
         if (frame.sessionId && frame.sessionId !== sessionIdRef.current) return;
-        if (frame.sessionId) setRunning(false);
+        if (frame.sessionId) {
+          setRunning(false);
+          setPending(false);
+        }
         handlersRef.current.onError(describeApiError(frame.code, frame.message, frame.params));
         return;
       }
@@ -149,6 +168,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
     bufferRef.current = [];
     hydratingRef.current = false;
     setRunning(false);
+    setPending(false);
 
     const { apply: applyItems, onError: report } = handlersRef.current;
     applyItems([]);
@@ -161,5 +181,5 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
     void hydrate();
   }, [hydrate, sessionId]);
 
-  return { loadingHistory, running };
+  return { loadingHistory, running, pending, markPending, clearPending };
 }

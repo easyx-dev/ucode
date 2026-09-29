@@ -7,6 +7,7 @@ import { SessionEventBus } from "./core/event-bus";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { SessionRepository } from "./db/session-repository";
+import { env } from "./env";
 import { logger } from "./lib/logger";
 import { AppError } from "./lib/response";
 
@@ -34,6 +35,8 @@ export const createServices = async (): Promise<Services> => {
   config.load();
   // 以 JSONL 为准对齐索引：补齐外部新增、清理文件已消失的行
   await sessions.reconcile();
+  // 启动时没有活跃会话，过期草稿无需豁免
+  sessions.deleteStaleDrafts(new Date(Date.now() - env.draftTtlMs).toISOString());
   await runtime.apply(config.get());
   // 内置 provider 集合要在首次 apply 之后才拿到，所以这里才能判断条目是否可落地；
   // 手改 config.json 留下的坏条目会被 pi 静默忽略，至少让它可见（不阻断启动）

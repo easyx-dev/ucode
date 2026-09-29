@@ -23,20 +23,24 @@ export const createMessagesRoute = (services: Services) => {
   router.post("/list", jsonBody(messageListInputSchema), async (c) => {
     const { sessionId } = c.req.valid("json");
     const record = services.sessions.find(sessionId);
-    const manager = record?.sourcePath
-      ? SessionManager.open(
-          record.sourcePath,
-          env.sessionsRoot,
-          record.piCwd || record.cwd || env.workspaceDir,
-        )
-      : null;
+    const live = services.pool.get(sessionId);
+    // 会话在池中时以它的内存条目为准：草稿（首轮回复完成前）还没写 JSONL，
+    // 只读文件会让刷新后的对话区空着，直到首条 assistant 消息落盘。
+    const manager =
+      live?.sessionManager ??
+      (record?.sourcePath
+        ? SessionManager.open(
+            record.sourcePath,
+            env.sessionsRoot,
+            record.piCwd || record.cwd || env.workspaceDir,
+          )
+        : null);
     const entries = manager ? manager.buildContextEntries() : [];
 
     // 序号与投影必须在同一同步块内取：中间一旦插入事件，
     // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量。
-    // 会话尚未落盘（首轮回复完成前）时 entries 为空，投影仍能给出在途消息。
     const seq = services.events.latestSeq(sessionId);
-    const projection = projectMessages(sessionId, services.pool.get(sessionId), entries);
+    const projection = projectMessages(sessionId, live, entries);
 
     return c.json(
       ok({

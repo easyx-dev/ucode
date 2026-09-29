@@ -68,6 +68,9 @@
   对话框遮罩由 `bg-black/10` 改用 `bg-overlay`。
 - 前端新增依赖 `dayjs`：会话列表的相对时间与消息时刻改用它（`relativeTime` 插件 + `zh-cn` locale），
   替换手写的差量计算。列表文案随之变为「几秒前 / 55 分钟前 / 1 天前」。
+- `sessions/list` 现在会带出未落盘的草稿会话（`persisted = 0`）：新建但还没发消息的会话刷新后不再消失；
+  新增 `APP_DRAFT_TTL_MS`（默认 7 天）清理长期未使用的草稿，运行中的会话豁免。
+- 草稿会话的时间改用数据库行的真实 `created_at` / `updated_at`，排序口径与已落盘会话一致。
 
 ### 变更
 
@@ -126,6 +129,10 @@
   若旧值指向的 provider 已被替换掉，清空并回落到「第一个可用模型」，避免保存成功但运行时不可用。
 - 修复 `models/list` 的 `available` 恒为 `false`：`ModelRuntime.create({ refreshOnCreate: false })` 后从未刷新鉴权快照，
   `hasConfiguredAuth()` 一直是空集；改为按 provider 注入 apiKey 时会同步该 provider 的鉴权状态。
+- 新会话发送首条消息后不再有「无加载反馈」的空窗：发送瞬间即进入 pending 态，
+  消息区尾部立刻显示「思考中…」，直到首个生成事件或收尾、出错时消除。
+- 首轮回答完成前刷新不再丢失会话：当前选中会话同步到 URL（`?session=`），刷新后据此恢复；
+  在途草稿会话也会出现在列表里，`messages/list` 改读活跃会话的内存条目，对话区不再空白。
 
 ### 移除
 

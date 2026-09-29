@@ -21,7 +21,8 @@ export function useSessionList(): SessionListController {
   const { t } = useTranslation();
   const [server, setServer] = useState<SessionSummary[]>([]);
   const [local, setLocal] = useState<SessionSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 初始即为 true：挂载后立刻 refresh，等待期间别让「URL 里的会话不存在」的判定提前生效
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(
     async (query?: string) => {

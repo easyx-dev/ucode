@@ -55,7 +55,12 @@ export function ChatPanel({
         </div>
       ) : null}
 
-      <MessageList items={chat.items} loading={chat.loadingHistory} empty={empty} />
+      <MessageList
+        items={chat.items}
+        loading={chat.loadingHistory}
+        pending={chat.pending}
+        empty={empty}
+      />
 
       <Composer
         streaming={chat.streaming}

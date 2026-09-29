@@ -11,7 +11,7 @@ export function useWorkspace() {
   const sessions = useSessions();
   const models = useModels();
   const health = useHealth();
-  const { activeId, setActiveId } = useActiveSession(sessions.sessions);
+  const { activeId, setActiveId } = useActiveSession(sessions.sessions, sessions.loading);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const configured = models.data?.configured ?? false;
