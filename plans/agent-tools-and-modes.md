@@ -25,6 +25,7 @@
 | 2 · 模式 + 权限引擎 + 审批 UI | 已完成 | `7eef6ce` |
 | 2.5 · plan 重做（present_plan + 决策表单） | 已完成 | `29e22d3` |
 | 3 · 会话工作区 + ask 模式成品 | 已完成 | `c94b53b` |
+| 3.5 · pi 升级 0.99 + 工具选择机制迁移 | 已完成 | `6ca1606` |
 | 4 · 自研系统提示词 | 未开始 | — |
 | 5 · question 双向通道 | 未开始 | — |
 | 6 · 项目级 Memory | 未开始 | — |
@@ -42,6 +43,9 @@
   - `websearch`：定义 `SearchProvider` 接口，先接 brave / tavily，key 走设置页，不硬编码某一家。
 - **按需局部替换**：仅当某工具确实需要自定义行为（自定义输出格式、pattern 级权限等）时，
   才用自研版单独替换该工具；优先级最低，不在首批范围。
+- **默认工具选择走 `defaultTools`（显式列出内置工具 + `codemode`）**，不对 `build` 传 `tools` 白名单——
+  白名单会静默屏蔽 pi 扩展与 MCP 注册的工具（阶段 1 遗留问题，阶段 3.5 解决）。
+  `tools` 只保留给 `plan` / `ask` 的显式只读集合。
 
 ### 助手模式（ask）
 
@@ -75,7 +79,9 @@ server/src/agent/
 | 需求 | pi 提供的接缝 |
 | --- | --- |
 | 注入自研工具 | `createAgentSession({ customTools: [defineTool(...)] })` |
-| 启用内置工具 | `createAgentSession({ tools: [...] })` |
+| 默认工具选择 | `defaultTools` 设置（显式内置清单，替换默认集）；`tools` 白名单只用于只读模式 |
+| 并行 / 复合工具调用 | `createCodemodeExtension()`（QuickJS 沙箱，脚本内 `tools.<name>()`） |
+| 外部工具接入 | `createMcpExtension()` + `session.bindExtensions({})`（`session_start` 时连接） |
 | 自研系统提示词 | `DefaultResourceLoader({ systemPromptOverride })` 或自写 `ResourceLoader` |
 | 模式 / 权限拦截 | `pi.on("tool_call", ...)`（可改参、可阻断） |
 | Memory / 统计触发 | `agent_settled` / `turn_end` 钩子 |
@@ -99,10 +105,11 @@ server/src/agent/
 | 1 | 工具层：grep/find、webfetch、websearch | 0 | 契约（websearch 设置） |
 | 2 | 模式 + 权限引擎 + 审批 UI | 0 | 契约（MODES / 会话 mode） |
 | 3 | 会话工作区 + ask 模式成品 | 0、2 | DB（阶段 0 已含） |
+| 3.5 | pi 升级 0.99 + 工具选择机制迁移 | 1、2 | 依赖升级（无新增契约） |
 | 4 | 自研系统提示词 | 0、2 | 无 |
 | 5 | question 双向通道 | 0 | 契约（新接口） |
 | 6 | 项目级 Memory | 0、4 | 契约 + 设置 |
-| 7 | 使用统计 / 编辑历史 / MCP / 子智能体 / goal | 各自独立 | 视功能 |
+| 7 | 接内置 MCP / 子智能体 / goal / 统计 / 编辑历史 | 各自独立 | 视功能 |
 
 ### 阶段 0 · 测试基建 + 组装层骨架
 
@@ -212,6 +219,45 @@ server/src/agent/
   会话工作目录的推导不再有回落到 `$APP_HOME` 的分支（那里放着 config.json 与 pi/auth.json，
   且在 cwd 之内、不会触发越界审批）。
 
+### 阶段 3.5 · pi 升级 0.99 + 工具选择机制迁移
+
+**目标**：pi 从 0.87.1 升到 0.99.x，并兑现「风险与边界」里 `tools` 白名单屏蔽扩展工具这条遗留问题；
+为阶段 4 的系统提示词定下稳定的工具选择机制，同时启用内置 `codemode`。
+
+**改动点**
+
+- `server/package.json`：`@earendil-works/pi-coding-agent` → `^0.99.1`；`pnpm install`；
+  `CHANGELOG.md` 记入「变更」（依赖升级属流程状态）。
+- `server/src/agent/session-config.ts` / `tools/index.ts` / `modes/index.ts`：
+  - `build` 模式不再传 `tools` 白名单，改为 `SettingsManager.applyOverrides({ defaultTools: [...] })`
+    （内置工具名 + `codemode`；自研工具经 `customTools` 注册即启用，不受 `defaultTools` 影响）。
+  - `plan` / `ask` 继续用显式 `tools` 白名单（只读集合，天然排除扩展 / codemode / MCP），不变。
+  - 收窄 `createSessionLoader` 里「`reload()` 后枚举扩展工具名」（`loader.getExtensions()`）的逻辑：
+    `build` 不再需要它。
+- 启用内置扩展：`extensionFactories` 加 `createCodemodeExtension({ mode: "on" })`。
+  （`tool_search` 与 MCP 留到阶段 7。）
+- 兼容核查：`SessionEntry` switch、`steer` / `followUp` 返回值、`bash` 结构化结果上限、
+  `--no-extensions` 语义（0.99 CHANGELOG 的「Changed」段）。
+
+**验收**：`pnpm check` + `pnpm smoke` 全绿；`build` 模式下扩展工具仍可用且能写 codemode 脚本；
+`plan` / `ask` 工具集与阶段 2 完全一致。
+
+**阶段 3.5 复盘（落地时的偏差）**
+
+- pi 升到 0.99.1 后 `pnpm -F @ucode/server typecheck` 一次通过，没有需要适配的破坏性改动。
+- 工具选择落进 `MODES[mode].toolSelection`（判别联合 `defaultTools` / `allowlist`）：`build` → 内置工具
+  + `codemode` 的默认集，`plan` / `ask` → 只读白名单，`session-config` 只做透传。
+  `createSessionLoader` 不再 `reload()` 后枚举扩展工具名；`buildSessionTools` 更名 `buildCustomTools`、
+  收窄为只返回 `customTools`。
+- codemode 用 `createCodemodeExtension({ mode: "on" })` 显式指定，不依赖 settings 默认值。
+- 顺带修 `core/pool.ts` 未使用的 `DEFAULT_SESSION_MODE` 导入（阶段 3 遗留，`pnpm check` 会报）。
+- 验收：`pnpm check` 全绿（79 单测 + 6 项约定校验）；`pnpm smoke` 通过；
+  `session-config.test.ts` 起离线 dummy provider 走真实 pi SDK，断言 build 含 `codemode`、自研工具未被过滤，
+  plan / ask 仍是只读白名单——同时兜住「`DEFAULT_EXTENSION_TOOLS` 与 pi 注册名脱节后静默失效」。
+- `smoke` 扩展一步：真实模型下让 build 会话用 `codemode` 跑脚本并回传 `tools.bash` 输出（`codemode: OK`）。
+  为此踩到一个时序约束——`settingsManager.applyOverrides` 必须在 `loader.reload()` **之后**，
+  reload 会重读设置、冲掉 reload 前的 in-memory 覆盖；已在 `session-config` 与 `smoke` 就地写明。
+
 ### 阶段 4 · 自研系统提示词
 
 - `server/src/agent/prompt/`：分节拼装（身份 / 工具说明 / 模式约束 / 项目上下文），参考 opencode 写法。
@@ -237,8 +283,14 @@ server/src/agent/
 
 ### 阶段 7 · 后续（概要）
 
-使用统计（`agent_settled` / `message_end` → SQLite）、编辑历史（`SessionManager` fork）、
-MCP 客户端（自研）、子智能体（复用组装层起子会话）、goal 模式（复用模式层）。
+- 7a **接内置 MCP**：`createMcpExtension()` + `session.bindExtensions({})`；配置来源先只读
+  `$APP_HOME/pi/mcp.json`（用户级，不做项目级与 OAuth）；权限按 MCP annotations
+  （`readOnlyHint` / `destructiveHint` / `openWorldHint`）判定，未命中规则的 `mcp__*` 调用走审批；
+  `plan` / `ask` 不加载 MCP 扩展——它连上后会主动 `setActiveTools()` 激活 `codemode`，绕过只读白名单。
+  P0 鉴权暂缓（见 `TODO.md`），**不作为本阶段前置**；未落地前服务只能在本机 / 可信环境使用。
+- 7b `tool_search`（`deferred` 暴露的 MCP 工具）。
+- 7c 子智能体（复用组装层起子会话）、goal 模式（复用模式层）。
+- 7d 使用统计（`agent_settled` / `message_end` → SQLite）、编辑历史（`SessionManager` fork）。
 
 ## 四、测试方案
 
@@ -314,6 +366,14 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
 | WS-03 | 孤儿目录超过 TTL | sweeper 清理，活跃会话豁免 |
 | WS-04 | 工具传入含 `../` 的路径 | 拒绝 |
 
+**阶段 3.5 · pi 升级与工具选择**
+
+| 编号 | 用例 | 预期 |
+| --- | --- | --- |
+| TS-01 | `build` 模式装配 | 走 `defaultTools`，扩展工具不被白名单过滤 |
+| TS-02 | `plan` / `ask` 模式装配 | 仍为只读白名单，不含扩展工具与 `codemode` |
+| TS-03 | 升级后跑既有 L2 / L3 用例 | 无回归 |
+
 **阶段 4~6 · 提示词 / question / Memory**
 
 | 编号 | 用例 | 预期 |
@@ -338,15 +398,16 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
   删本地 `app.db` 后会全部回落 `build`。阶段 2 若要让模式可恢复，需把它写进会话文件
   （pi 的 `custom` 条目，注意别进模型上下文）并在对账时读回。
 - **替换 pi 内置工具**（自研 grep/find）只有当确需自定义行为时才做，避免重写已有能力。
-- **显式 `tools` 白名单会屏蔽扩展工具**（阶段 1 已落地）：pi 的 `tools` 是白名单，一旦给出，
-  不在名单里的 pi 扩展 / pi 包 / MCP 注册的工具都会被静默过滤（`agent-session` 的
-  `_refreshToolRegistry` 对 `registeredTools` 同样套 `isAllowedTool`）。阶段 2 设计模式工具集时
-  要把「扩展工具怎么进白名单」一并定下来：`createAgentSession` 返回的 `extensionsResult` 里有工具名，
-  但白名单是构造期入参，得在装配前拿到。
+- ~~**显式 `tools` 白名单会屏蔽扩展工具**~~ → **阶段 3.5 已解决**：`build` 改走 `defaultTools`
+  （显式内置清单），`tools` 仅用于 `plan` / `ask` 的只读集合。
+- **MCP 会主动激活 `codemode`**：MCP 扩展在服务器连接时调 `pi.setActiveTools()`，与模式白名单无关；
+  `plan` / `ask` 必须不加载该扩展（阶段 7a）。
+- **P0 鉴权暂缓**：MCP 接入不依赖它，但服务在 P0 落地前不得暴露到不可信网络（见 `TODO.md`）。
 
 ## 六、落地顺序
 
-`阶段 0 → 1a → 1b / 1c → 2 → 3`，之后 4~7 逐个立项。
+`阶段 0 → 1a → 1b / 1c → 2 → 3 → 3.5 → 4 → 5 → 6 → 7`。
 
 阶段 1a 最快见效；**阶段 2（模式 / 权限）必须先于阶段 3（ask 成品）完成**，
 否则模式判断会散进工具代码，三个模式（ask / plan / goal）无法共用底座。
+**阶段 3.5 必须先于阶段 4**：阶段 4 的系统提示词按工具集书写，选择机制再改会返工。

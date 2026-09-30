@@ -2,6 +2,8 @@
 
 ## P0 · 给 `/api/v1` 加鉴权，并默认只监听回环地址
 
+> **状态：暂缓（2026-09-30）。** 只有收到用户的明确指令才启动；不要在其它阶段 / 任务里顺手做，也不要反复询问。落地前不得把服务暴露到公网或不可信网络（见 `AGENTS.md`「已知边界」）。
+
 **现状（已在真实运行实例上验证）**：`server/src/index.ts` 的 `serve({ fetch: app.fetch, port: env.port })` 未指定 `hostname`，Node 绑定 `::`（所有网卡）；`app.use("*", cors({ origin: env.corsOrigin }))` 的默认值是 `*`；整个 `server/src` 没有任何请求级鉴权（只有 pi 自己的 `authPath`）。
 
 实测：
@@ -113,7 +115,8 @@ https://pi.dev/packages/pi-web-access
 https://pi.dev/packages/@juicesharp/rpiv-ask-user-question
 
 ## MCP 支持
-https://pi.dev/packages/pi-mcp-adapter
+pi 0.99 起内置 codemode / tool_search / MCP，不再用第三方 `pi-mcp-adapter`；接入方案见
+[`plans/agent-tools-and-modes.md`](./plans/agent-tools-and-modes.md) 阶段 7a。
 
 ## 子智能体
 参考 https://pi.dev/packages/pi-subagents
@@ -135,7 +138,7 @@ https://pi.dev/packages/@gotgenes/pi-permission-system
 
 ## 助手模式（ask）
 最终设计已定稿，见 [`plans/agent-tools-and-modes.md`](./plans/agent-tools-and-modes.md)：模式 slug 用 `ask`（界面文案「问答」），
-模式与工作区解耦，工作区为 `$APP_HOME/workspace/<sessionId>/{uploads,outputs}`，只承诺只读工具集（禁 `bash`），不承诺只读权限。
+模式与工作区解耦，未绑定目录的会话落在 `$APP_HOME/workspace/<sessionId>`（就是它的工作目录，不预设子目录），只承诺只读工具集（禁 `bash`），不承诺只读权限。
 
 ## goal 模式(目标模式)
 https://pi.dev/packages/@schovest/pi-goal
