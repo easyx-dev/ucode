@@ -1,5 +1,8 @@
 /**
- * 冒烟测试：不走 HTTP，直接用 pi SDK 验证「端点 + 模型 + 工具 + 流式」是否跑通。
+ * 冒烟测试：不走 HTTP，直接用 pi SDK 验证「端点 + 模型 + 工具 + 流式 + codemode」是否跑通。
+ *
+ * codemode 只验证「沙箱能执行脚本并回传工具结果」，不验证模型工具选择的稳定性，
+ * 所以提示词写得足够直接、断言足够具体；仍属 L4 手动层，不进 `pnpm check`。
  *
  * 用法（默认值即 README 里的测试端点）：
  *   pnpm -F @ucode/server smoke
@@ -10,12 +13,16 @@ import { resolve } from "node:path";
 
 import {
   createAgentSession,
+  createCodemodeExtension,
+  DefaultResourceLoader,
   ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
 import type { ThinkingLevel } from "@ucode/contracts";
+
+import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../src/agent/tools/index";
 
 const args = process.argv.slice(2);
 const readArg = (name: string, fallback: string): string => {
@@ -29,6 +36,8 @@ const apiKey = readArg("api-key", "devtest");
 const modelId = readArg("model", "deepseek-v4-flash");
 const thinkingLevel = readArg("thinking", "medium") as ThinkingLevel;
 const providerId = "local";
+/** 脚本里要回传的标记串，用它判断沙箱执行结果有没有真的回到正文 */
+const CODEMODE_MARKER = "smoke-codemode-ok";
 
 const root = resolve(import.meta.dirname, "..");
 const workDir = resolve(root, "../.tmp/smoke");
@@ -79,6 +88,21 @@ if (!model) {
   process.exit(1);
 }
 
+// codemode 走内联扩展 + defaultTools，与真实会话同一套装配方式；
+// 工具名取自 agent 的常量，避免与 pi 注册名脱节后这里静默少一个工具
+const settingsManager = SettingsManager.inMemory();
+const resourceLoader = new DefaultResourceLoader({
+  cwd: workDir,
+  agentDir,
+  settingsManager,
+  extensionFactories: [createCodemodeExtension({ mode: "on" })],
+});
+await resourceLoader.reload();
+// 必须在 reload 之后：reload 会重读设置，把 reload 前的 in-memory 覆盖冲掉
+settingsManager.applyOverrides({
+  defaultTools: [...DEFAULT_BUILTIN_TOOLS, ...DEFAULT_EXTENSION_TOOLS],
+});
+
 const { session } = await createAgentSession({
   cwd: workDir,
   agentDir,
@@ -86,9 +110,12 @@ const { session } = await createAgentSession({
   model,
   thinkingLevel,
   sessionManager: SessionManager.inMemory(),
-  settingsManager: SettingsManager.inMemory(),
+  settingsManager,
+  resourceLoader,
 });
 
+/** 本轮真正执行过的工具名 */
+const toolsRan: string[] = [];
 session.subscribe((event) => {
   switch (event.type) {
     case "message_update": {
@@ -99,6 +126,7 @@ session.subscribe((event) => {
       break;
     }
     case "tool_execution_start":
+      toolsRan.push(event.toolName);
       process.stdout.write(`\n[tool] ${event.toolName} ${JSON.stringify(event.args)}\n`);
       break;
     case "tool_execution_end":
@@ -119,5 +147,17 @@ const elapsed = Date.now() - startedAt;
 console.log(`\n\n[smoke] OK (${(elapsed / 1000).toFixed(1)}s)`);
 console.log(`[smoke] lastAssistantText: ${JSON.stringify(session.getLastAssistantText() ?? null)}`);
 console.log(`[smoke] messages: ${session.messages.length}`);
+
+toolsRan.length = 0;
+console.log("\n[smoke] codemode …\n");
+await session.prompt(
+  `用 codemode 工具写一段 JavaScript：在脚本里调用 tools.bash 执行 \`echo ${CODEMODE_MARKER}\`，` +
+    "把命令输出通过脚本返回给我。只做这一件事。",
+);
+const codemodeText = session.getLastAssistantText() ?? "";
+const codemodeRan = toolsRan.includes("codemode") && codemodeText.includes(CODEMODE_MARKER);
+console.log(
+  `\n[smoke] codemode: ${codemodeRan ? "OK" : "FAILED"}（执行过的工具：${toolsRan.join(", ") || "无"}）`,
+);
 session.dispose();
-process.exit(0);
+process.exit(codemodeRan ? 0 : 1);

@@ -50,36 +50,14 @@
   归档只写 `deleted_at`，行、JSONL 与工作区目录全部保留，列表默认过滤已归档的会话。
 - 侧栏分「项目区 / 助理区」两段：项目区按会话 cwd 归组（组名取目录末段），助理区（助理根之下）
   平铺展示；不再有「项目登记表」，分组完全由目录决定。
-
-### 变更
-
-- `session` 表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /
-  `entry_count` / `message_count`，新增 `deleted_at`；`reconcile()` 不再从 JSONL 还原元数据
-  （外部导入能力放弃），只做「有行无文件」的清理；schema 版本收敛为 1，本地删 `app.db` 重建。
-- 删除 `project` 表与 `/api/v1/projects/*` 四个接口、前端项目空间相关入口与文案。
-- 删除草稿 TTL 清理（`deleteStaleDrafts` 与环境变量 `APP_DRAFT_TTL_MS`）：会话在首条消息时创建，
-  空行由对账清理；工作区孤儿清理保留但去掉 TTL（目录在会话要跑时才建，DB 行必然早于它存在，
-  「无行」即「无主」）。
-- `health.workspace` 改指助理根目录（原为 agent 工作目录）。
-- 会话列表不再返回 `messageCount`（前端不展示）。
-- 未知会话不再被放行：`messages/prompt` / `sessions/update` 对不存在的 `sessionId` 返回 404；
-  会话工作目录的推导随之只认已有记录，删掉了「查不到就回落到 `$APP_HOME`」那条分支
-  （`env.workspaceDir` 一并删除）。
-
-### 移除
-
-- 移除 `POST /sessions/delete`（由 `POST /sessions/archive` 取代）。
-- 移除 `messages/prompt` 的 `cwd` 字段（会话级设置只在 `sessions/create`）。
-- 移除 `SessionSummary.messageCount` 与 `SessionInfoResponse` 的 `persisted` / `entries` 字段。
-
-### 新增（阶段 2）
-
-- 新增助手模式 `build` / `plan` / `ask`（默认 `build`）：模式 = 工具白名单 + 权限规则 + 提示词片段，
+- 启用内置 `codemode` 工具（`build` 模式）：模型可写 JavaScript，在沙箱内并行调用其它工具、
+  先过滤大输出再回模型。
+- 新增助手模式 `build` / `plan` / `ask`（默认 `build`）：模式 = 工具选择 + 权限规则 + 提示词片段，
   经 `server/src/agent/modes` 声明。`plan` / `ask` 均为只读（工具集不含 `edit` / `write` / `bash`，
   只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式片段经 `appendSystemPrompt` 注入，
   切换模式会重建会话实例。composer 底部新增模式选择器，模式持久化到 `session.mode`。
-- plan 模式重做（阶段 2.5）：新增自研工具 `present_plan`（只在 plan 模式注册），
-  模型产出计划后调用它收尾。前端在本轮以 `present_plan` 收尾时，用「计划决策表单」替掉输入区：
+- plan 模式重做：新增自研工具 `present_plan`（只在 plan 模式注册），模型产出计划后调用它收尾。
+  前端在本轮以 `present_plan` 收尾时，用「计划决策表单」替掉输入区：
   「批准并执行」切换到 `build` 模式并自动发一条「计划已批准，请开始执行。」，
   「提交反馈」则带着意见留在 plan 模式继续讨论。计划只作为对话消息，不落盘。
 - 新增权限引擎 `server/src/agent/permissions`：声明式规则（工具名 + pattern + `allow` / `ask` / `deny`，
@@ -87,24 +65,19 @@
   挂到 `tool_call` 上拦截。默认规则：`.env` / `.env.*` 的读写阻断（`.env.example` 放行）、
   工作目录之外的路径走审批（`external_directory`）。「本会话恒允」按判定给出的范围追加一条会话级
   allow 规则（越界检查按父目录，如批准 `/etc/hosts` 只记住 `/etc/**`），而不是笼统放行整个工具。
-  `build` 模式的工具白名单会并入从 loader 发现到的扩展工具名（pi 的 `tools` 是白名单，
-  否则扩展工具会被静默过滤）。
 - 新增交互请求通道（「服务端提问、前端回答」，当前服务权限审批）：新增 `interactions/list` /
   `interactions/respond` 两个接口，事件流新增 `interaction_request` / `interaction_resolved`；
   审批超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）与会话删除按拒绝结算。
   前端新增权限审批弹窗（允许一次 / 本会话恒允 / 拒绝）。
-- 契约新增 `PERMISSION_ACTIONS` / `PERMISSION_DECISIONS` 常量与 `interactions` 域
-  （请求 / 响应类型）。
-
-- 新增自研工具（阶段 1）：`webfetch` 抓公网链接并用 `turndown` 转 markdown
+- 契约新增 `PERMISSION_ACTIONS` / `PERMISSION_DECISIONS` 常量与 `interactions` 域（请求 / 响应类型）。
+- 新增自研工具：`webfetch` 抓公网链接并用 `turndown` 转 markdown
   （响应体上限 5MB、超时默认 30s / 最长 120s、目标准入拦住回环 / 私网 / 链路本地与云元数据并逐跳校验重定向、
   交给模型的正文再按 pi 内置工具同档的 50KB 截断、返回内容以 `<fetched>` 边界包裹并中和正文里的同名标签，
   声明为不可信内容）；`websearch` 走 provider 抽象，先接 `tavily` / `searxng` / `brave`，
   前置条件（key 或实例地址）缺失、写错时返回可读错误而非崩溃。
   两者经 `customTools` 注入，并带系统提示词片段与注入隔离说明。
 - 会话工具集启用 pi 内置只读检索工具 `grep` / `find` / `ls`（此前只有 read / bash / edit / write），
-  由 `agent/tools/index.ts` 的 `buildSessionTools` 统一输出「内置白名单 + 自研工具名」——
-  pi 的 `tools` 是白名单，自研工具漏进去会被静默过滤，故成对维护。
+  内置清单与自研工具名由 `agent/tools/index.ts` 声明。
 - `config.json` 新增 `websearch: { provider, apiKey, baseUrl }`（默认 `tavily` + 空值）：
   `config/update` 可局部更新（`apiKey` 留空表示沿用已保存的 key，`baseUrl` 留空即清空），
   `config/info` 返回脱敏视图（`apiKeyMasked` / `baseUrl` / `configured`）；
@@ -112,25 +85,16 @@
   契约新增 `SEARCH_PROVIDERS` / `SEARCH_PROVIDER_LABELS` / `KEYLESS_SEARCH_PROVIDERS` 与 `WebsearchView`。
   provider 三家：`tavily`（默认，免费档不用绑卡）、`searxng`（自建实例，无 key）、`brave`（新用户已需绑卡）。
 - 新增依赖 `turndown`（HTML → markdown）与 `typebox`（自研工具的参数 schema），`@types/turndown` 为开发依赖。
-
 - 新增 `server/src/agent/`（会话装配层）：`session-config.ts` 把「会话覆盖值 + 运行时」收敛成
   `createAgentSession` 参数，`pool.ensure` 改为经它组装；后续的模式 / 工具集 / 自研提示词都从这里汇入。
-- 新增会话模式 `mode`（`build` / `plan` / `ask`，默认 `build`）与会话专属 `workspace_dir` 列（schema v3）：
-  会话契约新增 `mode`，`sessions/create|update` 可设置，`sessions/list|info` 返回。
+- 新增会话模式 `mode`（`build` / `plan` / `ask`，默认 `build`）：会话契约新增 `mode`，
+  `sessions/create|update` 可设置，`sessions/list|info` 返回。
 - 新增 `node:test` 单元测试（server），根 `pnpm test` 递归执行，`pnpm check` 纳入测试；
   `scripts/verify` 新增 tests 校验（有测试用例的包必须声明 `test` 脚本，避免被 `pnpm -r test` 静默跳过）。
-
-- 会话列表默认按项目分组：新增 `project` 表登记目录（`projects/list|create|update|delete`），
-  会话按 `cwd` 与项目 `path`（均经 `realpath` 归一）匹配归组，匹配不到的进「默认」分组（始终置底）；
-  分组可折叠，折叠状态记 `localStorage`；组内可直接新建会话（用该项目目录为 `cwd`）。
-- 会话侧栏「添加项目空间」打开目录选择对话框：浏览 / 返回上级 / 直接输入路径（结尾带 `/` 进入该目录，
-  不带则把末段当检索词在上级目录里过滤，防抖定位）/ 就地新建文件夹，确认后仅登记分组。
 - 新增 `fs` 域（`fs/list` / `fs/mkdir`）：文件系统浏览（`path` 省略时从用户 home 开始，条目带
   `type` / `size` / `updatedAt`，目录在前，`q` 按名称模糊过滤）与新建目录；设计为后续文件预览器复用。
-- `packages/contracts` 新增 `projects` / `fs` 两个域的请求与响应契约、`FS_ENTRY_TYPES` / `FS_LIST_FILTERS`
-  常量；`ERROR_CODES` 新增 `path_not_found` / `path_exists` / `mkdir_failed` / `project_not_found`。
-- 数据库 schema 升到 v2：新增 `project` 表；server 两个仓储共用同一个 SQLite 连接，关闭由 `Services.close()` 统一负责。
-
+  契约新增 `FS_ENTRY_TYPES` / `FS_LIST_FILTERS` 常量，`ERROR_CODES` 新增 `path_not_found` /
+  `path_exists` / `mkdir_failed`。
 - 新增国际化（基于 i18next）：web 设置 → 外观新增「语言」切换（中文 / English，母语名展示），
   偏好存 `localStorage`，首屏由 `index.html` 内联脚本同步 `<html lang>`，dayjs 的展示语言随之切换。
 - 新增 `packages/i18n`（`@ucode/i18n`）：跨端 i18n 运行时与共享文案的单一事实源，只依赖 `i18next`
@@ -149,7 +113,6 @@
   禁止硬编码中文（注释、`logger` / `console` 日志与 `i18n-ignore` 除外）。
 - `@ucode/brand` 新增 `localeStorageKey`（由 slug 派生）；`apps/web/plugins/brand-html.ts` 注入 `%BRAND_LOCALE_KEY%`。
 - 新增依赖 `i18next`（web / `@ucode/i18n`）与 `react-i18next`（web）；server 不引入 i18n 依赖。
-
 - 新增 pi 内置供应商目录：`models/list` 返回 pi `providers/all` 里可用一把 API key 接入的 32 个供应商
   （deepseek / minimax / zai / kimi-coding / xiaomi / qwen-token-plan / openai / anthropic / xai / openrouter …），
   以及它们完整的模型参数（`reasoning` / `thinkingLevelMap` / `contextWindow` / `maxTokens` / `cost` / `compat` 等）。
@@ -167,7 +130,8 @@
 - 新增品牌校验（`packages/brand/scripts/verify.ts`，作为第 4 项接入 `scripts/verify`，随 `pnpm check` 执行）：
   品牌值合法、资源齐备、源码无硬编码品牌名；另加应急脚本 `packages/brand/scripts/replace.ts`（`pnpm brand:replace`）。
 - 品牌包新增 `appHomeDirname`（默认 `~/.<slug>`，由品牌 slug 派生）：`APP_HOME` 未设置时用它作为主目录名；
-  SQLite 文件名改为通用名 `app.db`（放 server 常量，与品牌无关）。- 新增 `POST /api/v1/events`：全局 SSE 事件流，承载所有会话的实时事件，带 `seq` 会话内序号与 15s 心跳；
+  SQLite 文件名改为通用名 `app.db`（放 server 常量，与品牌无关）。
+- 新增 `POST /api/v1/events`：全局 SSE 事件流，承载所有会话的实时事件，带 `seq` 会话内序号与 15s 心跳；
   生成生命周期与调用方连接解耦，刷新 / 断线后重取快照即可接续。
 - `messages/list` 响应新增 `running`（是否有活跃生成）、`seq`（快照序号）与 `liveMessageId`（在途消息 id），
   并用活跃会话的 `streamingMessage` 投影正在生成的正文，刷新后不再丢失在途内容。
@@ -177,10 +141,10 @@
 - 新增项目内命令 `/review`（`.agents/commands/review.md`，经 `.opencode/commands/review.md` 软链被 OpenCode 发现）：
   按输入判定审查范围（未提交改动 / 提交 / 分支 / PR），产出可执行的代码审查反馈。
 - server 引入 SQLite（Node 内置 `node:sqlite` 的 `DatabaseSync`，无新增依赖）：新增 `db/` 模块，
-  用 `PRAGMA user_version` 管理 schema；`session-repository` 保存会话元数据（name / cwd / model / thinkingLevel 覆盖值）
-  与列表索引（名称、预览、条目数、消息数、创建/更新时间、JSONL 路径）。需 Node ≥ 24，启动会打印一条实验特性警告。
+  用 `PRAGMA user_version` 管理 schema；`session-repository` 保存会话的元数据覆盖值与列表索引
+  （名称、预览、创建/更新时间、JSONL 路径）。需 Node ≥ 24，启动会打印一条实验特性警告。
 - `APP_HOME` 目录按「谁的资产」分两层：`pi/`（pi 私有：`models.json` / `auth.json` / `sessions/`）与
-  `app/`（应用自有：`config.json` / `ucode.db`）；不再使用 `agent/` 与根目录的 `config.json`。
+  `app/`（应用自有：`config.json` / `app.db`）；不再使用 `agent/` 与根目录的 `config.json`。
 - 新增项目规范体系：根 `DESIGN.md`（设计系统）与 `docs/{database,api,components}.md`；
   `AGENTS.md` 增加「规范索引」并收敛为索引，细则下沉到各文档。
 - 新增 `scripts/verify/`（`pnpm verify`）：SQLite 迁移版本连续性、契约字段命名与 `*Request`/`*Input` 配对、
@@ -193,22 +157,29 @@
   对话框遮罩由 `bg-black/10` 改用 `bg-overlay`。
 - 前端新增依赖 `dayjs`：会话列表的相对时间与消息时刻改用它（`relativeTime` 插件 + `zh-cn` locale），
   替换手写的差量计算。列表文案随之变为「几秒前 / 55 分钟前 / 1 天前」。
-- `sessions/list` 现在会带出未落盘的草稿会话（`persisted = 0`）：新建但还没发消息的会话刷新后不再消失；
-  新增 `APP_DRAFT_TTL_MS`（默认 7 天）清理长期未使用的草稿，运行中的会话豁免。
-- 草稿会话的时间改用数据库行的真实 `created_at` / `updated_at`，排序口径与已落盘会话一致。
 
 ### 变更
 
-- 会话创建参数的工具集改为显式白名单装配（阶段 1）：内置工具与自研工具一起由
-  `buildSessionTools` 输出，`tools` 不再缺省交由 pi 决定。白名单语义下 pi 扩展 / pi 包注册的工具
-  不在名单里即被过滤（当前无扩展，实际影响为零，README 已注明）。
+- `session` 表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /
+  `entry_count` / `message_count`，新增 `deleted_at`；`reconcile()` 不再从 JSONL 还原元数据
+  （外部导入能力放弃），只做「有行无文件」的清理；schema 版本收敛为 1，本地删 `app.db` 重建。
+- 删除 `project` 表与 `/api/v1/projects/*` 四个接口、前端项目空间相关入口与文案。
+- 删除草稿 TTL 清理（`deleteStaleDrafts` 与环境变量 `APP_DRAFT_TTL_MS`）：会话在首条消息时创建，
+  空行由对账清理；工作区孤儿清理保留但去掉 TTL（目录在会话要跑时才建，DB 行必然早于它存在，
+  「无行」即「无主」）。
+- `health.workspace` 改指助理根目录（原为 agent 工作目录）。
+- 会话列表不再返回 `messageCount`（前端不展示）。
+- 未知会话不再被放行：`messages/prompt` / `sessions/update` 对不存在的 `sessionId` 返回 404；
+  会话工作目录的推导随之只认已有记录，删掉了「查不到就回落到 `$APP_HOME`」那条分支
+  （`env.workspaceDir` 一并删除）。
+- 升级 pi（`@earendil-works/pi-coding-agent` `^0.87.1` → `^0.99.1`）。
+- 工具选择机制改按模式分路：`build` 不再传 `tools` 白名单，改用 `defaultTools`（内置工具 + `codemode`），
+  pi 扩展与后续 MCP 注册的工具不再被白名单静默过滤；`plan` / `ask` 仍用显式的只读白名单。
 - 失败封套与 SSE 错误帧新增可选 `params`（错误文案的插值值）；前端仍按 `code` 分支。
 - `APP_HOME` 默认值由仓库内 `.tmp/.ucode` 改为用户主目录 `~/.ucode`；SQLite 数据库文件名由 `ucode.db` 改为通用名 `app.db`。
 - `sessions/list` / `sessions/info` 改为读 SQLite 索引，不再每次 `SessionManager.listAll()` 全量扫描解析 JSONL；
   列表的过滤与排序下推到 SQL。启动时 `reconcile()` 以 JSONL 为准对齐索引，每轮生成落定后回写一次。
 - 会话覆盖值从 `session-state.json` 迁到 SQLite（`config/session-state.ts` 移除），写入由整文件重写变为单行更新。
-- 移除 `SessionStateStore` 与池上的 `findInfo` / `listInfos`（原每次调用都 `SessionManager.listAll()` 全量扫描）；
-  `sessions` 与 `messages` 路由改为直接读 `SessionRepository`，`messages/list` 按索引里的 `source_path` 打开 JSONL。
 - `core/` 新增 `session-index.ts`（pi 会话对象 ↔ 入库索引 / `SessionInfo` 的转换）。
 - `POST /api/v1/messages/prompt` 改为投递语义：返回 `{ sessionId, admitted }` 回执，生成在服务端后台继续，
   事件统一走 `/events`（原请求级 SSE 流移除）。
@@ -268,6 +239,11 @@
 
 ### 移除
 
+- 移除 `POST /sessions/delete`（由 `POST /sessions/archive` 取代）。
+- 移除 `messages/prompt` 的 `cwd` 字段（会话级设置只在 `sessions/create`）。
+- 移除 `SessionSummary.messageCount` 与 `SessionInfoResponse` 的 `persisted` / `entries` 字段。
+- 移除 `SessionStateStore` 与池上的 `findInfo` / `listInfos`（原每次调用都 `SessionManager.listAll()` 全量扫描）；
+  `sessions` 与 `messages` 路由改为直接读 `SessionRepository`，`messages/list` 按索引里的 `source_path` 打开 JSONL。
 - 不再生成 `$APP_HOME/pi/models.json`：provider 目录与 apiKey 改为经 pi 的 `registerProvider` / `setRuntimeApiKey`
   注入内存，`$APP_HOME/app/config.json` 成为模型配置的唯一事实源，`pi/` 下不再出现明文凭证。
   升级后手工删掉遗留的 `pi/models.json` 即可（不会再被读取）。

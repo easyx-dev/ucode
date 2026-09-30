@@ -4,7 +4,7 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_SESSION_MODE, ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
+import { ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
 
 import type { SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";

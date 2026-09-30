@@ -1,10 +1,29 @@
-/** 会话装配层单测：工作目录解析的优先级 */
+/**
+ * 会话装配层单测：工作目录解析 + 工具装配。
+ *
+ * 工具装配起一个离线可用的 `ModelRuntime`（dummy provider，不发起任何请求）走真实 pi SDK，
+ * 断言 `defaultTools` / 白名单两条路在 pi 侧的实际落点——这也兜住「工具名与 pi 注册名脱节后静默失效」。
+ */
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import {
+  type AgentSession,
+  createAgentSession,
+  ModelRuntime,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
+import type { ProviderConfig, SessionMode } from "@ucode/contracts";
+
+import { toProviderConfigInput } from "../../core/provider-config";
+import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
-import { resolveModeTools, resolveSessionCwd } from "../session-config";
+import { buildSessionOptions, resolveSessionCwd } from "../session-config";
+import { DEFAULT_EXTENSION_TOOLS } from "../tools";
 
 const recordWith = (patch: Partial<SessionRecord>): SessionRecord => ({
   id: "s1",
@@ -31,34 +50,76 @@ describe("resolveSessionCwd", () => {
   });
 });
 
-/** 阶段 2 的模式工具集：build 全量（含扩展工具），ask / plan 按声明集过滤 */
-describe("resolveModeTools", () => {
-  const AVAILABLE = [
-    "read",
-    "bash",
-    "edit",
-    "write",
-    "grep",
-    "find",
-    "ls",
-    "webfetch",
-    "websearch",
-    "present_plan",
-  ];
-  const READ_ONLY = ["read", "grep", "find", "ls", "webfetch", "websearch"];
+/** 只构造会话、不提问，因此不需要凭证与网络 */
+const provider: ProviderConfig = {
+  id: "dummy",
+  api: "openai-completions",
+  apiKey: "test",
+  baseUrl: "http://127.0.0.1:9/v1",
+  models: [
+    {
+      id: "m",
+      reasoning: false,
+      input: ["text"],
+      contextWindow: 128000,
+      maxTokens: 8192,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    },
+  ],
+};
 
-  it("build 用全部可用工具并并入扩展工具", () => {
-    assert.deepEqual(resolveModeTools("build", AVAILABLE, ["ext_tool"]), [
-      ...AVAILABLE,
-      "ext_tool",
-    ]);
+const root = mkdtempSync(join(tmpdir(), "session-config-test-"));
+const cwd = join(root, "cwd");
+
+const activeTools = async (mode: SessionMode): Promise<string[]> => {
+  const modelRuntime = await ModelRuntime.create({
+    authPath: join(root, "auth.json"),
+    modelsPath: null,
+    refreshOnCreate: false,
+  });
+  modelRuntime.registerProvider(provider.id, toProviderConfigInput(provider));
+  await modelRuntime.setRuntimeApiKey(provider.id, provider.apiKey);
+  const model = modelRuntime.getModel(provider.id, "m");
+  assert.ok(model, "dummy 模型未注册");
+
+  // 只用到三个方法，装配层不关心 PiRuntime 的其余行为
+  const runtime = {
+    requireRuntime: () => modelRuntime,
+    resolveModelRef: () => model,
+    getStatus: () => ({ thinkingLevel: "off" }),
+  } as unknown as PiRuntime;
+
+  const options = await buildSessionOptions({
+    record: undefined,
+    cwd,
+    mode,
+    sessionManager: SessionManager.inMemory(),
+    runtime,
+    websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
+    permission: { listGrants: () => [], grant: () => {}, request: async () => "deny" as const },
+  });
+  const { session }: { session: AgentSession } = await createAgentSession(options);
+  const tools = session.getActiveToolNames();
+  session.dispose();
+  return tools;
+};
+
+describe("buildSessionOptions 工具装配", () => {
+  it("TS-01 build 走 defaultTools：codemode 激活，自研工具不被过滤", async () => {
+    const tools = await activeTools("build");
+    for (const name of [...DEFAULT_EXTENSION_TOOLS, "webfetch", "websearch"]) {
+      assert.ok(tools.includes(name), `build 应启用 ${name}，实际：${tools.join(", ")}`);
+    }
+    assert.ok(!tools.includes("present_plan"), "build 不应有 present_plan");
   });
 
-  it("plan / ask 只保留只读与联网工具", () => {
-    assert.deepEqual(resolveModeTools("plan", AVAILABLE, ["ext_tool"]), [
-      ...READ_ONLY,
-      "present_plan",
-    ]);
-    assert.deepEqual(resolveModeTools("ask", AVAILABLE, ["ext_tool"]), READ_ONLY);
+  it("TS-02 plan / ask 走只读白名单：不含 codemode 与写盘 / 执行工具", async () => {
+    for (const mode of ["plan", "ask"] as const) {
+      const tools = await activeTools(mode);
+      for (const name of ["codemode", "bash", "edit", "write"]) {
+        assert.ok(!tools.includes(name), `${mode} 不应启用 ${name}，实际：${tools.join(", ")}`);
+      }
+      assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
+    }
   });
 });

@@ -7,6 +7,7 @@
  */
 import {
   type CreateAgentSessionOptions,
+  createCodemodeExtension,
   DefaultResourceLoader,
   type SessionManager,
   SettingsManager,
@@ -18,7 +19,7 @@ import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
 import { MODES, rulesForMode } from "./modes";
 import { createPermissionExtension, type PermissionHooks } from "./permissions";
-import { buildSessionTools } from "./tools/index";
+import { buildCustomTools } from "./tools/index";
 import { workspaceDirOf } from "./workspace";
 
 /**
@@ -28,21 +29,6 @@ import { workspaceDirOf } from "./workspace";
  */
 export const resolveSessionCwd = (record: SessionRecord): string =>
   record.cwd || workspaceDirOf(record.id);
-
-/**
- * 模式白名单：`build` 用全部可用工具（含扩展工具），其余模式只保留模式声明的能力集。
- * 扩展工具即 `$APP_HOME/pi/extensions` 与项目 `.pi/extensions` 注册的工具。
- */
-export const resolveModeTools = (
-  mode: SessionMode,
-  available: readonly string[],
-  extensionTools: readonly string[],
-): string[] => {
-  const declared = MODES[mode].tools;
-  if (!declared) return [...new Set([...available, ...extensionTools])];
-  const allowed = new Set(declared);
-  return available.filter((name) => allowed.has(name));
-};
 
 export type SessionAssemblyInput = {
   record: SessionRecord | undefined;
@@ -58,13 +44,13 @@ export type SessionAssemblyInput = {
 };
 
 /**
- * 组装 resourceLoader：内联扩展负责 `tool_call` 权限拦截，模式片段追加到系统提示词。
- * `reload()` 后才能读到扩展注册的工具名，`build` 模式据此把它们纳入白名单。
+ * 组装 resourceLoader：内联扩展负责 `tool_call` 权限拦截与内置 `codemode`，
+ * 模式片段追加到系统提示词。
  */
 const createSessionLoader = async (
   input: SessionAssemblyInput,
   settingsManager: SettingsManager,
-): Promise<{ loader: DefaultResourceLoader; extensionTools: string[] }> => {
+): Promise<DefaultResourceLoader> => {
   const gate = {
     cwd: input.cwd,
     // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效
@@ -76,19 +62,16 @@ const createSessionLoader = async (
     cwd: input.cwd,
     agentDir: env.piDir,
     settingsManager,
-    extensionFactories: [createPermissionExtension(gate)],
+    extensionFactories: [createPermissionExtension(gate), createCodemodeExtension({ mode: "on" })],
     appendSystemPrompt: [MODES[input.mode].prompt],
   });
   await loader.reload();
-  const extensionTools = loader
-    .getExtensions()
-    .extensions.flatMap((extension) => [...extension.tools.keys()]);
-  return { loader, extensionTools };
+  return loader;
 };
 
 /**
  * 组装 AgentSession 的创建参数；模型与档位按「会话覆盖 > 全局默认」解析。
- * 异步是因为要先 `reload()` resourceLoader 才能拿到扩展工具名。
+ * 异步是因为要先 `reload()` resourceLoader 才能建出会话。
  */
 export const buildSessionOptions = async (
   input: SessionAssemblyInput,
@@ -100,8 +83,11 @@ export const buildSessionOptions = async (
 
   // loader 与会话共用同一个 SettingsManager：分两个实例会让资源发现与运行期设置不一致
   const settingsManager = SettingsManager.inMemory();
-  const { loader, extensionTools } = await createSessionLoader(input, settingsManager);
-  const { customTools, tools: availableTools } = buildSessionTools(input.websearch, input.mode);
+  const loader = await createSessionLoader(input, settingsManager);
+  const { toolSelection } = MODES[input.mode];
+  // 覆盖必须在 loader.reload() 之后：reload 会重读设置，冲掉 reload 前的 in-memory 覆盖
+  if (toolSelection.kind === "defaultTools")
+    settingsManager.applyOverrides({ defaultTools: toolSelection.defaultTools });
 
   return {
     cwd: input.cwd,
@@ -111,8 +97,8 @@ export const buildSessionOptions = async (
     thinkingLevel,
     sessionManager: input.sessionManager,
     settingsManager,
-    tools: resolveModeTools(input.mode, availableTools, extensionTools),
-    customTools,
+    ...(toolSelection.kind === "allowlist" ? { tools: toolSelection.tools } : {}),
+    customTools: buildCustomTools(input.websearch, input.mode),
     resourceLoader: loader,
   };
 };
