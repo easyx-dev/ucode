@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | 计划定稿 | 已完成 | — |
 | 0 · 测试基建 + 组装层骨架 | 已完成 | `c43d838` |
-| 1 · 工具层（grep/find · webfetch · websearch） | 未开始 | — |
+| 1 · 工具层（grep/find · webfetch · websearch） | 已完成 | `5fd2dd3` |
 | 2 · 模式 + 权限引擎 + 审批 UI | 未开始 | — |
 | 3 · 会话工作区 + ask 模式成品 | 未开始 | — |
 | 4 · 自研系统提示词 | 未开始 | — |
@@ -296,6 +296,11 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
   删本地 `app.db` 后会全部回落 `build`。阶段 2 若要让模式可恢复，需把它写进会话文件
   （pi 的 `custom` 条目，注意别进模型上下文）并在对账时读回。
 - **替换 pi 内置工具**（自研 grep/find）只有当确需自定义行为时才做，避免重写已有能力。
+- **显式 `tools` 白名单会屏蔽扩展工具**（阶段 1 已落地）：pi 的 `tools` 是白名单，一旦给出，
+  不在名单里的 pi 扩展 / pi 包 / MCP 注册的工具都会被静默过滤（`agent-session` 的
+  `_refreshToolRegistry` 对 `registeredTools` 同样套 `isAllowedTool`）。阶段 2 设计模式工具集时
+  要把「扩展工具怎么进白名单」一并定下来：`createAgentSession` 返回的 `extensionsResult` 里有工具名，
+  但白名单是构造期入参，得在装配前拿到。
 
 ## 六、落地顺序
 
