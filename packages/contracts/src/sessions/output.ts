@@ -1,6 +1,6 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
-import type { ThinkingLevel } from "../constants";
+import type { SessionMode, ThinkingLevel } from "../constants";
 
 export type SessionSummary = {
   id: string;
@@ -15,6 +15,8 @@ export type SessionSummary = {
   /** 生效的 "provider/model" */
   model: string | null;
   thinkingLevel: ThinkingLevel;
+  /** 会话模式：决定工具集与权限 */
+  mode: SessionMode;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
 };

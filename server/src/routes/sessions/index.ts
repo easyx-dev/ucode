@@ -116,6 +116,7 @@ const createSession = (services: Services, input: SessionCreateInput): SessionSu
     ...(input.cwd ? { cwd: input.cwd } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel } : {}),
+    ...(input.mode ? { mode: input.mode } : {}),
   });
 
   const { model, thinkingLevel } = runtimeDefaults(services);
@@ -147,7 +148,10 @@ const appendTranscriptPatch = (
 
 const updateSession = (services: Services, patch: SessionUpdateInput): SessionSummary => {
   if (patch.model) assertModel(services, patch.model);
-  if ((patch.model || patch.thinkingLevel) && services.pool.isActive(patch.sessionId)) {
+  if (
+    (patch.model || patch.thinkingLevel || patch.mode) &&
+    services.pool.isActive(patch.sessionId)
+  ) {
     throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断", 409);
   }
 
@@ -163,10 +167,11 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     ...(patch.name ? { name: patch.name } : {}),
     ...(patch.model ? { model: patch.model } : {}),
     ...(patch.thinkingLevel ? { thinkingLevel: patch.thinkingLevel } : {}),
+    ...(patch.mode ? { mode: patch.mode } : {}),
   });
 
-  // 换模型 / 换 thinking 需要重建会话实例才会生效，历史留在盘上
-  if (patch.model || patch.thinkingLevel) services.pool.dispose(patch.sessionId);
+  // 换模型 / 换 thinking / 换模式需要重建会话实例才会生效，历史留在盘上
+  if (patch.model || patch.thinkingLevel || patch.mode) services.pool.dispose(patch.sessionId);
 
   // 与 /create 一致，返回扁平摘要（/info 才是 {session, persisted, entries}）
   return describeSession(services, patch.sessionId).session;

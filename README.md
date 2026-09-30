@@ -201,10 +201,10 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | POST | `/api/v1/config/info` | `{}` | 当前配置（apiKey 脱敏） |
 | POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的，内置供应商只需 `id` + `apiKey` |
 | POST | `/api/v1/config/test` | `{ baseUrl, apiKey?, providerId?, api?, model }` | 连通性测试 |
-| POST | `/api/v1/sessions/list` | `{ q?, limit? }` | 会话列表（含每个会话生效的 `model` / `thinkingLevel`） |
-| POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel? }` | 新建会话（返回 id；首次回复后才落盘） |
+| POST | `/api/v1/sessions/list` | `{ q?, limit? }` | 会话列表（含每个会话生效的 `model` / `thinkingLevel` / `mode`） |
+| POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel?, mode? }` | 新建会话（返回 id；首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | `{ sessionId }` | 会话详情 |
-| POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel? }` | 重命名 / 换模型 |
+| POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel?, mode? }` | 重命名 / 换模型 / 换模式 |
 | POST | `/api/v1/sessions/delete` | `{ sessionId }` | 删除会话（含会话文件） |
 | POST | `/api/v1/projects/list` | `{}` | 项目空间列表（已登记的目录） |
 | POST | `/api/v1/projects/create` | `{ path }` | 登记一个已存在目录为项目空间（已登记则幂等返回） |
@@ -326,6 +326,9 @@ server/src/
     session-index.ts       # pi 会话对象 -> 入库索引 / SessionInfo
     serialize.ts           # pi 会话条目 -> MessageDTO
     events.ts              # AgentSessionEvent -> SSE 事件
+  agent/                   # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
+    session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
+    __tests__/             # 同模块的单元测试（约定见 AGENTS.md）
   routes/                  # health / models / config / sessions / messages / events
   index.ts                 # Hono 装配、静态托管 web、优雅退出
   scripts/smoke.ts         # 不经 HTTP 的 SDK 冒烟测试
@@ -354,12 +357,14 @@ apps/web/src/
 ## 验证
 
 ```bash
-pnpm check     # biome check . && pnpm -r typecheck && pnpm verify
+pnpm check     # biome check . && pnpm -r typecheck && pnpm -r test && pnpm verify
+pnpm test      # 各包单元测试（Node 内置 node:test，`src/**/__tests__/**/*.test.ts`）
 pnpm verify    # 只跑约定校验（scripts/verify）
 ```
 
-约定校验覆盖三项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
-业务组件不得出现裸色值或非语义颜色 utility。对应规范见 `docs/` 与 `DESIGN.md`。
+约定校验覆盖六项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
+业务组件不得出现裸色值或非语义颜色 utility、i18n 目录中英齐平且禁止硬编码中文、源码禁止硬编码品牌名、
+有测试用例的包必须声明 `test` 脚本。对应规范见 `docs/`、`AGENTS.md` 与 `DESIGN.md`。
 
 ## 冒烟测试
 

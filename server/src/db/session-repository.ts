@@ -7,7 +7,13 @@
  * 命名、SQL 与删除规则见 `docs/database.md`。
  */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { THINKING_LEVELS, type ThinkingLevel } from "@ucode/contracts";
+import {
+  DEFAULT_SESSION_MODE,
+  SESSION_MODES,
+  type SessionMode,
+  THINKING_LEVELS,
+  type ThinkingLevel,
+} from "@ucode/contracts";
 import { z } from "zod";
 
 import { env } from "../env";
@@ -21,6 +27,10 @@ export type SessionOverride = {
   cwd?: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
+  /** 会话模式；未设置时回落 `DEFAULT_SESSION_MODE` */
+  mode?: SessionMode;
+  /** 会话专属工作区目录（阶段 3 使用）；未设置时由会话 id 派生 */
+  workspaceDir?: string;
 };
 
 /** JSONL 派生出来的索引字段，由 `core/session-index` 从 pi 会话对象提取 */
@@ -41,6 +51,10 @@ export type SessionRecord = {
   cwd: string | null;
   model: string | null;
   thinkingLevel: string | null;
+  /** 已按白名单归一的会话模式 */
+  mode: SessionMode;
+  /** 会话专属工作区目录（阶段 3 使用） */
+  workspaceDir: string | null;
   piName: string | null;
   piCwd: string | null;
   sourcePath: string | null;
@@ -70,6 +84,8 @@ const SESSION_COLUMNS = [
   "cwd",
   "model",
   "thinking_level",
+  "mode",
+  "workspace_dir",
   "pi_name",
   "pi_cwd",
   "source_path",
@@ -87,6 +103,8 @@ const rowSchema = z.object({
   cwd: z.string().nullable(),
   model: z.string().nullable(),
   thinking_level: z.string().nullable(),
+  mode: z.string().nullable(),
+  workspace_dir: z.string().nullable(),
   pi_name: z.string().nullable(),
   pi_cwd: z.string().nullable(),
   source_path: z.string().nullable(),
@@ -106,6 +124,8 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   cwd: row.cwd,
   model: row.model,
   thinkingLevel: row.thinking_level,
+  mode: toSessionMode(row.mode),
+  workspaceDir: row.workspace_dir,
   piName: row.pi_name,
   piCwd: row.pi_cwd,
   sourcePath: row.source_path,
@@ -123,6 +143,12 @@ const toThinkingLevel = (value: string | null): ThinkingLevel | undefined =>
     ? (value as ThinkingLevel)
     : undefined;
 
+/** 会话模式同理：非法或缺失一律回落默认模式 */
+const toSessionMode = (value: string | null): SessionMode =>
+  value && (SESSION_MODES as readonly string[]).includes(value)
+    ? (value as SessionMode)
+    : DEFAULT_SESSION_MODE;
+
 /** 搜索结果一律按字面量匹配，转义 LIKE 的 `%` / `_` / `\`（配合 `ESCAPE '\'`） */
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -135,6 +161,8 @@ export const overrideOf = (record: SessionRecord | undefined): SessionOverride =
     ...(record.cwd ? { cwd: record.cwd } : {}),
     ...(record.model ? { model: record.model } : {}),
     ...(thinkingLevel ? { thinkingLevel } : {}),
+    mode: record.mode,
+    ...(record.workspaceDir ? { workspaceDir: record.workspaceDir } : {}),
   };
 };
 
@@ -146,8 +174,8 @@ export class SessionRepository {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session (id, name, cwd, model, thinking_level, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, workspace_dir, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -155,6 +183,8 @@ export class SessionRepository {
         override.cwd ?? null,
         override.model ?? null,
         override.thinkingLevel ?? null,
+        override.mode ?? null,
+        override.workspaceDir ?? null,
         now,
         now,
       );
@@ -175,13 +205,15 @@ export class SessionRepository {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session (id, name, cwd, model, thinking_level, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, workspace_dir, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = COALESCE(excluded.name, session.name),
            cwd = COALESCE(excluded.cwd, session.cwd),
            model = COALESCE(excluded.model, session.model),
-           thinking_level = COALESCE(excluded.thinking_level, session.thinking_level)`,
+           thinking_level = COALESCE(excluded.thinking_level, session.thinking_level),
+           mode = COALESCE(excluded.mode, session.mode),
+           workspace_dir = COALESCE(excluded.workspace_dir, session.workspace_dir)`,
       )
       .run(
         id,
@@ -189,6 +221,8 @@ export class SessionRepository {
         override.cwd ?? null,
         override.model ?? null,
         override.thinkingLevel ?? null,
+        override.mode ?? null,
+        override.workspaceDir ?? null,
         now,
         now,
       );

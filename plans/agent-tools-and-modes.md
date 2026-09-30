@@ -19,7 +19,7 @@
 | 阶段 | 状态 | 提交 |
 | --- | --- | --- |
 | 计划定稿 | 已完成 | — |
-| 0 · 测试基建 + 组装层骨架 | 未开始 | — |
+| 0 · 测试基建 + 组装层骨架 | 待 review | — |
 | 1 · 工具层（grep/find · webfetch · websearch） | 未开始 | — |
 | 2 · 模式 + 权限引擎 + 审批 UI | 未开始 | — |
 | 3 · 会话工作区 + ask 模式成品 | 未开始 | — |
@@ -206,12 +206,13 @@ MCP 客户端（自研）、子智能体（复用组装层起子会话）、goal
 **采用 Node 内置测试运行器**，契合仓库「最小依赖」原则，且 Node 24 可直接运行 TS：
 
 ```bash
-node --test "server/src/**/*.test.ts"
+node --import tsx --test "src/**/__tests__/**/*.test.ts"
 ```
 
 - 新增脚本 `pnpm -r test`；`pnpm check` 调整为
   `biome check . && pnpm -r typecheck && pnpm -r test && node scripts/verify/index.ts`。
-- 测试文件与源码同目录，命名 `*.test.ts`。
+- 测试文件放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`；脚本只匹配
+  `src/**/__tests__/**/*.test.ts`，写在别处不会被执行。断言用 `node:assert/strict`。
 - 备选：若之后需要前端组件测试（DOM 环境）再引入 `vitest`；后端不引入。
 
 ### 4.2 分层
@@ -290,6 +291,9 @@ node --test "server/src/**/*.test.ts"
 - **bash 的路径约束不可靠**：正式版 ask 模式直接禁 `bash`。
 - **自研系统提示词**会失去 pi 的结构化增量机制，需接受该取舍。
 - **websearch 依赖外部服务**：默认留空，未配置时降级为可读错误。
+- **`mode` 掉库即丢**：覆盖值不随 JSONL 重建（`reconcile()` 只回写派生索引组），而 `mode` 又没有任何转录表示，
+  删本地 `app.db` 后会全部回落 `build`。阶段 2 若要让模式可恢复，需把它写进会话文件
+  （pi 的 `custom` 条目，注意别进模型上下文）并在对账时读回。
 - **替换 pi 内置工具**（自研 grep/find）只有当确需自定义行为时才做，避免重写已有能力。
 
 ## 六、落地顺序

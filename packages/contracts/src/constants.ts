@@ -36,6 +36,17 @@ export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] 
 
 export type MessageRole = (typeof MESSAGE_ROLES)[number];
 
+/**
+ * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
+ * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
+ */
+export const SESSION_MODES = ["build", "plan", "ask"] as const;
+
+export type SessionMode = (typeof SESSION_MODES)[number];
+
+/** 新建会话的默认模式 */
+export const DEFAULT_SESSION_MODE: SessionMode = "build";
+
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";
 

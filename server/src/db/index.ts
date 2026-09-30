@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -44,6 +44,10 @@ const migrations: Record<number, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+  `,
+  3: `
+    ALTER TABLE session ADD COLUMN mode TEXT;
+    ALTER TABLE session ADD COLUMN workspace_dir TEXT;
   `,
 };
 

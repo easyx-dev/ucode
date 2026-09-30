@@ -1,6 +1,7 @@
 /** pi 的会话条目与消息 → 对外 DTO */
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import {
+  DEFAULT_SESSION_MODE,
   type MessageBlock,
   type MessageDTO,
   type SessionSummary,
@@ -199,6 +200,7 @@ export const sessionInfoToDTO = (
   preview: info.firstMessage ?? "",
   model: override.model ?? defaultModel,
   thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+  mode: override.mode ?? DEFAULT_SESSION_MODE,
   running,
 });
 
@@ -224,6 +226,7 @@ export const draftSessionSummary = (
     preview: "",
     model: override.model ?? defaultModel,
     thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+    mode: override.mode ?? DEFAULT_SESSION_MODE,
     running,
   };
 };

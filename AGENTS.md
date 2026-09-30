@@ -86,19 +86,27 @@
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值、i18n 目录齐平/错误码映射/禁止硬编码中文），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值、i18n 目录齐平/错误码映射/禁止硬编码中文、有测试用例必须有 `test` 脚本），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm verify` |
+| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify` |
+| `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand / i18n） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
+
+单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
+（如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
+写在别处不会被执行。断言用 `node:assert/strict`，不引第三方测试框架。
+
+根 `pnpm test` 走 `pnpm -r test`，只跑声明了 `test` 脚本的包；给某个包加了测试就要一并补脚本，
+否则 `scripts/verify` 的 tests 校验会报错（用例不会被静默跳过）。
 
 UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机已装 `agent-browser`
 （`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:2048`，
@@ -118,8 +126,9 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 
 - `routes/` 与 `lib/` 下一级一律是文件夹（`routes/health/index.ts`、`lib/response/index.ts`），
   不直接放 `.ts` 文件；`core/`、`utils/`、`constants.ts` 保持单文件。
-- `core/` 是 pi SDK 封装；`lib/` 是服务端基建（封套 / 校验中间件 / 日志）；`utils/` 只放无业务语义的纯函数；
-  默认值与固定目录名放 `constants.ts`。
+- `core/` 是 pi SDK 封装；`agent/` 是会话装配层（把覆盖值与运行时收敛成 `createAgentSession` 参数，
+  后续模式 / 工具集 / 自研提示词都在这里汇入）；`lib/` 是服务端基建（封套 / 校验中间件 / 日志）；
+  `utils/` 只放无业务语义的纯函数；默认值与固定目录名放 `constants.ts`。
 - 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
 - 日志统一走 `lib/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
 

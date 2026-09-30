@@ -6,6 +6,13 @@
 
 ### 新增
 
+- 新增 `server/src/agent/`（会话装配层）：`session-config.ts` 把「会话覆盖值 + 运行时」收敛成
+  `createAgentSession` 参数，`pool.ensure` 改为经它组装；后续的模式 / 工具集 / 自研提示词都从这里汇入。
+- 新增会话模式 `mode`（`build` / `plan` / `ask`，默认 `build`）与会话专属 `workspace_dir` 列（schema v3）：
+  会话契约新增 `mode`，`sessions/create|update` 可设置，`sessions/list|info` 返回。
+- 新增 `node:test` 单元测试（server），根 `pnpm test` 递归执行，`pnpm check` 纳入测试；
+  `scripts/verify` 新增 tests 校验（有测试用例的包必须声明 `test` 脚本，避免被 `pnpm -r test` 静默跳过）。
+
 - 会话列表默认按项目分组：新增 `project` 表登记目录（`projects/list|create|update|delete`），
   会话按 `cwd` 与项目 `path`（均经 `realpath` 归一）匹配归组，匹配不到的进「默认」分组（始终置底）；
   分组可折叠，折叠状态记 `localStorage`；组内可直接新建会话（用该项目目录为 `cwd`）。

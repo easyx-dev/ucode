@@ -2,7 +2,7 @@
 
 SQLite 存的是应用自有数据：会话索引与展示用元数据。**会话内容的事实源是 pi 的 JSONL 文件**
 （`$APP_HOME/pi/sessions/*.jsonl`），数据库只是它的派生索引。这条边界决定了本规范里删除、对账与容错的取向——
-库里的数据都可再生，可以随时删掉重建。
+索引与内容都可由 JSONL 再生，可以随时删掉重建；覆盖值组是例外，见「列分组」。
 
 实现落位：`server/src/db/`。
 
@@ -47,11 +47,17 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 `session` 有意保持单表，但列分两组语义，**新增列必须先归组**：
 
-- **覆盖值组**（用户可改、允许为空、未设置时回落到全局默认）：`name` / `cwd` / `model` / `thinking_level`
+- **覆盖值组**（用户可改、允许为空、未设置时回落到全局默认）：`name` / `cwd` / `model` / `thinking_level` /
+  `mode`（未设置回落 `build`）/ `workspace_dir`（未设置按会话 id 派生，阶段 3 使用）
 - **派生索引组**（由 JSONL 解析得到、以文件为准、由 `reconcile()` 覆盖）：`pi_name` / `pi_cwd` /
   `source_path` / `persisted` / `entry_count` / `message_count` / `preview` / `created_at` / `updated_at`
 
 两组唯一的重叠是 `created_at` / `updated_at`：首次落盘前只有覆盖值组，落盘后由 `refresh()` 用文件时间覆盖。
+
+对账只回写派生索引组：`reconcile()` 不会从 JSONL 还原覆盖值组，所以**删库重建后覆盖值会回落到默认**。
+其中 `name` / `cwd` 能由 `pi_name` / `pi_cwd` 兜底；`model` / `thinking_level` 的变更在会话文件里有 change 条目，
+pi 重放不受影响，但 ucode 侧展示与生效值会回落全局默认；`mode` 目前没有任何转录表示，删库即丢
+（是否补 pi 的 `custom` 条目见 [`plans/agent-tools-and-modes.md`](../plans/agent-tools-and-modes.md) 阶段 2）。
 
 ### `project` 表
 
@@ -122,6 +128,7 @@ server/src/db/
 
 ## 容错
 
-- 库里只存可再生产的数据，损坏或丢失时删除文件重建即可，不做备份与恢复流程
+- 库里只存可再生的索引与内容，损坏或丢失时删除文件重建即可，不做备份与恢复流程；
+  覆盖值组（尤其是 `mode`）重建后会回落默认，见「列分组」
 - 读取路径的解析失败一律回落而不是抛出，避免脏行打挂接口
 - 派生字段变更时同步更新 `reconcile()`，它是全量修复的唯一入口

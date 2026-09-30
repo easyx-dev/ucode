@@ -3,10 +3,10 @@ import {
   type AgentSession,
   createAgentSession,
   SessionManager,
-  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-import { overrideOf, type SessionRepository } from "../db/session-repository";
+import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
+import type { SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import type { SessionEventBus } from "./event-bus";
 import type { PiRuntime } from "./runtime";
@@ -77,26 +77,15 @@ export class SessionPool {
     }
 
     const record = this.repository.find(sessionId);
-    const override = overrideOf(record);
-    const cwd = record?.piCwd || record?.cwd || cwdOverride || env.workspaceDir;
+    const cwd = resolveSessionCwd(record, cwdOverride);
 
     const manager = record?.sourcePath
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
-    const model =
-      this.runtime.resolveModelRef(override.model) ?? this.runtime.resolveModelRef(null);
-    const thinkingLevel = override.thinkingLevel ?? this.runtime.getStatus().thinkingLevel;
-
-    const { session } = await createAgentSession({
-      cwd,
-      agentDir: env.piDir,
-      modelRuntime: this.runtime.requireRuntime(),
-      ...(model ? { model } : {}),
-      thinkingLevel,
-      sessionManager: manager,
-      settingsManager: SettingsManager.inMemory(),
-    });
+    const { session } = await createAgentSession(
+      buildSessionOptions({ record, cwd, sessionManager: manager, runtime: this.runtime }),
+    );
 
     const entry: PooledSession = { session, lastUsed: Date.now() };
     this.entries.set(sessionId, entry);
