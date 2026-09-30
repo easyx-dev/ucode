@@ -30,6 +30,72 @@ curl -i -X OPTIONS http://192.168.1.149:2048/api/v1/messages/prompt \
 
 ---
 
+## 代码风格统一（命名 / 写法 / 注释）
+
+**目标**：全项目的命名动词、声明写法、注释标点收敛成一套，读起来像同一个人写的。
+
+**规范**：统一口径已并入 `AGENTS.md` 的「语言规范」（声明写法、命名动词、注释形式与标点）；本节只跟踪代码侧的存量修正。
+
+**修正清单**
+
+声明写法：
+
+- `apps/web/src/lib/sse.ts`：`readSseStream` 由 `export async function` 改为 `export const ... = async () =>`
+- `server/src/lib/validate/index.ts`：`jsonBody` 由 `export function` 改为 `export const ... = () =>`
+
+转换函数方向：
+
+- `server/src/core/session-index.ts`：`indexFromManager` → `managerToIndex`、`infoFromRecord` → `recordToInfo`
+- `apps/web/src/lib/config-draft.ts`：`fromCatalogProvider` → `catalogToDraftProvider`（调用点 `apps/web/src/hooks/use-config-draft.ts` 一并改）
+- `apps/web/src/components/directory-picker-dialog.tsx`：`asDirectoryInput` → `toDirectoryInput`
+- `server/src/db/session-repository.ts`：`toRecord` → `rowToRecord`（点明源类型）
+
+「选一个」用词：
+
+- `apps/web/src/components/settings/provider-catalog.tsx`：`onPick` → `onSelect`
+- `apps/web/src/components/session-sidebar-header.tsx`、`session-sidebar.tsx`：`onPickDirectory` → `onSelectDirectory`
+
+布尔命名：
+
+- `apps/web/src/components/chat-panel.tsx`：`showSuggestions` → `shouldShowSuggestions`
+- `server/src/env.ts`：`legacyLayout` → `hasLegacyLayout`
+
+获取类：
+
+- `server/src/db/session-repository.ts`：收敛 `find` / `get` 的语义差异（`find` 只用于可能查不到，`get` 用于取了就用）
+
+`env.ts` 目录命名（统一 `Dir` 后缀）：
+
+- `workspaceRoot` → `workspacesDir`、`sessionsRoot` → `sessionsDir`、`repoRoot` → `repoDir`
+- 同步 `CHANGELOG.md` 里 `env.workspaceRoot` 的引用
+
+注释标点（单行 `//` 去掉句末 `。`；括号内为注释开头，便于重新定位）：
+
+- `apps/web/src/hooks/use-session-stream.ts:148`（`hydration 重合…`）
+- `packages/brand/scripts/verify.ts:95`（`只匹配当前品牌名…`）
+- `packages/brand/scripts/verify.ts:96`（`因此品牌名不宜取常见子串…`）
+- `server/src/core/pool.ts:103`（`绑定目录的会话在用户自己的目录里干活…`）
+- `server/src/core/pool.ts:130`（`序号也不能随 detach 重置…`）
+- `server/src/core/run.ts:67`（`而那一步现在只认已有记录…`）
+- `server/src/core/run.ts:75`（`否则并发请求会一直排队…`）
+- `server/src/agent/tools/ssrf.ts:50`（`代价是 NAT64…`）
+- `server/src/index.ts:44`（`生产模式：同源托管 web 构建产物…`）
+- `server/src/index.ts:46`（`所以先起服务、后 pnpm build 也能生效…`）
+- `server/src/routes/messages/index.ts:30`（`只读文件会让刷新后的对话区空着…`）
+- `server/src/routes/messages/index.ts:41`（`客户端按 seq 切分实时帧时…`）
+
+文件级注释补全：
+
+- `apps/web/src/components/message-list.tsx`、`message-item.tsx`、`tool-call-card.tsx`
+- `apps/web/src/hooks/use-models.ts`
+- `apps/web/src/lib/session.ts`（若不算「职责与路径同名」豁免）
+
+**可选 · `pnpm verify` 兜底**：把能静态查的约定做成 check，避免随实现漂移——除 `components/`、`hooks/` 外禁止 `export function`；禁止 `interface`；单行 `//` 注释末尾不得为 `。`；非豁免文件必须有文件级注释。
+
+**验收**：`pnpm check` 通过；上述清单全部消除。
+
+---
+
 ## 新功能探索与思考
 内置一系列的工具 tools，提示词命令（prompt），skiil
 系统提示词（不使用 pi 的）提示词内容可以参考 opencode 是怎么写的
