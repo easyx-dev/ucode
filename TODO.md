@@ -30,25 +30,84 @@ curl -i -X OPTIONS http://192.168.1.149:2048/api/v1/messages/prompt \
 
 ---
 
-## BUG · 新会话发消息后没有即时 loading；首轮回答完成前刷新会丢失该会话
+## 新功能探索与思考
+内置一系列的工具 tools，提示词命令（prompt），skiil
+系统提示词（不使用 pi 的）提示词内容可以参考 opencode 是怎么写的
+## 内置工具
+### grep
+使用正则表达式搜索文件内容。
 
-**现象**：
+### find
+通过模式匹配查找文件。
 
-1. 新建会话发送首条消息后，消息区要等几秒才出现「思考中…」，这几秒内没有任何加载反馈。
-2. 首轮回答还没结束时刷新页面，侧栏里找不到这个会话；等后台把这轮回答跑完才出现。
+### 网络搜索 websearch/webfetch
+https://pi.dev/packages/pi-web-access
 
-**根因**：
+### question
+https://pi.dev/packages/@juicesharp/rpiv-ask-user-question
 
-1. 「思考中…」只在存在 live 的 assistant 条目、且其 `blocks` 为空时渲染（`apps/web/src/components/message-item.tsx:81`），而这条 assistant 条目要等首个活动事件（`message_start` 等）才插入（`apps/web/src/lib/chat-reducer.ts:142`）。发送侧的 `sending` 只覆盖 `POST /messages/prompt` 的在途时间（`apps/web/src/hooks/use-send-message.ts:25`），服务端 `admitPrompt` 受理后立即返回、不 await 整轮生成（`server/src/core/run.ts:68`），`running` 又要等首个活动事件才置 true（`apps/web/src/hooks/use-session-stream.ts:57`）。于是「prompt 返回」到「首个事件到达」之间是空窗：`streaming = running || sending` 为 false，消息区没有任何生成中提示。空窗时长≈模型/网关吐出首个 token 的延迟（新会话还要先 `pool.ensure` 建 AgentSession）。
+## MCP 支持
+https://pi.dev/packages/pi-mcp-adapter
 
-2. 新会话在首轮 assistant 回复写入 JSONL 之前只是「草稿」：前端草稿只存在 `useSessionList` 的内存 `local` 里（`apps/web/src/hooks/use-session-list.ts:57`），刷新即丢；服务端 `/sessions/list` 只查 `persisted = 1 AND source_path IS NOT NULL`（`server/src/db/session-repository.ts:212`），而会话文件要到首轮回复才落盘（`server/src/core/session-index.ts:38`）。DB 里其实已有 `persisted = 0` 的草稿行，只是被列表过滤掉了。run 结束后 `pool.refreshIndex` 把索引刷成 persisted、前端 `onSettled` 再 refresh，会话才冒出来。
+## 子智能体
+参考 https://pi.dev/packages/pi-subagents
 
-**待办**：
+## TODO 工具
+https://pi.dev/packages/@juicesharp/rpiv-todo
 
-1. 发送时立即乐观插入一条 live 的 assistant 占位，或把生成态统一收敛成 `sending || running || pending`，在消息区尾部渲染 pending 指示，覆盖 `sending` 结束到首个事件之间的空窗；`pending` 在首个活动事件或 `agent_settled` 时消除。
-2. 让刷新后能找回在途会话：`/sessions/list` 纳入 `persisted = 0` 的草稿行（带 `running` 标记），或新增「运行中会话」查询；前端把当前会话 id 落到 URL / localStorage，刷新后按 id 重新 hydrate。
-3. （可选）评估 `/create` 直接写会话文件 header，从根上消掉「草稿」这个中间态。
+## wiki
+https://pi.dev/packages/openwiki?name=wiki
 
----
+## 权限控制
+https://opencode.ai/v2/docs/permissions/
+https://pi.dev/packages/@gotgenes/pi-permission-system
+
+## plan 模式(计划模式)
+参考 opencode 的计划模式 和 https://pi.dev/packages/@narumitw/pi-plan-mode?name=plan
+
+## 助手模式
+此模式默认专门用来做一些问答类的对话，很多用户不关心在项目空间也不会去选，所以这个助手模式默认在 `APP_HOME/workspace/qa` 下面每次在此目录下再新建一个子目录作为此次对话的工作空间，并且只能在此目录下有写的权限，其他只读。文件也是落到此工作空间下。
+
+## goal 模式(目标模式)
+https://pi.dev/packages/@schovest/pi-goal
+也可以参考 claude code ，zocode，codex 的
+https://zcode.z.ai/cn/docs/goal
+
+## 项目级记忆（Memory）
+有些信息只值得告诉 Agent 一次：你习惯的 commit message 写法、项目用的包管理器、团队的评审约定。Memory 为 UCode Agent 提供项目级的长期记忆，让这类信息延续到后续会话，而不需要每次对话开头都重复交代。
+
+开启后，UCode 会在每轮对话成功结束后于后台回顾最近的交流，判断是否有值得长期保留的内容——你的偏好、用户对 Agent 工作方式的纠正、项目目标与约束、你提供过的外部资料。保存下来的记忆会在同一项目的后续会话中自动带入上下文。
+
+也可以在对话中直接管理记忆：说「记住，我们从 staging 分支发布」即可立刻保存；说「忘掉刚才说的发布分支」即可删除对应记忆。
+
+### 会记住什么
+Memory 聚焦四类信息：
+
+类型	覆盖内容	示例
+用户	你的身份、专长和偏好	「习惯用 pnpm 和 Conventional Commits」
+反馈	对 Agent 工作方式的纠正或确认	「不要顺手修改无关文件里的 lint 报错」
+项目	项目目标、约束与进展	「站点需要保持兼容 Node 20」
+参考	你提供过的外部资源	「设计规范在团队 Wiki 的某个链接」
+
+同样重要的是 Memory 刻意不记的内容：代码结构和 Git 历史（Agent 随时可以重新读取）、项目指令文件里已有的内容，以及只在当前对话内有效的临时信息。
+
+### 工作机制
+一轮对话成功结束后，后台流程会回顾最近的交流。如果发现值得保留的信息，就把它写成一个小的 Markdown 事实文件，并更新 MEMORY.md 索引；没有则什么都不保存。整个过程发生在你的回合结束之后，不会拖慢对话本身。
+
+在同一项目的后续会话里，索引会自动加载进 Agent 的上下文，无需任何手动操作。记忆按项目隔离：UCode 在一个工作区学到的内容不会带到另一个工作区。
+
+记忆存在哪里
+记忆是保存在你本机的普通 Markdown 文件：
+
+~/.ucode/app/memory/projects/<project>/memory/
+├── MEMORY.md        # 索引，一行一条
+└── *.md             # 每条事实一个文件
+
+## 编辑历史对话
+https://zcode.z.ai/cn/docs/edit-history
+
+## 使用统计
+
 
 （其余项见 README「常见问题」；已修的 review 问题不在此列。）
+
