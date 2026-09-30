@@ -6,6 +6,8 @@ import { ConfigStore } from "./config/store";
 import { SessionEventBus } from "./core/event-bus";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
+import { openDatabase } from "./db";
+import { ProjectRepository } from "./db/project-repository";
 import { SessionRepository } from "./db/session-repository";
 import { env } from "./env";
 import { logger } from "./lib/logger";
@@ -15,6 +17,8 @@ export type Services = {
   config: ConfigStore;
   /** 会话元数据与索引（SQLite） */
   sessions: SessionRepository;
+  /** 项目空间：用户登记的目录集合，供会话分组 */
+  projects: ProjectRepository;
   runtime: PiRuntime;
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
@@ -23,11 +27,16 @@ export type Services = {
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
   reload(): Promise<void>;
+  /** 关闭共享的 SQLite 连接 */
+  close(): void;
 };
 
 export const createServices = async (): Promise<Services> => {
+  // 单进程单连接：两个仓储共用同一个句柄，关闭也由这里统一负责
+  const db = openDatabase();
   const config = new ConfigStore();
-  const sessions = new SessionRepository();
+  const sessions = new SessionRepository(db);
+  const projects = new ProjectRepository(db);
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
   const pool = new SessionPool(runtime, sessions, events);
@@ -55,9 +64,13 @@ export const createServices = async (): Promise<Services> => {
     }
   };
 
+  // 退出时可能先后收到多个信号，close 只能生效一次（DatabaseSync 重复 close 会抛）
+  let closed = false;
+
   return {
     config,
     sessions,
+    projects,
     runtime,
     pool,
     events,
@@ -76,6 +89,11 @@ export const createServices = async (): Promise<Services> => {
       runtime.assertUsable(next);
       pool.disposeAll();
       await runtime.apply(next);
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      db.close();
     },
   };
 };

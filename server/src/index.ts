@@ -15,9 +15,11 @@ import { logger, requestLogger } from "./lib/logger";
 import { AppError, fail } from "./lib/response";
 import { createConfigRoute } from "./routes/config";
 import { createEventsRoute } from "./routes/events";
+import { createFsRoute } from "./routes/fs";
 import { createHealthRoute } from "./routes/health";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
+import { createProjectsRoute } from "./routes/projects";
 import { createSessionsRoute } from "./routes/sessions";
 
 const services = await createServices();
@@ -34,6 +36,8 @@ v1.route("/config", createConfigRoute(services));
 v1.route("/sessions", createSessionsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
 v1.route("/events", createEventsRoute(services));
+v1.route("/projects", createProjectsRoute(services));
+v1.route("/fs", createFsRoute());
 
 app.route(API_BASE_PATH, v1);
 
@@ -106,7 +110,7 @@ server.on("error", (error: NodeJS.ErrnoException) => {
 const shutdown = () => {
   logger.info("关闭中…");
   services.pool.disposeAll();
-  services.sessions.close();
+  services.close();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1500).unref();
 };

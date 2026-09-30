@@ -162,6 +162,30 @@ export default {
   // Delete confirmation
   删除会话确认: 'Delete session "{{name}}"? This cannot be undone.',
 
+  // Projects
+  项目空间: "Project space",
+  添加项目空间: "Add project space",
+  默认: "Default",
+  重命名项目: "Rename project",
+  删除项目: "Remove project",
+  删除项目确认:
+    'Remove project "{{name}}"? Its sessions move back to "Default"; the sessions themselves are kept.',
+  选择目录: "Choose directory",
+  返回上级: "Go up",
+  新建文件夹: "New folder",
+  选择此目录: "Choose this directory",
+  文件夹名: "Folder name",
+  此处没有子目录: "No subdirectories here",
+  没有匹配的目录: "No matching directory",
+  输入绝对路径: "Enter an absolute path",
+  项目列表加载失败: "Failed to load projects",
+  项目已添加: "Project added",
+  添加项目失败: "Failed to add project",
+  项目已删除: "Project removed",
+  重命名项目失败: "Rename failed",
+  删除项目失败: "Remove failed",
+  创建文件夹失败: "Failed to create folder",
+
   // Requests and toasts
   "(未命名)": "(unnamed)",
   "校验.缺baseUrl": "{{label}} is missing baseUrl",

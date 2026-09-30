@@ -206,6 +206,12 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | POST | `/api/v1/sessions/info` | `{ sessionId }` | 会话详情 |
 | POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel? }` | 重命名 / 换模型 |
 | POST | `/api/v1/sessions/delete` | `{ sessionId }` | 删除会话（含会话文件） |
+| POST | `/api/v1/projects/list` | `{}` | 项目空间列表（已登记的目录） |
+| POST | `/api/v1/projects/create` | `{ path }` | 登记一个已存在目录为项目空间（已登记则幂等返回） |
+| POST | `/api/v1/projects/update` | `{ projectId, name }` | 重命名项目空间 |
+| POST | `/api/v1/projects/delete` | `{ projectId }` | 移除项目空间（其会话回落「默认」分组） |
+| POST | `/api/v1/fs/list` | `{ path?, q?, type? }` | 浏览目录（`path` 省略时从用户 home 开始；`type` 过滤条目，默认 `all`；`q` 按名称模糊过滤条目） |
+| POST | `/api/v1/fs/mkdir` | `{ path }` | 新建目录（单层） |
 | POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史快照（compaction 感知，带接续用的 `seq`） |
 | POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 投递一轮生成，返回受理 ack；结果走 `/events` |
 | POST | `/api/v1/messages/interrupt` | `{ sessionId }` | 中断当前生成 |

@@ -320,8 +320,4 @@ export class SessionRepository {
       if (record.persisted && !seen.has(record.id)) this.delete(record.id);
     }
   }
-
-  close(): void {
-    this.db.close();
-  }
 }

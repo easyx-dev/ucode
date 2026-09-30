@@ -5,10 +5,12 @@ import { useActiveSession } from "@/hooks/use-active-session";
 import { useChat } from "@/hooks/use-chat";
 import { useHealth } from "@/hooks/use-health";
 import { useModels } from "@/hooks/use-models";
+import { useProjects } from "@/hooks/use-projects";
 import { useSessions } from "@/hooks/use-sessions";
 
 export function useWorkspace() {
   const sessions = useSessions();
+  const projects = useProjects();
   const models = useModels();
   const health = useHealth();
   const { activeId, setActiveId } = useActiveSession(sessions.sessions, sessions.loading);
@@ -29,8 +31,8 @@ export function useWorkspace() {
   );
   const activeSession = sessionsView.find((item) => item.id === activeId) ?? null;
 
-  const createSession = async () => {
-    const session = await sessions.create();
+  const createSession = async (cwd: string | null = null) => {
+    const session = await sessions.create(cwd ?? undefined);
     if (session) setActiveId(session.id);
     else if (!configured) setSettingsOpen(true);
   };
@@ -42,6 +44,7 @@ export function useWorkspace() {
 
   return {
     sessions: { ...sessions, sessions: sessionsView },
+    projects,
     models,
     configured,
     /** agent 工作目录（health 未就绪时为 null） */

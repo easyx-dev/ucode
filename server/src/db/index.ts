@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -35,6 +35,15 @@ const migrations: Record<number, string> = {
       updated_at     TEXT NOT NULL
     );
     CREATE INDEX idx_session_updated_at ON session(updated_at DESC);
+  `,
+  2: `
+    CREATE TABLE project (
+      id         TEXT PRIMARY KEY,
+      name       TEXT,
+      path       TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `,
 };
 

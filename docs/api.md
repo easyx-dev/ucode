@@ -59,6 +59,7 @@
 | `list` | 列表查询 | 列表结构 |
 | `info` | 单个资源详情 | 详情结构 |
 | `create` | 新建 | 资源摘要 |
+| `mkdir` | 新建目录 | 目录路径 |
 | `update` | 局部更新 | 资源摘要 |
 | `delete` | 删除 | 动作回执 |
 | `prompt` | 发起生成 | 动作回执 |
@@ -164,6 +165,24 @@
 - 控制帧：`{ type: "server.connected" }`、`{ type: "error", sessionId?, code, message }`
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲
+
+## 文件系统（fs）与应用目录
+
+`fs` 域是通用的文件系统浏览入口（首个消费者是会话侧栏的项目目录选择器，后续文件预览器复用）：
+
+- `fs/list`：`path` 省略时从用户 home 开始，返回当前目录、上级目录与条目列表；
+  条目含 `name` / `path` / `type`(`file` | `directory`) / `size` / `updatedAt`，
+  服务端固定排序（目录在前、各自按名称）。`type` 过滤默认 `all`，目录选择器传 `directory`；
+  `q` 按名称模糊过滤条目（目录选择器以结尾 `/` 区分：带 `/` 进入该目录，不带则把末段当检索词）。
+- `fs/mkdir`：单层建目录；已存在返回 `path_exists`，父目录不存在返回 `path_not_found`，
+  其余失败（权限、只读等）返回 `mkdir_failed`。
+- 路径一律由服务端归一化（`~` 展开 + `realpath`），不存在的路径返回 `path_not_found`。
+- 与其它接口一致，`fs` 也没有鉴权：服务默认监听所有网卡且背后的 agent 有文件读写权限，
+  不要把本服务暴露到公网或不可信网络（见 `TODO.md` P0）。
+
+**预留扩展**（本次未实现，形状已为其留白）：`fs/info` 用于单路径 stat / 读文件内容；
+图片等原始字节预览与「除 health 外一律 POST JSON」冲突，届时按 `/events` 的先例单列一条非封套例外，
+不影响 `fs/list` 的响应形状。
 
 ## 版本与破坏性变更
 

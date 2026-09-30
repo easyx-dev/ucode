@@ -1,6 +1,6 @@
-/** 侧栏头部：品牌标识、新建会话入口与搜索框 */
+/** 侧栏头部：品牌标识、添加项目空间、新建会话入口与搜索框 */
 import { brand } from "@ucode/brand";
-import { MessageSquarePlus, Search } from "lucide-react";
+import { FolderPlus, MessageSquarePlus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -13,6 +13,7 @@ type SessionSidebarHeaderProps = {
   canCreate: boolean;
   onQueryChange: (query: string) => void;
   onCreate: () => void;
+  onAddProject: () => void;
 };
 
 export function SessionSidebarHeader({
@@ -20,6 +21,7 @@ export function SessionSidebarHeader({
   canCreate,
   onQueryChange,
   onCreate,
+  onAddProject,
 }: SessionSidebarHeaderProps) {
   const { t } = useTranslation();
 
@@ -30,8 +32,16 @@ export function SessionSidebarHeader({
         <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
         <Button
           variant="outline"
+          size="icon"
+          className="ml-auto size-7"
+          onClick={onAddProject}
+          title={t("添加项目空间")}
+        >
+          <FolderPlus className="size-4" />
+        </Button>
+        <Button
+          variant="outline"
           size="sm"
-          className="ml-auto"
           onClick={onCreate}
           disabled={!canCreate}
           title={t("新建会话")}

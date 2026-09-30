@@ -21,6 +21,16 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+/** 文件系统条目类型；fs/list 的 `entries[].type` 取值 */
+export const FS_ENTRY_TYPES = ["file", "directory"] as const;
+
+export type FsEntryType = (typeof FS_ENTRY_TYPES)[number];
+
+/** fs/list 的条目过滤；`all` 表示不过滤 */
+export const FS_LIST_FILTERS = ["all", ...FS_ENTRY_TYPES] as const;
+
+export type FsListFilter = (typeof FS_LIST_FILTERS)[number];
+
 /** 消息角色；响应用枚举，与 pi 的 AgentMessage 角色对齐（system 等内部角色不下发） */
 export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] as const;
 

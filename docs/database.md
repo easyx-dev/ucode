@@ -53,6 +53,15 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 两组唯一的重叠是 `created_at` / `updated_at`：首次落盘前只有覆盖值组，落盘后由 `refresh()` 用文件时间覆盖。
 
+### `project` 表
+
+登记「哪些目录算项目」，供会话按 `cwd` 分组：`id` / `name`（可空，缺省用目录名展示）/
+`path`（归一化的绝对路径，`UNIQUE`）/ `created_at` / `updated_at`。
+
+**不建外键**：会话与项目的归属靠 `session.cwd` 与 `project.path` 精确匹配（两侧都经
+`server/src/utils/path` 的 `realpath` 归一），这样外部导入的会话（`reconcile()` 落的行）也能归组；
+匹配不到任何项目的会话在 UI 上回落「默认」分组。删除项目只摘本表登记，不动会话。
+
 ## 类型映射
 
 | 语义 | SQLite | JS / TS | zod |

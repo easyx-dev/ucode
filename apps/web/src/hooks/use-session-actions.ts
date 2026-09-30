@@ -13,16 +13,19 @@ export function useSessionActions(list: SessionListController) {
   const { t } = useTranslation();
   const { refresh, patch, addDraft, drop } = list;
 
-  const create = useCallback(async (): Promise<SessionSummary | null> => {
-    try {
-      const session = await api.sessions.create({});
-      addDraft(session);
-      return session;
-    } catch (error) {
-      toast.error(t("失败提示", { label: t("新建会话失败"), reason: describeError(error) }));
-      return null;
-    }
-  }, [addDraft, t]);
+  const create = useCallback(
+    async (cwd?: string): Promise<SessionSummary | null> => {
+      try {
+        const session = await api.sessions.create(cwd ? { cwd } : {});
+        addDraft(session);
+        return session;
+      } catch (error) {
+        toast.error(t("失败提示", { label: t("新建会话失败"), reason: describeError(error) }));
+        return null;
+      }
+    },
+    [addDraft, t],
+  );
 
   const applyUpdate = useCallback(
     async (sessionId: string, next: SessionPatch, failureLabel: string): Promise<void> => {

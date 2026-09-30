@@ -16,13 +16,17 @@ export default function App() {
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
         <SessionSidebar
           sessions={sessions.sessions}
+          projects={workspace.projects.projects}
           activeId={activeId}
           loading={sessions.loading}
           configured={configured}
           onSelect={workspace.setActiveId}
-          onCreate={() => void workspace.createSession()}
+          onCreate={(cwd) => void workspace.createSession(cwd)}
           onRename={(sessionId, name) => void sessions.rename(sessionId, name)}
           onDelete={(sessionId) => void sessions.remove(sessionId)}
+          onAddProject={(path) => void workspace.projects.add(path)}
+          onRenameProject={(projectId, name) => void workspace.projects.rename(projectId, name)}
+          onDeleteProject={(projectId) => void workspace.projects.remove(projectId)}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
         />
 

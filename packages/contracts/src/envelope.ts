@@ -61,6 +61,15 @@ export const ERROR_CODES = {
 
   /** 配置文件解析失败 */
   invalidConfig: "invalid_config",
+
+  /** 路径不存在，或存在但不是目录 */
+  pathNotFound: "path_not_found",
+  /** 要创建的目录已存在 */
+  pathExists: "path_exists",
+  /** 创建目录失败（权限、只读等） */
+  mkdirFailed: "mkdir_failed",
+  /** 指定的项目空间不存在 */
+  projectNotFound: "project_not_found",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

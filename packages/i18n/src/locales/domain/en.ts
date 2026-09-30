@@ -14,4 +14,8 @@ export default {
   上游不可达: "Cannot reach {{url}}",
   上游错误: "Upstream returned HTTP {{status}}",
   配置文件解析失败: "Failed to parse the config file: {{path}}",
+  路径不存在: "Path does not exist: {{path}}",
+  目录已存在: "Directory already exists: {{path}}",
+  创建目录失败: "Failed to create directory: {{path}}",
+  项目不存在: "Project does not exist: {{path}}",
 };

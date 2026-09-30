@@ -6,6 +6,17 @@
 
 ### 新增
 
+- 会话列表默认按项目分组：新增 `project` 表登记目录（`projects/list|create|update|delete`），
+  会话按 `cwd` 与项目 `path`（均经 `realpath` 归一）匹配归组，匹配不到的进「默认」分组（始终置底）；
+  分组可折叠，折叠状态记 `localStorage`；组内可直接新建会话（用该项目目录为 `cwd`）。
+- 会话侧栏「添加项目空间」打开目录选择对话框：浏览 / 返回上级 / 直接输入路径（结尾带 `/` 进入该目录，
+  不带则把末段当检索词在上级目录里过滤，防抖定位）/ 就地新建文件夹，确认后仅登记分组。
+- 新增 `fs` 域（`fs/list` / `fs/mkdir`）：文件系统浏览（`path` 省略时从用户 home 开始，条目带
+  `type` / `size` / `updatedAt`，目录在前，`q` 按名称模糊过滤）与新建目录；设计为后续文件预览器复用。
+- `packages/contracts` 新增 `projects` / `fs` 两个域的请求与响应契约、`FS_ENTRY_TYPES` / `FS_LIST_FILTERS`
+  常量；`ERROR_CODES` 新增 `path_not_found` / `path_exists` / `mkdir_failed` / `project_not_found`。
+- 数据库 schema 升到 v2：新增 `project` 表；server 两个仓储共用同一个 SQLite 连接，关闭由 `Services.close()` 统一负责。
+
 - 新增国际化（基于 i18next）：web 设置 → 外观新增「语言」切换（中文 / English，母语名展示），
   偏好存 `localStorage`，首屏由 `index.html` 内联脚本同步 `<html lang>`，dayjs 的展示语言随之切换。
 - 新增 `packages/i18n`（`@ucode/i18n`）：跨端 i18n 运行时与共享文案的单一事实源，只依赖 `i18next`
