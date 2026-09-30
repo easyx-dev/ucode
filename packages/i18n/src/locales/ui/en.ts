@@ -156,6 +156,15 @@ export default {
   本会话恒允: "Allow for this session",
   拒绝: "Deny",
 
+  // Plan decision
+  计划已就绪: "Plan ready",
+  "计划已就绪.说明":
+    "Approve to switch to Build mode and start, or add feedback below to keep discussing.",
+  批准并执行: "Approve and run",
+  提交反馈: "Send feedback",
+  反馈占位: "Add feedback or objections to keep refining the plan",
+  计划已批准: "The plan is approved. Please start executing.",
+
   // Starter suggestions
   了解这个项目: "Learn about this project",
   排查构建报错: "Debug build errors",

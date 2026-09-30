@@ -98,7 +98,7 @@ export const buildSessionOptions = async (
   // loader 与会话共用同一个 SettingsManager：分两个实例会让资源发现与运行期设置不一致
   const settingsManager = SettingsManager.inMemory();
   const { loader, extensionTools } = await createSessionLoader(input, settingsManager);
-  const { customTools, tools: availableTools } = buildSessionTools(input.websearch);
+  const { customTools, tools: availableTools } = buildSessionTools(input.websearch, input.mode);
 
   return {
     cwd: input.cwd,

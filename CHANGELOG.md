@@ -10,6 +10,10 @@
   经 `server/src/agent/modes` 声明。`plan` / `ask` 均为只读（工具集不含 `edit` / `write` / `bash`，
   只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式片段经 `appendSystemPrompt` 注入，
   切换模式会重建会话实例。composer 底部新增模式选择器，模式持久化到 `session.mode`。
+- plan 模式重做（阶段 2.5）：新增自研工具 `present_plan`（只在 plan 模式注册），
+  模型产出计划后调用它收尾。前端在本轮以 `present_plan` 收尾时，用「计划决策表单」替掉输入区：
+  「批准并执行」切换到 `build` 模式并自动发一条「计划已批准，请开始执行。」，
+  「提交反馈」则带着意见留在 plan 模式继续讨论。计划只作为对话消息，不落盘。
 - 新增权限引擎 `server/src/agent/permissions`：声明式规则（工具名 + pattern + `allow` / `ask` / `deny`，
   `*` 通配、**最后命中者胜**），经 pi 内联扩展（`DefaultResourceLoader({ extensionFactories })`）
   挂到 `tool_call` 上拦截。默认规则：`.env` / `.env.*` 的读写阻断（`.env.example` 放行）、

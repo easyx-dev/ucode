@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ChatHeader } from "@/components/chat-header";
 import { Composer } from "@/components/composer";
 import { MessageList } from "@/components/message-list";
+import { PlanDecisionForm } from "@/components/plan-decision-form";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ModelsResponse, SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
 
@@ -23,6 +24,10 @@ type ChatPanelProps = {
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
   onSelectMode: (mode: SessionMode) => void;
   onOpenSettings: () => void;
+  /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
+  planReady: boolean;
+  onApprovePlan: () => void;
+  onFeedbackPlan: (text: string) => void;
 };
 
 export function ChatPanel({
@@ -35,6 +40,9 @@ export function ChatPanel({
   onSelectThinkingLevel,
   onSelectMode,
   onOpenSettings,
+  planReady,
+  onApprovePlan,
+  onFeedbackPlan,
 }: ChatPanelProps) {
   const { t } = useTranslation();
   // 模型选择器只列已接入的供应商：目录里还有大量没配凭证的内置供应商，选了必然报错
@@ -64,21 +72,25 @@ export function ChatPanel({
         empty={empty}
       />
 
-      <Composer
-        streaming={chat.streaming}
-        disabled={!session}
-        onSend={(text) => void chat.send(text)}
-        onStop={() => void chat.stop()}
-        suggestions={showSuggestions(session, chat) ? suggestions : undefined}
-        cwd={session?.cwd}
-        providers={providers}
-        model={session?.model ?? models?.defaultModel ?? ""}
-        thinkingLevel={session?.thinkingLevel ?? models?.thinkingLevel ?? "off"}
-        mode={session?.mode ?? "build"}
-        onSelectModel={onSelectModel}
-        onSelectThinkingLevel={onSelectThinkingLevel}
-        onSelectMode={onSelectMode}
-      />
+      {planReady ? (
+        <PlanDecisionForm onApprove={onApprovePlan} onFeedback={onFeedbackPlan} />
+      ) : (
+        <Composer
+          streaming={chat.streaming}
+          disabled={!session}
+          onSend={(text) => void chat.send(text)}
+          onStop={() => void chat.stop()}
+          suggestions={showSuggestions(session, chat) ? suggestions : undefined}
+          cwd={session?.cwd}
+          providers={providers}
+          model={session?.model ?? models?.defaultModel ?? ""}
+          thinkingLevel={session?.thinkingLevel ?? models?.thinkingLevel ?? "off"}
+          mode={session?.mode ?? "build"}
+          onSelectModel={onSelectModel}
+          onSelectThinkingLevel={onSelectThinkingLevel}
+          onSelectMode={onSelectMode}
+        />
+      )}
     </main>
   );
 }

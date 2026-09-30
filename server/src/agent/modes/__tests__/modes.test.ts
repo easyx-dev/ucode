@@ -15,17 +15,14 @@ describe("MODES", () => {
     }
   });
 
-  it("M-02 plan / ask 模式工具集只有只读与联网工具", () => {
-    const expected = ["read", "grep", "find", "ls", "webfetch", "websearch"];
-    for (const mode of ["plan", "ask"] as const) {
-      const tools = MODES[mode].tools ?? [];
-      for (const name of ["edit", "write", "bash"]) {
-        assert.ok(!tools.includes(name), `${mode} 模式不应暴露 ${name}`);
-      }
-      for (const name of expected) {
-        assert.ok(tools.includes(name), `${mode} 模式缺少只读工具 ${name}`);
-      }
+  it("M-02 plan / ask 模式工具集只有只读与联网工具，plan 额外带 present_plan", () => {
+    const readOnly = ["read", "grep", "find", "ls", "webfetch", "websearch"];
+    for (const name of ["edit", "write", "bash"]) {
+      assert.ok(!(MODES.plan.tools ?? []).includes(name), `plan 模式不应暴露 ${name}`);
+      assert.ok(!(MODES.ask.tools ?? []).includes(name), `ask 模式不应暴露 ${name}`);
     }
+    assert.deepEqual(MODES.ask.tools, readOnly);
+    assert.deepEqual(MODES.plan.tools, [...readOnly, "present_plan"]);
   });
 
   it("build 使用全部可用工具（null），不需要逐个枚举", () => {

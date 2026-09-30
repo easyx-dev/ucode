@@ -56,7 +56,9 @@ describe("resolveModeTools", () => {
     "ls",
     "webfetch",
     "websearch",
+    "present_plan",
   ];
+  const READ_ONLY = ["read", "grep", "find", "ls", "webfetch", "websearch"];
 
   it("build 用全部可用工具并并入扩展工具", () => {
     assert.deepEqual(resolveModeTools("build", AVAILABLE, ["ext_tool"]), [
@@ -66,9 +68,10 @@ describe("resolveModeTools", () => {
   });
 
   it("plan / ask 只保留只读与联网工具", () => {
-    const expected = ["read", "grep", "find", "ls", "webfetch", "websearch"];
-    for (const mode of ["plan", "ask"] as const) {
-      assert.deepEqual(resolveModeTools(mode, AVAILABLE, ["ext_tool"]), expected);
-    }
+    assert.deepEqual(resolveModeTools("plan", AVAILABLE, ["ext_tool"]), [
+      ...READ_ONLY,
+      "present_plan",
+    ]);
+    assert.deepEqual(resolveModeTools("ask", AVAILABLE, ["ext_tool"]), READ_ONLY);
   });
 });

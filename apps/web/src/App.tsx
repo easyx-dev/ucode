@@ -1,4 +1,6 @@
 /** 应用外壳：会话侧栏 + 对话区 + 设置对话框 */
+import { useTranslation } from "react-i18next";
+
 import { ChatPanel } from "@/components/chat-panel";
 import { PermissionDialog } from "@/components/permission-dialog";
 import { SessionSidebar } from "@/components/session-sidebar";
@@ -8,11 +10,25 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { WelcomePanel } from "@/components/welcome-panel";
 import { useInteractions } from "@/hooks/use-interactions";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { lastTurnPresentedPlan } from "@/lib/plan";
 
 export default function App() {
+  const { t } = useTranslation();
   const workspace = useWorkspace();
   const { sessions, models, configured, activeId, activeSession, chat } = workspace;
   const interactions = useInteractions(activeId);
+
+  // plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区
+  const planReady =
+    activeSession?.mode === "plan" && !chat.streaming && lastTurnPresentedPlan(chat.items);
+
+  const approvePlan = (): void => {
+    if (!activeId) return;
+    void (async () => {
+      await sessions.setMode(activeId, "build");
+      await chat.send(t("计划已批准"));
+    })();
+  };
 
   return (
     <TooltipProvider>
@@ -58,6 +74,9 @@ export default function App() {
             if (activeId) void sessions.setMode(activeId, mode);
           }}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
+          planReady={planReady}
+          onApprovePlan={approvePlan}
+          onFeedbackPlan={(text) => void chat.send(text)}
         />
 
         <PermissionDialog

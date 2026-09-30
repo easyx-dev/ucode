@@ -39,8 +39,10 @@ export const MODES: Record<SessionMode, ModeDefinition> = {
   },
   plan: {
     slug: "plan",
-    tools: READ_ONLY_TOOLS,
-    prompt: "当前处于「计划」模式：只做只读调研，产出可执行的方案；不要修改文件或执行命令。",
+    tools: [...READ_ONLY_TOOLS, "present_plan"],
+    prompt:
+      "当前处于「计划」模式：只做只读调研，产出可执行的方案；不要修改文件或执行命令。" +
+      "调研完成后，把计划写在回复里，并以 present_plan 收尾；需要用户确认的点写进计划，不要用提问收尾。",
     permissions: READ_ONLY_PERMISSIONS,
   },
   ask: {
