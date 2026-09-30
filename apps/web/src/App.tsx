@@ -1,15 +1,18 @@
 /** 应用外壳：会话侧栏 + 对话区 + 设置对话框 */
 import { ChatPanel } from "@/components/chat-panel";
+import { PermissionDialog } from "@/components/permission-dialog";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WelcomePanel } from "@/components/welcome-panel";
+import { useInteractions } from "@/hooks/use-interactions";
 import { useWorkspace } from "@/hooks/use-workspace";
 
 export default function App() {
   const workspace = useWorkspace();
   const { sessions, models, configured, activeId, activeSession, chat } = workspace;
+  const interactions = useInteractions(activeId);
 
   return (
     <TooltipProvider>
@@ -51,7 +54,15 @@ export default function App() {
           onSelectThinkingLevel={(level) => {
             if (activeId) void sessions.setThinkingLevel(activeId, level);
           }}
+          onSelectMode={(mode) => {
+            if (activeId) void sessions.setMode(activeId, mode);
+          }}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
+        />
+
+        <PermissionDialog
+          request={interactions.pending[0] ?? null}
+          onRespond={(requestId, decision) => void interactions.respond(requestId, decision)}
         />
 
         <SettingsDialog

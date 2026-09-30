@@ -138,6 +138,24 @@ export default {
   停止生成: "Stop generating",
   发送: "Send",
 
+  // Assistant modes
+  模式: "Mode",
+  编码模式: "Build",
+  计划模式: "Plan",
+  问答模式: "Ask",
+  "编码模式.说明": "Read, write and run commands directly.",
+  "计划模式.说明": "Produce a plan first; read-only research without code changes.",
+  "问答模式.说明": "Read-only analysis and answers; no file writes or commands.",
+  切换模式失败: "Failed to switch mode",
+
+  // Permission approval
+  需要授权: "Approval required",
+  "授权.说明": 'The agent wants to call "{{tool}}", target:',
+  授权范围: "Grant scope: {{scope}}",
+  允许一次: "Allow once",
+  本会话恒允: "Allow for this session",
+  拒绝: "Deny",
+
   // Starter suggestions
   了解这个项目: "Learn about this project",
   排查构建报错: "Debug build errors",

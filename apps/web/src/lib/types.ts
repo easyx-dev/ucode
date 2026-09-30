@@ -17,6 +17,8 @@ export type {
   MessageDTO,
   MessageRole,
   ModelsResponse,
+  PendingInteraction,
+  PermissionDecision,
   Project,
   ProjectListResponse,
   PromptAdmittedResponse,
@@ -28,6 +30,7 @@ export type {
   ServerEvent,
   ServerEventPayload,
   SessionListResponse,
+  SessionMode,
   SessionSummary,
   ThinkingLevel,
   WebsearchView,
@@ -38,6 +41,7 @@ export {
   KEYLESS_SEARCH_PROVIDERS,
   SEARCH_PROVIDER_LABELS,
   SEARCH_PROVIDERS,
+  SESSION_MODES,
   THINKING_LEVELS,
 } from "@ucode/contracts";
 

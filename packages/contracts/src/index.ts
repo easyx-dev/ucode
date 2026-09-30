@@ -8,6 +8,8 @@ export * from "./events";
 export * from "./fs/input";
 export * from "./fs/output";
 export * from "./health/output";
+export * from "./interactions/input";
+export * from "./interactions/output";
 export * from "./locale";
 export * from "./messages/input";
 export * from "./messages/output";

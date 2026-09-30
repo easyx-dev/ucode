@@ -3,10 +3,11 @@ import { ArrowUp, FolderOpen, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ModePicker } from "@/components/mode-picker";
 import { ModelPicker } from "@/components/model-picker";
 import { ThinkingPicker } from "@/components/thinking-picker";
 import { Button } from "@/components/ui/button";
-import type { CatalogProvider, ThinkingLevel } from "@/lib/types";
+import type { CatalogProvider, SessionMode, ThinkingLevel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ComposerProps = {
@@ -22,8 +23,11 @@ type ComposerProps = {
   /** 当前生效的 "provider/model" */
   model: string;
   thinkingLevel: ThinkingLevel;
+  /** 当前会话的助手模式 */
+  mode: SessionMode;
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
+  onSelectMode: (mode: SessionMode) => void;
 };
 
 export function Composer({
@@ -36,8 +40,10 @@ export function Composer({
   providers,
   model,
   thinkingLevel,
+  mode,
   onSelectModel,
   onSelectThinkingLevel,
+  onSelectMode,
 }: ComposerProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState("");
@@ -120,6 +126,8 @@ export function Composer({
                 onSelect={onSelectModel}
               />
             ) : null}
+
+            <ModePicker value={mode} disabled={disabled} onSelect={onSelectMode} />
 
             <div className="ml-auto flex items-center gap-1">
               <ThinkingPicker

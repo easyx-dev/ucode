@@ -11,6 +11,9 @@ import {
   type FsMkdirRequest,
   type FsMkdirResponse,
   type HealthResponse,
+  type InteractionListResponse,
+  type InteractionRespondRequest,
+  type InteractionRespondResponse,
   type MessageInterruptResponse,
   type MessageListRequest,
   type MessageListResponse,
@@ -134,6 +137,12 @@ export const api = {
     update: (body: SessionUpdateRequest) => post<SessionSummary>("sessions/update", body),
     remove: (sessionId: string) =>
       post<SessionDeleteResponse>("sessions/delete", { sessionId } satisfies SessionIdRequest),
+  },
+  interactions: {
+    /** 补齐某会话尚未回答的交互请求（刷新 / 重连后） */
+    list: (sessionId: string) => post<InteractionListResponse>("interactions/list", { sessionId }),
+    respond: (body: InteractionRespondRequest) =>
+      post<InteractionRespondResponse>("interactions/respond", body),
   },
   projects: {
     list: () => post<ProjectListResponse>("projects/list"),

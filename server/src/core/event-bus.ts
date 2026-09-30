@@ -8,7 +8,7 @@
  *   构成「快照 + 接续」的一致性边界：投影与序号在同一同步块读取。
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { ServerEvent } from "@ucode/contracts";
+import type { EventName, ServerEvent } from "@ucode/contracts";
 
 import { toSseEvents } from "./events";
 
@@ -61,6 +61,11 @@ export class SessionEventBus {
     params?: Record<string, string>,
   ): void {
     this.publish({ type: "error", sessionId, code, message, ...(params ? { params } : {}) });
+  }
+
+  /** 服务端自身产生的会话事件（如交互请求）；客户端按 type 过滤 */
+  emitFrame(sessionId: string, type: EventName, data: unknown): void {
+    this.publish({ type, sessionId, seq: this.nextSeq(sessionId), data });
   }
 
   /** 快照序号：与 messages/list 的投影同一次同步读取，客户端按它切分实时帧 */

@@ -1,7 +1,7 @@
-/** 路径归一化与校验：fs 与 projects 共用，保证登记的路径与会话 cwd 能精确匹配 */
+/** 路径归一化与校验：fs / projects / 权限规则共用，保证登记的路径与会话 cwd 能精确匹配 */
 import { realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 
 import { ERROR_CODES } from "@ucode/contracts";
 
@@ -47,3 +47,6 @@ export const parentPathOf = (path: string): string | null => {
   const parent = resolve(path, "..");
   return parent === path ? null : parent;
 };
+
+/** 平台路径转 posix（`\` → `/`）：权限规则匹配与展示统一用 `/`，屏蔽平台差异 */
+export const toPosixPath = (path: string): string => path.split(sep).join("/");

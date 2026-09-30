@@ -6,7 +6,7 @@ import { ChatHeader } from "@/components/chat-header";
 import { Composer } from "@/components/composer";
 import { MessageList } from "@/components/message-list";
 import type { ChatController } from "@/hooks/use-chat";
-import type { ModelsResponse, SessionSummary, ThinkingLevel } from "@/lib/types";
+import type { ModelsResponse, SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
 
 /** 只有「已选会话且历史加载完、没有任何消息」才展示起步建议 */
 const showSuggestions = (session: SessionSummary | null, chat: ChatController): boolean =>
@@ -21,6 +21,7 @@ type ChatPanelProps = {
   onReloadModels: () => void;
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
+  onSelectMode: (mode: SessionMode) => void;
   onOpenSettings: () => void;
 };
 
@@ -32,6 +33,7 @@ export function ChatPanel({
   onReloadModels,
   onSelectModel,
   onSelectThinkingLevel,
+  onSelectMode,
   onOpenSettings,
 }: ChatPanelProps) {
   const { t } = useTranslation();
@@ -72,8 +74,10 @@ export function ChatPanel({
         providers={providers}
         model={session?.model ?? models?.defaultModel ?? ""}
         thinkingLevel={session?.thinkingLevel ?? models?.thinkingLevel ?? "off"}
+        mode={session?.mode ?? "build"}
         onSelectModel={onSelectModel}
         onSelectThinkingLevel={onSelectThinkingLevel}
+        onSelectMode={onSelectMode}
       />
     </main>
   );

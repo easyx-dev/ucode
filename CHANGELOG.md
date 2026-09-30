@@ -6,6 +6,24 @@
 
 ### 新增
 
+- 新增助手模式 `build` / `plan` / `ask`（默认 `build`）：模式 = 工具白名单 + 权限规则 + 提示词片段，
+  经 `server/src/agent/modes` 声明。`plan` / `ask` 均为只读（工具集不含 `edit` / `write` / `bash`，
+  只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式片段经 `appendSystemPrompt` 注入，
+  切换模式会重建会话实例。composer 底部新增模式选择器，模式持久化到 `session.mode`。
+- 新增权限引擎 `server/src/agent/permissions`：声明式规则（工具名 + pattern + `allow` / `ask` / `deny`，
+  `*` 通配、**最后命中者胜**），经 pi 内联扩展（`DefaultResourceLoader({ extensionFactories })`）
+  挂到 `tool_call` 上拦截。默认规则：`.env` / `.env.*` 的读写阻断（`.env.example` 放行）、
+  工作目录之外的路径走审批（`external_directory`）。「本会话恒允」按判定给出的范围追加一条会话级
+  allow 规则（越界检查按父目录，如批准 `/etc/hosts` 只记住 `/etc/**`），而不是笼统放行整个工具。
+  `build` 模式的工具白名单会并入从 loader 发现到的扩展工具名（pi 的 `tools` 是白名单，
+  否则扩展工具会被静默过滤）。
+- 新增交互请求通道（「服务端提问、前端回答」，当前服务权限审批）：新增 `interactions/list` /
+  `interactions/respond` 两个接口，事件流新增 `interaction_request` / `interaction_resolved`；
+  审批超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）与会话删除按拒绝结算。
+  前端新增权限审批弹窗（允许一次 / 本会话恒允 / 拒绝）。
+- 契约新增 `PERMISSION_ACTIONS` / `PERMISSION_DECISIONS` 常量与 `interactions` 域
+  （请求 / 响应类型）。
+
 - 新增自研工具（阶段 1）：`webfetch` 抓公网链接并用 `turndown` 转 markdown
   （响应体上限 5MB、超时默认 30s / 最长 120s、目标准入拦住回环 / 私网 / 链路本地与云元数据并逐跳校验重定向、
   交给模型的正文再按 pi 内置工具同档的 50KB 截断、返回内容以 `<fetched>` 边界包裹并中和正文里的同名标签，

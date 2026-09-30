@@ -48,6 +48,22 @@ export type SessionMode = (typeof SESSION_MODES)[number];
 export const DEFAULT_SESSION_MODE: SessionMode = "build";
 
 /**
+ * 权限动作三态：`allow` 直接放行 / `ask` 交由用户确认 / `deny` 阻断。
+ * 规则按工具名分键、pattern 匹配，**最后命中者胜**；未命中任何规则时默认 `allow`。
+ */
+export const PERMISSION_ACTIONS = ["allow", "ask", "deny"] as const;
+
+export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
+
+/**
+ * 用户对审批请求的答复：`allow_once` 只放行本次 / `allow_session` 本会话恒允 / `deny` 拒绝。
+ * 「本会话恒允」只存进程内存，删会话时清理，服务重启回到规则默认。
+ */
+export const PERMISSION_DECISIONS = ["allow_once", "allow_session", "deny"] as const;
+
+export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
+
+/**
  * 联网搜索服务商：websearch 工具的可选实现，顺序即设置页的展示顺序。
  * 每家在 server 侧对应一个 `SearchProvider`（端点、鉴权与响应映射都不同）。
  */

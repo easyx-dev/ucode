@@ -66,6 +66,7 @@
 | `interrupt` | 中断生成 | 动作回执 |
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
 | `test` | 连通性测试 | 测试结果 |
+| `respond` | 回答挂起的交互请求 | 动作回执 |
 
 ## 字段命名
 
@@ -183,6 +184,21 @@
 **预留扩展**（本次未实现，形状已为其留白）：`fs/info` 用于单路径 stat / 读文件内容；
 图片等原始字节预览与「除 health 外一律 POST JSON」冲突，届时按 `/events` 的先例单列一条非封套例外，
 不影响 `fs/list` 的响应形状。
+
+## 交互请求（interactions）
+
+「服务端提问、前端回答」的请求-响应通道：生成过程中服务端挂起一条请求，等前端答复后才继续。
+当前唯一场景是**权限审批**（工具调用命中 `ask` 规则），后续的 question 通道复用同一套形状。
+
+- 请求下发：SSE 事件 `interaction_request`（载荷 `PendingInteraction`，含 `requestId` / `kind` /
+  `tool` / `subject` / `scope`）；答复或超时后下发 `interaction_resolved`（`{ requestId }`）。
+  `scope` 是本次授权覆盖的范围：规则类 ask 是规则串，越界检查（`external_directory`）是父目录通配。
+- `interactions/list`：按 `sessionId` 列出尚未回答的请求，供刷新 / 重连后补齐对话框。
+- `interactions/respond`：按 `kind` 判别提交答复（权限审批为 `allow_once` / `allow_session` / `deny`），
+  返回 `{ requestId, resolved }`；重复回答或已超时为 `resolved: false`。
+- 生命周期：请求只在进程内存、超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）按拒绝结算，
+  会话删除时一并清理；`allow_session` 等价于按 `scope` 追加一条会话级 allow 规则，同样只存进程内存，
+  服务重启回到规则默认。
 
 ## 版本与破坏性变更
 

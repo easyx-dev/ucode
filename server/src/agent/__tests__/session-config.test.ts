@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
-import { resolveSessionCwd } from "../session-config";
+import { resolveModeTools, resolveSessionCwd } from "../session-config";
 
 const recordWith = (patch: Partial<SessionRecord>): SessionRecord => ({
   id: "s1",
@@ -41,5 +41,34 @@ describe("resolveSessionCwd", () => {
 
   it("都没有时回落到全局工作目录", () => {
     assert.equal(resolveSessionCwd(undefined), env.workspaceDir);
+  });
+});
+
+/** 阶段 2 的模式工具集：build 全量（含扩展工具），ask / plan 按声明集过滤 */
+describe("resolveModeTools", () => {
+  const AVAILABLE = [
+    "read",
+    "bash",
+    "edit",
+    "write",
+    "grep",
+    "find",
+    "ls",
+    "webfetch",
+    "websearch",
+  ];
+
+  it("build 用全部可用工具并并入扩展工具", () => {
+    assert.deepEqual(resolveModeTools("build", AVAILABLE, ["ext_tool"]), [
+      ...AVAILABLE,
+      "ext_tool",
+    ]);
+  });
+
+  it("plan / ask 只保留只读与联网工具", () => {
+    const expected = ["read", "grep", "find", "ls", "webfetch", "websearch"];
+    for (const mode of ["plan", "ask"] as const) {
+      assert.deepEqual(resolveModeTools(mode, AVAILABLE, ["ext_tool"]), expected);
+    }
   });
 });

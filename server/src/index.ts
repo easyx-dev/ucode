@@ -17,6 +17,7 @@ import { createConfigRoute } from "./routes/config";
 import { createEventsRoute } from "./routes/events";
 import { createFsRoute } from "./routes/fs";
 import { createHealthRoute } from "./routes/health";
+import { createInteractionsRoute } from "./routes/interactions";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
 import { createProjectsRoute } from "./routes/projects";
@@ -36,6 +37,7 @@ v1.route("/config", createConfigRoute(services));
 v1.route("/sessions", createSessionsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
 v1.route("/events", createEventsRoute(services));
+v1.route("/interactions", createInteractionsRoute(services));
 v1.route("/projects", createProjectsRoute(services));
 v1.route("/fs", createFsRoute());
 

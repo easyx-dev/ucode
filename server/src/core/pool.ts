@@ -4,12 +4,14 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { WebsearchConfig } from "@ucode/contracts";
+import { DEFAULT_SESSION_MODE, type WebsearchConfig } from "@ucode/contracts";
 
+import type { SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
 import type { SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import type { SessionEventBus } from "./event-bus";
+import type { InteractionBroker } from "./interactions";
 import type { PiRuntime } from "./runtime";
 import { indexFromManager } from "./session-index";
 
@@ -36,6 +38,11 @@ export class SessionPool {
     private readonly events: SessionEventBus,
     /** 联网搜索设置的实时读取（自研 websearch 工具用） */
     private readonly websearch: () => WebsearchConfig,
+    /** 会话级权限状态：恒允记录与审批中转 */
+    private readonly permissions: {
+      allow: SessionAllowStore;
+      interactions: InteractionBroker;
+    },
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -81,18 +88,25 @@ export class SessionPool {
 
     const record = this.repository.find(sessionId);
     const cwd = resolveSessionCwd(record, cwdOverride);
+    const mode = record?.mode ?? DEFAULT_SESSION_MODE;
 
     const manager = record?.sourcePath
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
     const { session } = await createAgentSession(
-      buildSessionOptions({
+      await buildSessionOptions({
         record,
         cwd,
+        mode,
         sessionManager: manager,
         runtime: this.runtime,
         websearch: this.websearch,
+        permission: {
+          listGrants: () => this.permissions.allow.list(sessionId),
+          grant: (rule) => this.permissions.allow.add(sessionId, rule),
+          request: (ask) => this.permissions.interactions.requestPermission(sessionId, ask),
+        },
       }),
     );
 

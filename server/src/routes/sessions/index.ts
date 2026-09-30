@@ -186,6 +186,9 @@ const deleteSession = (services: Services, sessionId: string): SessionDeleteResp
   services.pool.dispose(sessionId);
   services.sessions.delete(sessionId);
   services.events.remove(sessionId);
+  // 会话删除后，挂起的审批与「本会话恒允」都失去意义
+  services.interactions.forget(sessionId);
+  services.permissions.clear(sessionId);
   if (record?.sourcePath) rmSync(record.sourcePath, { force: true });
 
   return { deleted: true, sessionId };

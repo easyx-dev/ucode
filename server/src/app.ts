@@ -2,8 +2,10 @@
 import type { AppConfigPatchInput } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
 
+import { SessionAllowStore } from "./agent/permissions";
 import { ConfigStore } from "./config/store";
 import { SessionEventBus } from "./core/event-bus";
+import { InteractionBroker } from "./core/interactions";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
@@ -23,6 +25,10 @@ export type Services = {
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
   events: SessionEventBus;
+  /** 交互中转：权限审批等「服务端提问、前端回答」的挂起请求 */
+  interactions: InteractionBroker;
+  /** 会话级权限状态：审批弹窗里的「本会话恒允」 */
+  permissions: SessionAllowStore;
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
@@ -39,7 +45,12 @@ export const createServices = async (): Promise<Services> => {
   const projects = new ProjectRepository(db);
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
-  const pool = new SessionPool(runtime, sessions, events, () => config.get().websearch);
+  const interactions = new InteractionBroker(events);
+  const permissions = new SessionAllowStore();
+  const pool = new SessionPool(runtime, sessions, events, () => config.get().websearch, {
+    allow: permissions,
+    interactions,
+  });
 
   config.load();
   // 以 JSONL 为准对齐索引：补齐外部新增、清理文件已消失的行
@@ -74,6 +85,8 @@ export const createServices = async (): Promise<Services> => {
     runtime,
     pool,
     events,
+    interactions,
+    permissions,
     async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
       // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json
