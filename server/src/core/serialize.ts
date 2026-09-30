@@ -8,7 +8,6 @@ import {
   THINKING_LEVELS,
   type ThinkingLevel,
 } from "@ucode/contracts";
-
 import type { SessionOverride } from "../db/session-repository";
 import { isRecord } from "../utils/object";
 
@@ -196,12 +195,12 @@ export const sessionInfoToDTO = (
   cwd: info.cwd,
   createdAt: info.created.toISOString(),
   updatedAt: info.modified.toISOString(),
-  messageCount: info.messageCount,
   preview: info.firstMessage ?? "",
   model: override.model ?? defaultModel,
   thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
   mode: override.mode ?? DEFAULT_SESSION_MODE,
   running,
+  deletedAt: override.deletedAt ?? null,
 });
 
 /** 还没落盘（没有 assistant 回复）的草稿会话；草稿也可能正在生成首轮回复 */
@@ -210,6 +209,7 @@ export const draftSessionSummary = (
   override: SessionOverride,
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
+  /** 覆盖值与会话工作区都缺失时的兜底（全局工作目录） */
   fallbackCwd: string,
   running: boolean,
   /** 来自数据库行的真实时间；缺省（新建会话刚返回）时用当前时间 */
@@ -219,14 +219,15 @@ export const draftSessionSummary = (
   return {
     id: sessionId,
     name: override.name ?? null,
+    // 未绑定目录的会话没有显式 cwd，工作区就是它的工作目录
     cwd: override.cwd ?? fallbackCwd,
     createdAt: timestamps?.createdAt ?? now,
     updatedAt: timestamps?.updatedAt ?? now,
-    messageCount: 0,
     preview: "",
     model: override.model ?? defaultModel,
     thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
     mode: override.mode ?? DEFAULT_SESSION_MODE,
     running,
+    deletedAt: override.deletedAt ?? null,
   };
 };

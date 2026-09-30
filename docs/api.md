@@ -62,6 +62,7 @@
 | `mkdir` | 新建目录 | 目录路径 |
 | `update` | 局部更新 | 资源摘要 |
 | `delete` | 删除 | 动作回执 |
+| `archive` | 归档（软删） | 动作回执 |
 | `prompt` | 发起生成 | 动作回执 |
 | `interrupt` | 中断生成 | 动作回执 |
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
@@ -111,7 +112,7 @@
 | 列表 | `ListResult & { <资源复数>: T[] }`，其中 `ListResult = { total }` | `SessionListResponse` |
 | 详情 | `{ <资源单数>: T, ...附加状态 }` | `SessionInfoResponse` |
 | 创建 / 更新 | 直接返回资源摘要（裸对象） | `SessionSummary` |
-| 以会话为主体的动作 | `SessionScoped & { <状态布尔>: boolean }` | `SessionDeleteResponse` |
+| 以会话为主体的动作 | `SessionScoped & { <状态布尔>: boolean }` | `SessionArchiveResponse` |
 
 基类型 `ListResult` / `SessionScoped` 定义在 `packages/contracts/src/common.ts`，新接口优先复用，不要重复声明 `total`、`sessionId`。
 

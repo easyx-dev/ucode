@@ -19,12 +19,15 @@ import { env } from "../env";
 import { MODES, rulesForMode } from "./modes";
 import { createPermissionExtension, type PermissionHooks } from "./permissions";
 import { buildSessionTools } from "./tools/index";
+import { workspaceDirOf } from "./workspace";
 
-/** 会话工作目录：已落盘会话 > 覆盖值 > 调用方指定 > 全局工作目录 */
-export const resolveSessionCwd = (
-  record: SessionRecord | undefined,
-  cwdOverride?: string,
-): string => record?.piCwd || record?.cwd || cwdOverride || env.workspaceDir;
+/**
+ * 会话工作目录：绑定目录的用那个目录，未绑定的用按会话 id 派生的工作区。
+ * 调用方只会拿到已存在的会话（`admitPrompt` 先挡了查不到的 id），所以这里没有兜底分支——
+ * 不存在「没有记录」时该用哪个目录的说法，真要兜也只能兜到全局目录（`$APP_HOME`），那里放着密钥。
+ */
+export const resolveSessionCwd = (record: SessionRecord): string =>
+  record.cwd || workspaceDirOf(record.id);
 
 /**
  * 模式白名单：`build` 用全部可用工具（含扩展工具），其余模式只保留模式声明的能力集。

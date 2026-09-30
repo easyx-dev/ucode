@@ -1,10 +1,10 @@
-/** 会话动作：新建、重命名、换模型、改 thinking level、删除 */
+/** 会话动作：新建、重命名、换模型、改 thinking level、归档 */
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SessionListController } from "@/hooks/use-session-list";
 import { api, describeError } from "@/lib/api";
-import type { SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
+import type { SessionCreateRequest, SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
 
 /** 可提交给 sessions/update 的字段，与 SessionSummary 的可选字段同名 */
 type SessionPatch = {
@@ -18,10 +18,11 @@ export function useSessionActions(list: SessionListController) {
   const { t } = useTranslation();
   const { refresh, patch, addDraft, drop } = list;
 
+  /** 建会话：首发消息时把草稿提升成真会话（见 useChat）；`seed` 是它的初始设置 */
   const create = useCallback(
-    async (cwd?: string): Promise<SessionSummary | null> => {
+    async (seed: SessionCreateRequest = {}): Promise<SessionSummary | null> => {
       try {
-        const session = await api.sessions.create(cwd ? { cwd } : {});
+        const session = await api.sessions.create(seed);
         addDraft(session);
         return session;
       } catch (error) {
@@ -66,18 +67,18 @@ export function useSessionActions(list: SessionListController) {
     [applyUpdate, t],
   );
 
-  const remove = useCallback(
+  const archive = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
-        await api.sessions.remove(sessionId);
+        await api.sessions.archive(sessionId);
         drop(sessionId);
-        toast.success(t("会话已删除"));
+        toast.success(t("已归档"));
       } catch (error) {
-        toast.error(t("失败提示", { label: t("删除失败"), reason: describeError(error) }));
+        toast.error(t("失败提示", { label: t("归档失败"), reason: describeError(error) }));
       }
     },
     [drop, t],
   );
 
-  return { create, rename, setModel, setThinkingLevel, setMode, remove };
+  return { create, rename, setModel, setThinkingLevel, setMode, archive };
 }

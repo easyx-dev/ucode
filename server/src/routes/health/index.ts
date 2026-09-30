@@ -18,7 +18,7 @@ export const createHealthRoute = (services: Services) => {
         defaultModel: status.defaultModel,
         thinkingLevel: status.thinkingLevel,
         error: status.error,
-        workspace: env.workspaceDir,
+        workspace: env.workspaceRoot,
         activeSessions: services.pool.activeCount(),
         uptimeMs: Math.round(process.uptime() * 1000),
       } satisfies HealthResponse),

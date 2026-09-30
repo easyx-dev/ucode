@@ -71,7 +71,7 @@ export function SessionListItem({
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             <Trash2 className="size-3.5" />
-            {t("删除")}
+            {t("归档")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

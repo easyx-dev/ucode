@@ -43,20 +43,24 @@ const replaceAt = (items: ChatItem[], index: number, item: ChatItem): ChatItem[]
 export const settle = (items: ChatItem[]): ChatItem[] =>
   items.map((item) => (item.live ? { ...item, live: false } : item));
 
-/** 乐观插入一条用户消息，等服务端回传权威消息后再合并 */
-export const appendUserItem = (items: ChatItem[], text: string): ChatItem[] => {
-  localId += 1;
-  return [
-    ...items,
-    {
-      id: `live-user-${localId}`,
-      role: "user",
-      blocks: [{ type: "text", text }],
-      live: true,
-      createdAt: nowIso(),
-    },
-  ];
+/** 乐观插入一条用户消息，等服务端回传权威消息后再合并；返回列表与新条目 id（失败时据此撤回） */
+export const appendUserItem = (
+  items: ChatItem[],
+  text: string,
+): { items: ChatItem[]; id: string } => {
+  const id = `live-user-${nextLocalId()}`;
+  return {
+    id,
+    items: [
+      ...items,
+      { id, role: "user", blocks: [{ type: "text", text }], live: true, createdAt: nowIso() },
+    ],
+  };
 };
+
+/** 撤回某条乐观消息（投递失败时用）；id 已不在列表里时原样返回 */
+export const removeUserItem = (items: ChatItem[], id: string): ChatItem[] =>
+  items.some((item) => item.id === id) ? items.filter((item) => item.id !== id) : items;
 
 /** 新建一条待填充的 assistant 消息（message_start） */
 export const appendAssistantItem = (items: ChatItem[]): ChatItem[] => [

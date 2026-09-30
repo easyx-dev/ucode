@@ -7,9 +7,6 @@ export const DEFAULT_PORT = 2048;
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
-/** 未落盘草稿会话多久没被使用后清理（超过 7 天视为废弃） */
-export const DEFAULT_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 /** pi 私有数据目录名（位于 APP_HOME 下）：auth / sessions */
 export const PI_DIRNAME = "pi";
 
@@ -18,6 +15,9 @@ export const APP_DIRNAME = "app";
 
 /** 会话 JSONL 目录名（位于 pi 目录下） */
 export const SESSIONS_DIRNAME = "sessions";
+
+/** 会话工作区根目录名（位于主目录下）：`workspace/<sessionId>` */
+export const WORKSPACE_DIRNAME = "workspace";
 
 /** SQLite 数据库文件名（位于 app 目录下），与品牌无关，保持稳定 */
 export const DB_FILENAME = "app.db";

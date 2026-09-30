@@ -9,7 +9,7 @@ import { SESSION_MODES, THINKING_LEVELS } from "../constants";
  */
 export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/);
 
-/** 只带 sessionId 的操作（详情、删除、中断等） */
+/** 只带 sessionId 的操作（详情、归档、中断等） */
 export const sessionIdInputSchema = z.object({ sessionId: sessionIdSchema });
 
 export const sessionListInputSchema = z.object({

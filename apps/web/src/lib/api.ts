@@ -18,16 +18,11 @@ import {
   type MessageListRequest,
   type MessageListResponse,
   type ModelsResponse,
-  type Project,
-  type ProjectCreateRequest,
-  type ProjectDeleteResponse,
-  type ProjectListResponse,
-  type ProjectUpdateRequest,
   type PromptAdmittedResponse,
   type PromptRequest,
   type ServerEvent,
+  type SessionArchiveResponse,
   type SessionCreateRequest,
-  type SessionDeleteResponse,
   type SessionIdRequest,
   type SessionInfoResponse,
   type SessionListRequest,
@@ -135,21 +130,14 @@ export const api = {
     info: (sessionId: string) =>
       post<SessionInfoResponse>("sessions/info", { sessionId } satisfies SessionIdRequest),
     update: (body: SessionUpdateRequest) => post<SessionSummary>("sessions/update", body),
-    remove: (sessionId: string) =>
-      post<SessionDeleteResponse>("sessions/delete", { sessionId } satisfies SessionIdRequest),
+    archive: (sessionId: string) =>
+      post<SessionArchiveResponse>("sessions/archive", { sessionId } satisfies SessionIdRequest),
   },
   interactions: {
     /** 补齐某会话尚未回答的交互请求（刷新 / 重连后） */
     list: (sessionId: string) => post<InteractionListResponse>("interactions/list", { sessionId }),
     respond: (body: InteractionRespondRequest) =>
       post<InteractionRespondResponse>("interactions/respond", body),
-  },
-  projects: {
-    list: () => post<ProjectListResponse>("projects/list"),
-    create: (path: string) =>
-      post<Project>("projects/create", { path } satisfies ProjectCreateRequest),
-    update: (body: ProjectUpdateRequest) => post<Project>("projects/update", body),
-    remove: (projectId: string) => post<ProjectDeleteResponse>("projects/delete", { projectId }),
   },
   fs: {
     list: (body: FsListRequest = {}) => post<FsListResponse>("fs/list", body),

@@ -10,12 +10,12 @@ import {
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
-  DEFAULT_DRAFT_TTL_MS,
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   LOG_LEVELS,
   PI_DIRNAME,
   SESSIONS_DIRNAME,
+  WORKSPACE_DIRNAME,
 } from "./constants";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
@@ -51,6 +51,7 @@ const resolveLogLevel = (value: string | undefined, fallback: string): string =>
 const homeDir = resolveDir(process.env.APP_HOME, resolve(homedir(), appHomeDirname));
 const piDir = resolve(homeDir, PI_DIRNAME);
 const appDir = resolve(homeDir, APP_DIRNAME);
+const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
 
 /**
@@ -67,8 +68,8 @@ export const env = {
   /** 工作与配置主目录 */
   homeDir,
   port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
-  /** agent 的工作目录（工具读写文件、会话分组） */
-  workspaceDir: homeDir,
+  /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
+  workspaceRoot,
   /** pi 私有数据目录：auth.json / sessions 放这里 */
   piDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
@@ -82,11 +83,16 @@ export const env = {
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
-  draftTtlMs: resolveNum(process.env.APP_DRAFT_TTL_MS, DEFAULT_DRAFT_TTL_MS),
   corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
   logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
 };
 
-for (const dir of new Set([env.workspaceDir, env.piDir, env.appDir, env.sessionsRoot])) {
+for (const dir of new Set([
+  env.homeDir,
+  env.workspaceRoot,
+  env.piDir,
+  env.appDir,
+  env.sessionsRoot,
+])) {
   mkdirSync(dir, { recursive: true });
 }

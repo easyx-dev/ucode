@@ -4,7 +4,7 @@
  * 数据库放 `$APP_HOME/app/app.db`，只保存应用自己的会话元数据与索引；
  * 消息正文仍由 pi 写在 JSONL 里。schema 版本记在 `PRAGMA user_version`。
  *
- * 迁移只追加：已发布版本的 DDL 不得再改，改 schema 就加新版本项。
+ * 迁移只追加：已发布的 DDL 不得再改，改 schema 就加新版本项。
  * 项目处于开发初期，破坏性变更直接改现有版本项、本地删库重建即可，不写数据迁移。
  * 规则见 `docs/database.md`。
  */
@@ -13,41 +13,25 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 1;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
   1: `
     CREATE TABLE session (
-      id             TEXT PRIMARY KEY,
-      name           TEXT,
-      cwd            TEXT,
-      model          TEXT,
-      thinking_level TEXT,
-      pi_name        TEXT,
-      pi_cwd         TEXT,
-      source_path    TEXT,
-      persisted      INTEGER NOT NULL DEFAULT 0,
-      entry_count    INTEGER NOT NULL DEFAULT 0,
-      message_count  INTEGER NOT NULL DEFAULT 0,
-      preview        TEXT NOT NULL DEFAULT '',
-      created_at     TEXT NOT NULL,
-      updated_at     TEXT NOT NULL
+      id              TEXT PRIMARY KEY,
+      name            TEXT,
+      cwd             TEXT,
+      model           TEXT,
+      thinking_level  TEXT,
+      mode            TEXT,
+      source_path     TEXT,
+      preview         TEXT NOT NULL DEFAULT '',
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT NOT NULL,
+      deleted_at      TEXT
     );
     CREATE INDEX idx_session_updated_at ON session(updated_at DESC);
-  `,
-  2: `
-    CREATE TABLE project (
-      id         TEXT PRIMARY KEY,
-      name       TEXT,
-      path       TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-  `,
-  3: `
-    ALTER TABLE session ADD COLUMN mode TEXT;
-    ALTER TABLE session ADD COLUMN workspace_dir TEXT;
   `,
 };
 

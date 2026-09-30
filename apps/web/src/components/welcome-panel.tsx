@@ -1,4 +1,4 @@
-/** 空态：未配置模型 / 还没有会话 / 已选会话但没有消息 */
+/** 空态：还没有会话（输入区常驻可用，直接打字就是第一个会话） */
 import { brand } from "@ucode/brand";
 import { useTranslation } from "react-i18next";
 
@@ -9,20 +9,15 @@ type WelcomePanelProps = {
   configured: boolean;
   /** 当前默认模型，"provider/model" */
   defaultModel: string | null;
-  /** 是否已有任何会话 */
-  hasSessions: boolean;
-  /** agent 工作目录，来自 health；未取到时退回通用文案 */
-  workspace: string | null;
-  onCreate: () => void;
+  /** 助理根目录，来自 health；未取到时退回通用文案 */
+  workspaceRoot: string | null;
   onOpenSettings: () => void;
 };
 
 export function WelcomePanel({
   configured,
   defaultModel,
-  hasSessions,
-  workspace,
-  onCreate,
+  workspaceRoot,
   onOpenSettings,
 }: WelcomePanelProps) {
   const { t } = useTranslation();
@@ -46,26 +41,6 @@ export function WelcomePanel({
     );
   }
 
-  if (!hasSessions) {
-    return (
-      <section className="flex flex-col items-center gap-3 py-12 text-center">
-        <h2 className="text-xl font-semibold">{t("开始第一个会话")}</h2>
-        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-          {t("就绪.说明", { model: defaultModel ?? "-" })}
-          {workspace ? (
-            <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
-              {abbreviateHome(workspace)}
-            </code>
-          ) : (
-            t("工作目录")
-          )}
-          {t("就绪.说明.后缀")}
-        </p>
-        <Button onClick={onCreate}>{t("新建会话")}</Button>
-      </section>
-    );
-  }
-
   return (
     <section className="flex flex-col items-center gap-4 py-12 text-center">
       {/* 水印是装饰，不参与朗读 */}
@@ -76,6 +51,15 @@ export function WelcomePanel({
         {brand.name}
       </span>
       <h2 className="text-xl font-semibold">{greeting()}</h2>
+      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+        {t("就绪.说明", { model: defaultModel ?? "-" })}
+        {workspaceRoot ? (
+          <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
+            {abbreviateHome(workspaceRoot)}
+          </code>
+        ) : null}
+        {t("就绪.说明.后缀")}
+      </p>
     </section>
   );
 }

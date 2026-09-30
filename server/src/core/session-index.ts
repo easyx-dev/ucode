@@ -1,12 +1,12 @@
 /**
  * pi 会话对象 ↔ 入库索引 / `SessionInfo` 的转换。
  *
- * 索引口径与 pi 的 `buildSessionInfo` 对齐：`messageCount` 数 `type === "message"`
- * 的条目，`preview` 取首条 user 文本，`updatedAt` 取最新消息时间（回落 header 时间）。
+ * 索引口径与 pi 的 `buildSessionInfo` 对齐：`preview` 取首条 user 文本，
+ * `updatedAt` 取最新消息时间（回落 header 时间）。
  */
 import { existsSync } from "node:fs";
 import type { SessionEntry, SessionInfo, SessionManager } from "@earendil-works/pi-coding-agent";
-
+import { workspaceDirOf } from "../agent/workspace";
 import type { SessionIndex, SessionRecord } from "../db/session-repository";
 import { isRecord } from "../utils/object";
 
@@ -38,13 +38,11 @@ export const indexFromManager = (manager: SessionManager): SessionIndex | null =
   if (!header || !sourcePath || !existsSync(sourcePath)) return null;
 
   const entries = manager.getEntries();
-  let messageCount = 0;
   let preview = "";
   let lastActivity = 0;
 
   for (const entry of entries) {
     if (entry.type !== "message") continue;
-    messageCount++;
     const time = entryTime(entry);
     if (typeof time === "number") lastActivity = Math.max(lastActivity, time);
     if (preview) continue;
@@ -53,16 +51,11 @@ export const indexFromManager = (manager: SessionManager): SessionIndex | null =
 
   const headerTime = Date.parse(header.timestamp);
   const fallbackTime = Number.isNaN(headerTime) ? Date.now() : headerTime;
-  const createdTime = Number.isNaN(headerTime) ? fallbackTime : headerTime;
 
   return {
-    piName: manager.getSessionName() ?? null,
-    piCwd: header.cwd || null,
     sourcePath,
-    entryCount: entries.length,
-    messageCount,
     preview,
-    createdAt: isoOf(createdTime),
+    createdAt: isoOf(Number.isNaN(headerTime) ? fallbackTime : headerTime),
     updatedAt: isoOf(lastActivity > 0 ? lastActivity : fallbackTime),
   };
 };
@@ -71,11 +64,13 @@ export const indexFromManager = (manager: SessionManager): SessionIndex | null =
 export const infoFromRecord = (record: SessionRecord): SessionInfo => ({
   path: record.sourcePath ?? "",
   id: record.id,
-  cwd: record.piCwd ?? "",
-  ...(record.piName ? { name: record.piName } : {}),
+  // 未绑定目录的会话，工作区就是它的工作目录（与 draftSessionSummary 同一口径）
+  cwd: record.cwd ?? workspaceDirOf(record.id),
+  ...(record.name ? { name: record.name } : {}),
   created: new Date(record.createdAt),
   modified: new Date(record.updatedAt),
-  messageCount: record.messageCount,
+  // 消息数不再入库（前端不展示），这里只满足 pi 的类型
+  messageCount: 0,
   firstMessage: record.preview || "(no messages)",
   allMessagesText: record.preview,
 });

@@ -9,9 +9,7 @@ import { InteractionBroker } from "./core/interactions";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
-import { ProjectRepository } from "./db/project-repository";
 import { SessionRepository } from "./db/session-repository";
-import { env } from "./env";
 import { logger } from "./lib/logger";
 import { AppError } from "./lib/response";
 
@@ -19,8 +17,6 @@ export type Services = {
   config: ConfigStore;
   /** 会话元数据与索引（SQLite） */
   sessions: SessionRepository;
-  /** 项目空间：用户登记的目录集合，供会话分组 */
-  projects: ProjectRepository;
   runtime: PiRuntime;
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
@@ -42,7 +38,6 @@ export const createServices = async (): Promise<Services> => {
   const db = openDatabase();
   const config = new ConfigStore();
   const sessions = new SessionRepository(db);
-  const projects = new ProjectRepository(db);
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
@@ -53,10 +48,8 @@ export const createServices = async (): Promise<Services> => {
   });
 
   config.load();
-  // 以 JSONL 为准对齐索引：补齐外部新增、清理文件已消失的行
+  // 以 JSONL 为准对齐索引：清理文件已消失的行
   await sessions.reconcile();
-  // 启动时没有活跃会话，过期草稿无需豁免
-  sessions.deleteStaleDrafts(new Date(Date.now() - env.draftTtlMs).toISOString());
   await runtime.apply(config.get());
   // 内置 provider 集合要在首次 apply 之后才拿到，所以这里才能判断条目是否可落地；
   // 手改 config.json 留下的坏条目会被 pi 静默忽略，至少让它可见（不阻断启动）
@@ -81,7 +74,6 @@ export const createServices = async (): Promise<Services> => {
   return {
     config,
     sessions,
-    projects,
     runtime,
     pool,
     events,

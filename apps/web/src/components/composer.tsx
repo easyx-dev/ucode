@@ -1,6 +1,6 @@
 /** 输入区：白卡容器，顶部上下文行 + 无边框输入 + 底部工具栏（模型 / 思考档位 / 发送） */
 import { ArrowUp, FolderOpen, Square } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ModePicker } from "@/components/mode-picker";
@@ -11,10 +11,12 @@ import type { CatalogProvider, SessionMode, ThinkingLevel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ComposerProps = {
-  onSend: (text: string) => void;
+  /** 输入内容由调用方持有（按上下文持久化的草稿，见 `lib/composer-draft`） */
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
   onStop: () => void;
   streaming: boolean;
-  disabled?: boolean;
   /** 空对话时展示的建议 chips，点击填入输入框 */
   suggestions?: readonly string[];
   /** 会话工作目录，展示在顶部上下文行 */
@@ -31,10 +33,11 @@ type ComposerProps = {
 };
 
 export function Composer({
+  value,
+  onChange,
   onSend,
   onStop,
   streaming,
-  disabled,
   suggestions,
   cwd,
   providers,
@@ -46,15 +49,12 @@ export function Composer({
   onSelectMode,
 }: ComposerProps) {
   const { t } = useTranslation();
-  const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = useCallback(() => {
-    const text = value.trim();
-    if (!text || streaming || disabled) return;
-    setValue("");
-    onSend(text);
-  }, [disabled, onSend, streaming, value]);
+    if (!value.trim() || streaming) return;
+    onSend();
+  }, [onSend, streaming, value]);
 
   // 随内容撑高，封顶 220px 后交给内部滚动
   useEffect(() => {
@@ -65,7 +65,7 @@ export function Composer({
   }, [value]);
 
   const fill = (text: string): void => {
-    setValue(text);
+    onChange(text);
     textareaRef.current?.focus();
   };
 
@@ -91,7 +91,6 @@ export function Composer({
           className={cn(
             "rounded-xl bg-popover ring-1 ring-foreground/10 transition-shadow",
             "focus-within:ring-2 focus-within:ring-ring/40",
-            disabled && "opacity-60",
           )}
         >
           {cwd ? (
@@ -104,37 +103,29 @@ export function Composer({
           <textarea
             ref={textareaRef}
             value={value}
-            disabled={disabled}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => onChange(event.target.value)}
             onKeyDown={(event) => {
+              // 输入法组合中（Enter 在选词）不算发送
+              if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 submit();
               }
             }}
             rows={1}
-            placeholder={disabled ? t("先新建一个会话") : t("输入消息占位")}
-            className="max-h-[220px] min-h-11 w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            placeholder={t("输入消息占位")}
+            className="max-h-[220px] min-h-11 w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
           />
 
           <div className="flex items-center gap-1 px-2 pb-2">
             {providers.length > 0 ? (
-              <ModelPicker
-                providers={providers}
-                value={model}
-                disabled={disabled}
-                onSelect={onSelectModel}
-              />
+              <ModelPicker providers={providers} value={model} onSelect={onSelectModel} />
             ) : null}
 
-            <ModePicker value={mode} disabled={disabled} onSelect={onSelectMode} />
+            <ModePicker value={mode} onSelect={onSelectMode} />
 
             <div className="ml-auto flex items-center gap-1">
-              <ThinkingPicker
-                value={thinkingLevel}
-                disabled={disabled}
-                onSelect={onSelectThinkingLevel}
-              />
+              <ThinkingPicker value={thinkingLevel} onSelect={onSelectThinkingLevel} />
 
               {streaming ? (
                 <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
@@ -144,7 +135,7 @@ export function Composer({
                 <Button
                   size="icon"
                   onClick={submit}
-                  disabled={disabled || value.trim().length === 0}
+                  disabled={value.trim().length === 0}
                   title={t("发送")}
                 >
                   <ArrowUp className="size-4" />

@@ -20,7 +20,6 @@ import { createHealthRoute } from "./routes/health";
 import { createInteractionsRoute } from "./routes/interactions";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
-import { createProjectsRoute } from "./routes/projects";
 import { createSessionsRoute } from "./routes/sessions";
 
 const services = await createServices();
@@ -38,7 +37,6 @@ v1.route("/sessions", createSessionsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
 v1.route("/events", createEventsRoute(services));
 v1.route("/interactions", createInteractionsRoute(services));
-v1.route("/projects", createProjectsRoute(services));
 v1.route("/fs", createFsRoute());
 
 app.route(API_BASE_PATH, v1);
@@ -81,7 +79,7 @@ app.onError((error, c) => {
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   const status = services.runtime.getStatus();
-  logger.info(`http://localhost:${info.port}  (workspace: ${env.workspaceDir})`);
+  logger.info(`http://localhost:${info.port}  (home: ${env.homeDir})`);
   if (env.legacyLayout) {
     logger.warn(
       `检测到旧布局（agent/ 或根目录的 config.json / session-state.json），不会被读取；` +

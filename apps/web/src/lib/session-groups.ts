@@ -1,57 +1,62 @@
-/** 会话按项目分组的纯函数：分组、排序与「默认」兜底 */
+/** 会话按区分组：项目区按 cwd 归组，助理区（助理根下的会话）平铺 */
 import { baseName } from "@/lib/path";
-import type { Project, SessionSummary } from "@/lib/types";
+import type { SessionSummary } from "@/lib/types";
 
 export type SessionGroup = {
-  /** 对应的项目；默认分组为 null */
-  project: Project | null;
-  /** 展示名；默认分组为空串，由调用方套 t("默认") */
+  /** 组名；助理区平铺时为空串 */
   name: string;
-  /** 项目目录；默认分组为 null */
+  /** 项目目录；助理区平铺时为 null */
   path: string | null;
   sessions: SessionSummary[];
 };
 
-/** 项目展示名：显式命名优先，否则取目录名 */
-export const projectDisplayName = (project: Project): string =>
-  project.name ?? baseName(project.path);
+export type SessionSection = {
+  kind: "projects" | "assistant";
+  groups: SessionGroup[];
+};
 
 /**
- * 按项目分组：会话 `cwd` 与 `project.path` 精确匹配，匹配不到的进「默认」分组。
- * 会话在组内保持入参顺序（列表已按 `updatedAt` 降序）。
- * 排序：有会话的项目按组内最近活动降序，空项目接在其后（保持入参的 createdAt DESC），
- * 「默认」分组始终置底。`includeEmpty` 为假时不输出空项目分组（搜索态用）。
+ * 路径是否落在助理根之下（未绑定目录的会话，cwd 是 `<root>/<sessionId>`）。
+ * 助理与项目会话共用同一套机制，区别只在「目录是不是我们分配的」，
+ * 所以这里只看目录，不看会话上有没有别的标记。
+ */
+export const isWorkspaceSession = (cwd: string, root: string): boolean => {
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return cwd.startsWith(prefix);
+};
+
+/**
+ * 分区：cwd 落在助理根之下的进「助理区」（平铺），其余按 cwd 精确归组进「项目区」。
+ * 组内保持入参顺序（列表已按 `updatedAt` 降序）；项目区各组按组内最近活动降序。
+ * 空分区不输出。
  */
 export const groupSessions = (
   sessions: SessionSummary[],
-  projects: Project[],
-  includeEmpty = true,
-): SessionGroup[] => {
-  const byPath = new Map(projects.map((project) => [project.path, project]));
-  const buckets = new Map<string, SessionSummary[]>(projects.map((project) => [project.id, []]));
-  const fallback: SessionSummary[] = [];
+  workspaceRoot: string | null,
+): SessionSection[] => {
+  const assistant: SessionSummary[] = [];
+  const byDir = new Map<string, SessionSummary[]>();
 
   for (const session of sessions) {
-    const project = byPath.get(session.cwd);
-    if (project) buckets.get(project.id)?.push(session);
-    else fallback.push(session);
+    if (workspaceRoot && isWorkspaceSession(session.cwd, workspaceRoot)) {
+      assistant.push(session);
+      continue;
+    }
+    const list = byDir.get(session.cwd) ?? [];
+    list.push(session);
+    byDir.set(session.cwd, list);
   }
 
-  const all: SessionGroup[] = projects.map((project) => ({
-    project,
-    name: projectDisplayName(project),
-    path: project.path,
-    sessions: buckets.get(project.id) ?? [],
-  }));
+  const sections: SessionSection[] = [];
 
-  const visible = includeEmpty ? all : all.filter((group) => group.sessions.length > 0);
-  visible.sort((a, b) => {
-    const left = a.sessions[0]?.updatedAt;
-    const right = b.sessions[0]?.updatedAt;
-    if (left === undefined) return right === undefined ? 0 : 1;
-    if (right === undefined) return -1;
-    return right.localeCompare(left);
-  });
+  const projectGroups = [...byDir.entries()]
+    .map(([path, items]) => ({ name: baseName(path), path, sessions: items }))
+    .sort((a, b) => (b.sessions[0]?.updatedAt ?? "").localeCompare(a.sessions[0]?.updatedAt ?? ""));
+  if (projectGroups.length > 0) sections.push({ kind: "projects", groups: projectGroups });
 
-  return [...visible, { project: null, name: "", path: null, sessions: fallback }];
+  if (assistant.length > 0) {
+    sections.push({ kind: "assistant", groups: [{ name: "", path: null, sessions: assistant }] });
+  }
+
+  return sections;
 };

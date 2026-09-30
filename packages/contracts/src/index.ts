@@ -14,8 +14,6 @@ export * from "./locale";
 export * from "./messages/input";
 export * from "./messages/output";
 export * from "./models/output";
-export * from "./projects/input";
-export * from "./projects/output";
 export * from "./runtime";
 export * from "./sessions/input";
 export * from "./sessions/output";

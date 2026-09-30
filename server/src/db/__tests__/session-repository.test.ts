@@ -1,4 +1,4 @@
-/** 会话仓储单测：模式与工作区覆盖值的持久化口径 */
+/** 会话仓储单测：覆盖值、归档与列表过滤 */
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,7 +8,7 @@ import { after, before, describe, it } from "node:test";
 import { openDatabase } from "../index";
 import { SessionRepository } from "../session-repository";
 
-describe("SessionRepository 覆盖值", () => {
+describe("SessionRepository", () => {
   let dir: string;
   let db: ReturnType<typeof openDatabase>;
   let repo: SessionRepository;
@@ -29,11 +29,11 @@ describe("SessionRepository 覆盖值", () => {
     assert.equal(repo.find("s1")?.mode, "build");
   });
 
-  it("模式与工作区可写入并读回", () => {
-    repo.create("s2", { mode: "ask", workspaceDir: "/workspace/s2" });
+  it("覆盖值可写入并读回", () => {
+    repo.create("s2", { mode: "ask", cwd: "/tmp" });
     const record = repo.find("s2");
     assert.equal(record?.mode, "ask");
-    assert.equal(record?.workspaceDir, "/workspace/s2");
+    assert.equal(record?.cwd, "/tmp");
   });
 
   it("set 只覆盖显式给出的字段", () => {
@@ -49,5 +49,38 @@ describe("SessionRepository 覆盖值", () => {
     // 绕过写入层直接塞脏值，模拟手工改库
     db.prepare("UPDATE session SET mode = ? WHERE id = ?").run("nonsense", "s4");
     assert.equal(repo.find("s4")?.mode, "build");
+  });
+
+  it("归档只写 deleted_at，行与文件都保留", () => {
+    repo.create("s5", {});
+    repo.archive("s5");
+    const record = repo.find("s5");
+    assert.ok(record?.deletedAt);
+    // 归档的会话不再出现在列表里
+    assert.equal(
+      repo.search({ limit: 10 }).records.some((item) => item.id === "s5"),
+      false,
+    );
+    assert.equal(repo.listIds().includes("s5"), true);
+  });
+
+  it("列表默认过滤已归档的会话", () => {
+    repo.create("s6", {});
+    repo.archive("s6");
+    const { records, total } = repo.search({ limit: 10 });
+    assert.equal(
+      records.some((item) => item.id === "s6"),
+      false,
+    );
+    assert.equal(total, records.length);
+  });
+
+  it("搜索按名称与预览匹配", () => {
+    repo.create("s7", { name: "写周报" });
+    const { records } = repo.search({ q: "周报", limit: 10 });
+    assert.equal(
+      records.some((item) => item.id === "s7"),
+      true,
+    );
   });
 });

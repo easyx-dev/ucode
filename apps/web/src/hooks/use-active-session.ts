@@ -1,5 +1,5 @@
 /** 当前选中的会话：默认选中最近一个，会话从列表消失时清空；选中项同步到 URL 便于刷新恢复 */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SessionSummary } from "@/lib/types";
 
@@ -18,22 +18,34 @@ const writeSessionToUrl = (sessionId: string | null, mode: "push" | "replace"): 
   else window.history.replaceState(null, "", next);
 };
 
-export function useActiveSession(sessions: SessionSummary[], loading: boolean) {
+/**
+ * `keepEmpty` 为真时（输入框里还有没发出去的草稿）不自动选中最近会话：
+ * 用户重新打开时应该回到他没收尾的那条输入，而不是被自动带进别的会话。
+ */
+export function useActiveSession(sessions: SessionSummary[], loading: boolean, keepEmpty = false) {
   const [activeId, setActiveIdState] = useState<string | null>(readSessionFromUrl);
+  /** 默认选中只发生一次（见下方 effect） */
+  const pickedRef = useRef(false);
 
   const setActiveId = useCallback((sessionId: string | null) => {
     setActiveIdState(sessionId);
     writeSessionToUrl(sessionId, "push");
   }, []);
 
-  // URL 未指定会话时，列表就绪后默认选中最近一个
+  /**
+   * URL 未指定会话时，列表就绪后默认选中最近一个——只做一次。
+   * 之后不再自动纠偏：用户主动回到空态（新建）或首发失败，都不该被拽进别的会话。
+   */
   useEffect(() => {
-    if (activeId !== null) return;
+    if (pickedRef.current || loading) return;
+    // 判定一次就落定：之后用户主动回到空态（新建 / 在目录中新建）不再被自动纠正
+    pickedRef.current = true;
+    if (activeId !== null || keepEmpty) return;
     const first = sessions[0];
     if (!first) return;
     setActiveIdState(first.id);
     writeSessionToUrl(first.id, "replace");
-  }, [activeId, sessions]);
+  }, [activeId, keepEmpty, loading, sessions]);
 
   // 列表加载完成后，URL 指向的会话已不存在则清空
   useEffect(() => {

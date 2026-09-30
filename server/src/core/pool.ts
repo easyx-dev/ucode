@@ -4,12 +4,15 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_SESSION_MODE, type WebsearchConfig } from "@ucode/contracts";
+import { DEFAULT_SESSION_MODE, ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
 
 import type { SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
+import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../agent/workspace";
 import type { SessionRepository } from "../db/session-repository";
 import { env } from "../env";
+import { logger } from "../lib/logger";
+import { AppError } from "../lib/response";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker } from "./interactions";
 import type { PiRuntime } from "./runtime";
@@ -79,7 +82,7 @@ export class SessionPool {
     if (index) this.repository.refresh(sessionId, index);
   }
 
-  async ensure(sessionId: string, cwdOverride?: string): Promise<AgentSession> {
+  async ensure(sessionId: string): Promise<AgentSession> {
     const existing = this.entries.get(sessionId);
     if (existing) {
       existing.lastUsed = Date.now();
@@ -87,8 +90,19 @@ export class SessionPool {
     }
 
     const record = this.repository.find(sessionId);
-    const cwd = resolveSessionCwd(record, cwdOverride);
-    const mode = record?.mode ?? DEFAULT_SESSION_MODE;
+    // 只为已存在的会话建实例：没有记录就没有可用的 cwd（见 run.ts 的同款前置检查）
+    if (!record) {
+      throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+        path: sessionId,
+      });
+    }
+    const cwd = resolveSessionCwd(record);
+    const mode = record.mode;
+
+    // 只有未绑定目录的会话住工作区：它同时是这类会话的 cwd，跑之前必须存在；
+    // 绑定目录的会话在用户自己的目录里干活，没有工作区这回事。
+    // DB 行早于目录存在，孤儿清理的「无行即无主」据此成立
+    if (cwd === workspaceDirOf(sessionId)) ensureWorkspaceDir(sessionId);
 
     const manager = record?.sourcePath
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
@@ -194,19 +208,10 @@ export class SessionPool {
       if (now - entry.lastUsed < env.poolIdleMs) continue;
       this.dispose(sessionId);
     }
-    // 复用同一个心跳顺带清理过期草稿；活跃会话豁免，避免删掉正在推进的会话
-    this.repository.deleteStaleDrafts(
-      new Date(now - env.draftTtlMs).toISOString(),
-      this.activeIds(),
-    );
-  }
-
-  /** 活跃会话 id：有占位 run 或正在流式生成的会话 */
-  private activeIds(): string[] {
-    const ids = new Set(this.running);
-    for (const [sessionId, entry] of this.entries) {
-      if (entry.session.isStreaming) ids.add(sessionId);
+    // 孤儿工作区：没有对应会话行的目录（对账删行、手工删库的漏网情形）
+    const removed = cleanOrphanWorkspaces({ keepIds: this.repository.listIds() });
+    if (removed.length > 0) {
+      logger.debug({ removed }, "清理孤儿会话工作区");
     }
-    return [...ids];
   }
 }

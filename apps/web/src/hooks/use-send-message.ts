@@ -2,11 +2,18 @@
 import { useCallback, useState } from "react";
 
 import { api, describeError } from "@/lib/api";
-import { appendUserItem } from "@/lib/chat-reducer";
-import type { ChatItem } from "@/lib/types";
+import { appendUserItem, removeUserItem } from "@/lib/chat-reducer";
+import type { ChatItem, SessionMode, ThinkingLevel } from "@/lib/types";
+
+/** 空态首发时用来建会话的初始设置 */
+export type SessionSeed = {
+  cwd?: string;
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+  mode?: SessionMode;
+};
 
 type SendMessageOptions = {
-  sessionId: string | null;
   /** 读取当前消息列表（以 ref 为准，避免闭包拿到旧数组） */
   readItems: () => ChatItem[];
   apply: (items: ChatItem[]) => void;
@@ -18,7 +25,6 @@ type SendMessageOptions = {
 };
 
 export function useSendMessage({
-  sessionId,
   readItems,
   apply,
   onError,
@@ -28,24 +34,32 @@ export function useSendMessage({
   /** prompt 请求本身的在途状态；消息区提示由 pending / running 承担 */
   const [sending, setSending] = useState(false);
 
+  /**
+   * 往指定会话投递一条消息；返回是否已被受理。
+   * 目标 id 由调用方显式给出（首发时是刚建好的会话），不依赖 React 状态的传播。
+   */
   const send = useCallback(
-    async (text: string) => {
-      if (!sessionId) return;
+    async (text: string, sessionId: string): Promise<boolean> => {
       onError(null);
-      apply(appendUserItem(readItems(), text));
+      const optimistic = appendUserItem(readItems(), text);
+      apply(optimistic.items);
       setSending(true);
-      // 立刻给出反馈：建会话 + 首个 token 都算在这段等待里
+      // 立刻给出反馈：首个 token 都算在这段等待里
       markPending();
       try {
         await api.messages.prompt({ sessionId, text });
+        return true;
       } catch (error) {
+        // 没投出去就别在消息区留一条发不出去的消息（调用方会把原文还回输入框）
+        apply(removeUserItem(readItems(), optimistic.id));
         onError(describeError(error));
         clearPending();
+        return false;
       } finally {
         setSending(false);
       }
     },
-    [apply, clearPending, markPending, onError, readItems, sessionId],
+    [apply, clearPending, markPending, onError, readItems],
   );
 
   return { sending, send };

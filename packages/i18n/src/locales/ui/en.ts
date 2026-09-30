@@ -23,7 +23,6 @@ export default {
   更多操作: "More actions",
   未选择会话: "No session selected",
   生成中: "Generating",
-  工作目录: "the working directory",
   中文: "中文",
 
   // Chat header
@@ -133,7 +132,6 @@ export default {
   视觉: "Vision",
 
   // Composer
-  先新建一个会话: "Create a session first",
   输入消息占位: "Type a message. Enter to send, Shift+Enter for a new line.",
   停止生成: "Stop generating",
   发送: "Send",
@@ -190,23 +188,23 @@ export default {
     "Add an OpenAI-compatible endpoint (baseUrl / apiKey / model id) to start chatting.",
   打开设置: "Open settings",
   开始第一个会话: "Start your first session",
-  "就绪.说明": "Model ready: {{model}}. The session agent can read and write files under ",
-  "就绪.说明.后缀": " and run commands.",
+  "就绪.说明": "Model ready: {{model}}. Each session has its own workspace under ",
+  "就绪.说明.后缀": ", where the agent reads, writes and runs commands.",
 
   // Rename dialog
   重命名会话: "Rename session",
 
-  // Delete confirmation
-  删除会话确认: 'Delete session "{{name}}"? This cannot be undone.',
+  // Archive
+  归档: "Archive",
+  归档确认:
+    'Archive session "{{name}}"? It disappears from the list; the conversation and files are kept.',
+  已归档: "Archived",
+  归档失败: "Archive failed",
 
-  // Projects
-  项目空间: "Project space",
-  添加项目空间: "Add project space",
-  默认: "Default",
-  重命名项目: "Rename project",
-  删除项目: "Remove project",
-  删除项目确认:
-    'Remove project "{{name}}"? Its sessions move back to "Default"; the sessions themselves are kept.',
+  // Sidebar sections
+  项目区: "Projects",
+  助理区: "Assistant",
+  在目录中新建: "New in directory",
   选择目录: "Choose directory",
   返回上级: "Go up",
   新建文件夹: "New folder",
@@ -215,13 +213,12 @@ export default {
   此处没有子目录: "No subdirectories here",
   没有匹配的目录: "No matching directory",
   输入绝对路径: "Enter an absolute path",
-  项目列表加载失败: "Failed to load projects",
-  项目已添加: "Project added",
-  添加项目失败: "Failed to add project",
-  项目已删除: "Project removed",
-  重命名项目失败: "Rename failed",
-  删除项目失败: "Remove failed",
   创建文件夹失败: "Failed to create folder",
+
+  // Session directory
+  目录: "Directory",
+  "目录.说明": "This session's working directory: the agent reads, writes and runs commands here.",
+  暂无文件: "No files",
 
   // Requests and toasts
   "(未命名)": "(unnamed)",
@@ -241,7 +238,5 @@ export default {
   重命名失败: "Rename failed",
   切换模型失败: "Failed to switch model",
   设置thinking失败: "Failed to set thinking level",
-  会话已删除: "Session deleted",
-  删除失败: "Delete failed",
   会话列表加载失败: "Failed to load sessions",
 };

@@ -36,7 +36,7 @@ pnpm build && pnpm start
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_PORT` | `2048` | HTTP 端口 |
-| `APP_HOME` | `~/.ucode` | 工作 / 配置主目录：agent 工作目录，以及 `pi/`、`app/` 两个数据子目录 |
+| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`pi/`、`app/`、`workspace/` 三个子目录 |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
 | `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
@@ -49,12 +49,13 @@ pnpm build && pnpm start
 ```
 $APP_HOME/                 # 默认 ~/.ucode
 ├── pi/                    # pi 私有：auth.json / sessions/
-└── app/                   # 应用自有：config.json / app.db（SQLite）
+├── app/                   # 应用自有：config.json / app.db（SQLite）
+└── workspace/<sessionId>  # 未绑定目录的会话的工作目录
 ```
 
-工作目录 = `$APP_HOME`、配置 = `$APP_HOME/app/config.json`、
-pi 的 agent 目录 = `$APP_HOME/pi`（`auth.json` / `sessions/`）、
+配置 = `$APP_HOME/app/config.json`、pi 的 agent 目录 = `$APP_HOME/pi`（`auth.json` / `sessions/`）、
 会话元数据与索引 = `$APP_HOME/app/app.db`。
+会话的工作目录：绑定目录的用那个目录，未绑定的用 `$APP_HOME/workspace/<sessionId>`。
 
 > SQLite 用 Node 内置的 `node:sqlite`（`DatabaseSync`），需要 **Node ≥ 24**；它是实验特性，启动时会打印一条 `ExperimentalWarning`，不影响使用。
 
@@ -262,15 +263,11 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&fo
 | POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel?, mode? }` | 新建会话（返回 id；首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | `{ sessionId }` | 会话详情 |
 | POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel?, mode? }` | 重命名 / 换模型 / 换模式 |
-| POST | `/api/v1/sessions/delete` | `{ sessionId }` | 删除会话（含会话文件） |
-| POST | `/api/v1/projects/list` | `{}` | 项目空间列表（已登记的目录） |
-| POST | `/api/v1/projects/create` | `{ path }` | 登记一个已存在目录为项目空间（已登记则幂等返回） |
-| POST | `/api/v1/projects/update` | `{ projectId, name }` | 重命名项目空间 |
-| POST | `/api/v1/projects/delete` | `{ projectId }` | 移除项目空间（其会话回落「默认」分组） |
+| POST | `/api/v1/sessions/archive` | `{ sessionId }` | 归档会话（软删：从列表隐藏，对话与文件都保留） |
 | POST | `/api/v1/fs/list` | `{ path?, q?, type? }` | 浏览目录（`path` 省略时从用户 home 开始；`type` 过滤条目，默认 `all`；`q` 按名称模糊过滤条目） |
 | POST | `/api/v1/fs/mkdir` | `{ path }` | 新建目录（单层） |
 | POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史快照（compaction 感知，带接续用的 `seq`） |
-| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 投递一轮生成，返回受理 ack；结果走 `/events` |
+| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 投递一轮生成，返回受理 ack；会话须先由 `sessions/create` 建好；结果走 `/events` |
 | POST | `/api/v1/messages/interrupt` | `{ sessionId }` | 中断当前生成 |
 | POST | `/api/v1/events` | `{}` | 全局 SSE 事件流（所有会话的实时事件） |
 

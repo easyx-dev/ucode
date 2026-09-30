@@ -1,4 +1,4 @@
-/** 路径归一化与校验：fs / projects / 权限规则共用，保证登记的路径与会话 cwd 能精确匹配 */
+/** 路径归一化与校验：fs / 会话工作区 / 权限规则共用，保证路径与会话 cwd 能精确匹配 */
 import { realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve, sep } from "node:path";

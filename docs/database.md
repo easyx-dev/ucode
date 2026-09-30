@@ -36,7 +36,8 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 | 列 | snake_case | `thinking_level` |
 | 主键 | 固定名 `id`，`TEXT PRIMARY KEY`，应用侧 `randomUUID()` 生成 | `id` |
 | 外键 | `<单数表名>_id`，需带 `REFERENCES <表>(id) ON DELETE CASCADE` | `session_id` |
-| 时间 | `created_at` / `updated_at` | `updated_at` |
+| 时间 | `created_at` / `updated_at` / `deleted_at` | `updated_at` |
+| 软删 | 统一用 `deleted_at`（可空时间；非空即已软删），不用 `archived_at` / `removed_at` 等别名 | `deleted_at` |
 | 布尔 | 语义形容词，不加 `is_` 前缀 | `persisted` |
 | 计数 | `*_count` | `message_count` |
 | 索引 | `idx_<表>_<列>[_<列>]` | `idx_session_updated_at` |
@@ -45,28 +46,19 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 ### `session` 表的列分组
 
-`session` 有意保持单表，但列分两组语义，**新增列必须先归组**：
+`session` 有意保持单表，列分两组语义，**新增列必须先归组**：
 
-- **覆盖值组**（用户可改、允许为空、未设置时回落到全局默认）：`name` / `cwd` / `model` / `thinking_level` /
-  `mode`（未设置回落 `build`）/ `workspace_dir`（未设置按会话 id 派生，阶段 3 使用）
-- **派生索引组**（由 JSONL 解析得到、以文件为准、由 `reconcile()` 覆盖）：`pi_name` / `pi_cwd` /
-  `source_path` / `persisted` / `entry_count` / `message_count` / `preview` / `created_at` / `updated_at`
+- **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
+  `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）
+- **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写）：`source_path` /
+  `preview` / `created_at` / `updated_at`
 
-两组唯一的重叠是 `created_at` / `updated_at`：首次落盘前只有覆盖值组，落盘后由 `refresh()` 用文件时间覆盖。
+`cwd` 在建会话时按 pi 的 `resolvePath` 口径规范化（绝对化并折叠 `.` / `..`），
+草稿与落盘用同一个值，避免同一目录因写法不同被分成两组。
 
-对账只回写派生索引组：`reconcile()` 不会从 JSONL 还原覆盖值组，所以**删库重建后覆盖值会回落到默认**。
-其中 `name` / `cwd` 能由 `pi_name` / `pi_cwd` 兜底；`model` / `thinking_level` 的变更在会话文件里有 change 条目，
-pi 重放不受影响，但 ucode 侧展示与生效值会回落全局默认；`mode` 目前没有任何转录表示，删库即丢
-（是否补 pi 的 `custom` 条目见 [`plans/agent-tools-and-modes.md`](../plans/agent-tools-and-modes.md) 阶段 2）。
-
-### `project` 表
-
-登记「哪些目录算项目」，供会话按 `cwd` 分组：`id` / `name`（可空，缺省用目录名展示）/
-`path`（归一化的绝对路径，`UNIQUE`）/ `created_at` / `updated_at`。
-
-**不建外键**：会话与项目的归属靠 `session.cwd` 与 `project.path` 精确匹配（两侧都经
-`server/src/utils/path` 的 `realpath` 归一），这样外部导入的会话（`reconcile()` 落的行）也能归组；
-匹配不到任何项目的会话在 UI 上回落「默认」分组。删除项目只摘本表登记，不动会话。
+会话正文的事实源是 pi 的 JSONL；`source_path` 指向它，也是「还没落盘」的判据（为 null 时
+文件尚未写出）。**不再从文件回读任何元数据**（外部导入能力已放弃），所以删库重建后
+`name` / `cwd` / `model` / `thinking_level` / `mode` 会丢失——这是有意的取舍。
 
 ## 类型映射
 
@@ -111,24 +103,25 @@ server/src/db/
 
 ## 删除
 
-- 默认硬删，不做软删（当前无审计与回收需求）
-- 仓储的 `delete(id)` 只删自己那张表的行，不感知文件与内存
-- 关联资源的清理由调用方按固定顺序编排，顺序不能颠倒：
-
-  1. 停用运行中的资源：`pool.dispose(sessionId)`、`events.remove(sessionId)`
-  2. 删数据库行
-  3. 删文件（JSONL 等）
-
-- 有活跃生成时先拒绝并返回 `409 session_busy`，不允许删除进行中的会话
-- 禁止无条件 `DELETE`（不带 `WHERE`）；确需清空要写专用方法并说明理由
-- `reconcile()` 是唯一的全量对账入口：以 JSONL 为准补齐缺失行、删除文件已消失的已落盘行；
-  草稿行（`persisted = 0`）不属于文件，保留
-- 过期草稿另由 `deleteStaleDrafts()`（TTL 清理，启动时与池心跳各跑一次）处理，与 `reconcile()` 职责不同：
-  前者按「多久没被使用」删未落盘行，后者按会话文件是否存在对账已落盘行；活跃会话（占用 run 或流式中）豁免清理
+- **默认软删**：用户动作（界面叫「归档」）只把 `deleted_at` 写成当前时间；行、JSONL、
+  `$APP_HOME/workspace/<sessionId>/` 全部保留
+- 读取语义：列表默认过滤 `deleted_at IS NULL`；按 id 直取仍可读（为以后的「归档箱 / 恢复」留路）
+- 内存资源照旧释放，软删只影响磁盘：
+  1. `pool.dispose(sessionId)`、`events.remove(sessionId)`
+  2. `interactions.forget(sessionId)`、`permissions.clear(sessionId)`
+  3. 回写 `deleted_at`
+- 硬删只剩一种用途：对账时删「有行无文件」的行（这种行没有任何内容，谈不上归档）；
+  仓储的 `delete(id)` 是硬删，只给对账与测试用
+- 有活跃生成时先拒绝并返回 `409 session_busy`，不允许归档进行中的会话
+- 禁止无条件 `DELETE`（不带 `WHERE`）
+- 不再有草稿 TTL：会话在首条消息时才创建，空行由对账清理
+- 孤儿工作区（没有对应会话行的目录）由池心跳顺带用 `cleanOrphanWorkspaces()` 清掉；
+  工作区只属于未绑定目录的会话、且在它真正要跑时才建（`pool.ensure`），DB 行一定早于目录存在，
+  「无行」即「无主」，所以不设 TTL
 
 ## 容错
 
-- 库里只存可再生的索引与内容，损坏或丢失时删除文件重建即可，不做备份与恢复流程；
-  覆盖值组（尤其是 `mode`）重建后会回落默认，见「列分组」
+- 库里只存会话状态与列表缓存，损坏或丢失时删掉 `app.db` 重建即可；代价是会话的
+  `name` / `cwd` / `model` / `thinking_level` / `mode` 与归档标记一并丢失（见「列分组」）
 - 读取路径的解析失败一律回落而不是抛出，避免脏行打挂接口
-- 派生字段变更时同步更新 `reconcile()`，它是全量修复的唯一入口
+- 对账（`reconcile()`）只做减法：删掉文件已消失的行，不再从文件还原元数据

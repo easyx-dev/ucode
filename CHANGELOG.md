@@ -6,6 +6,45 @@
 
 ### 新增
 
+- 新增会话工作区：`$APP_HOME` 下多一层 `workspace/`（`env.workspaceRoot`，启动时一并创建），
+  未绑定目录的会话落在 `workspace/<sessionId>`，它同时是这类会话的 cwd
+  （此前回落到 `$APP_HOME`）；绑定目录的会话在用户自己的目录里干活、不建工作区。
+  目录在会话要跑时才建、路径由会话 id 派生不落库。
+  对话区头部新增「目录」入口，用只读浏览窗口查看该会话的工作目录（复用 `fs/list`）。
+- 会话改为**首条消息时才创建**：输入框常驻可用，没有会话时它是「草稿阶段」——第一条消息发出时
+  客户端先 `sessions/create`（带上草稿里的目录 / 模型 / 档位 / 模式），拿到 id 再 `messages/prompt`；
+  服务端不再隐式建会话，创建只有一条路径。选目录的入口也不再预建会话，而是把目录绑到草稿上。
+- 新增**输入区草稿**：未发送的文本与初始设置按上下文（草稿阶段 / 每个会话）持久化在 localStorage，
+  关掉应用再打开会连同内容一起恢复，并停留在草稿阶段（不会被自动带进别的会话）；
+  发送成功、会话归档时清掉对应草稿。
+- 会话删除改为**归档（软删）**：新增 `POST /sessions/archive` 与 `SessionSummary.deletedAt`，
+  归档只写 `deleted_at`，行、JSONL 与工作区目录全部保留，列表默认过滤已归档的会话。
+- 侧栏分「项目区 / 助理区」两段：项目区按会话 cwd 归组（组名取目录末段），助理区（助理根之下）
+  平铺展示；不再有「项目登记表」，分组完全由目录决定。
+
+### 变更
+
+- `session` 表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /
+  `entry_count` / `message_count`，新增 `deleted_at`；`reconcile()` 不再从 JSONL 还原元数据
+  （外部导入能力放弃），只做「有行无文件」的清理；schema 版本收敛为 1，本地删 `app.db` 重建。
+- 删除 `project` 表与 `/api/v1/projects/*` 四个接口、前端项目空间相关入口与文案。
+- 删除草稿 TTL 清理（`deleteStaleDrafts` 与环境变量 `APP_DRAFT_TTL_MS`）：会话在首条消息时创建，
+  空行由对账清理；工作区孤儿清理保留但去掉 TTL（目录在会话要跑时才建，DB 行必然早于它存在，
+  「无行」即「无主」）。
+- `health.workspace` 改指助理根目录（原为 agent 工作目录）。
+- 会话列表不再返回 `messageCount`（前端不展示）。
+- 未知会话不再被放行：`messages/prompt` / `sessions/update` 对不存在的 `sessionId` 返回 404；
+  会话工作目录的推导随之只认已有记录，删掉了「查不到就回落到 `$APP_HOME`」那条分支
+  （`env.workspaceDir` 一并删除）。
+
+### 移除
+
+- 移除 `POST /sessions/delete`（由 `POST /sessions/archive` 取代）。
+- 移除 `messages/prompt` 的 `cwd` 字段（会话级设置只在 `sessions/create`）。
+- 移除 `SessionSummary.messageCount` 与 `SessionInfoResponse` 的 `persisted` / `entries` 字段。
+
+### 新增（阶段 2）
+
 - 新增助手模式 `build` / `plan` / `ask`（默认 `build`）：模式 = 工具白名单 + 权限规则 + 提示词片段，
   经 `server/src/agent/modes` 声明。`plan` / `ask` 均为只读（工具集不含 `edit` / `write` / `bash`，
   只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式片段经 `appendSystemPrompt` 注入，

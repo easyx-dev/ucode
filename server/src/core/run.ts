@@ -61,13 +61,19 @@ const startRun = (
  * 只 await「取会话」与「入队」这类短操作，不 await 整轮生成。
  */
 export const admitPrompt = async (services: Services, input: PromptInput): Promise<void> => {
-  const { sessionId, text, behavior, cwd } = input;
+  const { sessionId, text, behavior } = input;
+
+  // 会话必须先存在：查不到的 id 会一路走到「以会话工作目录当 cwd」的推导上，
+  // 而那一步现在只认已有记录（见 `resolveSessionCwd`），这里提前给出明确的 404。
+  if (!services.sessions.find(sessionId)) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
 
   // 只在「创建/取回 AgentSession」这段加锁；run 本身不占锁，
   // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效。
-  const session = await services.pool.withLock(sessionId, () =>
-    services.pool.ensure(sessionId, cwd),
-  );
+  const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
 
   if (!services.pool.isRunning(sessionId) && !session.isStreaming) {
     startRun(services, sessionId, session, text);

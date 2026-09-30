@@ -1,5 +1,5 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
-import { Loader2, RefreshCw, Settings2 } from "lucide-react";
+import { FolderOpen, Loader2, RefreshCw, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +13,17 @@ type ChatHeaderProps = {
   models: ModelsResponse | null;
   onReloadModels: () => void;
   onOpenSettings: () => void;
+  /** 打开会话的工作目录；还没有会话时不传 */
+  onOpenDirectory?: () => void;
 };
 
-export function ChatHeader({ session, models, onReloadModels, onOpenSettings }: ChatHeaderProps) {
+export function ChatHeader({
+  session,
+  models,
+  onReloadModels,
+  onOpenSettings,
+  onOpenDirectory,
+}: ChatHeaderProps) {
   const { t } = useTranslation();
 
   return (
@@ -32,6 +40,19 @@ export function ChatHeader({ session, models, onReloadModels, onOpenSettings }: 
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {onOpenDirectory ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+            title={t("目录")}
+            onClick={onOpenDirectory}
+          >
+            <FolderOpen className="size-3.5" />
+            {t("目录")}
+          </Button>
+        ) : null}
+
         {models && !models.configured ? (
           <>
             <Badge variant="destructive">{t("未配置模型")}</Badge>

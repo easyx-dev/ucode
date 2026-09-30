@@ -10,6 +10,7 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
+import { resolveSessionCwd } from "../../agent/session-config";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
 import { admitPrompt } from "../../core/run";
@@ -30,11 +31,7 @@ export const createMessagesRoute = (services: Services) => {
     const manager =
       live?.sessionManager ??
       (record?.sourcePath
-        ? SessionManager.open(
-            record.sourcePath,
-            env.sessionsRoot,
-            record.piCwd || record.cwd || env.workspaceDir,
-          )
+        ? SessionManager.open(record.sourcePath, env.sessionsRoot, resolveSessionCwd(record))
         : null);
     const entries = manager ? manager.buildContextEntries() : [];
     // 会话级设置沿完整路径推进：压缩只裁剪展示条目，看裁剪后的列表会让压缩点之后丢档位
@@ -48,7 +45,8 @@ export const createMessagesRoute = (services: Services) => {
     return c.json(
       ok({
         sessionId,
-        cwd: record?.piCwd || env.workspaceDir,
+        // 会话不存在（例如刚被归档）时没有可报的目录，交给客户端按空串处理
+        cwd: record ? resolveSessionCwd(record) : "",
         persisted: Boolean(record?.sourcePath),
         running: services.pool.isActive(sessionId),
         seq,

@@ -1,4 +1,4 @@
-/** 侧栏头部：品牌标识、添加项目空间、新建会话入口与搜索框 */
+/** 侧栏头部：品牌标识、在目录中新建、新建会话入口与搜索框 */
 import { brand } from "@ucode/brand";
 import { FolderPlus, MessageSquarePlus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -11,9 +11,11 @@ type SessionSidebarHeaderProps = {
   query: string;
   /** 未配置模型时禁止新建 */
   canCreate: boolean;
-  onQueryChange: (query: string) => void;
+  onQueryChange: (value: string) => void;
+  /** 新建助理会话（落在自己的工作区） */
   onCreate: () => void;
-  onAddProject: () => void;
+  /** 打开目录选择器，在选中的目录里新建会话 */
+  onPickDirectory: () => void;
 };
 
 export function SessionSidebarHeader({
@@ -21,7 +23,7 @@ export function SessionSidebarHeader({
   canCreate,
   onQueryChange,
   onCreate,
-  onAddProject,
+  onPickDirectory,
 }: SessionSidebarHeaderProps) {
   const { t } = useTranslation();
 
@@ -34,8 +36,8 @@ export function SessionSidebarHeader({
           variant="outline"
           size="icon"
           className="ml-auto size-7"
-          onClick={onAddProject}
-          title={t("添加项目空间")}
+          onClick={onPickDirectory}
+          title={t("在目录中新建")}
         >
           <FolderPlus className="size-4" />
         </Button>
