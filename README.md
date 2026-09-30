@@ -58,7 +58,8 @@ pi 的 agent 目录 = `$APP_HOME/pi`（`auth.json` / `sessions/`）、
 
 > SQLite 用 Node 内置的 `node:sqlite`（`DatabaseSync`），需要 **Node ≥ 24**；它是实验特性，启动时会打印一条 `ExperimentalWarning`，不影响使用。
 
-> agent 具备 `read` / `write` / `edit` / `bash` 工具，实际执行范围就是 `APP_HOME`，默认 `~/.ucode`。想让它改真实代码仓库，把它指向目标目录。
+> agent 具备 `read` / `write` / `edit` / `bash` / `grep` / `find` / `ls` 工具与自研的
+> `webfetch` / `websearch`，实际执行范围就是 `APP_HOME`，默认 `~/.ucode`。想让它改真实代码仓库，把它指向目标目录。
 
 ---
 
@@ -185,6 +186,62 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 
 ---
 
+## 联网搜索
+
+agent 有自研的 `webfetch`（抓链接转 markdown）与 `websearch`（联网搜索，只给标题 / 链接 / 摘要）两个工具。
+`websearch` 需要一家搜索服务商，配置与模型同放 `$APP_HOME/app/config.json`，
+也可以在设置对话框的「联网搜索」区块里改。
+
+| provider | 门槛 | 鉴权 / 地址 |
+| --- | --- | --- |
+| `tavily`（默认） | 注册即用，免费档 1000 次/月、**不用绑卡** | `Authorization: Bearer tvly-…` |
+| `searxng` | **完全免费、无需注册**，但要自己跑一个实例 | `baseUrl`，如 `http://localhost:8888` |
+| `brave` | 2026-02 起新人只剩 $5/月赠金，**要绑卡** | `X-Subscription-Token` |
+
+三家都需要在 `config.json` 里配：key 型填 `apiKey`，自建实例填 `baseUrl`。
+
+```jsonc
+{ "websearch": { "provider": "tavily", "apiKey": "tvly-..." } }
+```
+
+```bash
+curl -X POST http://localhost:2048/api/v1/config/update \
+  -H 'content-type: application/json' \
+  -d '{"websearch":{"provider":"tavily","apiKey":"tvly-..."}}'
+```
+
+**自建 SearXNG**（无 key、无额度限制、查询不出本机）。注意它**默认只开 HTML 输出**，
+而 `websearch` 走的是 JSON 接口，所以要挂一份开了 `json` 的 `settings.yml` 进去：
+
+```bash
+mkdir -p searxng
+cat > searxng/settings.yml <<'YAML'
+use_default_settings: true
+server:
+  secret_key: "换成你自己的随机串"
+search:
+  formats:
+    - html
+    - json
+YAML
+docker run -d --name searxng -p 8888:8080 -v "$PWD/searxng:/etc/searxng" searxng/searxng:latest
+```
+
+验证（`200` 表示 JSON 已开，`403` 说明 `search.formats` 里还没有 `json`）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&format=json'
+```
+
+然后把设置页的「搜索服务商」选成 SearXNG、实例地址填 `http://localhost:8888` 即可（地址必须带 `http://` 或 `https://`）。
+
+- `apiKey` 留空表示沿用已保存的 key；没配好前置条件时 `websearch` 不会崩，只返回一条可读错误。
+- `webfetch` 不需要任何配置，但只抓公网地址：回环、私网与链路本地（含云元数据 `169.254.169.254`）一律拒绝，
+  重定向逐跳校验；正文最多 5MB，交给模型的正文再按 50KB 截断。
+- 抓到的内容以 `<fetched>` / `<search_results>` 包起来，提示模型那是外部数据而非指令。
+
+---
+
 ## HTTP 接口
 
 统一响应体：`{ "success": true, "code": "ok", "message": "", "data": ... }`；
@@ -199,7 +256,7 @@ curl -X POST http://localhost:2048/api/v1/config/test \
 | POST | `/api/v1/models/list` | `{}` | 供应商目录（pi 内置 + 自定义）与各自的模型、接入状态 |
 | POST | `/api/v1/models/refresh` | `{}` | 丢弃内存会话、按当前配置重建运行时 |
 | POST | `/api/v1/config/info` | `{}` | 当前配置（apiKey 脱敏） |
-| POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的，内置供应商只需 `id` + `apiKey` |
+| POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel?, websearch? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的，内置供应商只需 `id` + `apiKey`；`websearch` 为 `{ provider?, apiKey?, baseUrl? }`（`searxng` 用 `baseUrl`） |
 | POST | `/api/v1/config/test` | `{ baseUrl, apiKey?, providerId?, api?, model }` | 连通性测试 |
 | POST | `/api/v1/sessions/list` | `{ q?, limit? }` | 会话列表（含每个会话生效的 `model` / `thinkingLevel` / `mode`） |
 | POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel?, mode? }` | 新建会话（返回 id；首次回复后才落盘） |
@@ -328,6 +385,11 @@ server/src/
     events.ts              # AgentSessionEvent -> SSE 事件
   agent/                   # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
     session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
+    tools/                 # 自研工具与工具集装配
+      index.ts             # 内置工具白名单 + 自研工具的成对装配（交给 createAgentSession）
+      webfetch.ts          # 抓公网链接转 markdown（响应体上限、返回内容边界包裹）
+      ssrf.ts              # 目标准入：协议白名单 + 回环 / 私网 / 链路本地拦截
+      websearch/           # 搜索 provider 抽象（brave / tavily）与 index.ts 工具定义
     __tests__/             # 同模块的单元测试（约定见 AGENTS.md）
   routes/                  # health / models / config / sessions / messages / events
   index.ts                 # Hono 装配、静态托管 web、优雅退出
@@ -349,6 +411,13 @@ apps/web/src/
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
 - **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `pi/models.json`；`config.json` 是模型配置的唯一事实源。
+- **工具集在装配层收口**：内置工具走 `tools` 白名单（pi 的该字段是白名单，自研工具漏进去就会被过滤掉），
+  `webfetch` / `websearch` 走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。
+  **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/pi/extensions`、项目 `.pi/extensions`）或 pi 包
+  注册的工具不在白名单里，不会生效。
+- **外部内容不入信任链**：`webfetch` 只抓公网地址（回环 / 私网 / 链路本地一律拒绝，重定向逐跳校验），
+  并用 `<fetched>` / `<search_results>` 边界包裹返回内容，正文里的同名标签先中和（否则页面能「闭合」边界），
+  工具说明里声明「那是数据不是指令」。
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型先落在 SQLite 的草稿行（`persisted = 0`），首次回复后索引对齐。
 - **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `app.db` 重建即可。
 - **删除会话**：先停用运行中的资源（`pool.dispose` / `events.remove`），再删 SQLite 行，最后删 JSONL 文件；顺序不能颠倒，见 `docs/database.md`。

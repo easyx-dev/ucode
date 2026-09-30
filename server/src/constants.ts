@@ -1,4 +1,6 @@
 /** server 侧常量：默认值与固定目录名集中于此，避免散落在 env / logger 中 */
+import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
+import { brand } from "@ucode/brand/values";
 
 export const DEFAULT_PORT = 2048;
 
@@ -30,6 +32,30 @@ export const CONFIG_FILENAME = "config.json";
 
 /** pi 的鉴权文件 */
 export const AUTH_FILENAME = "auth.json";
+
+/** webfetch 未指定 timeout 时的超时（30s） */
+export const WEBFETCH_DEFAULT_TIMEOUT_MS = 30_000;
+
+/** webfetch 的 timeout 上限（120s） */
+export const WEBFETCH_MAX_TIMEOUT_MS = 120_000;
+
+/** webfetch 单次响应体的字节上限，超出即截断 */
+export const WEBFETCH_MAX_BYTES = 5 * 1024 * 1024;
+
+/** webfetch 交给模型的正文字节上限：与 pi 内置工具同档，避免大页面直接撑爆上下文 */
+export const WEBFETCH_MAX_OUTPUT_BYTES = DEFAULT_MAX_BYTES;
+
+/** webfetch 跟随重定向的最大跳数，每一跳都重新做地址准入 */
+export const WEBFETCH_MAX_REDIRECTS = 5;
+
+/** webfetch 的 User-Agent：带上品牌标识，便于站点侧识别来源（品牌串从品牌包取） */
+export const WEBFETCH_USER_AGENT = `${brand.slug}-webfetch/1.0`;
+
+/** websearch 单次返回条数上限 */
+export const WEBSEARCH_MAX_RESULTS = 10;
+
+/** websearch 单次请求的超时 */
+export const WEBSEARCH_TIMEOUT_MS = 20_000;
 
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;

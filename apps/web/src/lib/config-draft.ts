@@ -6,7 +6,9 @@ import type {
   CatalogProvider,
   ProviderConfigView,
   ProviderModelView,
+  SearchProviderId,
   ThinkingLevel,
+  WebsearchView,
 } from "./types";
 
 /** 数字字段用字符串承载，否则编辑中间态（空串、半截数字）会被 Number() 吃掉 */
@@ -34,6 +36,17 @@ export type DraftModel = {
 
 /** builtin = 接入 pi 内置目录的供应商；custom = 自描述端点与模型 */
 export type DraftProviderSource = CatalogProvider["source"];
+
+/** 联网搜索草稿：已保存的 key 只回显脱敏值，输入框留空表示沿用 */
+export type DraftWebsearch = {
+  provider: SearchProviderId;
+  apiKey: string;
+  /** 已保存 key 的脱敏展示，用作输入框 placeholder */
+  apiKeyMasked: string;
+  /** 自建 SearXNG 的实例地址；其他 provider 不使用 */
+  baseUrl: string;
+  configured: boolean;
+};
 
 export type DraftProvider = {
   key: string;
@@ -91,6 +104,15 @@ const toDraftModel = (model: ProviderModelView): DraftModel => ({
   samplingParams: model.samplingParams,
   headers: model.headers,
   compat: model.compat,
+});
+
+/** 已保存的联网搜索设置 → 草稿；key 只带脱敏值，输入框留空 */
+export const toDraftWebsearch = (view: WebsearchView): DraftWebsearch => ({
+  provider: view.provider,
+  apiKey: "",
+  apiKeyMasked: view.apiKeyMasked,
+  baseUrl: view.baseUrl,
+  configured: view.configured,
 });
 
 /** 空表单的缺省模板，按本地 OpenAI 兼容端点预填 */
@@ -194,6 +216,7 @@ export const toUpdatePayload = (
   drafts: DraftProvider[],
   defaultModel: string | null,
   thinkingLevel: ThinkingLevel,
+  websearch: DraftWebsearch,
 ) => ({
   providers: drafts.map((provider) => {
     const apiKey = provider.apiKey.trim() ? { apiKey: provider.apiKey.trim() } : {};
@@ -215,6 +238,12 @@ export const toUpdatePayload = (
   }),
   defaultModel,
   thinkingLevel,
+  websearch: {
+    provider: websearch.provider,
+    // 留空表示沿用服务端已保存的 key
+    ...(websearch.apiKey.trim() ? { apiKey: websearch.apiKey.trim() } : {}),
+    baseUrl: websearch.baseUrl.trim(),
+  },
 });
 
 /** 「provider/model」选项：只列实际生效的模型（内置取目录，自定义取表单） */

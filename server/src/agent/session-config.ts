@@ -9,10 +9,12 @@ import {
   type SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import type { WebsearchConfig } from "@ucode/contracts";
 
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
+import { buildSessionTools } from "./tools/index";
 
 /** 会话工作目录：已落盘会话 > 覆盖值 > 调用方指定 > 全局工作目录 */
 export const resolveSessionCwd = (
@@ -26,6 +28,8 @@ export type SessionAssemblyInput = {
   cwd: string;
   sessionManager: SessionManager;
   runtime: PiRuntime;
+  /** 实时读取联网搜索设置：设置页保存后新建的会话即按新 key 生效 */
+  websearch: () => WebsearchConfig;
 };
 
 /** 组装 AgentSession 的创建参数；模型与档位按「会话覆盖 > 全局默认」解析 */
@@ -34,6 +38,7 @@ export const buildSessionOptions = ({
   cwd,
   sessionManager,
   runtime,
+  websearch,
 }: SessionAssemblyInput): CreateAgentSessionOptions => {
   const override = overrideOf(record);
   const model = runtime.resolveModelRef(override.model) ?? runtime.resolveModelRef(null);
@@ -47,5 +52,6 @@ export const buildSessionOptions = ({
     thinkingLevel,
     sessionManager,
     settingsManager: SettingsManager.inMemory(),
+    ...buildSessionTools(websearch),
   };
 };

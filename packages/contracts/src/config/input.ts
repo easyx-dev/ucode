@@ -1,7 +1,13 @@
 /** 应用配置（provider / 模型 / 默认值）的请求侧 zod 模型，同时是 config.json 的持久化结构 */
 import { z } from "zod";
 
-import { API_TYPES, THINKING_LEVELS, type ThinkingLevel } from "../constants";
+import {
+  API_TYPES,
+  DEFAULT_SEARCH_PROVIDER,
+  SEARCH_PROVIDERS,
+  THINKING_LEVELS,
+  type ThinkingLevel,
+} from "../constants";
 
 /** 分档计价：命中 inputTokensAbove 最高阈值的那一档，应用于整个请求 */
 export const modelCostTierSchema = z.object({
@@ -106,20 +112,44 @@ export const providerSchema = z.object({
   models: z.array(providerModelSchema).min(1).optional(),
 });
 
+/**
+ * 联网搜索：`provider` 决定调用哪家搜索接口。
+ * 除了需要 key 的服务商，`baseUrl` 承载自建实例地址（searxng），两者都留空即视为未配置。
+ */
+export const websearchSchema = z.object({
+  provider: z.enum(SEARCH_PROVIDERS).default(DEFAULT_SEARCH_PROVIDER),
+  apiKey: z.string().default(""),
+  /** 自建 SearXNG 的实例地址；其他 provider 不使用 */
+  baseUrl: z.string().default(""),
+});
+
 export const appConfigSchema = z.object({
   providers: z.array(providerSchema).default([]),
   /** "provider/model"，null 表示使用第一个可用模型 */
   defaultModel: z.string().min(1).nullable().default(null),
   thinkingLevel: z.enum(THINKING_LEVELS).default("off"),
+  websearch: websearchSchema.default({
+    provider: DEFAULT_SEARCH_PROVIDER,
+    apiKey: "",
+    baseUrl: "",
+  }),
 });
 
 /** 更新时 apiKey 可省略：省略则沿用该 provider 已保存的 key */
 export const providerPatchSchema = providerSchema.partial({ apiKey: true });
 
+/** 联网搜索的局部更新：都省略即不改动；`apiKey` 留空沿用已保存的 key，`baseUrl` 留空即清空 */
+export const websearchPatchSchema = z.object({
+  provider: z.enum(SEARCH_PROVIDERS).optional(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+});
+
 export const appConfigPatchSchema = z.object({
   providers: z.array(providerPatchSchema).optional(),
   defaultModel: z.string().min(1).nullable().optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
+  websearch: websearchPatchSchema.optional(),
 });
 
 export const configTestSchema = z.object({
@@ -137,6 +167,7 @@ export type AppConfigPatchInput = z.infer<typeof appConfigPatchSchema>;
 export type AppConfigPatchRequest = z.input<typeof appConfigPatchSchema>;
 export type ProviderConfig = z.infer<typeof providerSchema>;
 export type ProviderModel = z.infer<typeof providerModelSchema>;
+export type WebsearchConfig = z.infer<typeof websearchSchema>;
 export type ConfigTestInput = z.infer<typeof configTestSchema>;
 /** 客户端发送的连通性测试载荷（api 默认 openai-completions，可省） */
 export type ConfigTestRequest = z.input<typeof configTestSchema>;

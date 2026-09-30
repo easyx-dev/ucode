@@ -1,5 +1,5 @@
 /** config 接口的响应模型，apiKey 已脱敏 */
-import type { ApiType, ThinkingLevel } from "../constants";
+import type { ApiType, SearchProviderId, ThinkingLevel } from "../constants";
 import type { RuntimeStatus } from "../runtime";
 
 import type { ProviderModel } from "./input";
@@ -18,10 +18,21 @@ export type ProviderConfigView = {
   models?: ProviderModelView[];
 };
 
+/** 联网搜索设置视图：apiKey 已脱敏，未配置时 `apiKeyMasked` 为空串 */
+export type WebsearchView = {
+  provider: SearchProviderId;
+  apiKeyMasked: string;
+  /** 自建 SearXNG 的实例地址；其他 provider 恒为空串 */
+  baseUrl: string;
+  /** 该 provider 的前置条件是否齐备（key 或实例地址）；决定 websearch 工具是否可用 */
+  configured: boolean;
+};
+
 export type ConfigView = {
   defaultModel: string | null;
   thinkingLevel: ThinkingLevel;
   providers: ProviderConfigView[];
+  websearch: WebsearchView;
 };
 
 /** config/info 与 config/update 的返回：配置视图 + 运行时状态 */

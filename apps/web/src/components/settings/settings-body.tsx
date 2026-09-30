@@ -1,4 +1,4 @@
-/** 设置对话框的表单主体：外观 / 模型供应商 / 全局默认值 */
+/** 设置对话框的表单主体：外观 / 模型供应商 / 联网搜索 / 全局默认值 */
 import { Loader2, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { ProviderCard } from "@/components/settings/provider-card";
 import { ProviderCatalog } from "@/components/settings/provider-catalog";
 import { SettingsAppearance } from "@/components/settings/settings-appearance";
 import { SettingsDefaults } from "@/components/settings/settings-defaults";
+import { SettingsWebsearch } from "@/components/settings/settings-websearch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { ConfigDraft } from "@/hooks/use-config-draft";
@@ -78,6 +79,12 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
             {t("添加自定义供应商")}
           </Button>
         </div>
+      </Section>
+
+      <Separator />
+
+      <Section title={t("联网搜索")}>
+        <SettingsWebsearch websearch={draft.websearch} onPatch={draft.patchWebsearch} />
       </Section>
 
       <Separator />

@@ -6,8 +6,11 @@ import {
   type AppConfigPatchInput,
   appConfigSchema,
   type ConfigView,
+  DEFAULT_SEARCH_PROVIDER,
   ERROR_CODES,
+  KEYLESS_SEARCH_PROVIDERS,
   providerSchema,
+  type WebsearchConfig,
 } from "@ucode/contracts";
 
 import { env } from "../env";
@@ -17,6 +20,7 @@ export const emptyConfig = (): AppConfig => ({
   providers: [],
   defaultModel: null,
   thinkingLevel: "off",
+  websearch: { provider: DEFAULT_SEARCH_PROVIDER, apiKey: "", baseUrl: "" },
 });
 
 /** defaultModel 指向的 provider 已被替换掉时返回 null，让它回落到「第一个可用模型」 */
@@ -94,10 +98,18 @@ export class ConfigStore {
         ? (patch.defaultModel ?? null)
         : reconcileDefaultModel(this.config.defaultModel, providers ?? this.config.providers);
 
+    // 搜索 key 与 provider 的 apiKey 同规则（留空沿用已保存的）；实例地址是普通文本，留空即清空
+    const websearch = {
+      provider: patch.websearch?.provider ?? this.config.websearch.provider,
+      apiKey: patch.websearch?.apiKey?.trim() || this.config.websearch.apiKey,
+      baseUrl: patch.websearch?.baseUrl?.trim() ?? this.config.websearch.baseUrl,
+    };
+
     return appConfigSchema.parse({
       providers: providers ?? this.config.providers,
       defaultModel,
       thinkingLevel: patch.thinkingLevel ?? this.config.thinkingLevel,
+      websearch,
     });
   }
 }
@@ -117,4 +129,16 @@ export const publicConfig = (config: AppConfig): ConfigView => ({
     apiKeyMasked: maskApiKey(provider.apiKey),
     ...(provider.models ? { models: provider.models } : {}),
   })),
+  websearch: {
+    provider: config.websearch.provider,
+    apiKeyMasked: config.websearch.apiKey ? maskApiKey(config.websearch.apiKey) : "",
+    baseUrl: config.websearch.baseUrl,
+    configured: isWebsearchConfigured(config.websearch),
+  },
 });
+
+/** 搜索的前置条件按 provider 不同：自建实例要地址，其余要 key */
+export const isWebsearchConfigured = (config: WebsearchConfig): boolean =>
+  (KEYLESS_SEARCH_PROVIDERS as readonly string[]).includes(config.provider)
+    ? config.baseUrl.length > 0
+    : config.apiKey.length > 0;

@@ -39,7 +39,7 @@ export const createServices = async (): Promise<Services> => {
   const projects = new ProjectRepository(db);
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
-  const pool = new SessionPool(runtime, sessions, events);
+  const pool = new SessionPool(runtime, sessions, events, () => config.get().websearch);
 
   config.load();
   // 以 JSONL 为准对齐索引：补齐外部新增、清理文件已消失的行

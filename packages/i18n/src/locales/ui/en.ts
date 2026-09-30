@@ -34,7 +34,7 @@ export default {
 
   // Settings dialog
   "设置.说明":
-    "Appearance and model configuration. Saving rebuilds the pi runtime; leave apiKey blank to keep the saved key.",
+    "Appearance, model and web search configuration. Saving rebuilds the pi runtime; leave apiKey blank to keep the saved key.",
   保存并生效: "Save and apply",
   外观: "Appearance",
   模型: "Models",
@@ -42,6 +42,16 @@ export default {
   "供应商.空态":
     "No provider configured yet. Pick one from the catalog below, or add a custom provider.",
   添加自定义供应商: "Add custom provider",
+
+  // Web search
+  联网搜索: "Web search",
+  搜索服务商: "Search provider",
+  "搜索服务商.说明": "Which search API the websearch tool calls.",
+  "搜索key.说明":
+    "Leave blank to keep the saved key; without a key the websearch tool returns a readable error.",
+  实例地址: "Instance URL",
+  "实例地址.说明":
+    "URL of your SearXNG instance; enable JSON output in settings.yml (add json to search.formats).",
 
   // Appearance
   界面主题: "Theme",

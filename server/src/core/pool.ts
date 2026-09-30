@@ -4,6 +4,7 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import type { WebsearchConfig } from "@ucode/contracts";
 
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
 import type { SessionRepository } from "../db/session-repository";
@@ -33,6 +34,8 @@ export class SessionPool {
     private readonly runtime: PiRuntime,
     private readonly repository: SessionRepository,
     private readonly events: SessionEventBus,
+    /** 联网搜索设置的实时读取（自研 websearch 工具用） */
+    private readonly websearch: () => WebsearchConfig,
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -84,7 +87,13 @@ export class SessionPool {
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
     const { session } = await createAgentSession(
-      buildSessionOptions({ record, cwd, sessionManager: manager, runtime: this.runtime }),
+      buildSessionOptions({
+        record,
+        cwd,
+        sessionManager: manager,
+        runtime: this.runtime,
+        websearch: this.websearch,
+      }),
     );
 
     const entry: PooledSession = { session, lastUsed: Date.now() };

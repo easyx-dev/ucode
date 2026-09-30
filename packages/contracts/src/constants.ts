@@ -47,6 +47,27 @@ export type SessionMode = (typeof SESSION_MODES)[number];
 /** 新建会话的默认模式 */
 export const DEFAULT_SESSION_MODE: SessionMode = "build";
 
+/**
+ * 联网搜索服务商：websearch 工具的可选实现，顺序即设置页的展示顺序。
+ * 每家在 server 侧对应一个 `SearchProvider`（端点、鉴权与响应映射都不同）。
+ */
+export const SEARCH_PROVIDERS = ["tavily", "searxng", "brave"] as const;
+
+export type SearchProviderId = (typeof SEARCH_PROVIDERS)[number];
+
+/** 新建会话/默认配置使用的搜索服务商：Tavily 有免绑卡的免费额度，是门槛最低的一家 */
+export const DEFAULT_SEARCH_PROVIDER: SearchProviderId = "tavily";
+
+/** 需要自建实例、不需要 key 的服务商：前端据此切换「实例地址 / API Key」字段 */
+export const KEYLESS_SEARCH_PROVIDERS = ["searxng"] as const satisfies readonly SearchProviderId[];
+
+/** 服务商展示名：都是专有名词，不随语言翻译 */
+export const SEARCH_PROVIDER_LABELS: Record<SearchProviderId, string> = {
+  tavily: "Tavily",
+  searxng: "SearXNG",
+  brave: "Brave",
+};
+
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";
 

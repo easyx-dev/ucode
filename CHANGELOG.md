@@ -6,6 +6,23 @@
 
 ### 新增
 
+- 新增自研工具（阶段 1）：`webfetch` 抓公网链接并用 `turndown` 转 markdown
+  （响应体上限 5MB、超时默认 30s / 最长 120s、目标准入拦住回环 / 私网 / 链路本地与云元数据并逐跳校验重定向、
+  交给模型的正文再按 pi 内置工具同档的 50KB 截断、返回内容以 `<fetched>` 边界包裹并中和正文里的同名标签，
+  声明为不可信内容）；`websearch` 走 provider 抽象，先接 `tavily` / `searxng` / `brave`，
+  前置条件（key 或实例地址）缺失、写错时返回可读错误而非崩溃。
+  两者经 `customTools` 注入，并带系统提示词片段与注入隔离说明。
+- 会话工具集启用 pi 内置只读检索工具 `grep` / `find` / `ls`（此前只有 read / bash / edit / write），
+  由 `agent/tools/index.ts` 的 `buildSessionTools` 统一输出「内置白名单 + 自研工具名」——
+  pi 的 `tools` 是白名单，自研工具漏进去会被静默过滤，故成对维护。
+- `config.json` 新增 `websearch: { provider, apiKey, baseUrl }`（默认 `tavily` + 空值）：
+  `config/update` 可局部更新（`apiKey` 留空表示沿用已保存的 key，`baseUrl` 留空即清空），
+  `config/info` 返回脱敏视图（`apiKeyMasked` / `baseUrl` / `configured`）；
+  设置对话框新增「联网搜索」区块（自建实例型 provider 改填实例地址），
+  契约新增 `SEARCH_PROVIDERS` / `SEARCH_PROVIDER_LABELS` / `KEYLESS_SEARCH_PROVIDERS` 与 `WebsearchView`。
+  provider 三家：`tavily`（默认，免费档不用绑卡）、`searxng`（自建实例，无 key）、`brave`（新用户已需绑卡）。
+- 新增依赖 `turndown`（HTML → markdown）与 `typebox`（自研工具的参数 schema），`@types/turndown` 为开发依赖。
+
 - 新增 `server/src/agent/`（会话装配层）：`session-config.ts` 把「会话覆盖值 + 运行时」收敛成
   `createAgentSession` 参数，`pool.ensure` 改为经它组装；后续的模式 / 工具集 / 自研提示词都从这里汇入。
 - 新增会话模式 `mode`（`build` / `plan` / `ask`，默认 `build`）与会话专属 `workspace_dir` 列（schema v3）：
@@ -92,6 +109,9 @@
 
 ### 变更
 
+- 会话创建参数的工具集改为显式白名单装配（阶段 1）：内置工具与自研工具一起由
+  `buildSessionTools` 输出，`tools` 不再缺省交由 pi 决定。白名单语义下 pi 扩展 / pi 包注册的工具
+  不在名单里即被过滤（当前无扩展，实际影响为零，README 已注明）。
 - 失败封套与 SSE 错误帧新增可选 `params`（错误文案的插值值）；前端仍按 `code` 分支。
 - `APP_HOME` 默认值由仓库内 `.tmp/.ucode` 改为用户主目录 `~/.ucode`；SQLite 数据库文件名由 `ucode.db` 改为通用名 `app.db`。
 - `sessions/list` / `sessions/info` 改为读 SQLite 索引，不再每次 `SessionManager.listAll()` 全量扫描解析 JSONL；

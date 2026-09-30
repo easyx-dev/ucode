@@ -30,7 +30,12 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
     setSaving(true);
     try {
       await api.config.update(
-        toUpdatePayload(draft.providers, draft.defaultModel || null, draft.thinkingLevel),
+        toUpdatePayload(
+          draft.providers,
+          draft.defaultModel || null,
+          draft.thinkingLevel,
+          draft.websearch,
+        ),
       );
       toast.success(t("配置已保存"));
       onSaved();

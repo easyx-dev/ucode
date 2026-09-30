@@ -5,14 +5,24 @@ import { toast } from "sonner";
 
 import { useConfigModels } from "@/hooks/use-config-models";
 import { api, describeError } from "@/lib/api";
-import type { DraftProvider } from "@/lib/config-draft";
+import type { DraftProvider, DraftWebsearch } from "@/lib/config-draft";
 import {
   createDraftProvider,
   fromCatalogProvider,
   modelOptions,
   toDraftProvider,
+  toDraftWebsearch,
 } from "@/lib/config-draft";
-import type { CatalogProvider, ThinkingLevel } from "@/lib/types";
+import { type CatalogProvider, DEFAULT_SEARCH_PROVIDER, type ThinkingLevel } from "@/lib/types";
+
+/** 联网搜索草稿的初值：与契约的默认值保持一致 */
+const emptyWebsearch = (): DraftWebsearch => ({
+  provider: DEFAULT_SEARCH_PROVIDER,
+  apiKey: "",
+  apiKeyMasked: "",
+  baseUrl: "",
+  configured: false,
+});
 
 export type ConfigDraft = ReturnType<typeof useConfigDraft>;
 
@@ -22,6 +32,7 @@ export function useConfigDraft(open: boolean) {
   const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("off");
+  const [websearch, setWebsearch] = useState<DraftWebsearch>(emptyWebsearch);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -41,6 +52,7 @@ export function useConfigDraft(open: boolean) {
       );
       setDefaultModel(config.defaultModel ?? "");
       setThinkingLevel(config.thinkingLevel);
+      setWebsearch(toDraftWebsearch(config.websearch));
     } catch (error) {
       toast.error(t("失败提示", { label: t("配置加载失败"), reason: describeError(error) }));
     } finally {
@@ -89,6 +101,10 @@ export function useConfigDraft(open: boolean) {
     setProviders((prev) => prev.filter((item) => item.key !== key));
   }, []);
 
+  const patchWebsearch = useCallback((patch: Partial<DraftWebsearch>) => {
+    setWebsearch((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   const models = useConfigModels(setProviders);
   const options = useMemo(() => modelOptions(providers), [providers]);
   /** 已接入（配置里已有）的目录条目 id，用于在目录里做标记 */
@@ -103,6 +119,7 @@ export function useConfigDraft(open: boolean) {
     configuredIds,
     defaultModel,
     thinkingLevel,
+    websearch,
     loading,
     options,
     setDefaultModel,
@@ -111,6 +128,7 @@ export function useConfigDraft(open: boolean) {
     addProvider,
     addFromCatalog,
     removeProvider,
+    patchWebsearch,
     ...models,
   };
 }

@@ -24,14 +24,22 @@ export type {
   ProviderConfigView,
   ProviderModelView,
   RuntimeStatus,
+  SearchProviderId,
   ServerEvent,
   ServerEventPayload,
   SessionListResponse,
   SessionSummary,
   ThinkingLevel,
+  WebsearchView,
 } from "@ucode/contracts";
-
-export { API_TYPES, THINKING_LEVELS } from "@ucode/contracts";
+export {
+  API_TYPES,
+  DEFAULT_SEARCH_PROVIDER,
+  KEYLESS_SEARCH_PROVIDERS,
+  SEARCH_PROVIDER_LABELS,
+  SEARCH_PROVIDERS,
+  THINKING_LEVELS,
+} from "@ucode/contracts";
 
 /** 界面上的一条消息：live 表示还在流式生成中 */
 export type ChatItem = MessageDTO & { live?: boolean };
