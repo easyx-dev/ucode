@@ -24,7 +24,7 @@
 | 1 · 工具层（grep/find · webfetch · websearch） | 已完成 | `5fd2dd3` |
 | 2 · 模式 + 权限引擎 + 审批 UI | 已完成 | `7eef6ce` |
 | 2.5 · plan 重做（present_plan + 决策表单） | 已完成 | `29e22d3` |
-| 3 · 会话工作区 + ask 模式成品 | 未开始 | — |
+| 3 · 会话工作区 + ask 模式成品 | 已完成 | `c94b53b` |
 | 4 · 自研系统提示词 | 未开始 | — |
 | 5 · question 双向通道 | 未开始 | — |
 | 6 · 项目级 Memory | 未开始 | — |
@@ -48,7 +48,7 @@
 - slug **`ask`**，界面文案「**问答**」，不使用 `qa`（`qa` 在软件语境默认指 Quality Assurance）。
 - **模式 = 能力三元组**（提示词片段 + 工具白名单 + 权限规则）；**工作区 = 会话属性**。两者解耦：
   ask 模式既可跑在「绑定项目」（只读项目），也可跑在「独立工作区」。
-- 工作区目录：`$APP_HOME/workspace/<sessionId>/{uploads,outputs}`（不含 `qa` 层级）。
+- 工作区目录：`$APP_HOME/workspace/<sessionId>`（不含 `qa` 层级），就是个普通目录。
 - 权限模型：`allow | ask | deny` + pattern 匹配、**最后命中者胜**。默认两条对齐 opencode：
   `*.env` / `*.env.*` 读 deny（`*.env.example` allow）、`external_directory` 默认 ask。
 - **ask 模式直接禁 `bash`**，不做「允许但限制路径」——命令无法可靠解析路径，那是假约束。
@@ -175,13 +175,42 @@ server/src/agent/
 
 ### 阶段 3 · 会话工作区 + ask 模式成品
 
-- `server/src/agent/workspace/index.ts`：`ensureWorkspace(sessionId)` 生成
-  `$APP_HOME/workspace/<sessionId>/{uploads,outputs}`；拒绝路径穿越（`../`）。
+- `server/src/agent/workspace/index.ts`：`ensureWorkspaceDir(sessionId)` 生成
+  `$APP_HOME/workspace/<sessionId>`；拒绝路径穿越（`../`）。
 - 生命周期：会话创建时懒建；删除会话时清理；孤儿目录按 `APP_DRAFT_TTL_MS` 思路清理，挂在 pool 的 sweeper 上。
 - ask 模式两种 cwd：绑定项目（只读项目）或独立工作区。
 - 前端：工作区文件浏览，复用已有 `fs` 域接口。
 
 **验收**：新会话自动建目录；删除会话目录被清；刷新不丢；`../` 被拒。
+
+**阶段 3 复盘（落地时的偏差）**
+
+- 工作区只属于未绑定目录的会话（它同时是这类会话的 cwd）；绑定目录的会话在用户自己的目录里干活，
+  不建工作区。目录在会话要跑时才建，里面不预设子目录——它就是个普通目录。
+- `../` 穿越的边界落在会话 id 上：工作区目录由 sessionId 拼出，故按契约同款字符集校验 id
+  （`..` / 分隔符 / 绝对路径直接 400）；工具侧拿到 `../` 路径由 pi 与 `external_directory` 规则兜（阶段 2），
+  不在工作区模块里重复实现。
+- 会话表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /
+  `entry_count` / `message_count`，新增 `deleted_at`；`reconcile()` 不再从 JSONL 还原元数据
+  （外部导入放弃），只做「有行无文件」的清理；schema 版本收敛为 1，本地删 `app.db` 重建。
+- 删除改为**归档（软删）**：`POST /sessions/archive` 只写 `deleted_at`，行、JSONL 与工作区目录
+  全部保留，列表默认过滤；硬删只剩对账删「有行无文件」这一种用途。
+- 会话改为**首条消息时才创建**：空态是正式的「草稿阶段」，首条消息发出时客户端先 `sessions/create`
+  （带上草稿里的目录 / 模型 / 档位 / 模式）再 `messages/prompt`，服务端不做隐式创建；
+  空态的选择器可用，选的值随建会话落成初始覆盖值。
+- 输入区草稿（文本 + 初始设置）按上下文持久化在 localStorage，关掉应用再打开会恢复并留在草稿阶段；
+  会话身份始终来自 URL 与服务端行，客户端不再持有「只为兜窗口」的临时 id（此前 `useChat` 的
+  `adoptedId` 会在会话消失后仍然生效，把新消息发进已归档的会话）。
+- 草稿 TTL 整套删除（`deleteStaleDrafts` 与 `APP_DRAFT_TTL_MS`）：空行由对账清理；
+  工作区孤儿清理保留但去掉 TTL（目录在会话要跑时才建，DB 行必然早于它存在，「无行」即「无主」）。
+- 侧栏分「项目区 / 助理区」两段：项目区按 cwd 归组（组名取目录末段），助理区（助理根之下）
+  平铺展示；`project` 表与 `/api/v1/projects/*` 一并删除，分组完全由目录决定。
+- 界面文案：会话动作叫「归档」，存储统一 `deleted_at`（界面词与存储词故意不同）。
+- 「工作区文件浏览」落成对话区头部的「目录」入口，对所有会话一致（打开它的工作目录），
+  `SessionSummary.workspaceDir` 因此不需要，前端改用「cwd 是否落在助理根下」判定。
+- 顺带补了一道护栏：`messages/prompt` / `sessions/update` 对不存在的会话返回 404；
+  会话工作目录的推导不再有回落到 `$APP_HOME` 的分支（那里放着 config.json 与 pi/auth.json，
+  且在 cwd 之内、不会触发越界审批）。
 
 ### 阶段 4 · 自研系统提示词
 
@@ -280,7 +309,7 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
 
 | 编号 | 用例 | 预期 |
 | --- | --- | --- |
-| WS-01 | 新建会话 | 生成 `<sessionId>/{uploads,outputs}` |
+| WS-01 | 未绑定目录的会话要跑 | 生成 `<sessionId>` 工作区目录 |
 | WS-02 | 删除会话 | 工作区目录被清理 |
 | WS-03 | 孤儿目录超过 TTL | sweeper 清理，活跃会话豁免 |
 | WS-04 | 工具传入含 `../` 的路径 | 拒绝 |
