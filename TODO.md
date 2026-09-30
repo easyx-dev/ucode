@@ -65,6 +65,8 @@ https://pi.dev/packages/@gotgenes/pi-permission-system
 ## plan 模式(计划模式)
 参考 opencode 的计划模式 和 https://pi.dev/packages/@narumitw/pi-plan-mode?name=plan
 
+待办：隐藏 `present_plan` 的工具卡片。它是内部信号、不是给用户看的工作产物，模型又可能在调用后补一句结束语甚至重复调用；在消息区过滤掉卡片，计划正文会更连贯。先记着，看实际观感再决定要不要做。
+
 ## 助手模式（ask）
 最终设计已定稿，见 [`plans/agent-tools-and-modes.md`](./plans/agent-tools-and-modes.md)：模式 slug 用 `ask`（界面文案「问答」），
 模式与工作区解耦，工作区为 `$APP_HOME/workspace/<sessionId>/{uploads,outputs}`，只承诺只读工具集（禁 `bash`），不承诺只读权限。
