@@ -65,8 +65,9 @@ https://pi.dev/packages/@gotgenes/pi-permission-system
 ## plan 模式(计划模式)
 参考 opencode 的计划模式 和 https://pi.dev/packages/@narumitw/pi-plan-mode?name=plan
 
-## 助手模式
-此模式默认专门用来做一些问答类的对话，很多用户不关心在项目空间也不会去选，所以这个助手模式默认在 `APP_HOME/workspace/qa` 下面每次在此目录下再新建一个子目录作为此次对话的工作空间，并且只能在此目录下有写的权限，其他只读。文件也是落到此工作空间下。
+## 助手模式（ask）
+最终设计已定稿，见 [`plans/agent-tools-and-modes.md`](./plans/agent-tools-and-modes.md)：模式 slug 用 `ask`（界面文案「问答」），
+模式与工作区解耦，工作区为 `$APP_HOME/workspace/<sessionId>/{uploads,outputs}`，只承诺只读工具集（禁 `bash`），不承诺只读权限。
 
 ## goal 模式(目标模式)
 https://pi.dev/packages/@schovest/pi-goal
