@@ -16,6 +16,7 @@ import {
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { brand } from "@ucode/brand/values";
 import type { ProviderConfig, SessionMode } from "@ucode/contracts";
 
 import type { PromptSource } from "../../constants";
@@ -23,6 +24,7 @@ import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
+import { buildFullPrompt, buildPromptOverlay } from "../prompt";
 import { catalogFor } from "../prompt/locales";
 import { buildSessionOptions, resolveSessionCwd } from "../session-config";
 import { DEFAULT_EXTENSION_TOOLS } from "../tools";
@@ -135,24 +137,27 @@ describe("buildSessionOptions 工具装配", () => {
 });
 
 describe("buildSessionOptions 系统提示词", () => {
-  it("S-01 pi 源：保留 pi 默认提示词与工具指引，并叠加自研身份 / 模式 / 外部内容", async () => {
+  // 断言只用我们自己的目录文案，不依赖 pi 的提示词措辞——pi 升级不该让这里误报
+  const catalog = catalogFor();
+
+  it("S-01 pi 源：叠加自研片段而非整段替换，pi 默认正文仍在", async () => {
+    const overlay = buildPromptOverlay({ mode: "ask" });
     const { systemPrompt } = await snapshotOf("ask", "pi");
-    assert.ok(systemPrompt.includes("expert coding assistant"), "pi 源应保留 pi 默认前缀");
-    // promptGuidelines 随 pi 的 rules 节保留，这正是 pi 源的价值
-    assert.ok(systemPrompt.includes("instead of cat or sed"), "pi 源应保留工具指引");
-    assert.ok(systemPrompt.includes(catalogFor().modeConstraints.ask), "pi 源应叠加模式约束");
-    assert.ok(systemPrompt.includes("<addendum>"), "自研片段应走 addendum 节");
+    assert.ok(systemPrompt.includes(overlay), "pi 源应原样包含叠加片段");
+    assert.ok(!systemPrompt.includes(catalog.identity(brand.name)), "pi 源不应使用自研整段身份");
+    assert.ok(systemPrompt.length > overlay.length, "pi 源应保留 pi 默认正文（比叠加片段长）");
   });
 
-  it("S-02 custom 源：整段替换 pi 默认前缀，模式差异体现在提示词里", async () => {
+  it("S-02 custom 源：用自研整段替换 pi 默认正文", async () => {
     for (const mode of ["build", "plan", "ask"] as const) {
       const { systemPrompt } = await snapshotOf(mode, "custom");
-      assert.ok(!systemPrompt.includes("expert coding assistant"), `${mode} 残留 pi 默认前缀`);
-      assert.ok(!systemPrompt.includes("Pi documentation"), `${mode} 残留 pi 文档节`);
-      assert.ok(!systemPrompt.includes("instead of cat or sed"), `${mode} 残留 pi 工具指引`);
       assert.ok(
-        systemPrompt.includes(catalogFor().modeConstraints[mode]),
-        `${mode} 未包含模式约束`,
+        systemPrompt.includes(buildFullPrompt({ mode })),
+        `${mode} 应原样包含自研整段提示词`,
+      );
+      assert.ok(
+        !systemPrompt.includes(catalog.overlayIdentity(brand.name)),
+        `${mode} 不应走 pi 源叠加路径`,
       );
     }
 
