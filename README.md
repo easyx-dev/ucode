@@ -459,15 +459,18 @@ pnpm -F @ucode/server smoke -- --base-url http://localhost:8317/v1 --api-key dev
 支持按源对比：
 
 ```bash
-pnpm eval                                  # 跑默认源
-pnpm eval -- --source custom,pi            # 两套源对比
-pnpm eval -- --case read-not-cat           # 只跑指定用例
-pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devtest --model deepseek-v4-flash
+pnpm eval                                   # 跑默认源
+pnpm eval -- --source custom,pi             # 两套源对比
+pnpm eval -- --model deepseek-v4-flash,glm-5 --attempts 3   # 多模型 + 每例重复 3 遍看通过率
+pnpm eval -- --case read-not-cat            # 只跑指定用例
+pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devtest
 ```
 
-用例在 `server/scripts/eval.ts` 里集中声明（模式 + 提示词 + 工具 / 回复断言），
-需要真实端点，因此不进 `pnpm check`。用例断言的是模型行为，存在随机性（同一用例可能时过时不过）；
-失败时会打印工具序列与回复摘录，用 `--case` 单独复跑即可判断是提示词问题还是模型跑偏。
+用例在 `server/scripts/eval.ts` 里集中声明（模式 + 提示词 + 工具 / 回复 / 落盘断言），
+需要真实端点，因此不进 `pnpm check`；会写盘的用例在隔离工作区（`.tmp/eval/workspace`）里跑，不碰仓库。
+用例断言的是模型行为，存在随机性：用 `--attempts` 看通过率、`--model` 多个模型横向比；
+依赖模型自觉行为（如 plan 模式主动调 `present_plan`）的用例标为**可选**（输出里带 `*`），
+只报通过率、不计入退出码。
 
 ## 常见问题
 

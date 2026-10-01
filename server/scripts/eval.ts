@@ -1,15 +1,21 @@
 /**
- * 提示词评测：用真实模型跑一组任务 fixture，抓工具调用与最终回复做断言，按提示词源对比。
+ * 提示词评测：用真实模型跑一组任务 fixture，抓工具调用、最终回复与落盘结果做断言，按提示词源对比。
  *
  * 这是「持续调优」的依据——换文案、改基线都由它决定取舍，而不是看提示词写得好不好。
- * 不进 `pnpm check`：需要真实端点，模型不按预期行动属于评测结论，不是代码错误。
+ * 不进 `pnpm check`：需要真实端点，模型不按预期行动属于评测结论，不是代码错误；
+ * 单次结果有随机性，用 `--attempts` 多跑几次看通过率、`--model` 多个模型横向看。
+ * 依赖模型自觉行为的用例标为可选（带 `*`），只报通过率、不计入退出码。
+ *
+ * 会写盘的用例在隔离的 fixture 工作区（`.tmp/eval/workspace`）里跑，不碰仓库。
  *
  * 用法（默认值与 README 里的测试端点一致）：
  *   pnpm -F @ucode/server eval
- *   pnpm -F @ucode/server eval -- --source pi,custom
- *   pnpm -F @ucode/server eval -- --case read-not-cat,ask-readonly
- *   pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devtest --model deepseek-v4-flash
+ *   pnpm -F @ucode/server eval -- --source custom,pi
+ *   pnpm -F @ucode/server eval -- --model deepseek-v4-flash,glm-5 --attempts 3
+ *   pnpm -F @ucode/server eval -- --case read-not-cat,edit-in-workspace
+ *   pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devtest
  */
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -41,12 +47,18 @@ type EvalCase = {
   name: string;
   mode: SessionMode;
   prompt: string;
+  /** 运行目录：`repo`（默认，只读检索用）或 `workspace`（会写盘的用隔离工作区） */
+  cwd?: "repo" | "workspace";
   /** 至少要调用到其中一个工具 */
   toolsAny?: string[];
   /** 不得调用到的工具 */
   toolsNone?: string[];
   /** 最终回复至少要包含其中一个片段 */
   textAny?: string[];
+  /** 直接断言落盘结果：工作区里的文件应包含某片段（比看回复更硬） */
+  fileAfter?: { path: string; contains: string };
+  /** 可选用例：依赖模型自觉行为、稳定性不足，只报通过率，不计入退出码 */
+  optional?: boolean;
 };
 
 /** 每类用例只覆盖一个可判定的行为点，避免一条失败说不清是哪条提示词在起作用 */
@@ -67,24 +79,49 @@ const CASES: EvalCase[] = [
     textAny: ["session-config"],
   },
   {
+    name: "list-files",
+    mode: "build",
+    prompt: "列出 server/src/agent/prompt/locales 下的所有文件路径。",
+    toolsAny: ["find", "ls", "grep"],
+    textAny: ["zh-CN"],
+  },
+  {
     name: "ask-readonly",
     mode: "ask",
     prompt: "把 server/package.json 里的 name 字段改成 foo，改完告诉我。",
     toolsNone: ["edit", "write", "bash"],
   },
   {
+    name: "edit-in-workspace",
+    mode: "build",
+    cwd: "workspace",
+    prompt: "把当前目录下 hello.txt 的内容改成 World，改完只说一句结果。",
+    toolsAny: ["edit", "write"],
+    fileAfter: { path: "hello.txt", contains: "World" },
+  },
+  {
     name: "plan-present",
     mode: "plan",
-    prompt: "为「给 server 增加一个健康检查接口」写一份简短计划。",
+    cwd: "workspace",
+    optional: true,
+    // 断言的是「plan 模式以 present_plan 收尾」，依赖模型自觉调用；实测两源都会漏，故作可选用例
+    prompt: "为「给 server 增加一个把使用统计导出为 CSV 的接口」写一份简短计划。",
     toolsAny: ["present_plan"],
+    toolsNone: ["edit", "write", "bash"],
   },
 ];
 
+/** 隔离工作区的初始文件；会写盘的用例每次尝试前都重建成这个状态 */
+const WORKSPACE_FILES: Record<string, string> = { "hello.txt": "Hello\n" };
+
 const baseUrl = readArg("base-url", "http://localhost:8317/v1");
 const apiKey = readArg("api-key", "devtest");
-const modelId = readArg("model", "deepseek-v4-flash");
 const providerId = "local";
+const modelIds = readList("model").length > 0 ? readList("model") : ["deepseek-v4-flash"];
+const attempts = Math.max(1, Number(readArg("attempts", "1")) || 1);
 const agentDir = resolve(env.repoRoot, ".tmp/eval/agent");
+const workspaceDir = resolve(env.repoRoot, ".tmp/eval/workspace");
+const REPO_CWD = env.repoRoot;
 
 // 未命中就报错退出：静默回落到默认源 / 空用例会让评测假报通过，比跑错更误导
 const requestedSources = readList("source");
@@ -111,38 +148,24 @@ if (unknownCases.length > 0) {
 const cases =
   caseFilter.length > 0 ? CASES.filter((item) => caseFilter.includes(item.name)) : CASES;
 
-const { modelRuntime, model } = await createLocalGateway({
-  agentDir,
-  baseUrl,
-  apiKey,
-  modelId,
-  providerId,
-});
-if (!model) {
-  console.error(`[eval] 模型未注册: ${providerId}/${modelId}`);
-  process.exit(1);
-}
-
-/** 评测只关心提示词与工具行为，权限一律放行；装配层其余部分与线上共用同一入口 */
-const runtime = {
-  requireRuntime: () => modelRuntime,
-  resolveModelRef: () => model,
-  getStatus: () => ({ thinkingLevel: "off" }),
-} as unknown as PiRuntime;
-
-type Attempt = {
-  source: PromptSource;
-  ok: boolean;
-  toolsRan: string[];
-  failures: string[];
-  /** 最终回复，失败时截断展示，便于判断是提示词问题还是模型跑偏 */
-  text: string;
+const prepareWorkspace = (): void => {
+  rmSync(workspaceDir, { recursive: true, force: true });
+  mkdirSync(workspaceDir, { recursive: true });
+  for (const [name, content] of Object.entries(WORKSPACE_FILES)) {
+    writeFileSync(resolve(workspaceDir, name), content, "utf8");
+  }
 };
 
-const openSession = async (item: EvalCase, source: PromptSource): Promise<AgentSession> => {
+const cwdOf = (item: EvalCase): string => (item.cwd === "workspace" ? workspaceDir : REPO_CWD);
+
+const openSession = async (
+  item: EvalCase,
+  source: PromptSource,
+  runtime: PiRuntime,
+): Promise<AgentSession> => {
   const options = await buildSessionOptions({
     record: undefined,
-    cwd: env.repoRoot,
+    cwd: cwdOf(item),
     // 会话也落在评测自己的 agent 目录，避免受用户真实数据目录的 skills / 设置影响
     agentDir,
     mode: item.mode,
@@ -171,11 +194,31 @@ const evaluate = (item: EvalCase, toolsRan: string[], text: string): string[] =>
   if (item.textAny?.length && !item.textAny.some((fragment) => text.includes(fragment))) {
     failures.push(`回复未包含 ${item.textAny.join(" / ")}`);
   }
+  if (item.fileAfter) {
+    let content = "";
+    try {
+      content = readFileSync(resolve(cwdOf(item), item.fileAfter.path), "utf8");
+    } catch {
+      content = "";
+    }
+    if (!content.includes(item.fileAfter.contains)) {
+      failures.push(`${item.fileAfter.path} 未包含 ${item.fileAfter.contains}`);
+    }
+  }
   return failures;
 };
 
-const attempt = async (item: EvalCase, source: PromptSource): Promise<Attempt> => {
-  const session = await openSession(item, source);
+type AttemptResult = { toolsRan: string[]; text: string; failures: string[] };
+
+const attempt = async (
+  item: EvalCase,
+  source: PromptSource,
+  runtime: PiRuntime,
+): Promise<AttemptResult> => {
+  // 会写盘的用例每次重建成初始状态，重复跑才有意义
+  if (item.cwd === "workspace") prepareWorkspace();
+
+  const session = await openSession(item, source, runtime);
   const toolsRan: string[] = [];
   session.subscribe((event) => {
     if (event.type === "tool_execution_start") toolsRan.push(event.toolName);
@@ -183,36 +226,84 @@ const attempt = async (item: EvalCase, source: PromptSource): Promise<Attempt> =
   try {
     await session.prompt(item.prompt);
     const text = session.getLastAssistantText() ?? "";
-    const failures = evaluate(item, toolsRan, text);
-    return { source, ok: failures.length === 0, toolsRan, failures, text };
+    return { toolsRan, text, failures: evaluate(item, toolsRan, text) };
   } finally {
     session.dispose();
   }
 };
 
-console.log(`[eval] ${providerId}/${modelId} @ ${baseUrl}`);
-console.log(`[eval] cwd=${env.repoRoot}`);
-console.log(
-  `[eval] 源：${wantedSources.join(" / ")}，用例：${cases.map((item) => item.name).join(" / ")}\n`,
-);
+/** 每个模型的运行时由目标模型单独构造，装配层其余部分与线上共用同一入口 */
+const runtimeFor = (modelRuntime: unknown, model: unknown): PiRuntime =>
+  ({
+    requireRuntime: () => modelRuntime,
+    resolveModelRef: () => model,
+    getStatus: () => ({ thinkingLevel: "off" }),
+  }) as unknown as PiRuntime;
 
-let failed = 0;
-for (const item of cases) {
-  const attempts: Attempt[] = [];
-  for (const source of wantedSources) attempts.push(await attempt(item, source));
-
-  const row = attempts.map((entry) => `${entry.source}=${entry.ok ? "PASS" : "FAIL"}`).join("  ");
-  console.log(`${item.name.padEnd(16)} ${row}`);
-  for (const entry of attempts) {
-    console.log(`  ${entry.source}：工具 ${entry.toolsRan.join(", ") || "无"}`);
-    for (const failure of entry.failures) console.log(`    ✗ ${failure}`);
-    if (!entry.ok) {
-      const excerpt = entry.text.replace(/\s+/g, " ").slice(0, 400);
-      console.log(`    回复：${excerpt}${entry.text.length > 400 ? "…" : ""}`);
-    }
+const report = (item: EvalCase, results: AttemptResult[]): void => {
+  const shown = results.find((entry) => entry.failures.length > 0) ?? results[results.length - 1];
+  if (!shown) return;
+  console.log(`  工具 ${shown.toolsRan.join(", ") || "无"}`);
+  for (const failure of shown.failures) console.log(`    ✗ ${failure}`);
+  if (shown.failures.length > 0) {
+    const excerpt = shown.text.replace(/\s+/g, " ").slice(0, 400);
+    console.log(`    回复：${excerpt}${shown.text.length > 400 ? "…" : ""}`);
   }
-  failed += attempts.filter((entry) => !entry.ok).length;
+};
+
+console.log(`[eval] ${baseUrl}  模型：${modelIds.join(" / ")}`);
+console.log(
+  `[eval] 源：${wantedSources.join(" / ")}  用例：${cases.map((item) => item.name).join(" / ")}`,
+);
+console.log(`[eval] 每次尝试 ${attempts} 遍\n`);
+if (cases.some((item) => item.optional)) {
+  console.log("[eval] 带 * 的用例为可选，只报通过率、不计入退出码\n");
 }
 
-console.log(`\n[eval] ${failed === 0 ? "全部通过" : `${failed} 项未通过`}`);
+let failed = 0;
+for (const modelId of modelIds) {
+  const { modelRuntime, model } = await createLocalGateway({
+    agentDir,
+    baseUrl,
+    apiKey,
+    modelId,
+    providerId,
+  });
+  if (!model) {
+    console.error(`[eval] 模型未注册: ${providerId}/${modelId}`);
+    process.exit(1);
+  }
+  const runtime = runtimeFor(modelRuntime, model);
+  console.log(`— ${modelId} —`);
+
+  for (const item of cases) {
+    const cells: string[] = [];
+    const details: Array<{ source: PromptSource; results: AttemptResult[] }> = [];
+
+    for (const source of wantedSources) {
+      const results: AttemptResult[] = [];
+      for (let index = 0; index < attempts; index += 1) {
+        results.push(await attempt(item, source, runtime));
+      }
+      const passes = results.filter((entry) => entry.failures.length === 0).length;
+      const ok = passes === attempts;
+      if (!ok && !item.optional) failed += 1;
+      cells.push(
+        `${source}=${ok ? "PASS" : "FAIL"}${attempts > 1 ? `(${passes}/${attempts})` : ""}`,
+      );
+      details.push({ source, results });
+    }
+
+    const label = item.optional ? `${item.name}*` : item.name;
+    console.log(`${label.padEnd(18)} ${cells.join("  ")}`);
+    for (const entry of details) {
+      if (entry.results.every((result) => result.failures.length === 0)) continue;
+      console.log(`  [${entry.source}]`);
+      report(item, entry.results);
+    }
+  }
+  console.log("");
+}
+
+console.log(`[eval] ${failed === 0 ? "全部通过" : `${failed} 项未通过`}`);
 process.exit(failed === 0 ? 0 : 1);
