@@ -26,7 +26,7 @@
 | 2.5 · plan 重做（present_plan + 决策表单） | 已完成 | `29e22d3` |
 | 3 · 会话工作区 + ask 模式成品 | 已完成 | `c94b53b` |
 | 3.5 · pi 升级 0.99 + 工具选择机制迁移 | 已完成 | `6ca1606` |
-| 4 · 自研系统提示词 | 待 review | — |
+| 4 · 自研系统提示词 | 已完成 | `b18ab50` |
 | 5 · question 双向通道 | 未开始 | — |
 | 6 · 项目级 Memory | 未开始 | — |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 未开始 | — |
@@ -304,6 +304,8 @@ server/src/agent/
 - 验收：`pnpm check` 全绿（87 单测 + 6 项约定校验）。`prompt/__tests__/prompt.test.ts` 测语言目录拼装、
   模式差异与变体口子；`session-config.test.ts` 的 S-01 / S-02 走真实 SDK 读 `session.systemPrompt`
   分别断言 `pi` 源保留默认文案、`custom` 源无残留。
+- 随本次一并去 pi 品牌痕迹：`$APP_HOME` 数据目录 `pi/` → `agent/`（开发初期不做迁移），
+  设置界面 4 条文案去掉 pi 字样；`AGENTS.md` 落「不做历史兼容」规则，后续同类破坏性变更直接改、不写迁移。
 
 ### 阶段 5 · question 双向通道
 
