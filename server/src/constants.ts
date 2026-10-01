@@ -7,8 +7,8 @@ export const DEFAULT_PORT = 2048;
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
-/** pi 私有数据目录名（位于 APP_HOME 下）：auth / sessions */
-export const PI_DIRNAME = "pi";
+/** agent 数据目录名（位于 APP_HOME 下）：auth.json / sessions */
+export const AGENT_DIRNAME = "agent";
 
 /** 应用自有数据目录名（位于 APP_HOME 下）：config.json / SQLite */
 export const APP_DIRNAME = "app";
@@ -62,3 +62,14 @@ export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;
+
+/**
+ * 系统提示词源：`custom` 用整段自研提示词，`pi` 用 pi 默认提示词并叠加自研片段。
+ * 默认 `custom`——自研提示词是线上交付版本；`pi` 作为可对比的行为基线，供 `pnpm eval` 对照。
+ */
+export const PROMPT_SOURCES = ["pi", "custom"] as const;
+
+export type PromptSource = (typeof PROMPT_SOURCES)[number];
+
+/** 默认提示词源 */
+export const DEFAULT_PROMPT_SOURCE: PromptSource = "custom";

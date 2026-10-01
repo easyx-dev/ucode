@@ -36,10 +36,11 @@ pnpm build && pnpm start
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_PORT` | `2048` | HTTP 端口 |
-| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`pi/`、`app/`、`workspace/` 三个子目录 |
+| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`agent/`、`app/`、`workspace/` 三个子目录 |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
 | `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
+| `APP_PROMPT_SOURCE` | `custom` | 系统提示词源：`custom`（整段自研）/ `pi`（pi 默认 + 自研片段），改后重启生效 |
 
 > `APP_HOME` 不设置时默认落在用户主目录（`~/.<品牌 slug>`，默认品牌即 `~/.ucode`）；
 > 显式指定请用绝对路径，相对路径会按仓库根解析。
@@ -48,12 +49,12 @@ pnpm build && pnpm start
 
 ```
 $APP_HOME/                 # 默认 ~/.ucode
-├── pi/                    # pi 私有：auth.json / sessions/
+├── agent/                 # agent 私有：auth.json / sessions/
 ├── app/                   # 应用自有：config.json / app.db（SQLite）
 └── workspace/<sessionId>  # 未绑定目录的会话的工作目录
 ```
 
-配置 = `$APP_HOME/app/config.json`、pi 的 agent 目录 = `$APP_HOME/pi`（`auth.json` / `sessions/`）、
+配置 = `$APP_HOME/app/config.json`、agent 目录 = `$APP_HOME/agent`（`auth.json` / `sessions/`）、
 会话元数据与索引 = `$APP_HOME/app/app.db`。
 会话的工作目录：绑定目录的用那个目录，未绑定的用 `$APP_HOME/workspace/<sessionId>`。
 
@@ -382,6 +383,10 @@ server/src/
     events.ts              # AgentSessionEvent -> SSE 事件
   agent/                   # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
     session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
+    prompt/                # 系统提示词：组装 + 多语言目录 + 模型族变体（pi / custom 两套源可切换）
+      index.ts             # 按目录拼装整段提示词（custom 源）或 pi 源叠加片段
+      locales/             # 语言目录：新增语言＝按 PromptCatalog 加文件并注册（当前仅 zh-CN）
+      variant.ts           # 模型适配：按模型解析提示词变体（当前统一 default）
     tools/                 # 自研工具与工具集装配
       index.ts             # 内置工具白名单 + 自研工具的成对装配（交给 createAgentSession）
       webfetch.ts          # 抓公网链接转 markdown（响应体上限、返回内容边界包裹）
@@ -390,7 +395,10 @@ server/src/
     __tests__/             # 同模块的单元测试（约定见 AGENTS.md）
   routes/                  # health / models / config / sessions / messages / events
   index.ts                 # Hono 装配、静态托管 web、优雅退出
-  scripts/smoke.ts         # 不经 HTTP 的 SDK 冒烟测试
+  scripts/
+    smoke.ts               # 不经 HTTP 的 SDK 冒烟测试
+    eval.ts                # 提示词评测：真实模型跑固定用例，按提示词源对比
+    lib/local-gateway.ts   # smoke / eval 共用的本地端点装配
 apps/web/src/
   lib/                     # 接口封装、契约类型出口、SSE 与事件流、消息归并、纯函数
     i18n.ts                # i18next 接线与语言切换（文案在 @ucode/i18n）
@@ -403,14 +411,14 @@ apps/web/src/
 
 ### 实现要点
 
-- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/pi/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
+- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/agent/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
 - **索引同步**：启动时 `reconcile()` 以 JSONL 为准对齐索引（补齐外部新增、清理已删文件），每轮生成落定后再回写一次；列表 / 详情直接读 SQLite，不再扫描 JSONL 目录。
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
-- **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `pi/models.json`；`config.json` 是模型配置的唯一事实源。
+- **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `agent/models.json`；`config.json` 是模型配置的唯一事实源。
 - **工具集在装配层收口**：内置工具走 `tools` 白名单（pi 的该字段是白名单，自研工具漏进去就会被过滤掉），
   `webfetch` / `websearch` 走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。
-  **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/pi/extensions`、项目 `.pi/extensions`）或 pi 包
+  **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/agent/extensions`、项目 `.pi/extensions`）或 pi 包
   注册的工具不在白名单里，不会生效。
 - **外部内容不入信任链**：`webfetch` 只抓公网地址（回环 / 私网 / 链路本地一律拒绝，重定向逐跳校验），
   并用 `<fetched>` / `<search_results>` 边界包裹返回内容，正文里的同名标签先中和（否则页面能「闭合」边界），
@@ -441,6 +449,25 @@ pnpm smoke
 # 或指定参数
 pnpm -F @ucode/server smoke -- --base-url http://localhost:8317/v1 --api-key devtest --model glm-5.2
 ```
+
+## 提示词评测
+
+系统提示词有两套可切换的源（`APP_PROMPT_SOURCE`）：`custom` 自研（默认，正文以 opencode 的
+提示词分节与规则为蓝本移植改写）与 `pi` 基线（pi 默认提示词 + 自研片段）。正文按语言存放在
+`prompt/locales`（当前仅 `zh-CN`），按模型族在 `prompt/variant.ts` 解析变体（当前统一 `default`）。
+哪套更好由评测决定，不看文案观感——`eval` 用真实模型跑一组固定用例，抓工具调用与最终回复做断言，
+支持按源对比：
+
+```bash
+pnpm eval                                  # 跑默认源
+pnpm eval -- --source custom,pi            # 两套源对比
+pnpm eval -- --case read-not-cat           # 只跑指定用例
+pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devtest --model deepseek-v4-flash
+```
+
+用例在 `server/scripts/eval.ts` 里集中声明（模式 + 提示词 + 工具 / 回复断言），
+需要真实端点，因此不进 `pnpm check`。用例断言的是模型行为，存在随机性（同一用例可能时过时不过）；
+失败时会打印工具序列与回复摘录，用 `--case` 单独复跑即可判断是提示词问题还是模型跑偏。
 
 ## 常见问题
 

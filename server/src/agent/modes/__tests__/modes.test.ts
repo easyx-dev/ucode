@@ -19,7 +19,6 @@ describe("MODES", () => {
     for (const mode of SESSION_MODES) {
       assert.ok(MODES[mode], `缺少模式声明 ${mode}`);
       assert.equal(MODES[mode].slug, mode);
-      assert.ok(MODES[mode].prompt.length > 0, `${mode} 缺少提示词片段`);
     }
   });
 

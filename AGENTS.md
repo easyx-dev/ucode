@@ -41,6 +41,8 @@
 ## 编码原则
 
 - 代码是唯一判断依据，文档与代码不一致时以代码为准。
+- **不做历史兼容**：项目处于开发初期，不维护向后兼容，也不写数据 / 目录布局迁移脚本。
+  破坏性变更直接改；本地数据（`$APP_HOME` 下的目录、`app.db`、会话 JSONL）按新布局直接删除重建即可。
 - 不添加不必要的抽象层。
 - 代码体积控制：
   - 预警阈值（超过后必须评估是否拆分）：函数/方法 40 行
@@ -158,12 +160,12 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 - 服务端**不做本地化**：失败封套与 SSE 错误帧只给 `code` + 固定中文兜底 `message` + 插值 `params`，
   由客户端按 `code` 查表渲染（见 `docs/api.md`「语言与本地化」）。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
-- `$APP_HOME`（默认 `~/.ucode`）是 pi agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
-  `pi/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。
+- `$APP_HOME`（默认 `~/.ucode`）是 agent 的运行时目录与默认工作目录，按「谁的资产」分两层：
+  `agent/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）。
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
 - `$APP_HOME/app/config.json` 由服务根据 `POST /api/v1/config/update` 生成（模型 provider 与 apiKey 只存这一份，
-  不再派生 `pi/models.json`），`app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
-- 需要调整 `APP_HOME` 下的目录布局时走一次性迁移，不加版本目录（演进靠 SQLite 的 `user_version`）。
+  不再派生 `agent/models.json`），`app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
+- `$APP_HOME` 下的目录布局可以直接调整（见「编码原则」的兼容性约定），不加版本目录。
 
 ### Biome 配置
 

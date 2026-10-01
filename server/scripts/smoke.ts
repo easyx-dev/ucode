@@ -8,14 +8,12 @@
  *   pnpm -F @ucode/server smoke
  *   pnpm -F @ucode/server smoke -- --base-url http://localhost:8317/v1 --api-key devtest --model deepseek-v4-flash
  */
-import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
   createAgentSession,
   createCodemodeExtension,
   DefaultResourceLoader,
-  ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -23,6 +21,7 @@ import {
 import type { ThinkingLevel } from "@ucode/contracts";
 
 import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../src/agent/tools/index";
+import { createLocalGateway } from "./lib/local-gateway";
 
 const args = process.argv.slice(2);
 const readArg = (name: string, fallback: string): string => {
@@ -41,48 +40,15 @@ const CODEMODE_MARKER = "smoke-codemode-ok";
 
 const root = resolve(import.meta.dirname, "..");
 const workDir = resolve(root, "../.tmp/smoke");
-const agentDir = resolve(workDir, "pi");
-mkdirSync(agentDir, { recursive: true });
+const agentDir = resolve(workDir, "agent");
 
-const modelsPath = resolve(agentDir, "models.json");
-writeFileSync(
-  modelsPath,
-  `${JSON.stringify(
-    {
-      providers: {
-        [providerId]: {
-          name: "Smoke Gateway",
-          baseUrl,
-          api: "openai-completions",
-          apiKey,
-          models: [
-            {
-              id: modelId,
-              name: modelId,
-              reasoning: true,
-              input: ["text"],
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              contextWindow: 128000,
-              maxTokens: 8192,
-              compat: { supportsDeveloperRole: false },
-            },
-          ],
-        },
-      },
-    },
-    null,
-    2,
-  )}\n`,
-  "utf8",
-);
-
-const modelRuntime = await ModelRuntime.create({
-  authPath: resolve(agentDir, "auth.json"),
-  modelsPath,
-  refreshOnCreate: false,
+const { modelRuntime, model } = await createLocalGateway({
+  agentDir,
+  baseUrl,
+  apiKey,
+  modelId,
+  providerId,
 });
-
-const model = modelRuntime.getModel(providerId, modelId);
 if (!model) {
   console.error(`[smoke] 模型未注册: ${providerId}/${modelId}`);
   process.exit(1);

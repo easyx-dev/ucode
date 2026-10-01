@@ -80,12 +80,6 @@ app.onError((error, c) => {
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   const status = services.runtime.getStatus();
   logger.info(`http://localhost:${info.port}  (home: ${env.homeDir})`);
-  if (env.legacyLayout) {
-    logger.warn(
-      `检测到旧布局（agent/ 或根目录的 config.json / session-state.json），不会被读取；` +
-        `请手工移到 ${env.piDir} 与 ${env.appDir}`,
-    );
-  }
   if (status.configured) {
     logger.info(`模型: ${status.defaultModel}   thinking: ${status.thinkingLevel}`);
   } else {

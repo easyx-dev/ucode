@@ -14,7 +14,8 @@
     "verify": "node scripts/verify/index.ts",
     "brand:replace": "node packages/brand/scripts/replace.ts",
     "format": "biome format --write .",
-    "smoke": "pnpm -F @ucode/server smoke"
+    "smoke": "pnpm -F @ucode/server smoke",
+    "eval": "pnpm -F @ucode/server eval"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",

@@ -33,7 +33,7 @@ export default {
 
   // Settings dialog
   "设置.说明":
-    "Appearance, model and web search configuration. Saving rebuilds the pi runtime; leave apiKey blank to keep the saved key.",
+    "Appearance, model and web search configuration. Saving rebuilds the model runtime; leave apiKey blank to keep the saved key.",
   保存并生效: "Save and apply",
   外观: "Appearance",
   模型: "Models",
@@ -80,7 +80,7 @@ export default {
   最高: "Max",
   推理等级映射: "Reasoning level map",
   添加等级: "Add level",
-  "推理等级.空态": "Unspecified levels use the vendor default; all 7 pi levels are usable.",
+  "推理等级.空态": "Unspecified levels use the vendor default; all 7 levels are usable.",
   推理等级: "Reasoning level",
   思考档位: "Reasoning level",
   厂商取值: "Vendor value; blank = unsupported",
@@ -94,10 +94,11 @@ export default {
   "未保存 key": "No key saved",
   测试连接: "Test connection",
   "删除 provider": "Remove provider",
-  "模型清单.自定义": "The model list is customized ({{n}}), so it no longer updates with pi.",
+  "模型清单.自定义":
+    "The model list is customized ({{n}}), so it no longer follows the built-in catalog.",
   恢复默认: "Reset",
   "模型清单.继承":
-    "The endpoint and {{n}} models come from pi's built-in catalog and update with pi.",
+    "The endpoint and {{n}} models come from the built-in catalog and update with the app.",
 
   // Defaults
   默认模型: "Default model",

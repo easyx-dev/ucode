@@ -1,7 +1,7 @@
 /**
  * 会话装配层：把「会话覆盖值 + 运行时 + 模式 + 权限」收敛成 pi 的会话创建参数。
  *
- * 模式、权限、工具集、提示词片段都从这里汇入，是这些能力的唯一入口。
+ * 模式、权限、工具集、提示词源都从这里汇入，是这些能力的唯一入口。
  * pi 没有「构造后注册 tool_call 处理器」的入口，权限规则只能经内联扩展 +
  * `DefaultResourceLoader({ extensionFactories })` 注入，所以这里同时负责装配 resourceLoader。
  */
@@ -14,11 +14,18 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { SessionMode, WebsearchConfig } from "@ucode/contracts";
 
+import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
 import { MODES, rulesForMode } from "./modes";
 import { createPermissionExtension, type PermissionHooks } from "./permissions";
+import {
+  buildFullPrompt,
+  buildPromptOverlay,
+  type PromptVariant,
+  resolvePromptVariant,
+} from "./prompt";
 import { buildCustomTools } from "./tools/index";
 import { workspaceDirOf } from "./workspace";
 
@@ -41,15 +48,32 @@ export type SessionAssemblyInput = {
   websearch: () => WebsearchConfig;
   /** 权限钩子：审批回调与会话恒允，由会话池按 sessionId 提供 */
   permission: PermissionHooks;
+  /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
+  promptSource?: PromptSource;
+  /** agent 数据目录；缺省取 `env.agentDir`（评测 / 测试需要隔离时显式传入） */
+  agentDir?: string;
 };
+
+/** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
+const promptLoaderOptions = (
+  source: PromptSource,
+  input: { mode: SessionMode; variant: PromptVariant },
+): Pick<
+  ConstructorParameters<typeof DefaultResourceLoader>[0],
+  "systemPromptOverride" | "appendSystemPrompt"
+> =>
+  source === "custom"
+    ? { systemPromptOverride: () => buildFullPrompt(input) }
+    : { appendSystemPrompt: [buildPromptOverlay(input)] };
 
 /**
  * 组装 resourceLoader：内联扩展负责 `tool_call` 权限拦截与内置 `codemode`，
- * 模式片段追加到系统提示词。
+ * 系统提示词按 `promptSource` 装配（见 `agent/prompt`）。
  */
 const createSessionLoader = async (
   input: SessionAssemblyInput,
   settingsManager: SettingsManager,
+  variant: PromptVariant,
 ): Promise<DefaultResourceLoader> => {
   const gate = {
     cwd: input.cwd,
@@ -60,10 +84,10 @@ const createSessionLoader = async (
   };
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
-    agentDir: env.piDir,
+    agentDir: input.agentDir ?? env.agentDir,
     settingsManager,
     extensionFactories: [createPermissionExtension(gate), createCodemodeExtension({ mode: "on" })],
-    appendSystemPrompt: [MODES[input.mode].prompt],
+    ...promptLoaderOptions(input.promptSource ?? env.promptSource, { mode: input.mode, variant }),
   });
   await loader.reload();
   return loader;
@@ -83,7 +107,8 @@ export const buildSessionOptions = async (
 
   // loader 与会话共用同一个 SettingsManager：分两个实例会让资源发现与运行期设置不一致
   const settingsManager = SettingsManager.inMemory();
-  const loader = await createSessionLoader(input, settingsManager);
+  const variant = resolvePromptVariant(model ? `${model.provider}/${model.id}` : null);
+  const loader = await createSessionLoader(input, settingsManager, variant);
   const { toolSelection } = MODES[input.mode];
   // 覆盖必须在 loader.reload() 之后：reload 会重读设置，冲掉 reload 前的 in-memory 覆盖
   if (toolSelection.kind === "defaultTools")
@@ -91,7 +116,7 @@ export const buildSessionOptions = async (
 
   return {
     cwd: input.cwd,
-    agentDir: env.piDir,
+    agentDir: input.agentDir ?? env.agentDir,
     modelRuntime: input.runtime.requireRuntime(),
     ...(model ? { model } : {}),
     thinkingLevel,

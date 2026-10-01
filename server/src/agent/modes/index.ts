@@ -1,6 +1,7 @@
 /**
- * 助手模式：模式 = 能力三元组（工具选择 + 权限规则 + 提示词片段）。
+ * 助手模式：模式 = 能力三元组（工具选择 + 权限规则 + 提示词约束）。
  *
+ * 提示词约束按模式存放在 `agent/prompt` 的语言目录里（多语言口子），这里只管工具与权限。
  * 工作区、模式本身都挂在会话上，模式切换只影响会话实例的装配（见 `session-config`）。
  * `build` 走 `defaultTools`（内置工具 + 内置扩展，pi 扩展 / MCP 注册的工具保持默认启用）；
  * `plan` / `ask` 是只读能力集，用显式白名单，越权工具既不在选择里，也有阻断规则兜底。
@@ -8,7 +9,7 @@
 import type { SessionMode } from "@ucode/contracts";
 
 import { DEFAULT_PERMISSION_RULES, type PermissionRule } from "../permissions";
-import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../tools";
+import { CUSTOM_TOOL_NAMES, DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../tools";
 
 /** 工具选择：直接对应 pi 会话参数的 `defaultTools`（默认集）与 `tools`（白名单） */
 export type ToolSelection =
@@ -19,8 +20,6 @@ export type ModeDefinition = {
   slug: SessionMode;
   /** 本次会话启用哪些工具 */
   toolSelection: ToolSelection;
-  /** 追加到系统提示词的模式片段（完整自研提示词在阶段 4） */
-  prompt: string;
   /** 在默认规则之后附加；最后命中者胜，所以可覆盖默认 */
   permissions: readonly PermissionRule[];
 };
@@ -42,23 +41,29 @@ export const MODES: Record<SessionMode, ModeDefinition> = {
       kind: "defaultTools",
       defaultTools: [...DEFAULT_BUILTIN_TOOLS, ...DEFAULT_EXTENSION_TOOLS],
     },
-    prompt: "当前处于「编码」模式：可以直接读写文件、执行命令来完成用户的任务。",
     permissions: [],
   },
   plan: {
     slug: "plan",
     toolSelection: { kind: "allowlist", tools: [...READ_ONLY_TOOLS, "present_plan"] },
-    prompt:
-      "当前处于「计划」模式：只做只读调研，产出可执行的方案；不要修改文件或执行命令。" +
-      "调研完成后，把计划写在回复里，并以 present_plan 收尾；需要用户确认的点写进计划，不要用提问收尾。",
     permissions: READ_ONLY_PERMISSIONS,
   },
   ask: {
     slug: "ask",
     toolSelection: { kind: "allowlist", tools: [...READ_ONLY_TOOLS] },
-    prompt: "当前处于「问答」模式：只做只读分析与回答，不要修改文件或执行命令。",
     permissions: READ_ONLY_PERMISSIONS,
   },
+};
+
+/**
+ * 某模式下实际可用的工具名：默认集要补上自研工具（它们经 `customTools` 注册即启用，
+ * 不列在 `defaultTools` 里）；白名单本就显式列出，直接照搬。
+ */
+export const toolsForMode = (mode: SessionMode): string[] => {
+  const { toolSelection } = MODES[mode];
+  return toolSelection.kind === "defaultTools"
+    ? [...toolSelection.defaultTools, ...CUSTOM_TOOL_NAMES]
+    : [...toolSelection.tools];
 };
 
 /** 模式的完整权限规则：全局默认在前，模式规则在后（可覆盖默认） */

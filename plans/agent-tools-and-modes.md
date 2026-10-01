@@ -26,7 +26,7 @@
 | 2.5 · plan 重做（present_plan + 决策表单） | 已完成 | `29e22d3` |
 | 3 · 会话工作区 + ask 模式成品 | 已完成 | `c94b53b` |
 | 3.5 · pi 升级 0.99 + 工具选择机制迁移 | 已完成 | `6ca1606` |
-| 4 · 自研系统提示词 | 未开始 | — |
+| 4 · 自研系统提示词 | 待 review | — |
 | 5 · question 双向通道 | 未开始 | — |
 | 6 · 项目级 Memory | 未开始 | — |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 未开始 | — |
@@ -66,7 +66,7 @@
 ```
 server/src/agent/
   session-config.ts   # 每会话 AgentConfig：模式 / 工具集 / 提示词 / 工作区 / 权限策略
-  prompt/             # 自研系统提示词（分节拼装）
+  prompt/             # 系统提示词：pi / custom 两套源 + 多语言目录 + 模型族变体
   tools/              # 自研工具：webfetch / websearch / question / todo
   modes/              # build / plan / ask 模式声明
   permissions/        # 权限策略引擎 + tool_call 拦截
@@ -260,11 +260,50 @@ server/src/agent/
 
 ### 阶段 4 · 自研系统提示词
 
-- `server/src/agent/prompt/`：分节拼装（身份 / 工具说明 / 模式约束 / 项目上下文），参考 opencode 写法。
-- 经 `systemPromptOverride` 注入；模式片段按当前模式拼入。
-- 取舍：替换整段会失去 pi 的结构化 `systemPromptOptions` 增量机制，属已知取舍。
+**目标**：提示词成为自研、可评测的资产——以成熟方案为蓝本移植，再用评测守住不回退。
 
-**验收**：无 pi 默认提示词残留；模式差异体现在提示词中。
+**改动点**
+
+- `server/src/agent/prompt/`：两套可切换的提示词源，由 `APP_PROMPT_SOURCE` 选择：
+  - `custom`（默认）：整段替换 pi 默认前缀与 tools / rules / docs 三节（`systemPromptOverride`）。
+    正文以 **opencode 的提示词分节与规则为蓝本移植改写**：去掉 CLI / 终端语境与 opencode 专有入口
+    （帮助链接、Task 子智能体、TodoWrite 等我们没有的能力），工具名对齐本仓库（`find` 而非 `glob`），
+    把 opencode 的「禁止写注释」换成「遵循项目 AGENTS.md」，并按当前模式裁剪工具使用指引。
+  - `pi`：保留 pi 默认提示词，只追加身份、模式约束、外部内容边界，供评测做对照。
+- 两个扩展口子：**语言目录**（`prompt/locales/`，实现 `PromptCatalog` 即新增语言，当前仅 `zh-CN`）
+  与**模型族变体**（`prompt/variant.ts` 按模型解析，当前统一 `default`，差异写在目录的 `variantNotes`）。
+  模式约束文案随之收进语言目录，`modes` 只留工具选择与权限规则。
+- `session-config.ts` 按源装配 resourceLoader，并按解析出的模型取变体；`SessionAssemblyInput.promptSource`
+  可显式覆盖（评测按源对比用），缺省取 `env.promptSource`。
+- 评测：`server/scripts/eval.ts`（`pnpm eval`）用真实模型跑固定用例，抓工具调用与最终回复做断言，
+  `--source custom,pi` 对比，失败时打印工具序列与回复摘录；`smoke` / `eval` 共用 `scripts/lib/local-gateway.ts`。
+
+**验收**：`pnpm check` 全绿；`custom` 源无 pi 默认文案残留，且不再引用我们没有的工具 / 入口；
+`pi` 源保留 pi 默认提示词；两套源在 `pnpm eval` 下给出可对比的结果。
+
+**阶段 4 复盘（落地时的偏差）**
+
+- 方向两次修正：先按计划做了「整段自研」；评审提出「抄 opencode 换品牌名」后一度改为「pi 基线 +
+  可切换源」；最终确认**默认就用自研（`custom`）**，「自研」的内容即 opencode 提示词的移植改写。
+- opencode 提示词不能逐字照抄：`default.txt` / `anthropic.txt` 是 CLI/TUI 语境
+  （`fewer than 4 lines`、`monospace`、`DO NOT ADD ANY COMMENTS`），并引用我们没有的
+  Task / WrapFetch / TodoWrite / `glob`。移植时逐条对齐本产品与工具集；语言改为中文，与既有模式片段一致。
+- 提示词源 slug 用 `custom` 而非 `ucode`：`ucode` 与 `brand.name` 字面重合，会被 brand 校验拦下。
+- 「失去 pi 的结构化增量机制」这一原判断不准确：`systemPromptOverride` 走 `customPrompt`，
+  仍作为 `preamble` 一节参与 `diffSystemPromptSections`，节级增量照常工作；真正丢的是 pi 自动生成的
+  tools / rules / docs 三节（含 `promptGuidelines`）。要真正丢增量得走 `before_agent_start` 的
+  `forceSystemPrompt`（无分节），本次未走。
+- `custom` 源落地为一个文件（分节常量 + 工具使用指引 + 模式拼装）；工具使用指引从
+  `MODES[mode].toolSelection` 派生（`toolsForMode`，默认集补 `CUSTOM_TOOL_NAMES`），
+  只读模式不出现写盘 / 执行相关条目。
+- 评测（deepseek-v4-flash，4 用例 × 2 源）两套源通过；`plan-present` 用例存在随机性
+  （模型有时调研不收敛、不调 `present_plan`，两源同时失败 / 通过），属模型行为而非提示词回归；
+  eval 已支持失败时打印工具序列与回复摘录，按 `--case` 复跑判断。用例集与稳定性待继续打磨。
+- 按需新增两个扩展口子：语言目录（`prompt/locales`）与模型族变体（`prompt/variant.ts`）；
+  模式约束文案随之从 `modes` 移入语言目录，`modes` 只留工具选择与权限规则。
+- 验收：`pnpm check` 全绿（87 单测 + 6 项约定校验）。`prompt/__tests__/prompt.test.ts` 测语言目录拼装、
+  模式差异与变体口子；`session-config.test.ts` 的 S-01 / S-02 走真实 SDK 读 `session.systemPrompt`
+  分别断言 `pi` 源保留默认文案、`custom` 源无残留。
 
 ### 阶段 5 · question 双向通道
 
@@ -284,7 +323,7 @@ server/src/agent/
 ### 阶段 7 · 后续（概要）
 
 - 7a **接内置 MCP**：`createMcpExtension()` + `session.bindExtensions({})`；配置来源先只读
-  `$APP_HOME/pi/mcp.json`（用户级，不做项目级与 OAuth）；权限按 MCP annotations
+  `$APP_HOME/agent/mcp.json`（用户级，不做项目级与 OAuth）；权限按 MCP annotations
   （`readOnlyHint` / `destructiveHint` / `openWorldHint`）判定，未命中规则的 `mcp__*` 调用走审批；
   `plan` / `ask` 不加载 MCP 扩展——它连上后会主动 `setActiveTools()` 激活 `codemode`，绕过只读白名单。
   P0 鉴权暂缓（见 `TODO.md`），**不作为本阶段前置**；未落地前服务只能在本机 / 可信环境使用。
@@ -378,7 +417,11 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
 
 | 编号 | 用例 | 预期 |
 | --- | --- | --- |
-| S-01 | 组装系统提示词 | 无 pi 默认文案残留；含当前模式片段 |
+| S-01 | `pi` 源装配 | 保留 pi 默认前缀与工具指引，叠加自研模式片段 |
+| S-02 | `custom` 源装配 | 无 pi 默认文案残留；工具清单随模式变化 |
+| S-03 | `pnpm eval` 按源对比 | 固定用例下给出各源通过 / 失败与工具调用记录 |
+| S-04 | 语言目录口子 | 默认语言已注册且各模式有约束文案；不改组装逻辑即可加语言 |
+| S-05 | 模型变体口子 | 解析函数对任意模型返回合法变体；目录声明 `variantNotes` 时拼入提示词 |
 | Q-01 | question 工具触发 | 前端收到请求；超时返回可读错误 |
 | Q-02 | 前端回答后 | 会话继续推进 |
 | MEM-01 | 用户说「记住 X」 | 生成事实文件 + 更新 `MEMORY.md` |
@@ -392,7 +435,9 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
 - **模式不是安全边界**：ask 模式靠工具白名单防误操作，防不住恶意模型或提示注入。
   OS 级隔离（容器 / VM）留作后续可选项。
 - **bash 的路径约束不可靠**：正式版 ask 模式直接禁 `bash`。
-- **自研系统提示词**会失去 pi 的结构化增量机制，需接受该取舍。
+- **自研系统提示词**：`custom` 源（默认）会丢掉 pi 自动生成的 tools / rules / docs 三节（含各工具的
+  `promptGuidelines`），相关要点已并入自研提示词；`preamble` 仍是独立一节，
+  `diffSystemPromptSections` 的节级增量不受影响。移植自 opencode，需用 `pnpm eval` 持续盯行为不回退。
 - **websearch 依赖外部服务**：默认留空，未配置时降级为可读错误。
 - **`mode` 掉库即丢**：覆盖值不随 JSONL 重建（`reconcile()` 只回写派生索引组），而 `mode` 又没有任何转录表示，
   删本地 `app.db` 后会全部回落 `build`。阶段 2 若要让模式可恢复，需把它写进会话文件

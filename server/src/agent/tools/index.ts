@@ -18,6 +18,9 @@ export const DEFAULT_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "
 /** 内置扩展工具：注册即存在但不默认激活，由 `build` 的默认集一并开启 */
 export const DEFAULT_EXTENSION_TOOLS = ["codemode"];
 
+/** 自研工具名：经 `customTools` 注册即启用，不在 `defaultTools` 里，默认集的提示词要单独补上 */
+export const CUSTOM_TOOL_NAMES = ["webfetch", "websearch"] as const;
+
 export const buildCustomTools = (
   readWebsearchConfig: () => WebsearchConfig,
   mode: SessionMode,

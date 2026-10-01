@@ -18,10 +18,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { ProviderConfig, SessionMode } from "@ucode/contracts";
 
+import type { PromptSource } from "../../constants";
 import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
+import { catalogFor } from "../prompt/locales";
 import { buildSessionOptions, resolveSessionCwd } from "../session-config";
 import { DEFAULT_EXTENSION_TOOLS } from "../tools";
 
@@ -71,7 +73,12 @@ const provider: ProviderConfig = {
 const root = mkdtempSync(join(tmpdir(), "session-config-test-"));
 const cwd = join(root, "cwd");
 
-const activeTools = async (mode: SessionMode): Promise<string[]> => {
+type SessionSnapshot = { tools: string[]; systemPrompt: string };
+
+const snapshotOf = async (
+  mode: SessionMode,
+  promptSource: PromptSource = "custom",
+): Promise<SessionSnapshot> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
     modelsPath: null,
@@ -92,21 +99,24 @@ const activeTools = async (mode: SessionMode): Promise<string[]> => {
   const options = await buildSessionOptions({
     record: undefined,
     cwd,
+    // 用测试自己的 pi 目录，别去读用户真实的数据目录
+    agentDir: join(root, "pi"),
     mode,
     sessionManager: SessionManager.inMemory(),
     runtime,
     websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
     permission: { listGrants: () => [], grant: () => {}, request: async () => "deny" as const },
+    promptSource,
   });
   const { session }: { session: AgentSession } = await createAgentSession(options);
-  const tools = session.getActiveToolNames();
+  const snapshot = { tools: session.getActiveToolNames(), systemPrompt: session.systemPrompt };
   session.dispose();
-  return tools;
+  return snapshot;
 };
 
 describe("buildSessionOptions 工具装配", () => {
   it("TS-01 build 走 defaultTools：codemode 激活，自研工具不被过滤", async () => {
-    const tools = await activeTools("build");
+    const { tools } = await snapshotOf("build");
     for (const name of [...DEFAULT_EXTENSION_TOOLS, "webfetch", "websearch"]) {
       assert.ok(tools.includes(name), `build 应启用 ${name}，实际：${tools.join(", ")}`);
     }
@@ -115,11 +125,40 @@ describe("buildSessionOptions 工具装配", () => {
 
   it("TS-02 plan / ask 走只读白名单：不含 codemode 与写盘 / 执行工具", async () => {
     for (const mode of ["plan", "ask"] as const) {
-      const tools = await activeTools(mode);
+      const { tools } = await snapshotOf(mode);
       for (const name of ["codemode", "bash", "edit", "write"]) {
         assert.ok(!tools.includes(name), `${mode} 不应启用 ${name}，实际：${tools.join(", ")}`);
       }
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
     }
+  });
+});
+
+describe("buildSessionOptions 系统提示词", () => {
+  it("S-01 pi 源：保留 pi 默认提示词与工具指引，并叠加自研身份 / 模式 / 外部内容", async () => {
+    const { systemPrompt } = await snapshotOf("ask", "pi");
+    assert.ok(systemPrompt.includes("expert coding assistant"), "pi 源应保留 pi 默认前缀");
+    // promptGuidelines 随 pi 的 rules 节保留，这正是 pi 源的价值
+    assert.ok(systemPrompt.includes("instead of cat or sed"), "pi 源应保留工具指引");
+    assert.ok(systemPrompt.includes(catalogFor().modeConstraints.ask), "pi 源应叠加模式约束");
+    assert.ok(systemPrompt.includes("<addendum>"), "自研片段应走 addendum 节");
+  });
+
+  it("S-02 custom 源：整段替换 pi 默认前缀，模式差异体现在提示词里", async () => {
+    for (const mode of ["build", "plan", "ask"] as const) {
+      const { systemPrompt } = await snapshotOf(mode, "custom");
+      assert.ok(!systemPrompt.includes("expert coding assistant"), `${mode} 残留 pi 默认前缀`);
+      assert.ok(!systemPrompt.includes("Pi documentation"), `${mode} 残留 pi 文档节`);
+      assert.ok(!systemPrompt.includes("instead of cat or sed"), `${mode} 残留 pi 工具指引`);
+      assert.ok(
+        systemPrompt.includes(catalogFor().modeConstraints[mode]),
+        `${mode} 未包含模式约束`,
+      );
+    }
+
+    const build = (await snapshotOf("build", "custom")).systemPrompt;
+    const ask = (await snapshotOf("ask", "custom")).systemPrompt;
+    assert.ok(build.includes("codemode"), "build 工具说明应含 codemode");
+    assert.ok(!ask.includes("codemode"), "ask 提示词不应提到 codemode");
   });
 });

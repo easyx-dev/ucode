@@ -54,7 +54,8 @@
   先过滤大输出再回模型。
 - 新增助手模式 `build` / `plan` / `ask`（默认 `build`）：模式 = 工具选择 + 权限规则 + 提示词片段，
   经 `server/src/agent/modes` 声明。`plan` / `ask` 均为只读（工具集不含 `edit` / `write` / `bash`，
-  只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式片段经 `appendSystemPrompt` 注入，
+  只剩 `read` / `grep` / `find` / `ls` / `webfetch` / `websearch`）；模式约束随系统提示词注入
+  （阶段 4 起由自研提示词承担，见下方「系统提示词源」条目），
   切换模式会重建会话实例。composer 底部新增模式选择器，模式持久化到 `session.mode`。
 - plan 模式重做：新增自研工具 `present_plan`（只在 plan 模式注册），模型产出计划后调用它收尾。
   前端在本轮以 `present_plan` 收尾时，用「计划决策表单」替掉输入区：
@@ -87,6 +88,18 @@
 - 新增依赖 `turndown`（HTML → markdown）与 `typebox`（自研工具的参数 schema），`@types/turndown` 为开发依赖。
 - 新增 `server/src/agent/`（会话装配层）：`session-config.ts` 把「会话覆盖值 + 运行时」收敛成
   `createAgentSession` 参数，`pool.ensure` 改为经它组装；后续的模式 / 工具集 / 自研提示词都从这里汇入。
+- 新增系统提示词源开关 `APP_PROMPT_SOURCE`（`custom` / `pi`，默认 `custom`，重启生效）：
+  `custom` 整段替换 pi 默认前缀与 tools / rules / docs 三节（`systemPromptOverride`），正文以
+  opencode 的提示词分节与规则为蓝本移植改写（去掉 CLI 语境与 opencode 专有入口、工具名对齐本仓库、
+  「禁止写注释」改为遵循项目 AGENTS.md），并按模式裁剪工具使用指引；`pi` 保留 pi 默认提示词，
+  只追加身份、模式约束、外部内容边界，供评测对照。两套源的取舍由真实模型评测决定，不靠文案观感。
+- 系统提示词预留两个扩展口子：**语言目录**（`agent/prompt/locales`，实现 `PromptCatalog` 即新增语言，
+  当前仅 `zh-CN`）与**模型族变体**（`agent/prompt/variant.ts`，按模型解析变体，当前统一 `default`，
+  差异文案写在目录的 `variantNotes` 里）。模式约束文案一并收进语言目录，`agent/modes` 只留
+  工具选择与权限规则。
+- 新增提示词评测 `pnpm eval`（`server/scripts/eval.ts`，根脚本同名转发）：用真实模型跑固定用例，
+  抓工具调用与最终回复做断言，支持 `--source pi,custom` 按源对比，不进 `pnpm check`；
+  `smoke` / `eval` 共用的本地端点装配抽到 `server/scripts/lib/local-gateway.ts`。
 - 新增会话模式 `mode`（`build` / `plan` / `ask`，默认 `build`）：会话契约新增 `mode`，
   `sessions/create|update` 可设置，`sessions/list|info` 返回。
 - 新增 `node:test` 单元测试（server），根 `pnpm test` 递归执行，`pnpm check` 纳入测试；
@@ -160,6 +173,8 @@
 
 ### 变更
 
+- agent 数据目录由 `$APP_HOME/pi` 更名为 `$APP_HOME/agent`（去掉上游品牌字样，`env.piDir` → `env.agentDir`）。
+  开发初期不做兼容：旧 `pi/` 目录不会被自动迁移，按新布局删除重建即可（见 `AGENTS.md`「编码原则」）。
 - `session` 表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /
   `entry_count` / `message_count`，新增 `deleted_at`；`reconcile()` 不再从 JSONL 还原元数据
   （外部导入能力放弃），只做「有行无文件」的清理；schema 版本收敛为 1，本地删 `app.db` 重建。

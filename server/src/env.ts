@@ -1,19 +1,22 @@
 /** 环境变量解析：由 APP_HOME 一个主目录派生工作目录与全部配置路径 */
-import { existsSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 
 import { appHomeDirname } from "@ucode/brand/values";
 
 import {
+  AGENT_DIRNAME,
   APP_DIRNAME,
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
+  DEFAULT_PROMPT_SOURCE,
   LOG_LEVELS,
-  PI_DIRNAME,
+  PROMPT_SOURCES,
+  type PromptSource,
   SESSIONS_DIRNAME,
   WORKSPACE_DIRNAME,
 } from "./constants";
@@ -42,25 +45,25 @@ const resolveLogLevel = (value: string | undefined, fallback: string): string =>
   return raw && (LOG_LEVELS as readonly string[]).includes(raw) ? raw : fallback;
 };
 
+/** 提示词源同样只接受白名单，写错时回落默认而不是让会话装配在运行期才炸 */
+const resolvePromptSource = (value: string | undefined): PromptSource => {
+  const raw = value?.trim().toLowerCase();
+  return raw && (PROMPT_SOURCES as readonly string[]).includes(raw)
+    ? (raw as PromptSource)
+    : DEFAULT_PROMPT_SOURCE;
+};
+
 /**
  * 应用主目录，同时是 agent 的工作目录。
  * 默认落在用户主目录下（`~/` + `appHomeDirname`），可用 `APP_HOME` 指向别处。
- * 下面按「谁的资产」分成两层：pi 的私有数据（auth / sessions）与
+ * 下面按「谁的资产」分成两层：agent 的私有数据（auth / sessions）与
  * 应用自有数据（config.json / SQLite），互不混放。
  */
 const homeDir = resolveDir(process.env.APP_HOME, resolve(homedir(), appHomeDirname));
-const piDir = resolve(homeDir, PI_DIRNAME);
+const agentDir = resolve(homeDir, AGENT_DIRNAME);
 const appDir = resolve(homeDir, APP_DIRNAME);
 const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
-
-/**
- * 旧布局标记：`agent/` 或根目录下的 `config.json` / `session-state.json`。
- * 只用于启动提示，不做迁移——这些路径不会被读取。
- */
-const legacyLayout =
-  !existsSync(piDir) &&
-  ["config.json", "session-state.json", "agent"].some((name) => existsSync(resolve(homeDir, name)));
 
 export const env = {
   repoRoot,
@@ -70,27 +73,27 @@ export const env = {
   port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
   /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
   workspaceRoot,
-  /** pi 私有数据目录：auth.json / sessions 放这里 */
-  piDir,
+  /** agent 数据目录：auth.json / sessions 放这里 */
+  agentDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
   appDir,
-  /** 是否检测到旧布局（仅在启动日志提示，不迁移） */
-  legacyLayout,
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
-  sessionsRoot: resolve(piDir, SESSIONS_DIRNAME),
-  authPath: resolve(piDir, AUTH_FILENAME),
+  sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
+  authPath: resolve(agentDir, AUTH_FILENAME),
   configPath: resolve(appDir, CONFIG_FILENAME),
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
   corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
   logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
+  /** 系统提示词源：`APP_PROMPT_SOURCE=pi|custom`，改它需要重启（会话装配时读取） */
+  promptSource: resolvePromptSource(process.env.APP_PROMPT_SOURCE),
 };
 
 for (const dir of new Set([
   env.homeDir,
   env.workspaceRoot,
-  env.piDir,
+  env.agentDir,
   env.appDir,
   env.sessionsRoot,
 ])) {
