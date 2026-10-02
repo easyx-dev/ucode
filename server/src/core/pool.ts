@@ -121,6 +121,10 @@ export class SessionPool {
           grant: (rule) => this.permissions.allow.add(sessionId, rule),
           request: (ask) => this.permissions.interactions.requestPermission(sessionId, ask),
         },
+        question: {
+          ask: (ask, signal) =>
+            this.permissions.interactions.requestQuestion(sessionId, ask.questions, signal),
+        },
       }),
     );
 

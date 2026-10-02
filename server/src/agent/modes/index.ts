@@ -24,8 +24,16 @@ export type ModeDefinition = {
   permissions: readonly PermissionRule[];
 };
 
-/** 只读能力集：读文件与检索，不含任何写盘 / 执行能力 */
-const READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "webfetch", "websearch"] as const;
+/** 只读能力集：读文件、检索与提问，不含任何写盘 / 执行能力 */
+const READ_ONLY_TOOLS = [
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "webfetch",
+  "websearch",
+  "question",
+] as const;
 
 /** 只读模式的兜底规则：白名单已不含这些工具，规则作为第二道闸门 */
 const READ_ONLY_PERMISSIONS: readonly PermissionRule[] = [

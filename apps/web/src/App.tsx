@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ChatPanel } from "@/components/chat-panel";
 import { PermissionDialog } from "@/components/permission-dialog";
+import { QuestionDialog } from "@/components/question-dialog";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,6 +21,8 @@ export default function App() {
   const { sessions, models, configured, activeId, activeSession, chat, workspaceRoot } = workspace;
   const { composer, setActiveId } = workspace;
   const interactions = useInteractions(activeId);
+  // 界面一次只展示最早的待答请求；权限审批与提问各自按 kind 分发
+  const interaction = interactions.pending[0] ?? null;
 
   // plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区
   const planReady =
@@ -107,8 +110,17 @@ export default function App() {
         />
 
         <PermissionDialog
-          request={interactions.pending[0] ?? null}
-          onRespond={(requestId, decision) => void interactions.respond(requestId, decision)}
+          request={interaction?.kind === "permission" ? interaction : null}
+          onRespond={(requestId, decision) =>
+            void interactions.respond({ requestId, kind: "permission", decision })
+          }
+        />
+
+        <QuestionDialog
+          request={interaction?.kind === "question" ? interaction : null}
+          onRespond={(requestId, answers) =>
+            void interactions.respond({ requestId, kind: "question", answers })
+          }
         />
 
         <SettingsDialog

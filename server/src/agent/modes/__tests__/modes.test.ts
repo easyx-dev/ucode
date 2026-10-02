@@ -34,7 +34,7 @@ describe("MODES", () => {
   });
 
   it("TS-02 / M-02 plan / ask 走只读白名单，不含写盘 / 执行工具与 codemode", () => {
-    const readOnly = ["read", "grep", "find", "ls", "webfetch", "websearch"];
+    const readOnly = ["read", "grep", "find", "ls", "webfetch", "websearch", "question"];
     for (const mode of ["plan", "ask"] as const) {
       const tools = allowlistOf(mode);
       for (const name of ["edit", "write", "bash", "codemode"]) {

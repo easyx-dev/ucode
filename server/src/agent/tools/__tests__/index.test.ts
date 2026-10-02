@@ -9,10 +9,12 @@ import { describe, it } from "node:test";
 import type { WebsearchConfig } from "@ucode/contracts";
 
 import { buildCustomTools, DEFAULT_BUILTIN_TOOLS } from "../index";
+import type { QuestionHooks } from "../question";
 
 const readConfig = (): WebsearchConfig => ({ provider: "tavily", apiKey: "", baseUrl: "" });
-const build = buildCustomTools(readConfig, "build");
-const plan = buildCustomTools(readConfig, "plan");
+const question: QuestionHooks = { ask: async () => ({ kind: "cancelled" }) };
+const build = buildCustomTools(readConfig, "build", question);
+const plan = buildCustomTools(readConfig, "plan", question);
 
 const namesOf = (tools: readonly { name: string }[]): string[] =>
   tools.map((tool) => tool.name).sort();
@@ -25,8 +27,8 @@ describe("buildCustomTools", () => {
     assert.ok(!DEFAULT_BUILTIN_TOOLS.includes("powershell"));
   });
 
-  it("build 只注册联网工具", () => {
-    assert.deepEqual(namesOf(build), ["webfetch", "websearch"]);
+  it("build 只注册联网与提问工具", () => {
+    assert.deepEqual(namesOf(build), ["question", "webfetch", "websearch"]);
   });
 
   it("present_plan 只在 plan 模式注册", () => {

@@ -60,6 +60,9 @@ export const WEBSEARCH_TIMEOUT_MS = 20_000;
 /** 权限审批等待用户答复的时限；超时按拒绝处理，避免工具调用永久挂起 */
 export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 
+/** question 工具等待用户答复的时限；超时以可读错误结束本轮提问 */
+export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;
 

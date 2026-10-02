@@ -108,6 +108,7 @@ const snapshotOf = async (
     runtime,
     websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
     permission: { listGrants: () => [], grant: () => {}, request: async () => "deny" as const },
+    question: { ask: async () => ({ kind: "cancelled" }) },
     promptSource,
   });
   const { session }: { session: AgentSession } = await createAgentSession(options);
@@ -119,7 +120,7 @@ const snapshotOf = async (
 describe("buildSessionOptions 工具装配", () => {
   it("TS-01 build 走 defaultTools：codemode 激活，自研工具不被过滤", async () => {
     const { tools } = await snapshotOf("build");
-    for (const name of [...DEFAULT_EXTENSION_TOOLS, "webfetch", "websearch"]) {
+    for (const name of [...DEFAULT_EXTENSION_TOOLS, "webfetch", "websearch", "question"]) {
       assert.ok(tools.includes(name), `build 应启用 ${name}，实际：${tools.join(", ")}`);
     }
     assert.ok(!tools.includes("present_plan"), "build 不应有 present_plan");
@@ -132,6 +133,7 @@ describe("buildSessionOptions 工具装配", () => {
         assert.ok(!tools.includes(name), `${mode} 不应启用 ${name}，实际：${tools.join(", ")}`);
       }
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
+      assert.ok(tools.includes("question"), `${mode} 应保留提问工具`);
     }
   });
 });

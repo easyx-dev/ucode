@@ -64,6 +64,11 @@ export const zhCN: PromptCatalog = {
       rules.push("edit 用最小且唯一的旧文本定位；同一文件多处不相邻的改动合成一次调用。");
     }
     if (has("write")) rules.push("write 只用于新建文件或整体重写。");
+    if (has("question")) {
+      rules.push(
+        "信息不足或需要用户拍板时用 question 提问，把选项与代价写清楚；能自己查证的先查证，不要动辄打断用户。",
+      );
+    }
     if (has("codemode")) {
       rules.push("需要连续调用多个工具、或先过滤大输出再回传时，用 codemode 写脚本并发执行。");
     }

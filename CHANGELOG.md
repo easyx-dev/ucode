@@ -70,6 +70,12 @@
   `interactions/respond` 两个接口，事件流新增 `interaction_request` / `interaction_resolved`；
   审批超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）与会话删除按拒绝结算。
   前端新增权限审批弹窗（允许一次 / 本会话恒允 / 拒绝）。
+- 新增 `question` 自研工具：模型在信息不足时经交互通道向前端提问（每题给若干选项、可多选，
+  用户也可自填或跳过），前端新增提问弹窗。答复以 `interactions/respond` 的 `kind: "question"`
+  回传后本轮继续；等待超时（`QUESTION_TIMEOUT_MS`）或本轮中断 / 会话归档时以可读错误结束，避免工具调用悬空。
+  `build` / `plan` / `ask` 三种模式都可提问（只读模式的工具白名单已纳入）。
+- 契约 `PendingInteraction` 由单一的权限审批改为按 `kind` 判别联合（`permission` / `question`），
+  `interactionRespondInputSchema` 同步新增提问分支（`answers: string[][]`），`QuestionItem` 描述问题与选项。
 - 契约新增 `PERMISSION_ACTIONS` / `PERMISSION_DECISIONS` 常量与 `interactions` 域（请求 / 响应类型）。
 - 新增自研工具：`webfetch` 抓公网链接并用 `turndown` 转 markdown
   （响应体上限 5MB、超时默认 30s / 最长 120s、目标准入拦住回环 / 私网 / 链路本地与云元数据并逐跳校验重定向、

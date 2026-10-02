@@ -27,6 +27,7 @@ import {
   resolvePromptVariant,
 } from "./prompt";
 import { buildCustomTools } from "./tools/index";
+import type { QuestionHooks } from "./tools/question";
 import { workspaceDirOf } from "./workspace";
 
 /**
@@ -48,6 +49,8 @@ export type SessionAssemblyInput = {
   websearch: () => WebsearchConfig;
   /** 权限钩子：审批回调与会话恒允，由会话池按 sessionId 提供 */
   permission: PermissionHooks;
+  /** question 工具通道：向本会话前端提问并等待答复，由会话池按 sessionId 提供 */
+  question: QuestionHooks;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** agent 数据目录；缺省取 `env.agentDir`（评测 / 测试需要隔离时显式传入） */
@@ -123,7 +126,7 @@ export const buildSessionOptions = async (
     sessionManager: input.sessionManager,
     settingsManager,
     ...(toolSelection.kind === "allowlist" ? { tools: toolSelection.tools } : {}),
-    customTools: buildCustomTools(input.websearch, input.mode),
+    customTools: buildCustomTools(input.websearch, input.mode, input.question),
     resourceLoader: loader,
   };
 };

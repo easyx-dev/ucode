@@ -10,11 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { PendingInteraction, PermissionDecision } from "@/lib/types";
+import type { PermissionDecision, PermissionInteraction } from "@/lib/types";
 
 type PermissionDialogProps = {
-  /** 当前待答请求；为空时不展示 */
-  request: PendingInteraction | null;
+  /** 当前待答的权限审批；为空或不是审批时不展示 */
+  request: PermissionInteraction | null;
   onRespond: (requestId: string, decision: PermissionDecision) => void;
 };
 

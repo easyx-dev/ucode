@@ -14,8 +14,34 @@ export type PermissionInteraction = {
   createdAt: string;
 };
 
-/** 待回答的交互请求；后续 question 通道并入这里的联合 */
-export type PendingInteraction = PermissionInteraction;
+/** question 的一个选项：标签 + 说明，说明写清含义与代价 */
+export type QuestionOption = {
+  label: string;
+  description: string;
+};
+
+/** question 的一个问题：主题标签 + 完整问题 + 选项；`multiple` 为真时允许多选 */
+export type QuestionItem = {
+  header: string;
+  question: string;
+  options: QuestionOption[];
+  multiple?: boolean;
+};
+
+/**
+ * 一条待回答的提问：模型在信息不足时经 `question` 工具抛出，
+ * 前端弹窗收集答案后经 `interactions/respond` 回传（`answers` 与 `questions` 同序）。
+ */
+export type QuestionInteraction = {
+  requestId: string;
+  kind: "question";
+  sessionId: string;
+  questions: QuestionItem[];
+  createdAt: string;
+};
+
+/** 待回答的交互请求，按 `kind` 判别 */
+export type PendingInteraction = PermissionInteraction | QuestionInteraction;
 
 export type InteractionListResponse = {
   interactions: PendingInteraction[];

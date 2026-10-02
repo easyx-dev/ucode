@@ -189,17 +189,22 @@
 ## 交互请求（interactions）
 
 「服务端提问、前端回答」的请求-响应通道：生成过程中服务端挂起一条请求，等前端答复后才继续。
-当前唯一场景是**权限审批**（工具调用命中 `ask` 规则），后续的 question 通道复用同一套形状。
+按 `kind` 判别两类：
 
-- 请求下发：SSE 事件 `interaction_request`（载荷 `PendingInteraction`，含 `requestId` / `kind` /
-  `tool` / `subject` / `scope`）；答复或超时后下发 `interaction_resolved`（`{ requestId }`）。
-  `scope` 是本次授权覆盖的范围：规则类 ask 是规则串，越界检查（`external_directory`）是父目录通配。
+- `permission`：工具调用命中 `ask` 规则，用户答 `allow_once` / `allow_session` / `deny`。
+- `question`：模型经 `question` 工具向用户提问，用户从选项中选择或自填；答复为 `answers: string[][]`，
+  与问题同序，每项是该问题选中的标签或自填文本，空数组表示用户跳过。
+
+- 请求下发：SSE 事件 `interaction_request`（载荷 `PendingInteraction`）；答复或超时后下发
+  `interaction_resolved`（`{ requestId }`）。权限审批的载荷额外带 `tool` / `subject` / `scope`：
+  `scope` 是本次授权覆盖的范围，规则类 ask 是规则串，越界检查（`external_directory`）是父目录通配。
 - `interactions/list`：按 `sessionId` 列出尚未回答的请求，供刷新 / 重连后补齐对话框。
-- `interactions/respond`：按 `kind` 判别提交答复（权限审批为 `allow_once` / `allow_session` / `deny`），
-  返回 `{ requestId, resolved }`；重复回答或已超时为 `resolved: false`。
-- 生命周期：请求只在进程内存、超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）按拒绝结算，
-  会话删除时一并清理；`allow_session` 等价于按 `scope` 追加一条会话级 allow 规则，同样只存进程内存，
-  服务重启回到规则默认。
+- `interactions/respond`：按 `kind` 判别提交答复，返回 `{ requestId, resolved }`。
+  `kind` 与待答请求不一致时不结算，重复回答或已超时也为 `resolved: false`。
+- 生命周期：请求只在进程内存。权限审批超时（`PERMISSION_APPROVAL_TIMEOUT_MS`）按拒绝结算；
+  question 超时（`QUESTION_TIMEOUT_MS`）以可读错误结束本轮提问；本轮中断（stop）取消挂起的提问；
+  会话归档时两类请求一并结算清理。`allow_session` 等价于按 `scope` 追加一条会话级 allow 规则，
+  同样只存进程内存，服务重启回到规则默认。
 
 ## 版本与破坏性变更
 

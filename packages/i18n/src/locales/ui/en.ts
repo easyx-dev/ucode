@@ -147,13 +147,22 @@ export default {
   "问答模式.说明": "Read-only analysis and answers; no file writes or commands.",
   切换模式失败: "Failed to switch mode",
 
-  // Permission approval
+  // Interaction request (permission / question)
+  交互请求: "Interaction request",
   需要授权: "Approval required",
   "授权.说明": 'The agent wants to call "{{tool}}", target:',
   授权范围: "Grant scope: {{scope}}",
   允许一次: "Allow once",
   本会话恒允: "Allow for this session",
   拒绝: "Deny",
+
+  // Question (question tool)
+  需要你回答: "Your input is needed",
+  "提问.说明": "The agent needs your input to continue. Pick an option, or type your own answer.",
+  可多选: "Multiple choice",
+  "其他.占位": "Or type your own answer",
+  提交回答: "Submit answers",
+  跳过回答: "Skip",
 
   // Plan decision
   计划已就绪: "Plan ready",

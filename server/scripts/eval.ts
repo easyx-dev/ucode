@@ -177,6 +177,8 @@ const openSession = async (
       grant: () => {},
       request: async () => "allow_once" as const,
     },
+    // 评测里没有前端可答，question 一律按取消结束，避免挂起
+    question: { ask: async () => ({ kind: "cancelled" }) },
     promptSource: source,
   });
   const { session } = await createAgentSession(options);
