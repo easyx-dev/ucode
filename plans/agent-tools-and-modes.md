@@ -27,7 +27,7 @@
 | 3 · 会话工作区 + ask 模式成品 | 已完成 | `c94b53b` |
 | 3.5 · pi 升级 0.99 + 工具选择机制迁移 | 已完成 | `6ca1606` |
 | 4 · 自研系统提示词 | 已完成 | `b18ab50` |
-| 5 · question 双向通道 | 未开始 | — |
+| 5 · question 双向通道 | 已完成 | `d77231e` |
 | 6 · 项目级 Memory | 未开始 | — |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 未开始 | — |
 
@@ -315,6 +315,21 @@ server/src/agent/
 - 流程：工具触发 → 事件 → 前端弹窗 → 回填 → 会话续跑；带超时与取消。
 
 **验收**：工具触发后前端收到问题；回答后会话继续；超时返回可读错误。
+
+**阶段 5 复盘（落地时的偏差）**
+
+- 复用阶段 2 的交互中转与 `interaction_request` / `interactions/respond`，没有新开一条通道：
+  `PendingInteraction` 改为按 `kind` 判别联合（`permission` / `question`），`respond` 增加 kind 一致性校验，
+  答错形状不结算原请求。
+- `question` 对三种模式都开放（含只读的 `plan` / `ask`）——提问无副作用；
+  plan 的「`present_plan` 后不再提问」仍是提示词层约束，不由工具集区分。
+- 协议形状对齐 opencode（`question.ts` / `schema/v1/question.ts`）：问题、选项、答案都不设数量与长度上限，
+  「自填」常驻、无需单列「其他」选项；前端另加「跳过」（提交空答案）。早期曾加 4 问 / 4 选 / 2000 字
+  的服务端上限，评审后按 opencode 去掉。
+- 超时用新常量 `QUESTION_TIMEOUT_MS`（10 分钟，与审批的 5 分钟分开）；取消绑定工具调用的 `AbortSignal`
+  （pi 的 `session.abort()` 会把 run 的 signal 传到 `tool.execute`），会话归档时 `forget` 一并结算。
+- 验收：`pnpm check` 全绿（96 单测 + 6 项约定校验）；真实浏览器里跑通
+  「模型调用 `question` → 弹窗作答 → 工具结果回传 → 本轮继续」，含 Enter 提交与跳过路径。
 
 ### 阶段 6 · 项目级 Memory
 
