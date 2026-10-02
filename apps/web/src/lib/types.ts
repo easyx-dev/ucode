@@ -14,6 +14,7 @@ export type {
   FsListResponse,
   HealthResponse,
   InteractionRespondRequest,
+  MemoryView,
   MessageBlock,
   MessageDTO,
   MessageRole,

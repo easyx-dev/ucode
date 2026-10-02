@@ -28,11 +28,17 @@ export type WebsearchView = {
   configured: boolean;
 };
 
+/** 项目级记忆设置视图：只有开关，记忆内容按项目落在服务端磁盘上 */
+export type MemoryView = {
+  enabled: boolean;
+};
+
 export type ConfigView = {
   defaultModel: string | null;
   thinkingLevel: ThinkingLevel;
   providers: ProviderConfigView[];
   websearch: WebsearchView;
+  memory: MemoryView;
 };
 
 /** config/info 与 config/update 的返回：配置视图 + 运行时状态 */

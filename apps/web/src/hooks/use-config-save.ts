@@ -35,6 +35,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
           draft.defaultModel || null,
           draft.thinkingLevel,
           draft.websearch,
+          draft.memoryEnabled,
         ),
       );
       toast.success(t("配置已保存"));

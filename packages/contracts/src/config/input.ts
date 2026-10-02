@@ -123,6 +123,11 @@ export const websearchSchema = z.object({
   baseUrl: z.string().default(""),
 });
 
+/** 项目级记忆开关；默认关闭，开启后才写盘并在会话落定后自动回顾 */
+export const memorySchema = z.object({
+  enabled: z.boolean().default(false),
+});
+
 export const appConfigSchema = z.object({
   providers: z.array(providerSchema).default([]),
   /** "provider/model"，null 表示使用第一个可用模型 */
@@ -133,6 +138,7 @@ export const appConfigSchema = z.object({
     apiKey: "",
     baseUrl: "",
   }),
+  memory: memorySchema.default({ enabled: false }),
 });
 
 /** 更新时 apiKey 可省略：省略则沿用该 provider 已保存的 key */
@@ -145,11 +151,16 @@ export const websearchPatchSchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const memoryPatchSchema = z.object({
+  enabled: z.boolean().optional(),
+});
+
 export const appConfigPatchSchema = z.object({
   providers: z.array(providerPatchSchema).optional(),
   defaultModel: z.string().min(1).nullable().optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
   websearch: websearchPatchSchema.optional(),
+  memory: memoryPatchSchema.optional(),
 });
 
 export const configTestSchema = z.object({
@@ -168,6 +179,7 @@ export type AppConfigPatchRequest = z.input<typeof appConfigPatchSchema>;
 export type ProviderConfig = z.infer<typeof providerSchema>;
 export type ProviderModel = z.infer<typeof providerModelSchema>;
 export type WebsearchConfig = z.infer<typeof websearchSchema>;
+export type MemoryConfig = z.infer<typeof memorySchema>;
 export type ConfigTestInput = z.infer<typeof configTestSchema>;
 /** 客户端发送的连通性测试载荷（api 默认 openai-completions，可省） */
 export type ConfigTestRequest = z.input<typeof configTestSchema>;

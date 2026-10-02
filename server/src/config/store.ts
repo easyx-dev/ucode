@@ -21,6 +21,7 @@ export const emptyConfig = (): AppConfig => ({
   defaultModel: null,
   thinkingLevel: "off",
   websearch: { provider: DEFAULT_SEARCH_PROVIDER, apiKey: "", baseUrl: "" },
+  memory: { enabled: false },
 });
 
 /** defaultModel 指向的 provider 已被替换掉时返回 null，让它回落到「第一个可用模型」 */
@@ -105,11 +106,16 @@ export class ConfigStore {
       baseUrl: patch.websearch?.baseUrl?.trim() ?? this.config.websearch.baseUrl,
     };
 
+    const memory = {
+      enabled: patch.memory?.enabled ?? this.config.memory.enabled,
+    };
+
     return appConfigSchema.parse({
       providers: providers ?? this.config.providers,
       defaultModel,
       thinkingLevel: patch.thinkingLevel ?? this.config.thinkingLevel,
       websearch,
+      memory,
     });
   }
 }
@@ -135,6 +141,7 @@ export const publicConfig = (config: AppConfig): ConfigView => ({
     baseUrl: config.websearch.baseUrl,
     configured: isWebsearchConfigured(config.websearch),
   },
+  memory: { enabled: config.memory.enabled },
 });
 
 /** 搜索的前置条件按 provider 不同：自建实例要地址，其余要 key */

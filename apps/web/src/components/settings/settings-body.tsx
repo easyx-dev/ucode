@@ -7,6 +7,7 @@ import { ProviderCard } from "@/components/settings/provider-card";
 import { ProviderCatalog } from "@/components/settings/provider-catalog";
 import { SettingsAppearance } from "@/components/settings/settings-appearance";
 import { SettingsDefaults } from "@/components/settings/settings-defaults";
+import { SettingsMemory } from "@/components/settings/settings-memory";
 import { SettingsWebsearch } from "@/components/settings/settings-websearch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -85,6 +86,12 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
 
       <Section title={t("联网搜索")}>
         <SettingsWebsearch websearch={draft.websearch} onPatch={draft.patchWebsearch} />
+      </Section>
+
+      <Separator />
+
+      <Section title={t("记忆")}>
+        <SettingsMemory enabled={draft.memoryEnabled} onChange={draft.setMemoryEnabled} />
       </Section>
 
       <Separator />

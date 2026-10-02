@@ -14,6 +14,7 @@
 import { brand } from "@ucode/brand/values";
 import type { SessionMode } from "@ucode/contracts";
 
+import { MEMORY_TOOL_NAMES } from "../memory/tools";
 import { toolsForMode } from "../modes";
 import { catalogFor, type PromptLocale } from "./locales";
 import { DEFAULT_PROMPT_VARIANT, type PromptCatalog, type PromptVariant } from "./types";
@@ -24,7 +25,15 @@ export type PromptBuildInput = {
   locale?: PromptLocale;
   /** 模型族变体（模型适配口子，默认 default；见 `prompt/variant.ts`） */
   variant?: PromptVariant;
+  /** 项目记忆是否开启：决定记忆分节与 remember / forget 工具指引是否拼入 */
+  memoryEnabled?: boolean;
 };
+
+/** 当前可用工具名：默认集 / 白名单，加上 build 模式下开关打开才有的记忆工具 */
+const promptToolNames = (mode: SessionMode, memoryEnabled: boolean): string[] => [
+  ...toolsForMode(mode),
+  ...(memoryEnabled && mode === "build" ? [...MEMORY_TOOL_NAMES] : []),
+];
 
 const modeBlock = (catalog: PromptCatalog, mode: SessionMode): string =>
   `${catalog.modeHeading}\n${catalog.modeConstraints[mode]}`;
@@ -35,6 +44,7 @@ export const composeFullPrompt = (
   brandName: string,
   mode: SessionMode,
   variant: PromptVariant,
+  memoryEnabled = false,
 ): string => {
   const parts = [
     catalog.identity(brandName),
@@ -44,11 +54,12 @@ export const composeFullPrompt = (
     catalog.conventions,
     catalog.codeStyle,
     catalog.doingTasks,
-    catalog.toolPolicy(toolsForMode(mode)),
+    catalog.toolPolicy(promptToolNames(mode, memoryEnabled)),
     catalog.codeReferences,
   ];
   const note = catalog.variantNotes[variant];
   if (note) parts.push(note);
+  if (memoryEnabled) parts.push(catalog.memory);
   parts.push(modeBlock(catalog, mode), catalog.untrusted);
   return parts.join("\n\n");
 };
@@ -59,10 +70,12 @@ export const composeOverlayPrompt = (
   brandName: string,
   mode: SessionMode,
   variant: PromptVariant,
+  memoryEnabled = false,
 ): string => {
   const parts = [catalog.overlayIdentity(brandName)];
   const note = catalog.variantNotes[variant];
   if (note) parts.push(note);
+  if (memoryEnabled) parts.push(catalog.memory);
   parts.push(modeBlock(catalog, mode), catalog.untrusted);
   return parts.join("\n\n");
 };
@@ -73,6 +86,7 @@ export const buildFullPrompt = (input: PromptBuildInput): string =>
     brand.name,
     input.mode,
     input.variant ?? DEFAULT_PROMPT_VARIANT,
+    input.memoryEnabled ?? false,
   );
 
 export const buildPromptOverlay = (input: PromptBuildInput): string =>
@@ -81,6 +95,7 @@ export const buildPromptOverlay = (input: PromptBuildInput): string =>
     brand.name,
     input.mode,
     input.variant ?? DEFAULT_PROMPT_VARIANT,
+    input.memoryEnabled ?? false,
   );
 
 export type { PromptVariant } from "./types";

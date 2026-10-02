@@ -38,6 +38,8 @@ export type PromptCatalog = {
   modeHeading: string;
   /** 各模式的约束文案 */
   modeConstraints: Record<SessionMode, string>;
+  /** 项目记忆分节：仅在记忆开启时拼入 */
+  memory: string;
   /** 外部内容边界分节 */
   untrusted: string;
   /** 模型族追加文案，缺省为空 */

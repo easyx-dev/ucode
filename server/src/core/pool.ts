@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
 
+import type { MemoryService } from "../agent/memory";
 import type { SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../agent/workspace";
@@ -21,6 +22,8 @@ import { indexFromManager } from "./session-index";
 type PooledSession = {
   session: AgentSession;
   lastUsed: number;
+  /** 会话落定事件的订阅解绑；随池回收一并释放 */
+  memoryUnsubscribe: () => void;
 };
 
 /**
@@ -46,6 +49,8 @@ export class SessionPool {
       allow: SessionAllowStore;
       interactions: InteractionBroker;
     },
+    /** 项目级记忆：落定后自动回顾，并把索引 / 工具接进会话装配 */
+    private readonly memory: MemoryService,
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -125,10 +130,17 @@ export class SessionPool {
           ask: (ask, signal) =>
             this.permissions.interactions.requestQuestion(sessionId, ask.questions, signal),
         },
+        memory: this.memory,
       }),
     );
 
-    const entry: PooledSession = { session, lastUsed: Date.now() };
+    // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾；
+    // 事件总线已单独 attach 一份订阅，这里再加一个监听不影响它
+    const memoryUnsubscribe = session.subscribe((event) => {
+      if (event.type === "agent_settled") this.memory.review(sessionId, session);
+    });
+
+    const entry: PooledSession = { session, lastUsed: Date.now(), memoryUnsubscribe };
     this.entries.set(sessionId, entry);
     // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
     // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧。
@@ -178,6 +190,12 @@ export class SessionPool {
     this.locks.delete(sessionId);
     this.running.delete(sessionId);
     this.events.detach(sessionId);
+    this.memory.discardReview(sessionId);
+    try {
+      entry.memoryUnsubscribe();
+    } catch {
+      // pi 侧已释放，忽略
+    }
     try {
       entry.session.dispose();
     } catch {

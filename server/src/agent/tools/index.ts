@@ -26,10 +26,13 @@ export const buildCustomTools = (
   readWebsearchConfig: () => WebsearchConfig,
   mode: SessionMode,
   question: QuestionHooks,
+  memoryTools: ToolDefinition[] = [],
 ): ToolDefinition[] => [
   createWebfetchTool(),
   createWebsearchTool(readWebsearchConfig),
   createQuestionTool(question),
   // 计划提交只在 plan 模式提供：它是「计划就绪」的信号，build / ask 用不到
   ...(mode === "plan" ? [createPresentPlanTool()] : []),
+  // 记忆工具由装配层按「记忆开关 + build 模式」筛过再传入
+  ...memoryTools,
 ];

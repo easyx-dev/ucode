@@ -217,6 +217,7 @@ export const toUpdatePayload = (
   defaultModel: string | null,
   thinkingLevel: ThinkingLevel,
   websearch: DraftWebsearch,
+  memoryEnabled: boolean,
 ) => ({
   providers: drafts.map((provider) => {
     const apiKey = provider.apiKey.trim() ? { apiKey: provider.apiKey.trim() } : {};
@@ -244,6 +245,7 @@ export const toUpdatePayload = (
     ...(websearch.apiKey.trim() ? { apiKey: websearch.apiKey.trim() } : {}),
     baseUrl: websearch.baseUrl.trim(),
   },
+  memory: { enabled: memoryEnabled },
 });
 
 /** 「provider/model」选项：只列实际生效的模型（内置取目录，自定义取表单） */

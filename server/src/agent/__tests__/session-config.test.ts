@@ -24,6 +24,8 @@ import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
+import { MemoryService } from "../memory";
+import { rememberFact } from "../memory/store";
 import { buildFullPrompt, buildPromptOverlay } from "../prompt";
 import { catalogFor } from "../prompt/locales";
 import { buildSessionOptions, resolveSessionCwd } from "../session-config";
@@ -80,6 +82,7 @@ type SessionSnapshot = { tools: string[]; systemPrompt: string };
 const snapshotOf = async (
   mode: SessionMode,
   promptSource: PromptSource = "custom",
+  memory?: MemoryService,
 ): Promise<SessionSnapshot> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
@@ -109,6 +112,7 @@ const snapshotOf = async (
     websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
     permission: { listGrants: () => [], grant: () => {}, request: async () => "deny" as const },
     question: { ask: async () => ({ kind: "cancelled" }) },
+    ...(memory ? { memory } : {}),
     promptSource,
   });
   const { session }: { session: AgentSession } = await createAgentSession(options);
@@ -134,6 +138,40 @@ describe("buildSessionOptions 工具装配", () => {
       }
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
       assert.ok(tools.includes("question"), `${mode} 应保留提问工具`);
+    }
+  });
+});
+
+describe("buildSessionOptions 项目记忆", () => {
+  const memoryAppDir = join(root, "memory-app");
+  const enabledMemory = new MemoryService(() => ({ enabled: true }), memoryAppDir);
+  const disabledMemory = new MemoryService(() => ({ enabled: false }), memoryAppDir);
+
+  it("开启后 build 注册 remember / forget，并把索引注入上下文与提示词", async () => {
+    rememberFact(cwd, { title: "包管理器", content: "项目统一用 pnpm。" }, memoryAppDir);
+
+    const { tools, systemPrompt } = await snapshotOf("build", "custom", enabledMemory);
+    for (const name of ["remember", "forget"]) {
+      assert.ok(tools.includes(name), `build 应启用 ${name}，实际：${tools.join(", ")}`);
+    }
+    assert.ok(systemPrompt.includes("[包管理器](包管理器.md)"), "索引应注入上下文");
+    assert.ok(systemPrompt.includes("## 项目记忆"), "提示词应含记忆分节");
+  });
+
+  it("未开启时不注册记忆工具、不注入记忆分节", async () => {
+    const { tools, systemPrompt } = await snapshotOf("build", "custom", disabledMemory);
+    for (const name of ["remember", "forget"]) {
+      assert.ok(!tools.includes(name), `未开启不应有 ${name}`);
+    }
+    assert.ok(!systemPrompt.includes("## 项目记忆"), "未开启不应拼入记忆分节");
+  });
+
+  it("plan / ask 即使开启也不注册记忆工具", async () => {
+    for (const mode of ["plan", "ask"] as const) {
+      const { tools } = await snapshotOf(mode, "custom", enabledMemory);
+      for (const name of ["remember", "forget"]) {
+        assert.ok(!tools.includes(name), `${mode} 不应有 ${name}`);
+      }
     }
   });
 });

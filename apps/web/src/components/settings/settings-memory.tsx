@@ -1,0 +1,38 @@
+/** 记忆设置：项目长期记忆的开关 */
+import { useTranslation } from "react-i18next";
+
+import { SegmentedControl, type SegmentedOption } from "@/components/segmented-control";
+import { SettingsGroup, SettingsRow } from "@/components/settings/settings-row";
+
+type MemoryToggle = "on" | "off";
+
+type SettingsMemoryProps = {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+};
+
+export function SettingsMemory({ enabled, onChange }: SettingsMemoryProps) {
+  const { t } = useTranslation();
+
+  const options = [
+    { value: "on", label: t("开启") },
+    { value: "off", label: t("关闭") },
+  ] as const satisfies ReadonlyArray<SegmentedOption<MemoryToggle>>;
+
+  return (
+    <SettingsGroup>
+      <SettingsRow
+        title={t("项目记忆")}
+        description={t("项目记忆.说明")}
+        control={
+          <SegmentedControl
+            label={t("项目记忆")}
+            value={enabled ? "on" : "off"}
+            options={options}
+            onChange={(value) => onChange(value === "on")}
+          />
+        }
+      />
+    </SettingsGroup>
+  );
+}

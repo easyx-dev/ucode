@@ -35,6 +35,12 @@
 
 ### 新增
 
+- 新增**项目级记忆（Memory）**：`config.json` 增加 `memory: { enabled }`（默认关闭），
+  设置对话框新增「记忆」区块。开启后每轮对话彻底落定（`agent_settled`）会在后台用当前模型回顾最近交流，
+  把值得长期保留的事实写成 `$APP_HOME/app/memory/projects/<project>/*.md`，
+  并更新同目录的 `MEMORY.md` 索引；下一会话经 `agentsFilesOverride` 把索引并入上下文。
+  记忆按会话工作目录归属，目录名取「末段 + 绝对路径短哈希」；`remember` / `forget` 两个自研工具
+  （仅 `build` 模式注册）让模型按用户明确指令直接增删。契约新增 `memory` 配置与 `MemoryView`。
 - 新增会话工作区：`$APP_HOME` 下多一层 `workspace/`（`env.workspaceRoot`，启动时一并创建），
   未绑定目录的会话落在 `workspace/<sessionId>`，它同时是这类会话的 cwd
   （此前回落到 `$APP_HOME`）；绑定目录的会话在用户自己的目录里干活、不建工作区。

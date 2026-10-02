@@ -63,6 +63,36 @@ export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 /** question 工具等待用户答复的时限；超时以可读错误结束本轮提问 */
 export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** 项目记忆根目录名（位于 `$APP_HOME/app` 下）：`memory/projects/<project>` */
+export const MEMORY_DIRNAME = "memory";
+
+/** 记忆项目目录名（位于记忆根目录下） */
+export const MEMORY_PROJECTS_DIRNAME = "projects";
+
+/** 记忆索引文件名：一行一条，指向同目录下的事实文件 */
+export const MEMORY_INDEX_FILENAME = "MEMORY.md";
+
+/** 单个记忆文件 slug 的长度上限（按码点计） */
+export const MEMORY_SLUG_MAX_LENGTH = 60;
+
+/** 索引里每条记忆的描述长度上限 */
+export const MEMORY_DESCRIPTION_MAX_LENGTH = 120;
+
+/** 注入上下文时索引正文的字符上限，超出即截断（记忆不该撑爆提示词） */
+export const MEMORY_INDEX_MAX_CHARS = 8_000;
+
+/** 自动回顾时最多回看的用户轮数 */
+export const MEMORY_REVIEW_MAX_USER_TURNS = 3;
+
+/** 自动回顾时交流文本的字符上限 */
+export const MEMORY_REVIEW_MAX_CHARS = 12_000;
+
+/** 自动回顾调用的最长输出 token */
+export const MEMORY_REVIEW_MAX_TOKENS = 1_024;
+
+/** 自动回顾调用的超时；超时只记日志，不影响会话 */
+export const MEMORY_REVIEW_TIMEOUT_MS = 60_000;
+
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;
 

@@ -52,6 +52,13 @@ export default {
   "实例地址.说明":
     "URL of your SearXNG instance; enable JSON output in settings.yml (add json to search.formats).",
 
+  // Memory
+  记忆: "Memory",
+  项目记忆: "Project memory",
+  "项目记忆.说明":
+    "When on, each conversation is reviewed in the background and durable facts are saved per project; later sessions in the same project load them automatically. Memory is stored locally and isolated by project directory.",
+  开启: "On",
+
   // Appearance
   界面主题: "Theme",
   "界面主题.说明":

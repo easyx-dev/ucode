@@ -33,6 +33,7 @@ export function useConfigDraft(open: boolean) {
   const [defaultModel, setDefaultModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("off");
   const [websearch, setWebsearch] = useState<DraftWebsearch>(emptyWebsearch);
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -53,6 +54,7 @@ export function useConfigDraft(open: boolean) {
       setDefaultModel(config.defaultModel ?? "");
       setThinkingLevel(config.thinkingLevel);
       setWebsearch(toDraftWebsearch(config.websearch));
+      setMemoryEnabled(config.memory.enabled);
     } catch (error) {
       toast.error(t("失败提示", { label: t("配置加载失败"), reason: describeError(error) }));
     } finally {
@@ -120,6 +122,7 @@ export function useConfigDraft(open: boolean) {
     defaultModel,
     thinkingLevel,
     websearch,
+    memoryEnabled,
     loading,
     options,
     setDefaultModel,
@@ -129,6 +132,7 @@ export function useConfigDraft(open: boolean) {
     addFromCatalog,
     removeProvider,
     patchWebsearch,
+    setMemoryEnabled,
     ...models,
   };
 }

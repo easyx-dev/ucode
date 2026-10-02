@@ -2,6 +2,7 @@
 import type { AppConfigPatchInput } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
 
+import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
 import { ConfigStore } from "./config/store";
 import { SessionEventBus } from "./core/event-bus";
@@ -42,10 +43,18 @@ export const createServices = async (): Promise<Services> => {
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
   const permissions = new SessionAllowStore();
-  const pool = new SessionPool(runtime, sessions, events, () => config.get().websearch, {
-    allow: permissions,
-    interactions,
-  });
+  const memory = new MemoryService(() => config.get().memory);
+  const pool = new SessionPool(
+    runtime,
+    sessions,
+    events,
+    () => config.get().websearch,
+    {
+      allow: permissions,
+      interactions,
+    },
+    memory,
+  );
 
   config.load();
   // 以 JSONL 为准对齐索引：清理文件已消失的行

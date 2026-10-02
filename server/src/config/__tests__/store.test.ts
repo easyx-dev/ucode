@@ -89,3 +89,26 @@ describe("联网搜索配置", () => {
     assert.equal(switched.configured, false);
   });
 });
+
+describe("记忆配置", () => {
+  it("默认关闭", () => {
+    assert.deepEqual(store().get().memory, { enabled: false });
+    assert.equal(store().merge({}).memory.enabled, false);
+  });
+
+  it("可以开启并落盘、脱敏视图同步", () => {
+    const first = store();
+    first.set(first.merge({ memory: { enabled: true } }));
+
+    const reloaded = store();
+    assert.equal(reloaded.load().memory.enabled, true);
+    assert.deepEqual(publicConfig(reloaded.get()).memory, { enabled: true });
+  });
+
+  it("省略时不改动", () => {
+    const store1 = store();
+    store1.set(store1.merge({ memory: { enabled: true } }));
+    store1.set(store1.merge({ thinkingLevel: "high" }));
+    assert.equal(store1.get().memory.enabled, true);
+  });
+});

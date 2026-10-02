@@ -18,6 +18,7 @@ import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
+import type { MemoryService } from "./memory";
 import { MODES, rulesForMode } from "./modes";
 import { createPermissionExtension, type PermissionHooks } from "./permissions";
 import {
@@ -51,6 +52,8 @@ export type SessionAssemblyInput = {
   permission: PermissionHooks;
   /** question 工具通道：向本会话前端提问并等待答复，由会话池按 sessionId 提供 */
   question: QuestionHooks;
+  /** 项目级记忆：索引注入与 remember / forget 工具；缺省即不启用 */
+  memory?: MemoryService;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** agent 数据目录；缺省取 `env.agentDir`（评测 / 测试需要隔离时显式传入） */
@@ -60,7 +63,7 @@ export type SessionAssemblyInput = {
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
 const promptLoaderOptions = (
   source: PromptSource,
-  input: { mode: SessionMode; variant: PromptVariant },
+  input: { mode: SessionMode; variant: PromptVariant; memoryEnabled: boolean },
 ): Pick<
   ConstructorParameters<typeof DefaultResourceLoader>[0],
   "systemPromptOverride" | "appendSystemPrompt"
@@ -71,7 +74,7 @@ const promptLoaderOptions = (
 
 /**
  * 组装 resourceLoader：内联扩展负责 `tool_call` 权限拦截与内置 `codemode`，
- * 系统提示词按 `promptSource` 装配（见 `agent/prompt`）。
+ * 系统提示词按 `promptSource` 装配（见 `agent/prompt`），项目记忆开启时把记忆索引并入上下文文件。
  */
 const createSessionLoader = async (
   input: SessionAssemblyInput,
@@ -85,12 +88,21 @@ const createSessionLoader = async (
     grant: input.permission.grant,
     request: input.permission.request,
   };
+  const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
     agentDir: input.agentDir ?? env.agentDir,
     settingsManager,
     extensionFactories: [createPermissionExtension(gate), createCodemodeExtension({ mode: "on" })],
-    ...promptLoaderOptions(input.promptSource ?? env.promptSource, { mode: input.mode, variant }),
+    // 记忆索引作为额外的上下文文件拼进系统提示词；索引在会话创建时读一次即可
+    ...(memoryFile
+      ? { agentsFilesOverride: (base) => ({ agentsFiles: [...base.agentsFiles, memoryFile] }) }
+      : {}),
+    ...promptLoaderOptions(input.promptSource ?? env.promptSource, {
+      mode: input.mode,
+      variant,
+      memoryEnabled: input.memory?.enabled === true,
+    }),
   });
   await loader.reload();
   return loader;
@@ -117,6 +129,9 @@ export const buildSessionOptions = async (
   if (toolSelection.kind === "defaultTools")
     settingsManager.applyOverrides({ defaultTools: toolSelection.defaultTools });
 
+  // 记忆工具只在 build 模式注册；plan / ask 的只读白名单不纳入
+  const memoryTools = input.mode === "build" ? (input.memory?.tools(input.cwd) ?? []) : [];
+
   return {
     cwd: input.cwd,
     agentDir: input.agentDir ?? env.agentDir,
@@ -126,7 +141,7 @@ export const buildSessionOptions = async (
     sessionManager: input.sessionManager,
     settingsManager,
     ...(toolSelection.kind === "allowlist" ? { tools: toolSelection.tools } : {}),
-    customTools: buildCustomTools(input.websearch, input.mode, input.question),
+    customTools: buildCustomTools(input.websearch, input.mode, input.question, memoryTools),
     resourceLoader: loader,
   };
 };
