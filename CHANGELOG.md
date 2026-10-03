@@ -43,6 +43,9 @@
   新增 `mcp/list` / `mcp/upsert` / `mcp/delete` 接口与 `mcp` 契约域（按会话 agentDir 读取该文件，
   评测 / 测试覆盖 agentDir 时随之隔离；读写保留未知顶层键与未建模的条目字段，坏配置可覆盖修复）；
   设置对话框新增「MCP」区块，可增删改服务器、切换启用与暴露方式，改动写入该文件、新会话生效。
+  暴露方式覆盖 pi 的五种：`codemode` / `codemode-deferred` / `deferred` / `direct` / `hidden`；
+  `build` 额外注册 `tool_search`（默认不激活，出现 `deferred` 服务器时由 MCP 扩展自动激活并加载工具），
+  `plan` / `ask` 不注册。
 - 新增**项目级记忆（Memory）**：`config.json` 增加 `memory: { enabled }`（默认关闭），
   设置对话框新增「记忆」区块。开启后每轮对话彻底落定（`agent_settled`）会在后台用当前模型回顾最近交流，
   把值得长期保留的事实写成 `$APP_HOME/app/memory/projects/<project>/*.md`，

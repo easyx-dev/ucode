@@ -277,8 +277,10 @@ export default {
   "HTTP 端点": "HTTP endpoint",
   暴露方式: "Exposure",
   "暴露方式.说明":
-    "Scripts reaches the tool through codemode without declaring it to the model; Direct declares it to the model.",
+    "Scripts reach tools through codemode without declaring them to the model; in-script search keeps them out of the codemode description and finds them on demand; search-then-call declares them once tool_search loads them; Direct declares them right away.",
   脚本调用: "Scripts",
+  脚本内检索: "In-script search",
+  检索后调用: "Search then call",
   直接调用: "Direct",
   隐藏: "Hidden",
   启动命令: "Command",

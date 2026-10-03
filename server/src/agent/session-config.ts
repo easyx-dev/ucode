@@ -8,6 +8,7 @@
 import {
   type CreateAgentSessionOptions,
   createCodemodeExtension,
+  createToolSearchExtension,
   DefaultResourceLoader,
   type SessionManager,
   SettingsManager,
@@ -92,6 +93,8 @@ const createSessionLoader = async (
   const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
   // MCP 只进 build；只读模式加载它会被扩展激活的 codemode 绕过工具白名单
   const mcpExtension = mcpExtensionForMode(input.mode, input.agentDir ?? env.agentDir);
+  // tool_search 只注册、默认不激活：build 下 MCP 出现 deferred 服务器时由 MCP 扩展自动激活
+  const discoveryExtension = input.mode === "build" ? [createToolSearchExtension()] : [];
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
     agentDir: input.agentDir ?? env.agentDir,
@@ -99,6 +102,7 @@ const createSessionLoader = async (
     extensionFactories: [
       createPermissionExtension(gate),
       createCodemodeExtension({ mode: "on" }),
+      ...discoveryExtension,
       ...(mcpExtension ? [mcpExtension] : []),
     ],
     // 记忆索引作为额外的上下文文件拼进系统提示词；索引在会话创建时读一次即可

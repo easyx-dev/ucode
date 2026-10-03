@@ -66,6 +66,26 @@ describe("readMcpConfig", () => {
     assert.equal(response.servers[0]?.name, "ok");
     assert.match(response.errors[0] ?? "", /bad/);
   });
+
+  it("deferred / codemode-deferred 暴露方式合法", () => {
+    const path = freshPath();
+    writeFileSync(
+      path,
+      JSON.stringify({
+        mcpServers: {
+          a: { command: "npx", exposure: "deferred" },
+          b: { command: "npx", exposure: "codemode-deferred" },
+        },
+      }),
+      "utf8",
+    );
+    const response = readMcpConfig(path);
+    assert.deepEqual(response.errors, []);
+    assert.deepEqual(
+      response.servers.map((server) => server.exposure),
+      ["deferred", "codemode-deferred"],
+    );
+  });
 });
 
 describe("writeMcpServer / deleteMcpServer", () => {
@@ -120,6 +140,12 @@ describe("writeMcpServer / deleteMcpServer", () => {
     writeMcpServer(stdioServer("fs"), path);
     assert.deepEqual(readMcpConfig(path).servers, [stdioServer("fs")]);
     assert.deepEqual(readMcpConfig(path).errors, []);
+  });
+
+  it("写入 deferred 暴露方式并被 pi 装载器原样透传", () => {
+    const path = freshPath();
+    writeMcpServer({ ...stdioServer("fs"), exposure: "deferred" }, path);
+    assert.equal(readMcpConfigForLoader(path).servers[0]?.config.exposure, "deferred");
   });
 
   it("写入保留本服务未建模的字段（toolExposure / oauth 等）", () => {

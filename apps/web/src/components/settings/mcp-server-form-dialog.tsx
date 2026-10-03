@@ -98,6 +98,15 @@ export function McpServerFormDialog({
     { value: "off", label: t("停用") },
   ] as const satisfies ReadonlyArray<SegmentedOption<"on" | "off">>;
 
+  // 暴露方式 → 文案；渲染顺序由 MCP_EXPOSURES 决定
+  const exposureLabels = {
+    codemode: t("脚本调用"),
+    "codemode-deferred": t("脚本内检索"),
+    deferred: t("检索后调用"),
+    direct: t("直接调用"),
+    hidden: t("隐藏"),
+  } satisfies Record<McpExposure, string>;
+
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-xl">
@@ -146,11 +155,7 @@ export function McpServerFormDialog({
                 <SelectContent>
                   {MCP_EXPOSURES.map((exposure) => (
                     <SelectItem key={exposure} value={exposure}>
-                      {exposure === "codemode"
-                        ? t("脚本调用")
-                        : exposure === "direct"
-                          ? t("直接调用")
-                          : t("隐藏")}
+                      {exposureLabels[exposure]}
                     </SelectItem>
                   ))}
                 </SelectContent>

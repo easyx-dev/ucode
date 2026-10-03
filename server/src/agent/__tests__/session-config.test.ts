@@ -77,7 +77,7 @@ const provider: ProviderConfig = {
 const root = mkdtempSync(join(tmpdir(), "session-config-test-"));
 const cwd = join(root, "cwd");
 
-type SessionSnapshot = { tools: string[]; systemPrompt: string };
+type SessionSnapshot = { tools: string[]; allTools: string[]; systemPrompt: string };
 
 const sessionOf = async (
   mode: SessionMode,
@@ -125,7 +125,11 @@ const snapshotOf = async (
   memory?: MemoryService,
 ): Promise<SessionSnapshot> => {
   const session = await sessionOf(mode, promptSource, memory);
-  const snapshot = { tools: session.getActiveToolNames(), systemPrompt: session.systemPrompt };
+  const snapshot = {
+    tools: session.getActiveToolNames(),
+    allTools: session.getAllTools().map((tool) => tool.name),
+    systemPrompt: session.systemPrompt,
+  };
   session.dispose();
   return snapshot;
 };
@@ -141,13 +145,26 @@ describe("buildSessionOptions 工具装配", () => {
 
   it("TS-02 plan / ask 走只读白名单：不含 codemode 与写盘 / 执行工具", async () => {
     for (const mode of ["plan", "ask"] as const) {
-      const { tools } = await snapshotOf(mode);
+      const { tools, allTools } = await snapshotOf(mode);
       for (const name of ["codemode", "bash", "edit", "write"]) {
         assert.ok(!tools.includes(name), `${mode} 不应启用 ${name}，实际：${tools.join(", ")}`);
       }
+      assert.ok(!allTools.includes("tool_search"), `${mode} 不应注册 tool_search`);
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
       assert.ok(tools.includes("question"), `${mode} 应保留提问工具`);
     }
+  });
+
+  it("TS-04 tool_search 只注册不激活：无 deferred 服务器时不进默认工具集", async () => {
+    const { tools, allTools } = await snapshotOf("build");
+    assert.ok(
+      allTools.includes("tool_search"),
+      "build 应注册 tool_search 供 deferred 服务器按需激活",
+    );
+    assert.ok(
+      !tools.includes("tool_search"),
+      `无 deferred 服务器时不应激活，实际：${tools.join(", ")}`,
+    );
   });
 });
 
