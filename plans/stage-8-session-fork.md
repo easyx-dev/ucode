@@ -126,8 +126,8 @@
 - **阶段 9 · 编辑历史**：编辑已发消息并重发；pi 的 `appendContextEdit(targetId, replacement)` 可在不改树的前提下替换早前条目的上下文，
   或用 `branch(entryId)` + 重发。参考 opencode / zcode 的「只作用于最近一轮用户消息」。
   「连文件一起重置」拆为可选子项，不做进首批。
-- **阶段 10 · 使用统计**：`message_end` / `agent_settled` 钩子取 `Usage`，落 SQLite（新表），
-  提供会话 / 全局聚合与展示；为阶段 11 的 goal 用量上限提供数据。
+- **阶段 10 · 使用统计**：从 pi 会话记录里的 `usage`（assistant 消息 / `usage` 条目 / compaction）聚合出 token 用量，
+  不建表，按文件 mtime 做内存缓存，提供会话 / 全局聚合与展示；为阶段 11 的 goal 用量上限提供数据。
 - **阶段 11 · goal 模式**：`/goal <目标>` 设当前会话目标，每轮落定后由一次校验模型调用判断是否达成，
   未达成自动开下一轮；支持查看 / 替换 / 暂停 / 恢复 / 清除；plan 模式下禁用；用量上限依赖阶段 10。
   参考 [zcode 目标模式](https://zcode.z.ai/cn/docs/goal) 与 [pi-goal](https://pi.dev/packages/@schovest/pi-goal)。

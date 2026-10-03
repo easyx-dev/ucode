@@ -19,6 +19,7 @@ import type {
   SessionMode,
   SessionSummary,
   ThinkingLevel,
+  UsageTotals,
 } from "@/lib/types";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
@@ -48,6 +49,10 @@ type ChatPanelProps = {
   onEdit: (item: ChatItem, text: string) => Promise<boolean>;
   /** 本会话分叉自的源会话名；用于头部来源链接 */
   forkedFromName?: string | null;
+  /** 本会话累计 token 用量；用于头部徽标 */
+  usage?: UsageTotals | null;
+  /** 打开全局使用统计 */
+  onOpenUsage?: () => void;
   /** 从子会话视图返回父会话 */
   onBackToParent?: () => void;
   /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
@@ -72,6 +77,8 @@ export function ChatPanel({
   onFork,
   onEdit,
   forkedFromName,
+  usage,
+  onOpenUsage,
   onBackToParent,
   planReady,
   onApprovePlan,
@@ -129,6 +136,8 @@ export function ChatPanel({
         onBackToParent={onBackToParent}
         onOpenForkSource={onOpenSession}
         forkedFromName={forkedFromName}
+        usage={usage}
+        onOpenUsage={onOpenUsage}
       />
 
       <DirectoryDialog

@@ -35,6 +35,10 @@
 
 ### 新增
 
+- 新增**使用统计**：从 pi 会话记录里的 `usage`（assistant 消息 / `usage` 条目 / compaction）聚合 token 用量，
+  **不落库**，按会话文件 mtime 内存缓存。新增 `stats/summary` 接口（`statsSummaryInputSchema`：可选 `days`），
+  `sessions/info` 响应追加 `usage`；子会话与分叉会话一并计入并按来源标注。界面在对话区头部显示本会话用量，
+  点击打开全局统计对话框（总量、按模型、按会话、工具调用次数，支持全部 / 30 天 / 7 天）。无 DB / schema 变更。
 - 新增**编辑历史**：在用户消息上「编辑并重新发送」，从该消息之前继续推进；被放弃的后续内容保留在会话
   文件里（旧分支），不删除。新增 `messages/edit` 接口（`messageEditInputSchema`：`sessionId` /
   `entryId` / `text`），复用 pi 的 `AgentSession.navigateTree`（`summarize: false`）把活动分支移回该

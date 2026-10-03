@@ -22,6 +22,7 @@ import { createMcpRoute } from "./routes/mcp";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
 import { createSessionsRoute } from "./routes/sessions";
+import { createStatsRoute } from "./routes/stats";
 
 const services = await createServices();
 
@@ -35,6 +36,7 @@ v1.route("/health", createHealthRoute(services));
 v1.route("/models", createModelsRoute(services));
 v1.route("/config", createConfigRoute(services));
 v1.route("/sessions", createSessionsRoute(services));
+v1.route("/stats", createStatsRoute(services));
 v1.route("/messages", createMessagesRoute(services));
 v1.route("/events", createEventsRoute(services));
 v1.route("/interactions", createInteractionsRoute(services));

@@ -1,6 +1,7 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
 import type { SessionMode, ThinkingLevel } from "../constants";
+import type { UsageTotals } from "../stats/output";
 
 export type SessionSummary = {
   id: string;
@@ -39,6 +40,8 @@ export type SessionListResponse = ListResult & {
 
 export type SessionInfoResponse = {
   session: SessionSummary;
+  /** 本会话累计 token 用量（见 stage-10）；未落盘 / 无用量时为零值 */
+  usage: UsageTotals;
 };
 
 export type SessionArchiveResponse = SessionScoped & {

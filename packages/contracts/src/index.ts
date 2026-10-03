@@ -19,3 +19,5 @@ export * from "./models/output";
 export * from "./runtime";
 export * from "./sessions/input";
 export * from "./sessions/output";
+export * from "./stats/input";
+export * from "./stats/output";

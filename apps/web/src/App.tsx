@@ -1,4 +1,5 @@
 /** 应用外壳：会话侧栏 + 对话区 + 设置对话框 */
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ChatPanel } from "@/components/chat-panel";
@@ -8,8 +9,10 @@ import { SessionSidebar } from "@/components/session-sidebar";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { UsageDialog } from "@/components/usage-dialog";
 import { WelcomePanel } from "@/components/welcome-panel";
 import { useInteractions } from "@/hooks/use-interactions";
+import { useSessionUsage } from "@/hooks/use-session-usage";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { composerKeyOf, NEW_SESSION_KEY } from "@/lib/composer-draft";
 import { lastTurnPresentedPlan } from "@/lib/plan";
@@ -21,6 +24,9 @@ export default function App() {
   const { sessions, models, configured, activeId, activeSession, chat, workspaceRoot } = workspace;
   const { composer, setActiveId } = workspace;
   const interactions = useInteractions(activeId);
+  const [usageOpen, setUsageOpen] = useState(false);
+  // 本会话累计用量：切换会话时取一次，生成落定后刷新
+  const sessionUsage = useSessionUsage(activeSession?.id ?? null, chat.streaming);
   // 界面一次只展示最早的待答请求；权限审批与提问各自按 kind 分发
   const interaction = interactions.pending[0] ?? null;
 
@@ -129,6 +135,8 @@ export default function App() {
           onFork={forkFrom}
           onEdit={editMessage}
           forkedFromName={forkSourceName}
+          usage={sessionUsage}
+          onOpenUsage={() => setUsageOpen(true)}
           onBackToParent={() => {
             const parentId = activeSession?.parentSessionId;
             if (parentId) setActiveId(parentId);
@@ -151,6 +159,8 @@ export default function App() {
             void interactions.respond({ requestId, kind: "question", answers })
           }
         />
+
+        <UsageDialog open={usageOpen} onOpenChange={setUsageOpen} onOpenSession={setActiveId} />
 
         <SettingsDialog
           open={workspace.settingsOpen}

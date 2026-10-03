@@ -4,6 +4,7 @@ import { ERROR_CODES } from "@ucode/contracts";
 
 import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
+import { UsageService } from "./agent/usage";
 import { ConfigStore } from "./config/store";
 import { SessionEventBus } from "./core/event-bus";
 import { InteractionBroker } from "./core/interactions";
@@ -26,6 +27,8 @@ export type Services = {
   interactions: InteractionBroker;
   /** 会话级权限状态：审批弹窗里的「本会话恒允」 */
   permissions: SessionAllowStore;
+  /** 使用统计：从会话记录聚合 token 用量，不落库 */
+  usage: UsageService;
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
@@ -43,6 +46,7 @@ export const createServices = async (): Promise<Services> => {
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
   const permissions = new SessionAllowStore();
+  const usage = new UsageService(sessions);
   const memory = new MemoryService(() => config.get().memory);
   const pool = new SessionPool(
     runtime,
@@ -88,6 +92,7 @@ export const createServices = async (): Promise<Services> => {
     events,
     interactions,
     permissions,
+    usage,
     async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
       // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json

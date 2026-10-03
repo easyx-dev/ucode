@@ -24,6 +24,7 @@ export type {
   MessageEditRequest,
   MessageRole,
   ModelsResponse,
+  ModelUsage,
   PendingInteraction,
   PermissionDecision,
   PermissionInteraction,
@@ -42,7 +43,11 @@ export type {
   SessionListResponse,
   SessionMode,
   SessionSummary,
+  SessionUsageEntry,
+  SessionUsageKind,
+  StatsSummaryResponse,
   ThinkingLevel,
+  UsageTotals,
   WebsearchView,
 } from "@ucode/contracts";
 export {

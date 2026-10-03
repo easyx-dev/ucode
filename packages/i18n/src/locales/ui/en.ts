@@ -329,4 +329,23 @@ export default {
   "MCP 服务器加载失败": "Failed to load MCP servers",
   "MCP 服务器保存失败": "Failed to save the MCP server",
   "MCP 服务器删除失败": "Failed to delete the MCP server",
+
+  // Usage statistics
+  使用统计: "Usage",
+  "使用统计.说明":
+    "Token usage aggregated from local session records; model cost is not included, and subagent / forked sessions are counted.",
+  "用量.输入": "Input",
+  "用量.输出": "Output",
+  "用量.缓存读": "Cache read",
+  "用量.缓存写": "Cache write",
+  "用量.合计": "Total tokens",
+  "用量.模型": "By model",
+  "用量.会话": "By session",
+  "用量.工具": "{{value}} tool calls",
+  "用量.全部": "All time",
+  "用量.最近30天": "Last 30 days",
+  "用量.最近7天": "Last 7 days",
+  "用量.空": "No usage recorded yet.",
+  主会话: "Primary",
+  分叉: "Forked",
 };

@@ -35,6 +35,8 @@ import {
   type SessionListResponse,
   type SessionSummary,
   type SessionUpdateRequest,
+  type StatsSummaryRequest,
+  type StatsSummaryResponse,
 } from "@ucode/contracts";
 import { errorMessageKey } from "@ucode/i18n";
 
@@ -139,6 +141,10 @@ export const api = {
     fork: (body: SessionForkRequest) => post<SessionSummary>("sessions/fork", body),
     archive: (sessionId: string) =>
       post<SessionArchiveResponse>("sessions/archive", { sessionId } satisfies SessionIdRequest),
+  },
+  stats: {
+    /** 全局使用统计；`days` 缺省为全部时间 */
+    summary: (body: StatsSummaryRequest = {}) => post<StatsSummaryResponse>("stats/summary", body),
   },
   interactions: {
     /** 补齐某会话尚未回答的交互请求（刷新 / 重连后） */

@@ -33,7 +33,7 @@
 | 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 已完成（7c-1a ~ 7c-1d-b；7c-1d-c 暂缓，不放开嵌套） | `076a3c5` |
 | 8 · 会话分叉（细化见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)） | 已完成 | `6ead508` |
 | 9 · 编辑历史（细化见 [`stage-9-edit-history.md`](./stage-9-edit-history.md)） | 已完成 | `e35c16f` |
-| 10 · 使用统计 | 未开始 | — |
+| 10 · 使用统计（细化见 [`stage-10-usage-stats.md`](./stage-10-usage-stats.md)） | 进行中 | — |
 | 11 · goal 模式 | 未开始 | — |
 
 ## 一、已锁定的决策
@@ -373,7 +373,8 @@ server/src/agent/
 - 7b `tool_search`（`deferred` 暴露的 MCP 工具）。
 - 7c 子智能体（复用组装层起子会话），已落地 7c-1a ~ 7c-1d-b；**7c-1d-c（放开嵌套）决定不做**，
   维持单层（`SUBAGENT_MAX_DEPTH = 1`）——依据与语义见 [`stage-8-session-fork.md`](./stage-8-session-fork.md) 一、1.1。
-- 7d 使用统计（`agent_settled` / `message_end` → SQLite）、编辑历史（`SessionManager` fork）。
+- 7d 使用统计（从 pi 会话记录的 `usage` 现算，不建表；见 [`stage-10-usage-stats.md`](./stage-10-usage-stats.md)）、
+  编辑历史（`SessionManager` fork）。
 
 **后续阶段顺序（已定）**：`会话分叉 → 编辑历史 → 使用统计 → goal 模式`。
 

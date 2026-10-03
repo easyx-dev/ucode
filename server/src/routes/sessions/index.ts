@@ -54,6 +54,8 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
   }
   const override = overrideOf(record);
   const running = services.pool.isActive(sessionId);
+  // 池内会话直接读内存条目，避免每次 info 都重解析整份会话文件
+  const usage = services.usage.usageOf(record, { live: services.pool.get(sessionId) });
 
   if (!record.sourcePath) {
     return {
@@ -67,6 +69,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
         record.childCount,
         { createdAt: record.createdAt, updatedAt: record.updatedAt },
       ),
+      usage,
     };
   }
 
@@ -79,6 +82,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
       running,
       record.childCount,
     ),
+    usage,
   };
 };
 

@@ -1,12 +1,21 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
-import { ChevronLeft, FolderOpen, GitFork, Loader2, RefreshCw, Settings2 } from "lucide-react";
+import {
+  ChevronLeft,
+  FolderOpen,
+  Gauge,
+  GitFork,
+  Loader2,
+  RefreshCw,
+  Settings2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { sessionTitle } from "@/lib/session";
-import type { ModelsResponse, SessionSummary } from "@/lib/types";
+import type { ModelsResponse, SessionSummary, UsageTotals } from "@/lib/types";
+import { formatTokens } from "@/lib/usage";
 
 type ChatHeaderProps = {
   session: SessionSummary | null;
@@ -21,6 +30,10 @@ type ChatHeaderProps = {
   onOpenForkSource?: (sessionId: string) => void;
   /** 源会话名；列表里取不到时退化显示 id */
   forkedFromName?: string | null;
+  /** 本会话累计 token 用量；无会话或还没有用量时为 null */
+  usage?: UsageTotals | null;
+  /** 打开全局使用统计 */
+  onOpenUsage?: () => void;
 };
 
 export function ChatHeader({
@@ -32,6 +45,8 @@ export function ChatHeader({
   onBackToParent,
   onOpenForkSource,
   forkedFromName,
+  usage,
+  onOpenUsage,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
@@ -78,6 +93,24 @@ export function ChatHeader({
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {usage && usage.totalTokens > 0 && onOpenUsage ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 px-2 text-xs text-muted-foreground tabular-nums hover:text-foreground"
+                title={t("使用统计")}
+                onClick={onOpenUsage}
+              >
+                <Gauge className="size-3.5" />
+                {formatTokens(usage.totalTokens)}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("使用统计")}</TooltipContent>
+          </Tooltip>
+        ) : null}
+
         {onOpenDirectory ? (
           <Button
             variant="ghost"
