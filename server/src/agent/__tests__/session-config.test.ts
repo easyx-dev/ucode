@@ -79,11 +79,11 @@ const cwd = join(root, "cwd");
 
 type SessionSnapshot = { tools: string[]; systemPrompt: string };
 
-const snapshotOf = async (
+const sessionOf = async (
   mode: SessionMode,
   promptSource: PromptSource = "custom",
   memory?: MemoryService,
-): Promise<SessionSnapshot> => {
+): Promise<AgentSession> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
     modelsPath: null,
@@ -116,6 +116,15 @@ const snapshotOf = async (
     promptSource,
   });
   const { session }: { session: AgentSession } = await createAgentSession(options);
+  return session;
+};
+
+const snapshotOf = async (
+  mode: SessionMode,
+  promptSource: PromptSource = "custom",
+  memory?: MemoryService,
+): Promise<SessionSnapshot> => {
+  const session = await sessionOf(mode, promptSource, memory);
   const snapshot = { tools: session.getActiveToolNames(), systemPrompt: session.systemPrompt };
   session.dispose();
   return snapshot;
@@ -139,6 +148,15 @@ describe("buildSessionOptions 工具装配", () => {
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
       assert.ok(tools.includes("question"), `${mode} 应保留提问工具`);
     }
+  });
+});
+
+describe("buildSessionOptions 的 session_start", () => {
+  // MCP 扩展在 `session_start` 时才连接服务器；build 会话必须能触发这一步（pool 也依赖它）
+  it("build 触发 bindExtensions 不抛错", async () => {
+    const session = await sessionOf("build");
+    await assert.doesNotReject(() => session.bindExtensions({}));
+    session.dispose();
   });
 });
 

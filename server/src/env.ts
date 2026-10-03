@@ -15,6 +15,7 @@ import {
   DEFAULT_PORT,
   DEFAULT_PROMPT_SOURCE,
   LOG_LEVELS,
+  MCP_CONFIG_FILENAME,
   PROMPT_SOURCES,
   type PromptSource,
   SESSIONS_DIRNAME,
@@ -81,6 +82,8 @@ export const env = {
   sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
   authPath: resolve(agentDir, AUTH_FILENAME),
   configPath: resolve(appDir, CONFIG_FILENAME),
+  /** pi 的 MCP 服务器配置（用户级）；设置页增删改写回这里 */
+  mcpConfigPath: resolve(agentDir, MCP_CONFIG_FILENAME),
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),

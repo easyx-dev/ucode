@@ -9,6 +9,7 @@ import type {
   ExtensionAPI,
   ToolCallEvent,
   ToolCallEventResult,
+  ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 
 import type { PermissionRule } from "../engine";
@@ -16,13 +17,14 @@ import { createPermissionExtension, type PermissionGate } from "../extension";
 
 type Handler = (event: ToolCallEvent) => Promise<ToolCallEventResult | undefined>;
 
-/** 用最小的假 ExtensionAPI 捕获注册的 `tool_call` 处理器 */
-const mount = (gate: PermissionGate): Handler => {
+/** 用最小的假 ExtensionAPI 捕获注册的 `tool_call` 处理器；tools 供 MCP annotations 兜底查询 */
+const mount = (gate: PermissionGate, tools: ToolInfo[] = []): Handler => {
   let handler: Handler | undefined;
   const pi = {
     on: (_event: string, next: Handler) => {
       handler = next;
     },
+    getAllTools: () => tools,
   } as unknown as ExtensionAPI;
   createPermissionExtension(gate)(pi);
   assert.ok(handler, "应注册 tool_call 处理器");
@@ -103,6 +105,78 @@ describe("createPermissionExtension", () => {
     assert.equal(await handler(callEvent("read", { path: "notes.md" })), undefined);
     assert.deepEqual(granted, [
       { tool: "read", pattern: "*.md", action: "allow", note: "文档文件" },
+    ]);
+  });
+});
+
+const mcpTool = (name: string, annotations: ToolInfo["annotations"]): ToolInfo =>
+  ({
+    name,
+    description: "",
+    parameters: {},
+    exposure: "codemode",
+    sourceInfo: {},
+    annotations,
+  }) as unknown as ToolInfo;
+
+describe("MCP annotations 兜底", () => {
+  it("只读 MCP 工具无需审批直接放行", async () => {
+    let requested = false;
+    const handler = mount(
+      {
+        ...baseGate([]),
+        request: async () => {
+          requested = true;
+          return "deny";
+        },
+      },
+      [mcpTool("mcp__fs__read_file", { readOnlyHint: true })],
+    );
+    assert.equal(await handler(callEvent("mcp__fs__read_file", { path: "a" })), undefined);
+    assert.equal(requested, false);
+  });
+
+  it("未声明只读的 MCP 工具发起审批，展示参数摘要与原因", async () => {
+    const seen: Array<{ tool: string; subject: string; scope: string }> = [];
+    const handler = mount(
+      {
+        ...baseGate([]),
+        request: async (ask) => {
+          seen.push({ tool: ask.tool, subject: ask.subject, scope: ask.scope });
+          return "allow_once";
+        },
+      },
+      [mcpTool("mcp__fs__write_file", { destructiveHint: true })],
+    );
+    assert.equal(await handler(callEvent("mcp__fs__write_file", { path: "/tmp/a" })), undefined);
+    assert.equal(seen[0]?.tool, "mcp__fs__write_file");
+    assert.match(seen[0]?.subject ?? "", /删除或覆盖/);
+    assert.equal(seen[0]?.scope, "*");
+  });
+
+  it("显式规则覆盖 annotations：只读工具也能被 deny", async () => {
+    const handler = mount(
+      baseGate([{ tool: "mcp__fs__read_file", pattern: "*", action: "deny", note: "禁用该工具" }]),
+      [mcpTool("mcp__fs__read_file", { readOnlyHint: true })],
+    );
+    const result = await handler(callEvent("mcp__fs__read_file", { path: "a" }));
+    assert.equal(result?.block, true);
+    assert.match(result?.reason ?? "", /禁用该工具/);
+  });
+
+  it("本会话恒允按工具名追加 allow，后续调用不再审批", async () => {
+    const granted: PermissionRule[] = [];
+    const handler = mount(
+      {
+        ...baseGate([]),
+        request: async () => "allow_session",
+        grant: (rule) => granted.push(rule),
+      },
+      [mcpTool("mcp__fs__create_dir", undefined)],
+    );
+    assert.equal(await handler(callEvent("mcp__fs__create_dir", { path: "a" })), undefined);
+    assert.deepEqual(granted, [
+      { tool: "mcp__fs__create_dir", pattern: "*", action: "allow", note: undefined },
     ]);
   });
 });

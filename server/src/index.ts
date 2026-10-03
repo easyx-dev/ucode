@@ -18,6 +18,7 @@ import { createEventsRoute } from "./routes/events";
 import { createFsRoute } from "./routes/fs";
 import { createHealthRoute } from "./routes/health";
 import { createInteractionsRoute } from "./routes/interactions";
+import { createMcpRoute } from "./routes/mcp";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
 import { createSessionsRoute } from "./routes/sessions";
@@ -38,6 +39,7 @@ v1.route("/messages", createMessagesRoute(services));
 v1.route("/events", createEventsRoute(services));
 v1.route("/interactions", createInteractionsRoute(services));
 v1.route("/fs", createFsRoute());
+v1.route("/mcp", createMcpRoute());
 
 app.route(API_BASE_PATH, v1);
 

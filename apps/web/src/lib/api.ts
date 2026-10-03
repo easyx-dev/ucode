@@ -14,6 +14,10 @@ import {
   type InteractionListResponse,
   type InteractionRespondRequest,
   type InteractionRespondResponse,
+  type McpDeleteResponse,
+  type McpListResponse,
+  type McpUpsertRequest,
+  type McpWriteResponse,
   type MessageInterruptResponse,
   type MessageListRequest,
   type MessageListResponse,
@@ -142,6 +146,11 @@ export const api = {
   fs: {
     list: (body: FsListRequest = {}) => post<FsListResponse>("fs/list", body),
     mkdir: (path: string) => post<FsMkdirResponse>("fs/mkdir", { path } satisfies FsMkdirRequest),
+  },
+  mcp: {
+    list: () => post<McpListResponse>("mcp/list"),
+    upsert: (body: McpUpsertRequest) => post<McpWriteResponse>("mcp/upsert", body),
+    remove: (name: string) => post<McpDeleteResponse>("mcp/delete", { name }),
   },
   messages: {
     list: (sessionId: string) =>

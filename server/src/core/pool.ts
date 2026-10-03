@@ -134,6 +134,10 @@ export class SessionPool {
       }),
     );
 
+    // MCP 扩展在 `session_start` 时才连接 mcp.json 的服务器，必须显式触发；
+    // 只读模式的资源装载没有 MCP 扩展，不必调用（见 agent/mcp）。
+    if (mode === "build") await session.bindExtensions({});
+
     // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾；
     // 事件总线已单独 attach 一份订阅，这里再加一个监听不影响它
     const memoryUnsubscribe = session.subscribe((event) => {

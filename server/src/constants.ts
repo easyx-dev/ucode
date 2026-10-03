@@ -30,6 +30,9 @@ export const EVENTS_HEARTBEAT_MS = 15_000;
 
 export const CONFIG_FILENAME = "config.json";
 
+/** pi 的 MCP 服务器配置（用户级），位于 agent 目录下，由本服务读写 */
+export const MCP_CONFIG_FILENAME = "mcp.json";
+
 /** pi 的鉴权文件 */
 export const AUTH_FILENAME = "auth.json";
 

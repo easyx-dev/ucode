@@ -13,6 +13,7 @@ import type { ExtensionFactory, ToolCallEventResult } from "@earendil-works/pi-c
 import type { PermissionDecision } from "@ucode/contracts";
 
 import { decidePermission, type PermissionAsk, type PermissionRule } from "./engine";
+import { isMcpToolName, mcpPermission, mcpSubject } from "./mcp-rules";
 
 export type PermissionGate = {
   /** 会话工作目录：相对路径与越界判断的基准 */
@@ -47,23 +48,32 @@ export const createPermissionExtension =
     pi.on("tool_call", async (event): Promise<ToolCallEventResult | undefined> => {
       const input = event.input as Record<string, unknown>;
       const verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
+      // MCP 工具没有显式规则时按服务器声明的 annotations 兜底：只读放行，其余审批
+      const mcp =
+        verdict.rule === undefined && isMcpToolName(event.toolName)
+          ? mcpPermission(
+              pi.getAllTools().find((tool) => tool.name === event.toolName)?.annotations,
+            )
+          : undefined;
+      const action = mcp?.action ?? verdict.action;
+      const subject = mcp ? mcpSubject(input, mcp.note) : verdict.subject;
 
-      if (verdict.action === "allow") return undefined;
-      if (verdict.action === "deny") {
+      if (action === "allow") return undefined;
+      if (action === "deny") {
         return {
           block: true,
-          reason: denyReason(verdict.tool, verdict.subject, verdict.rule?.note),
+          reason: denyReason(verdict.tool, subject, verdict.rule?.note),
         };
       }
 
       const decision = await gate.request({
         // 展示实际工具名；授权范围按判定给出的 scope 记账
         tool: event.toolName,
-        subject: verdict.subject,
+        subject,
         scope: verdict.scope,
       });
       if (decision === "deny") {
-        return { block: true, reason: askDenyReason(verdict.tool, verdict.subject) };
+        return { block: true, reason: askDenyReason(verdict.tool, subject) };
       }
       if (decision === "allow_session") {
         gate.grant({

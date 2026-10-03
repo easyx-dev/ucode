@@ -7,6 +7,7 @@ import { ProviderCard } from "@/components/settings/provider-card";
 import { ProviderCatalog } from "@/components/settings/provider-catalog";
 import { SettingsAppearance } from "@/components/settings/settings-appearance";
 import { SettingsDefaults } from "@/components/settings/settings-defaults";
+import { SettingsMcp } from "@/components/settings/settings-mcp";
 import { SettingsMemory } from "@/components/settings/settings-memory";
 import { SettingsWebsearch } from "@/components/settings/settings-websearch";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,12 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
 
       <Section title={t("记忆")}>
         <SettingsMemory enabled={draft.memoryEnabled} onChange={draft.setMemoryEnabled} />
+      </Section>
+
+      <Separator />
+
+      <Section title="MCP">
+        <SettingsMcp />
       </Section>
 
       <Separator />

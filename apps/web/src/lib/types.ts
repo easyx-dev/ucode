@@ -14,6 +14,10 @@ export type {
   FsListResponse,
   HealthResponse,
   InteractionRespondRequest,
+  McpExposure,
+  McpListResponse,
+  McpServerView,
+  McpTransport,
   MemoryView,
   MessageBlock,
   MessageDTO,
@@ -42,8 +46,11 @@ export type {
 } from "@ucode/contracts";
 export {
   API_TYPES,
+  DEFAULT_MCP_EXPOSURE,
   DEFAULT_SEARCH_PROVIDER,
   KEYLESS_SEARCH_PROVIDERS,
+  MCP_EXPOSURES,
+  MCP_TRANSPORTS,
   SEARCH_PROVIDER_LABELS,
   SEARCH_PROVIDERS,
   SESSION_MODES,

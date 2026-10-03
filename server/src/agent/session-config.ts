@@ -18,6 +18,7 @@ import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
+import { mcpExtensionForMode } from "./mcp";
 import type { MemoryService } from "./memory";
 import { MODES, rulesForMode } from "./modes";
 import { createPermissionExtension, type PermissionHooks } from "./permissions";
@@ -89,11 +90,17 @@ const createSessionLoader = async (
     request: input.permission.request,
   };
   const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
+  // MCP 只进 build；只读模式加载它会被扩展激活的 codemode 绕过工具白名单
+  const mcpExtension = mcpExtensionForMode(input.mode, input.agentDir ?? env.agentDir);
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
     agentDir: input.agentDir ?? env.agentDir,
     settingsManager,
-    extensionFactories: [createPermissionExtension(gate), createCodemodeExtension({ mode: "on" })],
+    extensionFactories: [
+      createPermissionExtension(gate),
+      createCodemodeExtension({ mode: "on" }),
+      ...(mcpExtension ? [mcpExtension] : []),
+    ],
     // 记忆索引作为额外的上下文文件拼进系统提示词；索引在会话创建时读一次即可
     ...(memoryFile
       ? { agentsFilesOverride: (base) => ({ agentsFiles: [...base.agentsFiles, memoryFile] }) }

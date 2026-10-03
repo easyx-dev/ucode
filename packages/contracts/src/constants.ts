@@ -84,6 +84,23 @@ export const SEARCH_PROVIDER_LABELS: Record<SearchProviderId, string> = {
   brave: "Brave",
 };
 
+/**
+ * MCP 服务器的工具暴露方式，取 pi `McpExposure` 的子集：
+ * `codemode` 只可从 codemode 脚本调用、不进模型工具声明；`direct` 直接声明给模型；
+ * `hidden` 注册但不可达。`deferred` / `codemode-deferred` 依赖 `tool_search`，留到阶段 7b。
+ */
+export const MCP_EXPOSURES = ["codemode", "direct", "hidden"] as const;
+
+export type McpExposure = (typeof MCP_EXPOSURES)[number];
+
+/** MCP 传输方式：本地进程（stdio）或 HTTP 端点 */
+export const MCP_TRANSPORTS = ["stdio", "http"] as const;
+
+export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+
+/** 新建 MCP 服务器的默认暴露方式：经 codemode 调用，不占用模型工具声明 */
+export const DEFAULT_MCP_EXPOSURE: McpExposure = "codemode";
+
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";
 

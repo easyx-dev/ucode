@@ -11,6 +11,8 @@ export * from "./health/output";
 export * from "./interactions/input";
 export * from "./interactions/output";
 export * from "./locale";
+export * from "./mcp/input";
+export * from "./mcp/output";
 export * from "./messages/input";
 export * from "./messages/output";
 export * from "./models/output";
