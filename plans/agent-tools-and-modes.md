@@ -29,7 +29,7 @@
 | 4 · 自研系统提示词 | 已完成 | `b18ab50` |
 | 5 · question 双向通道 | 已完成 | `d77231e` |
 | 6 · 项目级 Memory | 已完成 | `049b798` |
-| 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 未开始 | — |
+| 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a 已完成） | `eba5bbc` |
 
 ## 一、已锁定的决策
 
@@ -368,6 +368,25 @@ server/src/agent/
 - 7b `tool_search`（`deferred` 暴露的 MCP 工具）。
 - 7c 子智能体（复用组装层起子会话）、goal 模式（复用模式层）。
 - 7d 使用统计（`agent_settled` / `message_end` → SQLite）、编辑历史（`SessionManager` fork）。
+
+**阶段 7a 复盘（落地时的偏差）**
+
+- 配置管理超出原概要的「只读」：新增 `mcp/list|upsert|delete` 与设置页「MCP」区块，可增删改。
+  文件结构之外的字段原样保留：顶层未知键不丢，条目里本服务未建模的字段（`toolExposure` / `oauth`）
+  写入时从原条目继承、交给 pi 时透传原始条目，避免把 `toolExposure` 的 hidden 语义悄悄反转。
+- 配置按会话 `agentDir` 读取（`mcpConfigPathOf`），不是固定读 `env.mcpConfigPath`：
+  `pnpm eval` 与单测会覆盖 `agentDir` 做隔离，固定路径会让它们读到用户真实配置并尝试拉起进程。
+- 坏 `mcp.json` 不再抛错：读取以 `errors` 回报（设置页展示），写入按空配置处理作为修复路径
+  （原设计抛 `invalid_config`，会让坏文件在 UI 里无法增删改）。
+- 超时（`timeout`）纳入表单与契约往返，否则编辑一次就会把已有 timeout 抹掉。
+- 权限兜底放在 `permissions/mcp-rules.ts`（纯函数）+ 扩展里；`mcp__*` 未命中显式规则时按
+  `ToolInfo.annotations` 判定，只读放行、其余审批；显式规则与会话恒允仍「最后命中者胜」。
+  `exposure: deferred` / `codemode-deferred` 仍显式报错（属 7b，`tool_search` 未接线）。
+- 验收：`pnpm check` 全绿（148 单测 + 6 项约定校验）；真实服务 curl 走通 CRUD 与坏配置；
+  `agent-browser` 走查设置页新增 / 编辑（名称锁定）/ 删除。
+- 已知边界：MCP 文件类工具的入参不做 `external_directory` 越界审批（非路径类工具），
+  只靠服务器 annotations 约束；`mcp/list` 明文返回 `env` / `headers`（按「明文回显」的决策）。
+  未做真实 MCP server 的端到端验证，`build` 经 codemode 调用 `mcp__*` 的链路只按 pi 文档接线 + 单测兜住。
 
 ## 四、测试方案
 
