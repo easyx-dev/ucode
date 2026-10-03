@@ -16,11 +16,11 @@ export function useWorkspace() {
   const composer = useComposerDrafts();
   // 输入框里还有没发出去的草稿时不被自动带进别的会话
   const pendingDraft = hasDraftContent(composer.drafts[NEW_SESSION_KEY]);
-  const { activeId, setActiveId } = useActiveSession(
-    sessions.sessions,
-    sessions.loading,
-    pendingDraft,
-  );
+  const {
+    activeId,
+    setActiveId,
+    session: activeSessionBase,
+  } = useActiveSession(sessions.sessions, sessions.loading, pendingDraft);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const configured = models.data?.configured ?? false;
@@ -41,7 +41,13 @@ export function useWorkspace() {
       ),
     [activeId, chat.streaming, sessions.sessions],
   );
-  const activeSession = sessionsView.find((item) => item.id === activeId) ?? null;
+  const activeSession = useMemo(
+    () =>
+      activeSessionBase && activeSessionBase.id === activeId && chat.streaming
+        ? { ...activeSessionBase, running: true }
+        : activeSessionBase,
+    [activeId, activeSessionBase, chat.streaming],
+  );
 
   const handleSettingsSaved = () => {
     void models.reload();

@@ -1,4 +1,5 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区 */
+import { Bot } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +8,7 @@ import { Composer } from "@/components/composer";
 import { DirectoryDialog } from "@/components/directory-dialog";
 import { MessageList } from "@/components/message-list";
 import { PlanDecisionForm } from "@/components/plan-decision-form";
+import { Button } from "@/components/ui/button";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ComposerDraftsController } from "@/hooks/use-composer-drafts";
 import { composerKeyOf, emptyDraft } from "@/lib/composer-draft";
@@ -32,6 +34,10 @@ type ChatPanelProps = {
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
   onSelectMode: (mode: SessionMode) => void;
   onOpenSettings: () => void;
+  /** 打开某个子会话（子智能体工具卡上的入口） */
+  onOpenSession: (sessionId: string) => void;
+  /** 从子会话视图返回父会话 */
+  onBackToParent?: () => void;
   /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
   planReady: boolean;
   onApprovePlan: () => void;
@@ -50,6 +56,8 @@ export function ChatPanel({
   onSelectThinkingLevel,
   onSelectMode,
   onOpenSettings,
+  onOpenSession,
+  onBackToParent,
   planReady,
   onApprovePlan,
   onFeedbackPlan,
@@ -88,6 +96,9 @@ export function ChatPanel({
 
   // 模型选择器只列已接入的供应商：目录里还有大量没配凭证的内置供应商，选了必然报错
   const providers = (models?.providers ?? []).filter((provider) => provider.available);
+  /** 子会话由委派产生、只读查看，不提供输入区与 plan 决策表单 */
+  const isChild = Boolean(session?.parentSessionId);
+  const showPlanForm = planReady && !isChild;
   /** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
   const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
@@ -100,6 +111,7 @@ export function ChatPanel({
         onOpenSettings={onOpenSettings}
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
+        onBackToParent={onBackToParent}
       />
 
       <DirectoryDialog
@@ -120,9 +132,18 @@ export function ChatPanel({
         loading={chat.loadingHistory}
         pending={chat.pending}
         empty={empty}
+        onOpenSession={onOpenSession}
       />
 
-      {planReady ? (
+      {isChild ? (
+        <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+          <Bot className="size-4 shrink-0 text-muted-foreground" />
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("子会话.只读提示")}</p>
+          <Button variant="outline" size="sm" onClick={onBackToParent}>
+            {t("返回父会话")}
+          </Button>
+        </div>
+      ) : showPlanForm ? (
         <PlanDecisionForm onApprove={onApprovePlan} onFeedback={onFeedbackPlan} />
       ) : (
         <Composer

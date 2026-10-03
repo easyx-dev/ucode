@@ -45,7 +45,13 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
 }
 
 /** 子智能体的内联进度：子会话自己的消息，折叠在父会话的工具卡里 */
-function SubagentProgress({ stream }: { stream: SubagentStream }) {
+function SubagentProgress({
+  stream,
+  onOpenSession,
+}: {
+  stream: SubagentStream;
+  onOpenSession?: (sessionId: string) => void;
+}) {
   const { t } = useTranslation();
   const status = stream.done ? (stream.isError ? t("失败") : t("完成")) : t("执行中");
 
@@ -58,6 +64,15 @@ function SubagentProgress({ stream }: { stream: SubagentStream }) {
           <span className="truncate text-foreground/70">{stream.description}</span>
         ) : null}
         <span className="ml-auto shrink-0">{status}</span>
+        {onOpenSession && stream.sessionId ? (
+          <button
+            type="button"
+            className="shrink-0 text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+            onClick={() => onOpenSession(stream.sessionId)}
+          >
+            {t("打开子会话")}
+          </button>
+        ) : null}
       </div>
       <div className="space-y-3 border-l-2 border-border pl-3">
         {stream.items.map((item) => (
@@ -72,10 +87,13 @@ function SubagentProgress({ stream }: { stream: SubagentStream }) {
 export function MessageItem({
   item,
   subagent,
+  onOpenSession,
 }: {
   item: ChatItem;
   /** 该条工具结果的子智能体内联进度（仅 subagent 工具调用会有） */
   subagent?: SubagentStream;
+  /** 打开子会话；子会话自身的嵌套消息不再下传 */
+  onOpenSession?: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
   if (item.role === "user") {
@@ -98,7 +116,7 @@ export function MessageItem({
         isError={item.isError}
         running={item.live}
       >
-        {subagent ? <SubagentProgress stream={subagent} /> : null}
+        {subagent ? <SubagentProgress stream={subagent} onOpenSession={onOpenSession} /> : null}
       </ToolCallCard>
     );
   }

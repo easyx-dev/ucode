@@ -65,6 +65,8 @@ export type ChatItem = MessageDTO & { live?: boolean };
  * 进度不落盘，刷新后不重建，只作实时展示。
  */
 export type SubagentStream = {
+  /** 子会话 id；据此可从卡片直接打开该子会话 */
+  sessionId: string;
   /** 任务简称，服务端已按长度截断；用于嵌套卡标题 */
   description: string;
   /** 子会话的消息列表（按事件流实时归并） */

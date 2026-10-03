@@ -47,6 +47,10 @@
 - 子智能体**流式进度**：新增 `subagent_start` / `subagent_end` 两个事件，只建立 / 解除
   「父会话 `toolCallId` ↔ 子会话 id」关联，**不重发**子会话事件——子会话自身的帧已在同一事件流上按其
   sessionId 广播，前端据此把子帧归入父会话里对应工具卡的嵌套视图（可折叠）；进度不落盘，刷新后不重建。
+- 子会话**导航**：侧栏父会话条目可下钻列出子会话（`SessionSummary` 新增 `childCount`，仅在有子会话时
+  显示展开箭头），点进子会话切到该会话视图并可一键「返回父会话」；子会话只读查看，输入区替换为只读提示。
+  归档父会话时**级联归档**其全部子会话（行、JSONL 与工作区目录仍保留）；父会话里子智能体工具卡
+  新增「打开子会话」入口（仅实时可见）。
 - 接入 pi 内置 **MCP（Model Context Protocol）**：`build` 模式加载 `$APP_HOME/agent/mcp.json`
   （用户级；自定义 `loadConfig` 排除 pi 默认的项目级 `.pi/mcp.json`），并在 `session_start` 时连接；
   `plan` / `ask` 不加载该扩展——连接成功会激活 `codemode`，绕过只读白名单。

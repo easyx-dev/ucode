@@ -112,6 +112,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
         applySubagents({
           ...subagentsRef.current,
           [toolCallId]: {
+            sessionId: childId,
             description: String(data.description ?? ""),
             items: subagentsRef.current[toolCallId]?.items ?? [],
             done: false,

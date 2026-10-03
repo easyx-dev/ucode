@@ -1,8 +1,8 @@
 /** 会话列表的一个目录分组：可折叠的组头 + 组内会话 / 空态 */
 import { ChevronRight, Folder, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { SessionListItem } from "@/components/session-list-item";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { SessionSummary } from "@/lib/types";
@@ -13,27 +13,22 @@ type SessionProjectGroupProps = {
   /** 项目目录；助理区平铺时为 null */
   path: string | null;
   sessions: SessionSummary[];
-  activeId: string | null;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
-  onSelect: (sessionId: string) => void;
-  onRename: (session: SessionSummary) => void;
-  onDelete: (session: SessionSummary) => void;
   /** 在组内新建会话（在该目录里开一个会话） */
   onCreate: () => void;
+  /** 渲染组内一行；由上层统一带上选中态与子会话下钻数据 */
+  renderItem: (session: SessionSummary) => ReactNode;
 };
 
 export function SessionProjectGroup({
   name,
   path,
   sessions,
-  activeId,
   collapsed,
   onCollapsedChange,
-  onSelect,
-  onRename,
-  onDelete,
   onCreate,
+  renderItem,
 }: SessionProjectGroupProps) {
   const { t } = useTranslation();
 
@@ -74,16 +69,7 @@ export function SessionProjectGroup({
           {sessions.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("暂无会话")}</p>
           ) : (
-            sessions.map((session) => (
-              <SessionListItem
-                key={session.id}
-                session={session}
-                active={session.id === activeId}
-                onSelect={() => onSelect(session.id)}
-                onRename={() => onRename(session)}
-                onDelete={() => onDelete(session)}
-              />
-            ))
+            sessions.map((session) => renderItem(session))
           )}
         </div>
       </CollapsibleContent>

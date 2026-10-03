@@ -83,6 +83,10 @@ export default function App() {
             composer.clear(composerKeyOf(sessionId));
           }}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
+          childrenByParent={sessions.childrenByParent}
+          childrenLoading={sessions.childrenLoading}
+          onLoadChildren={sessions.loadChildren}
+          activeParentId={activeSession?.parentSessionId ?? null}
         />
 
         <ChatPanel
@@ -104,6 +108,11 @@ export default function App() {
           onSelectThinkingLevel={selectThinkingLevel}
           onSelectMode={selectMode}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
+          onOpenSession={setActiveId}
+          onBackToParent={() => {
+            const parentId = activeSession?.parentSessionId;
+            if (parentId) setActiveId(parentId);
+          }}
           planReady={planReady}
           onApprovePlan={approvePlan}
           onFeedbackPlan={(text) => void chat.send(text)}

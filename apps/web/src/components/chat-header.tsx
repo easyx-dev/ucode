@@ -1,5 +1,5 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
-import { FolderOpen, Loader2, RefreshCw, Settings2 } from "lucide-react";
+import { ChevronLeft, FolderOpen, Loader2, RefreshCw, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,8 @@ type ChatHeaderProps = {
   onOpenSettings: () => void;
   /** 打开会话的工作目录；还没有会话时不传 */
   onOpenDirectory?: () => void;
+  /** 子会话视图返回父会话；主会话不传 */
+  onBackToParent?: () => void;
 };
 
 export function ChatHeader({
@@ -23,15 +25,33 @@ export function ChatHeader({
   onReloadModels,
   onOpenSettings,
   onOpenDirectory,
+  onBackToParent,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
   return (
     <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+      {session?.parentSessionId && onBackToParent ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0"
+          title={t("返回父会话")}
+          onClick={onBackToParent}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+      ) : null}
+
       <div className="min-w-0 truncate text-sm font-medium">
         {session ? sessionTitle(session, t("新会话")) : t("未选择会话")}
       </div>
 
+      {session?.parentSessionId ? (
+        <Badge variant="secondary" className="shrink-0">
+          {t("子会话")}
+        </Badge>
+      ) : null}
       {session?.running ? (
         <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="size-3 animate-spin" />

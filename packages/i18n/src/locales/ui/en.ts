@@ -197,6 +197,17 @@ export default {
   失败: "Failed",
   完成: "Done",
 
+  // Sub-session navigation
+  子会话: "Sub-session",
+  返回父会话: "Back to parent",
+  打开子会话: "Open sub-session",
+  展开子会话: "Expand sub-sessions",
+  收起子会话: "Collapse sub-sessions",
+  无子会话: "No sub-sessions",
+  子会话加载失败: "Failed to load sub-sessions",
+  "子会话.只读提示":
+    "Sub-sessions are independent delegated conversations and are read-only. To continue, ask in the parent session.",
+
   // Empty states
   "夜深了，接下来交给我吧": "It's late. Leave it to me.",
   "早上好，接下来交给我吧": "Good morning. Leave it to me.",
@@ -217,6 +228,8 @@ export default {
   归档: "Archive",
   归档确认:
     'Archive session "{{name}}"? It disappears from the list; the conversation and files are kept.',
+  "归档确认.含子会话":
+    'Archive session "{{name}}"? Its sub-sessions are archived too; the conversations and files are kept.',
   已归档: "Archived",
   归档失败: "Archive failed",
 

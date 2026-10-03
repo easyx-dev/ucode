@@ -56,6 +56,8 @@ export type SessionRecord = {
   parentSessionId: string | null;
   /** 子会话的角色 slug（如 general / explore）；主会话为空 */
   agent: string | null;
+  /** 未归档的直接子会话数（派生值，不参与写入） */
+  childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */
   sourcePath: string | null;
   preview: string;
@@ -81,7 +83,10 @@ export type SessionSearchResult = {
   total: number;
 };
 
-/** session 表的显式列清单。禁止 `SELECT *`：加列不应改变既有查询的结果形状 */
+/**
+ * session 表的显式列清单。禁止 `SELECT *`：加列不应改变既有查询的结果形状。
+ * 末尾为派生的子会话计数（列表与详情都要用它决定侧栏能否下钻）。
+ */
 const SESSION_COLUMNS = [
   "id",
   "name",
@@ -98,6 +103,11 @@ const SESSION_COLUMNS = [
   "deleted_at",
 ].join(", ");
 
+const CHILD_COUNT_EXPR =
+  "(SELECT COUNT(*) FROM session child WHERE child.parent_session_id = session.id AND child.deleted_at IS NULL) AS child_count";
+
+const SESSION_SELECT = `SELECT ${SESSION_COLUMNS}, ${CHILD_COUNT_EXPR} FROM session`;
+
 const rowSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
@@ -112,6 +122,7 @@ const rowSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   deleted_at: z.string().nullable(),
+  child_count: z.number(),
 });
 
 type SessionRow = z.infer<typeof rowSchema>;
@@ -125,6 +136,7 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   mode: toSessionMode(row.mode),
   parentSessionId: row.parent_session_id,
   agent: row.agent,
+  childCount: row.child_count,
   sourcePath: row.source_path,
   preview: row.preview,
   createdAt: row.created_at,
@@ -220,7 +232,7 @@ export class SessionRepository {
   }
 
   find(id: string): SessionRecord | undefined {
-    const row = this.db.prepare(`SELECT ${SESSION_COLUMNS} FROM session WHERE id = ?`).get(id);
+    const row = this.db.prepare(`${SESSION_SELECT} WHERE id = ?`).get(id);
     return row ? toRecord(rowSchema.parse(row)) : undefined;
   }
 
@@ -277,7 +289,7 @@ export class SessionRepository {
 
   list(): SessionRecord[] {
     return this.db
-      .prepare(`SELECT ${SESSION_COLUMNS} FROM session ORDER BY updated_at DESC`)
+      .prepare(`${SESSION_SELECT} ORDER BY updated_at DESC`)
       .all()
       .map((row) => toRecord(rowSchema.parse(row)));
   }
@@ -288,6 +300,32 @@ export class SessionRepository {
       .prepare("SELECT id FROM session")
       .all()
       .map((row) => (row as { id: string }).id);
+  }
+
+  /**
+   * 某会话的全部子孙 id（含已归档），BFS 展开以便后续放开嵌套深度时无需重写。
+   * 结果不含入参自身；`seen` 兼作环兜底，脏数据里出现父子成环也不会死循环。
+   */
+  descendantIds(rootId: string): string[] {
+    const descendants: string[] = [];
+    const seen = new Set<string>([rootId]);
+    const stmt = this.db.prepare("SELECT id FROM session WHERE parent_session_id = ?");
+    let frontier = [rootId];
+
+    while (frontier.length > 0) {
+      const next: string[] = [];
+      for (const parentId of frontier) {
+        for (const row of stmt.all(parentId) as { id: string }[]) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          descendants.push(row.id);
+          next.push(row.id);
+        }
+      }
+      frontier = next;
+    }
+
+    return descendants;
   }
 
   /**
@@ -322,9 +360,7 @@ export class SessionRepository {
       .prepare(`SELECT COUNT(*) AS total FROM session WHERE ${where}`)
       .get(...params) as { total?: number } | undefined;
     const rows = this.db
-      .prepare(
-        `SELECT ${SESSION_COLUMNS} FROM session WHERE ${where} ORDER BY updated_at DESC LIMIT ?`,
-      )
+      .prepare(`${SESSION_SELECT} WHERE ${where} ORDER BY updated_at DESC LIMIT ?`)
       .all(...params, query.limit);
 
     return {

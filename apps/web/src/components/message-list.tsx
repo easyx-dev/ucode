@@ -13,9 +13,18 @@ type MessageListProps = {
   /** 已发送、首个生成内容未到：尾部显示等待指示 */
   pending?: boolean;
   empty?: React.ReactNode;
+  /** 打开子会话（子智能体工具卡中的入口） */
+  onOpenSession?: (sessionId: string) => void;
 };
 
-export function MessageList({ items, subagents, loading, pending, empty }: MessageListProps) {
+export function MessageList({
+  items,
+  subagents,
+  loading,
+  pending,
+  empty,
+  onOpenSession,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -53,6 +62,7 @@ export function MessageList({ items, subagents, loading, pending, empty }: Messa
             key={item.role === "tool" && item.toolCallId ? `tool-${item.toolCallId}` : item.id}
             item={item}
             subagent={item.toolCallId ? subagents?.[item.toolCallId] : undefined}
+            onOpenSession={onOpenSession}
           />
         ))}
 

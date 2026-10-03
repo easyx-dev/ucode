@@ -127,4 +127,79 @@ describe("SessionRepository", () => {
     assert.equal(repo.find("dc-drop"), undefined, "未落盘的行应被删");
     assert.ok(repo.find("dc-keep"), "已落盘的行不应被删");
   });
+
+  it("childCount 只数未归档的直接子会话", () => {
+    repo.create("cc-root", {});
+    repo.createChild("cc-a", {
+      parentId: "cc-root",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "general",
+      name: "a",
+    });
+    repo.createChild("cc-b", {
+      parentId: "cc-root",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "explore",
+      name: "b",
+    });
+    repo.createChild("cc-grand", {
+      parentId: "cc-a",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "explore",
+      name: "grand",
+    });
+
+    assert.equal(repo.find("cc-root")?.childCount, 2, "孙会话不计入直接子会话");
+    assert.equal(repo.find("cc-a")?.childCount, 1);
+    assert.equal(repo.find("cc-grand")?.childCount, 0);
+
+    repo.archive("cc-b");
+    assert.equal(repo.find("cc-root")?.childCount, 1, "已归档的子会话不计入");
+  });
+
+  it("descendantIds 收集全部子孙且不含自身", () => {
+    repo.create("dd-root", {});
+    repo.createChild("dd-a", {
+      parentId: "dd-root",
+      cwd: "/tmp/project",
+      mode: "plan",
+      agent: "general",
+      name: "a",
+    });
+    repo.createChild("dd-b", {
+      parentId: "dd-a",
+      cwd: "/tmp/project",
+      mode: "plan",
+      agent: "explore",
+      name: "b",
+    });
+
+    assert.deepEqual(new Set(repo.descendantIds("dd-root")), new Set(["dd-a", "dd-b"]));
+    assert.equal(repo.descendantIds("dd-root").includes("dd-root"), false);
+    assert.deepEqual(repo.descendantIds("dd-b"), []);
+  });
+
+  it("级联归档父会话后子孙一起从列表消失", () => {
+    repo.create("cas-root", {});
+    repo.createChild("cas-child", {
+      parentId: "cas-root",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "explore",
+      name: "子会话",
+    });
+
+    // 复刻路由的级联归档：父 + descendantIds 全部写 deleted_at
+    for (const id of ["cas-root", ...repo.descendantIds("cas-root")]) repo.archive(id);
+
+    assert.equal(
+      repo.search({ limit: 50 }).records.some((item) => item.id === "cas-root"),
+      false,
+    );
+    assert.equal(repo.search({ limit: 50, parentSessionId: "cas-root" }).total, 0);
+    assert.ok(repo.find("cas-child")?.deletedAt, "子会话行保留但标记为已归档");
+  });
 });

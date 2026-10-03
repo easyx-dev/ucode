@@ -49,6 +49,7 @@ const recordWith = (patch: Partial<SessionRecord>): SessionRecord => ({
   mode: "build",
   parentSessionId: null,
   agent: null,
+  childCount: 0,
   sourcePath: null,
   preview: "",
   createdAt: "2026-01-01T00:00:00.000Z",

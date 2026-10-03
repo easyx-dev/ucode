@@ -6,6 +6,10 @@ import type { SessionSummary } from "./types";
 export const sessionTitle = (session: SessionSummary, fallback: string): string =>
   session.name || session.preview.split("\n")[0]?.slice(0, 40) || fallback;
 
-/** 归档会话前的确认；标题口径与侧栏保持一致 */
-export const confirmArchiveSession = (session: SessionSummary, t: TFunction): boolean =>
-  window.confirm(t("归档确认", { name: sessionTitle(session, t("新会话")) }));
+/** 归档会话前的确认；标题口径与侧栏保持一致，有子会话时提示会级联归档 */
+export const confirmArchiveSession = (session: SessionSummary, t: TFunction): boolean => {
+  const name = sessionTitle(session, t("新会话"));
+  return window.confirm(
+    session.childCount > 0 ? t("归档确认.含子会话", { name }) : t("归档确认", { name }),
+  );
+};

@@ -35,6 +35,14 @@ type SessionListProps = {
   onCreate: (cwd: string) => void;
   onRename: (session: SessionSummary) => void;
   onDelete: (session: SessionSummary) => void;
+  /** 已加载的子会话，按父会话 id 索引 */
+  childrenByParent: Record<string, SessionSummary[]>;
+  childrenLoading: Record<string, boolean>;
+  /** 已展开子会话的父会话 id */
+  expanded: Set<string>;
+  onToggleChildren: (sessionId: string) => void;
+  /** 搜索期间收起子会话，避免把未参与过滤的子项混进结果 */
+  searching: boolean;
 };
 
 export function SessionList({
@@ -46,6 +54,11 @@ export function SessionList({
   onCreate,
   onRename,
   onDelete,
+  childrenByParent,
+  childrenLoading,
+  expanded,
+  onToggleChildren,
+  searching,
 }: SessionListProps) {
   const { t } = useTranslation();
   const sections = useMemo(() => groupSessions(sessions, workspaceRoot), [sessions, workspaceRoot]);
@@ -64,6 +77,35 @@ export function SessionList({
       return updated;
     });
   }, []);
+
+  const renderItem = useCallback(
+    (session: SessionSummary) => (
+      <SessionListItem
+        key={session.id}
+        session={session}
+        activeId={activeId}
+        onSelect={onSelect}
+        onRename={() => onRename(session)}
+        onDelete={() => onDelete(session)}
+        expandable={!searching && session.childCount > 0}
+        expanded={expanded.has(session.id)}
+        onToggleExpand={() => onToggleChildren(session.id)}
+        childSessions={childrenByParent[session.id]}
+        childLoading={childrenLoading[session.id] ?? false}
+      />
+    ),
+    [
+      activeId,
+      childrenByParent,
+      childrenLoading,
+      expanded,
+      onDelete,
+      onRename,
+      onSelect,
+      onToggleChildren,
+      searching,
+    ],
+  );
 
   const empty = !loading && sessions.length === 0;
 
@@ -94,29 +136,17 @@ export function SessionList({
                           name={group.name}
                           path={group.path}
                           sessions={group.sessions}
-                          activeId={activeId}
                           collapsed={collapsed.has(key)}
                           onCollapsedChange={(next) => toggle(key, next)}
-                          onSelect={onSelect}
-                          onRename={onRename}
-                          onDelete={onDelete}
                           onCreate={() => group.path && onCreate(group.path)}
+                          renderItem={renderItem}
                         />
                       );
                     })}
                   </div>
                 ) : (
                   <div className="space-y-0.5">
-                    {section.groups[0]?.sessions.map((session) => (
-                      <SessionListItem
-                        key={session.id}
-                        session={session}
-                        active={session.id === activeId}
-                        onSelect={() => onSelect(session.id)}
-                        onRename={() => onRename(session)}
-                        onDelete={() => onDelete(session)}
-                      />
-                    ))}
+                    {section.groups[0]?.sessions.map((session) => renderItem(session))}
                   </div>
                 )}
               </div>

@@ -189,6 +189,7 @@ export const sessionInfoToDTO = (
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
   running: boolean,
+  childCount: number,
 ): SessionSummary => ({
   id: info.id,
   name: info.name ?? override.name ?? null,
@@ -201,6 +202,7 @@ export const sessionInfoToDTO = (
   mode: override.mode ?? DEFAULT_SESSION_MODE,
   parentSessionId: override.parentSessionId ?? null,
   agent: override.agent ?? null,
+  childCount,
   running,
   deletedAt: override.deletedAt ?? null,
 });
@@ -214,6 +216,8 @@ export const draftSessionSummary = (
   /** 覆盖值与会话工作区都缺失时的兜底（全局工作目录） */
   fallbackCwd: string,
   running: boolean,
+  /** 未归档的直接子会话数；草稿阶段恒为 0，由调用方按记录给出 */
+  childCount: number,
   /** 来自数据库行的真实时间；缺省（新建会话刚返回）时用当前时间 */
   timestamps?: { createdAt: string; updatedAt: string },
 ): SessionSummary => {
@@ -231,6 +235,7 @@ export const draftSessionSummary = (
     mode: override.mode ?? DEFAULT_SESSION_MODE,
     parentSessionId: override.parentSessionId ?? null,
     agent: override.agent ?? null,
+    childCount,
     running,
     deletedAt: override.deletedAt ?? null,
   };
