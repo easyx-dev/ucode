@@ -31,7 +31,7 @@
 | 6 · 项目级 Memory | 已完成 | `049b798` |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a、7b 已完成） | `4770c53` |
 | 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 已完成（7c-1a ~ 7c-1d-b；7c-1d-c 暂缓，不放开嵌套） | `076a3c5` |
-| 8 · 会话分叉（细化见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)） | 待 review | — |
+| 8 · 会话分叉（细化见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)） | 已完成 | `6ead508` |
 | 9 · 编辑历史 | 未开始 | — |
 | 10 · 使用统计 | 未开始 | — |
 | 11 · goal 模式 | 未开始 | — |

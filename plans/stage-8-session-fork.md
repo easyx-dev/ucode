@@ -3,8 +3,8 @@
 > 计划母文档：[`agent-tools-and-modes.md`](./agent-tools-and-modes.md) 阶段 7「后续」。
 > 参考：pi `SessionManager` 的条目树 / 分支能力（0.99.1），opencode `task` 与 [zcode 编辑历史](https://zcode.z.ai/cn/docs/edit-history)。
 >
-> 状态：**设计已定稿**。本文记录已定的路线与顺序，并给出「会话分叉」阶段的落地方案；
-> 落地实现时在实现会话里补母文档「进度」表、新建 `plans/stage-8-session-fork.md` 并更新 `CHANGELOG.md`。
+> 状态：**已完成**（`6ead508`）。本文记录已定的路线与顺序，并给出「会话分叉」阶段的落地方案；
+> 复盘与已知边界见第四节。
 
 ## 一、本轮决定
 
