@@ -4,7 +4,7 @@
 > 参考：[opencode `task`](https://opencode.ai/docs/agents/) 与 [pi-subagents](https://pi.dev/packages/pi-subagents)。
 > 本文只覆盖子智能体；goal 模式、7d（统计 / 编辑历史）、会话分叉不在此文（分叉只在「口子」一节交叉引用）。
 >
-> 状态：**设计已定稿**，按 7c-1a ~ 7c-1d 分阶段执行；7c-1a 进行中。
+> 状态：**设计已定稿**，按 7c-1a ~ 7c-1d 分阶段执行；7c-1a 已完成（`a4271e6`）。
 
 ## 一、核心原理（已确认）
 
@@ -183,6 +183,23 @@ type AgentProfile = {
 SUB-02 能力交集（plan 父 + general = 只读，不能越权；build 父 + explore = 只读）；
 SUB-03 装配行为保持（复用现有 TS/S 用例）；SUB-04 并发上限；SUB-05 中止 / 超时；
 SUB-06 仓储父子与列表过滤；SUB-07 交互来源；SUB-08 真实模型冒烟；SUB-09 浏览器来源标注。
+
+**7c-1a 复盘（落地时的偏差）**
+
+- 用统一的 `AgentProfile`（primary + subagent）替换了原 `agent/modes/`：装配层从「按 mode 索引」改为
+  「按已解析的角色能力」，`buildCustomTools` 从「按 mode 分支」改为「按可用工具名集合注册」，
+  消掉了「声明与注册成对维护」的隐性耦合。
+- 权限交集没有退化成「合并规则表」，而是在 `tool_call` 拦截时对「角色判定」与「父会话判定」取较严者
+  （`severityOf`），保证只读父不会靠委派放宽。
+- MCP / `tool_search` 的加载门控从「`mode === build`」收紧为「`mode === build` 且继承默认工具集」：
+  `explore`、只读模式下的子会话不再白连 MCP。
+- 子会话经会话池创建（而非裸 `createAgentSession`），因此天然落盘并接入事件总线；结束时依次回写索引、
+  结算来源交互、回收实例。
+- 真实模型端到端验证通过（build 父委派 `explore`，子会话落盘并产出结论、父会话贴回）；随后补了 4 项硬化：
+  子会话内部报错归一为可读文案、`model` 覆盖显式校验、装配失败删行（带 `source_path IS NULL` 守卫）、
+  失败路径也回写索引并结算交互；另修 `ensure` 创建后失败的会话泄漏。
+- 已知：SUB-04「并发上限」目前只有实现、未在池层单测；7c-1b（流式进度）与 7c-1c（导航）未开始；
+  `fork` 上下文接口已留并接线（当前固定 `fresh`，非 fresh 时失败关闭）。
 
 ### 7c-1b · 流式子会话进度
 
