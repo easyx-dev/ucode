@@ -66,6 +66,15 @@ export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 /** question 工具等待用户答复的时限；超时以可读错误结束本轮提问 */
 export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** 单个父会话同时运行的子智能体数量上限；超限立即报错，不排队 */
+export const SUBAGENT_MAX_CONCURRENCY = 4;
+
+/** 单次子智能体调用的时限；超时中止子会话，避免它继续烧 token */
+export const SUBAGENT_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** 子智能体会话名的长度上限（取任务简称） */
+export const SUBAGENT_DESCRIPTION_MAX_LENGTH = 60;
+
 /** 项目记忆根目录名（位于 `$APP_HOME/app` 下）：`memory/projects/<project>` */
 export const MEMORY_DIRNAME = "memory";
 

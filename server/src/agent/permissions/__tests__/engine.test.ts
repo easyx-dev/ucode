@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { rulesForMode } from "../../modes";
+import { agentRules, PRIMARY_PROFILES } from "../../agents";
 import { DEFAULT_PERMISSION_RULES } from "../defaults";
 import {
   decidePermission,
@@ -71,7 +71,7 @@ describe("decidePermission", () => {
 
   it("P-01 / P-06 plan / ask 模式阻断写盘与执行", () => {
     for (const mode of ["plan", "ask"] as const) {
-      const rules = rulesForMode(mode);
+      const rules = agentRules(PRIMARY_PROFILES[mode]);
       assert.equal(decidePermission(rules, "edit", { path: "src/a.ts" }, CWD).action, "deny");
       assert.equal(decidePermission(rules, "write", { path: "src/a.ts" }, CWD).action, "deny");
       assert.equal(decidePermission(rules, "bash", { command: "ls" }, CWD).action, "deny");

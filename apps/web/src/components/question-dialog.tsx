@@ -93,7 +93,16 @@ function QuestionForm({
     <>
       <DialogHeader>
         <DialogTitle>{t("需要你回答")}</DialogTitle>
-        <DialogDescription>{t("提问.说明")}</DialogDescription>
+        <DialogDescription>
+          {request.sourceSessionId ? (
+            <span className="mb-1 block text-xs text-muted-foreground">
+              {t("子智能体来源", {
+                description: request.sourceDescription ?? request.sourceSessionId,
+              })}
+            </span>
+          ) : null}
+          {t("提问.说明")}
+        </DialogDescription>
       </DialogHeader>
 
       <div className="-mx-1 max-h-[55vh] space-y-4 overflow-y-auto px-1">

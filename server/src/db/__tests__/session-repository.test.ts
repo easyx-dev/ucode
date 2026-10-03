@@ -83,4 +83,48 @@ describe("SessionRepository", () => {
       true,
     );
   });
+
+  it("子会话不进主列表，按 parentSessionId 可取到", () => {
+    repo.create("parent-1", {});
+    repo.createChild("child-1", {
+      parentId: "parent-1",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "explore",
+      name: "侦察影响面",
+    });
+
+    const roots = repo.search({ limit: 50 }).records.map((item) => item.id);
+    assert.ok(roots.includes("parent-1"));
+    assert.ok(!roots.includes("child-1"), "子会话不应出现在主列表");
+
+    const children = repo.search({ limit: 50, parentSessionId: "parent-1" }).records;
+    assert.equal(children.length, 1);
+    assert.equal(children[0]?.agent, "explore");
+    assert.equal(children[0]?.parentSessionId, "parent-1");
+    assert.equal(children[0]?.cwd, "/tmp/project");
+  });
+
+  it("discardChild 只删未落盘的行", () => {
+    repo.create("dc-keep", {});
+    repo.refresh("dc-keep", {
+      sourcePath: "/tmp/dc-keep.jsonl",
+      preview: "",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    repo.createChild("dc-drop", {
+      parentId: "dc-keep",
+      cwd: "/tmp/project",
+      mode: "build",
+      agent: "explore",
+      name: "装配失败",
+    });
+
+    repo.discardChild("dc-drop");
+    repo.discardChild("dc-keep");
+
+    assert.equal(repo.find("dc-drop"), undefined, "未落盘的行应被删");
+    assert.ok(repo.find("dc-keep"), "已落盘的行不应被删");
+  });
 });

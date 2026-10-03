@@ -15,6 +15,11 @@ export const sessionIdInputSchema = z.object({ sessionId: sessionIdSchema });
 export const sessionListInputSchema = z.object({
   q: z.string().optional(),
   limit: z.number().int().positive().max(500).default(100),
+  /**
+   * 列表的父子过滤：缺省只出根会话（`parentSessionId` 为空的）；
+   * 传某个会话 id 时改为列出它的子会话。见 `plans/stage-7c-subagents.md`。
+   */
+  parentSessionId: sessionIdSchema.optional(),
 });
 
 export const sessionCreateInputSchema = z.object({

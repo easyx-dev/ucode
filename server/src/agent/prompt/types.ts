@@ -6,6 +6,8 @@
  */
 import type { SessionMode } from "@ucode/contracts";
 
+import type { SubagentSlug } from "../agents";
+
 /**
  * 模型族变体：同一语言下针对模型族的差异文案。
  * opencode 用的是整份分模型提示词文件；我们先用「同一套正文 + 变体追加」，够用再升级。
@@ -36,8 +38,10 @@ export type PromptCatalog = {
   codeReferences: string;
   /** 当前模式分节的标题 */
   modeHeading: string;
-  /** 各模式的约束文案 */
+  /** 各主会话模式的约束文案 */
   modeConstraints: Record<SessionMode, string>;
+  /** 各子角色的约束文案，键为子角色 slug */
+  subagentConstraints: Record<SubagentSlug, string>;
   /** 项目记忆分节：仅在记忆开启时拼入 */
   memory: string;
   /** 外部内容边界分节 */

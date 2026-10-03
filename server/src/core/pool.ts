@@ -6,16 +6,28 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
 
+import {
+  type AgentProfile,
+  agentRules,
+  PRIMARY_PROFILES,
+  primaryCapability,
+  type ResolvedCapability,
+  resolveSubagentCapability,
+  subagentProfile,
+  usesDefaultToolSet,
+} from "../agent/agents";
 import type { MemoryService } from "../agent/memory";
-import type { SessionAllowStore } from "../agent/permissions";
+import type { PermissionRule, SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
+import { type SubagentHooks, spawnSubagent } from "../agent/subagents";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../agent/workspace";
-import type { SessionRepository } from "../db/session-repository";
+import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
+import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import { logger } from "../lib/logger";
 import { AppError } from "../lib/response";
 import type { SessionEventBus } from "./event-bus";
-import type { InteractionBroker } from "./interactions";
+import type { InteractionBroker, InteractionSource } from "./interactions";
 import type { PiRuntime } from "./runtime";
 import { indexFromManager } from "./session-index";
 
@@ -87,6 +99,67 @@ export class SessionPool {
     if (index) this.repository.refresh(sessionId, index);
   }
 
+  /**
+   * 解析会话的角色与能力：主会话直接用模式声明；子会话把父会话能力与子角色取交集。
+   * v1 只禁一层递归，故父会话即主会话；放开嵌套时要沿 `parentSessionId` 链解析到根。
+   */
+  private resolveAgent(record: SessionRecord): {
+    profile: AgentProfile;
+    capability: ResolvedCapability;
+    parentRules?: () => readonly PermissionRule[];
+  } {
+    if (!record.parentSessionId || !record.agent) {
+      return {
+        profile: PRIMARY_PROFILES[record.mode],
+        capability: primaryCapability(record.mode),
+      };
+    }
+    const parent = this.repository.find(record.parentSessionId);
+    const parentMode = parent?.mode ?? record.mode;
+    const profile = subagentProfile(record.agent);
+    return {
+      profile,
+      capability: resolveSubagentCapability(profile, primaryCapability(parentMode)),
+      parentRules: () => agentRules(PRIMARY_PROFILES[parentMode]),
+    };
+  }
+
+  /** 主会话的委派钩子：并发上限按父会话计数，超限立即报错而非排队 */
+  private subagentHooks(record: SessionRecord, cwd: string): SubagentHooks {
+    let active = 0;
+    return {
+      spawn: async (request, signal) => {
+        // 模型覆盖先校验：拼错的 provider/model 应显式报错，而不是静默回落默认模型
+        if (request.model && !this.runtime.resolveModelRef(request.model)) {
+          throw new Error(`子智能体指定的模型不可用：${request.model}`);
+        }
+        if (active >= SUBAGENT_MAX_CONCURRENCY) {
+          throw new Error(
+            `同时运行的子智能体已达上限（${SUBAGENT_MAX_CONCURRENCY}），请等其中一个完成后再派。`,
+          );
+        }
+        active += 1;
+        try {
+          return await spawnSubagent(
+            { parent: record, cwd, request, ...(signal ? { signal } : {}) },
+            {
+              createChild: (id, input) => this.repository.createChild(id, input),
+              discardChild: (id) => this.repository.discardChild(id),
+              ensure: (id) => this.ensure(id),
+              refresh: (id) => this.refreshIndex(id),
+              settleInteractions: (id) => this.permissions.interactions.forgetSource(record.id, id),
+              dispose: (id) => {
+                this.dispose(id);
+              },
+            },
+          );
+        } finally {
+          active -= 1;
+        }
+      },
+    };
+  }
+
   async ensure(sessionId: string): Promise<AgentSession> {
     const existing = this.entries.get(sessionId);
     if (existing) {
@@ -103,15 +176,27 @@ export class SessionPool {
     }
     const cwd = resolveSessionCwd(record);
     const mode = record.mode;
+    const isSubagent = Boolean(record.parentSessionId && record.agent);
 
     // 只有未绑定目录的会话住工作区：它同时是这类会话的 cwd，跑之前必须存在；
     // 绑定目录的会话在用户自己的目录里干活，没有工作区这回事。
-    // DB 行早于目录存在，孤儿清理的「无行即无主」据此成立
+    // 子会话的 cwd 是父会话目录，不在这里建目录
     if (cwd === workspaceDirOf(sessionId)) ensureWorkspaceDir(sessionId);
 
     const manager = record?.sourcePath
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
+
+    const { profile, capability, parentRules } = this.resolveAgent(record);
+    // 子会话的审批 / 提问归属根（v1 即父）会话，并带上来源标注
+    const interactionSessionId = record.parentSessionId ?? sessionId;
+    const source: InteractionSource | undefined =
+      isSubagent && record.parentSessionId
+        ? {
+            sourceSessionId: sessionId,
+            sourceDescription: record.name ?? profile.label,
+          }
+        : undefined;
 
     const { session } = await createAgentSession(
       await buildSessionOptions({
@@ -120,36 +205,59 @@ export class SessionPool {
         mode,
         sessionManager: manager,
         runtime: this.runtime,
+        profile,
+        capability,
+        ...(parentRules ? { parentRules } : {}),
+        ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd) }),
         websearch: this.websearch,
         permission: {
-          listGrants: () => this.permissions.allow.list(sessionId),
-          grant: (rule) => this.permissions.allow.add(sessionId, rule),
-          request: (ask) => this.permissions.interactions.requestPermission(sessionId, ask),
+          listGrants: () => this.permissions.allow.list(interactionSessionId),
+          grant: (rule) => this.permissions.allow.add(interactionSessionId, rule),
+          request: (ask) =>
+            this.permissions.interactions.requestPermission(interactionSessionId, ask, source),
         },
         question: {
           ask: (ask, signal) =>
-            this.permissions.interactions.requestQuestion(sessionId, ask.questions, signal),
+            this.permissions.interactions.requestQuestion(
+              interactionSessionId,
+              ask.questions,
+              signal,
+              source,
+            ),
         },
         memory: this.memory,
       }),
     );
 
-    // MCP 扩展在 `session_start` 时才连接 mcp.json 的服务器，必须显式触发；
-    // 只读模式的资源装载没有 MCP 扩展，不必调用（见 agent/mcp）。
-    if (mode === "build") await session.bindExtensions({});
+    // 会话已创建、但还没入池：这之后的任何失败都要先 dispose，否则会话（及其可能拉起的
+    // MCP 子进程）会脱离池被泄漏
+    try {
+      // MCP 扩展在 `session_start` 时才连接 mcp.json 的服务器，必须显式触发；
+      // 只有继承默认工具集、够得着扩展工具的会话才挂了它（见 session-config）
+      if (mode === "build" && usesDefaultToolSet(capability)) await session.bindExtensions({});
 
-    // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾；
-    // 事件总线已单独 attach 一份订阅，这里再加一个监听不影响它
-    const memoryUnsubscribe = session.subscribe((event) => {
-      if (event.type === "agent_settled") this.memory.review(sessionId, session);
-    });
+      // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾。
+      // 子会话不参与回顾，避免把半截结论固化成项目记忆
+      const memoryUnsubscribe = isSubagent
+        ? () => {}
+        : session.subscribe((event) => {
+            if (event.type === "agent_settled") this.memory.review(sessionId, session);
+          });
 
-    const entry: PooledSession = { session, lastUsed: Date.now(), memoryUnsubscribe };
-    this.entries.set(sessionId, entry);
-    // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
-    // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧。
-    this.events.attach(sessionId, session);
-    return session;
+      const entry: PooledSession = { session, lastUsed: Date.now(), memoryUnsubscribe };
+      this.entries.set(sessionId, entry);
+      // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
+      // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧。
+      this.events.attach(sessionId, session);
+      return session;
+    } catch (error) {
+      try {
+        session.dispose();
+      } catch {
+        // pi 侧已释放，忽略
+      }
+      throw error;
+    }
   }
 
   get(sessionId: string): AgentSession | undefined {

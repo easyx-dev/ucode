@@ -31,6 +31,12 @@ export type QuestionAnswerResult =
 
 type FailureReason = "timeout" | "cancelled";
 
+/** 请求来源：由子会话触发时标注，父会话前端据此提示「来自子智能体」 */
+export type InteractionSource = {
+  sourceSessionId: string;
+  sourceDescription: string;
+};
+
 type Pending = {
   request: PendingInteraction;
   timer: NodeJS.Timeout;
@@ -50,7 +56,11 @@ export class InteractionBroker {
   ) {}
 
   /** 权限审批：挂起并向事件流发一条请求，返回用户答复（超时 / 断连为 `deny`） */
-  requestPermission(sessionId: string, ask: PermissionAsk): Promise<PermissionDecision> {
+  requestPermission(
+    sessionId: string,
+    ask: PermissionAsk,
+    source?: InteractionSource,
+  ): Promise<PermissionDecision> {
     const request: PermissionInteraction = {
       requestId: randomUUID(),
       kind: "permission",
@@ -58,6 +68,7 @@ export class InteractionBroker {
       tool: ask.tool,
       subject: ask.subject,
       scope: ask.scope,
+      ...(source ?? {}),
       createdAt: new Date().toISOString(),
     };
 
@@ -87,6 +98,7 @@ export class InteractionBroker {
     sessionId: string,
     questions: QuestionItem[],
     signal?: AbortSignal,
+    source?: InteractionSource,
   ): Promise<QuestionAnswerResult> {
     if (signal?.aborted) return Promise.resolve({ kind: "cancelled" });
 
@@ -95,6 +107,7 @@ export class InteractionBroker {
       kind: "question",
       sessionId,
       questions,
+      ...(source ?? {}),
       createdAt: new Date().toISOString(),
     };
 
@@ -154,6 +167,18 @@ export class InteractionBroker {
       if (entry.request.sessionId === sessionId) {
         this.settle(requestId, (pending) => pending.fail("cancelled"));
       }
+    }
+  }
+
+  /**
+   * 结算某个来源子会话发起的挂起请求：请求挂在父会话下（`sessionId`），
+   * 按 `sourceSessionId` 只清该子会话的来源，父会话自身的请求不受影响。
+   */
+  forgetSource(sessionId: string, sourceSessionId: string): void {
+    for (const requestId of [...this.pending.keys()]) {
+      const request = this.pending.get(requestId)?.request;
+      if (request?.sessionId !== sessionId || request.sourceSessionId !== sourceSessionId) continue;
+      this.settle(requestId, (pending) => pending.fail("cancelled"));
     }
   }
 

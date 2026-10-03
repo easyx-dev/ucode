@@ -124,6 +124,9 @@ export const externalScope = (absolutePath: string): string => {
 
 const SEVERITY = { allow: 0, ask: 1, deny: 2 } as const;
 
+/** 动作严格程度：`allow < ask < deny`；用于父子能力取交集时「取较严者」 */
+export const severityOf = (action: PermissionAction): number => SEVERITY[action];
+
 const strongest = (a: PermissionAction, b: PermissionAction): PermissionAction =>
   SEVERITY[a] >= SEVERITY[b] ? a : b;
 

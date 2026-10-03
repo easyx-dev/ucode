@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -32,6 +32,12 @@ const migrations: Record<number, string> = {
       deleted_at      TEXT
     );
     CREATE INDEX idx_session_updated_at ON session(updated_at DESC);
+  `,
+  // 子智能体：子会话记父会话 id 与角色 slug（见 plans/stage-7c-subagents.md）
+  2: `
+    ALTER TABLE session ADD COLUMN parent_session_id TEXT;
+    ALTER TABLE session ADD COLUMN agent TEXT;
+    CREATE INDEX idx_session_parent ON session(parent_session_id);
   `,
 };
 

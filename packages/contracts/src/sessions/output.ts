@@ -19,6 +19,10 @@ export type SessionSummary = {
   thinkingLevel: ThinkingLevel;
   /** 会话模式：决定工具集与权限 */
   mode: SessionMode;
+  /** 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） */
+  parentSessionId: string | null;
+  /** 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 */
+  agent: string | null;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
   /** 归档时间；非空表示已归档（软删），列表默认过滤 */

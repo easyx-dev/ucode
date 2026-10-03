@@ -24,6 +24,15 @@ import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
+import {
+  type AgentProfile,
+  agentRules,
+  PRIMARY_PROFILES,
+  primaryCapability,
+  type ResolvedCapability,
+  resolveSubagentCapability,
+  subagentProfile,
+} from "../agents";
 import { MemoryService } from "../memory";
 import { rememberFact } from "../memory/store";
 import { buildFullPrompt, buildPromptOverlay } from "../prompt";
@@ -38,6 +47,8 @@ const recordWith = (patch: Partial<SessionRecord>): SessionRecord => ({
   model: null,
   thinkingLevel: null,
   mode: "build",
+  parentSessionId: null,
+  agent: null,
   sourcePath: null,
   preview: "",
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -83,6 +94,7 @@ const sessionOf = async (
   mode: SessionMode,
   promptSource: PromptSource = "custom",
   memory?: MemoryService,
+  subagent?: { profile: AgentProfile; capability: ResolvedCapability },
 ): Promise<AgentSession> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
@@ -112,6 +124,15 @@ const sessionOf = async (
     websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
     permission: { listGrants: () => [], grant: () => {}, request: async () => "deny" as const },
     question: { ask: async () => ({ kind: "cancelled" }) },
+    // 与真实会话池一致：主会话提供 subagent 钩子（子会话的工具集本就不含 subagent，不受影响）
+    subagents: { spawn: async () => ({ sessionId: "sub-test", text: "" }) },
+    ...(subagent
+      ? {
+          profile: subagent.profile,
+          capability: subagent.capability,
+          parentRules: () => agentRules(PRIMARY_PROFILES[mode]),
+        }
+      : {}),
     ...(memory ? { memory } : {}),
     promptSource,
   });
@@ -123,8 +144,9 @@ const snapshotOf = async (
   mode: SessionMode,
   promptSource: PromptSource = "custom",
   memory?: MemoryService,
+  subagent?: { profile: AgentProfile; capability: ResolvedCapability },
 ): Promise<SessionSnapshot> => {
-  const session = await sessionOf(mode, promptSource, memory);
+  const session = await sessionOf(mode, promptSource, memory, subagent);
   const snapshot = {
     tools: session.getActiveToolNames(),
     allTools: session.getAllTools().map((tool) => tool.name),
@@ -240,5 +262,54 @@ describe("buildSessionOptions 系统提示词", () => {
     const ask = (await snapshotOf("ask", "custom")).systemPrompt;
     assert.ok(build.includes("codemode"), "build 工具说明应含 codemode");
     assert.ok(!ask.includes("codemode"), "ask 提示词不应提到 codemode");
+  });
+});
+
+describe("buildSessionOptions 子智能体装配", () => {
+  const childOf = (parentMode: SessionMode, slug: "general" | "explore") => {
+    const profile = subagentProfile(slug);
+    return {
+      profile,
+      capability: resolveSubagentCapability(profile, primaryCapability(parentMode)),
+    };
+  };
+
+  it("SUB-01 explore 在 build 父下只读，且不注册 subagent", async () => {
+    const { tools, allTools } = await snapshotOf(
+      "build",
+      "custom",
+      undefined,
+      childOf("build", "explore"),
+    );
+    for (const name of ["edit", "write", "bash", "subagent", "present_plan"]) {
+      assert.ok(!tools.includes(name), `explore 子会话不应启用 ${name}，实际：${tools.join(", ")}`);
+    }
+    assert.ok(tools.includes("read"));
+    assert.ok(!allTools.includes("subagent"), "子会话不应注册 subagent（禁递归）");
+  });
+
+  it("SUB-01 plan 父派 general：被交集收窄为只读", async () => {
+    const { tools } = await snapshotOf("plan", "custom", undefined, childOf("plan", "general"));
+    for (const name of ["edit", "write", "bash", "subagent"]) {
+      assert.ok(!tools.includes(name), `plan 下的 general 不应启用 ${name}`);
+    }
+    assert.ok(tools.includes("read"));
+  });
+
+  it("SUB-01 build 父派 general：保留写盘能力，但无 subagent", async () => {
+    const { tools } = await snapshotOf("build", "custom", undefined, childOf("build", "general"));
+    assert.ok(tools.includes("edit") && tools.includes("bash"));
+    assert.ok(!tools.includes("subagent"));
+  });
+
+  it("子会话提示词用子角色约束", async () => {
+    const catalog = catalogFor();
+    const { systemPrompt } = await snapshotOf(
+      "build",
+      "custom",
+      undefined,
+      childOf("build", "explore"),
+    );
+    assert.ok(systemPrompt.includes(catalog.subagentConstraints.explore));
   });
 });

@@ -74,6 +74,24 @@ describe("InteractionBroker", () => {
     assert.equal(broker.list("s1").length, 0);
   });
 
+  it("forgetSource 只结算指定来源子会话的请求，父会话自身请求保留", async () => {
+    const bus = new SessionEventBus();
+    const broker = new InteractionBroker(bus, 1000);
+    const child = broker.requestPermission(
+      "p1",
+      { tool: "read", subject: "/etc/hosts", scope: "/etc/**" },
+      { sourceSessionId: "sub-1", sourceDescription: "侦察影响面" },
+    );
+    const parent = broker.requestPermission("p1", { tool: "bash", subject: "ls", scope: "*" });
+
+    broker.forgetSource("p1", "sub-1");
+    assert.equal(await child, "deny");
+    assert.equal(broker.list("p1").length, 1, "父会话自身的请求不应被清掉");
+
+    broker.forget("p1");
+    assert.equal(await parent, "deny");
+  });
+
   it("超时按拒绝结算", async () => {
     const bus = new SessionEventBus();
     const broker = new InteractionBroker(bus, 10);

@@ -159,6 +159,7 @@ export default {
   需要授权: "Approval required",
   "授权.说明": 'The agent wants to call "{{tool}}", target:',
   授权范围: "Grant scope: {{scope}}",
+  子智能体来源: 'Request from subagent "{{description}}":',
   允许一次: "Allow once",
   本会话恒允: "Allow for this session",
   拒绝: "Deny",

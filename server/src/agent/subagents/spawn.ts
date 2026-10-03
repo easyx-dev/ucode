@@ -1,0 +1,179 @@
+/**
+ * 子会话语义：建子会话行 → 走会话池取实例 → 前台 prompt → 取最终文本 → 回收。
+ *
+ * 复用会话池（而不是直接 `createAgentSession`）是为了让子会话天然落盘、接入事件总线，
+ * 后续的进度流式与导航都走同一条链路。
+ */
+import { randomUUID } from "node:crypto";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
+
+import { SUBAGENT_DESCRIPTION_MAX_LENGTH, SUBAGENT_TIMEOUT_MS } from "../../constants";
+import type { SessionRecord } from "../../db/session-repository";
+import { isRecord } from "../../utils/object";
+import { subagentProfile } from "../agents";
+import { resolveContextPlan } from "./context";
+import type { SubagentRequest, SubagentResult } from "./types";
+
+export type SubagentSpawnDeps = {
+  createChild: (
+    id: string,
+    input: {
+      parentId: string;
+      cwd: string;
+      mode: SessionMode;
+      agent: string;
+      name: string;
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    },
+  ) => void;
+  /** 装配失败时丢弃刚建的行（此时还没有文件，硬删） */
+  discardChild: (sessionId: string) => void;
+  ensure: (sessionId: string) => Promise<AgentSession>;
+  /** 子会话落定后回写索引（source_path / preview），供列表与导航使用 */
+  refresh: (sessionId: string) => void;
+  /** 结算该子会话发起的挂起交互（归属父会话，但只清来源是它的） */
+  settleInteractions: (sessionId: string) => void;
+  dispose: (sessionId: string) => void;
+};
+
+/**
+ * 子智能体自身的失败：用来区分「子会话内部报错」与「超时 / 中止」。
+ * 后者已是可读文案，前者由 `toReadableError` 归一。
+ */
+class SubagentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SubagentError";
+  }
+}
+
+/** 原始错误信息截断长度：够定位问题，又不把大段内部栈塞进工具结果 */
+const MAX_ERROR_CHARS = 500;
+
+const textOf = (content: unknown): string => {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text : ""))
+    .filter(Boolean)
+    .join(" ");
+};
+
+/**
+ * 子会话最后一条有正文的 assistant 文本：它是父会话唯一能看到的产出。
+ * 末条 assistant 可能只有工具调用而没有正文，所以要跳过空的继续往前找。
+ */
+const lastAssistantText = (session: AgentSession): string => {
+  const entries = session.sessionManager.getEntries();
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (entry?.type !== "message" || entry.message.role !== "assistant") continue;
+    const text = textOf(entry.message.content).trim();
+    if (text) return text;
+  }
+  return "";
+};
+
+const toReadableError = (error: unknown): SubagentError => {
+  if (error instanceof SubagentError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return new SubagentError(`子智能体执行失败：${message.slice(0, MAX_ERROR_CHARS)}`);
+};
+
+/**
+ * 前台跑一条 prompt，带超时与中止；两者都 abort 子会话，避免它继续烧 token。
+ * 只结算一次（超时 / 中止 / 正常结束三者竞争）。
+ */
+const promptChild = (child: AgentSession, task: string, signal?: AbortSignal): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const fail = (message: string): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      void child.abort();
+      reject(new SubagentError(message));
+    };
+    const onAbort = (): void => fail("子智能体已中止。");
+    const timer = setTimeout(
+      () => fail("子智能体执行超时，已中止；请缩小任务范围后重试。"),
+      SUBAGENT_TIMEOUT_MS,
+    );
+    if (signal?.aborted) {
+      fail("子智能体已中止。");
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    child.prompt(task).then(
+      () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(toReadableError(error));
+      },
+    );
+  });
+
+export const spawnSubagent = async (
+  input: {
+    parent: SessionRecord;
+    /** 父会话工作目录；子会话在同一个目录里干活 */
+    cwd: string;
+    request: SubagentRequest;
+    signal?: AbortSignal;
+  },
+  deps: SubagentSpawnDeps,
+): Promise<SubagentResult> => {
+  const profile = subagentProfile(input.request.agent);
+  const contextPlan = resolveContextPlan(profile);
+  // fork 上下文与「会话分叉」共用原语，尚未实现；这里失败关闭而不是静默按 fresh 跑
+  if (contextPlan.kind !== "fresh") {
+    throw new Error("子智能体的 fork 上下文尚未开放。");
+  }
+
+  const childId = `sub-${randomUUID()}`;
+  const name =
+    input.request.description.trim().slice(0, SUBAGENT_DESCRIPTION_MAX_LENGTH) || profile.label;
+
+  deps.createChild(childId, {
+    parentId: input.parent.id,
+    cwd: input.cwd,
+    mode: input.parent.mode,
+    agent: profile.slug,
+    name,
+    ...(input.request.model ? { model: input.request.model } : {}),
+    ...(input.request.thinkingLevel ? { thinkingLevel: input.request.thinkingLevel } : {}),
+  });
+
+  let child: AgentSession;
+  try {
+    child = await deps.ensure(childId);
+  } catch (error) {
+    // 装配失败（模型未配置等）：删掉刚建的空行，否则会留一条永远没有文件的子会话
+    deps.discardChild(childId);
+    throw error;
+  }
+
+  try {
+    await promptChild(child, input.request.task, input.signal);
+    return { sessionId: childId, text: lastAssistantText(child) };
+  } finally {
+    // 失败（超时 / 中止）也要回写：子会话可能已写出 JSONL，不回写会永远停在「未落盘」的草稿口径
+    deps.refresh(childId);
+    // 子会话挂起的审批 / 提问归属父会话，结束时一并结算，避免它超时前一直挂在前端
+    deps.settleInteractions(childId);
+    deps.dispose(childId);
+  }
+};

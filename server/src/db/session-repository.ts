@@ -29,6 +29,9 @@ export type SessionOverride = {
   thinkingLevel?: ThinkingLevel;
   /** 会话模式；未设置时回落 `DEFAULT_SESSION_MODE` */
   mode?: SessionMode;
+  /** 子会话的父会话 id 与角色 slug（只读派生，不参与 upsert） */
+  parentSessionId?: string;
+  agent?: string;
   /** 归档时间；非空表示已归档（软删） */
   deletedAt?: string;
 };
@@ -49,6 +52,10 @@ export type SessionRecord = {
   thinkingLevel: string | null;
   /** 已按白名单归一的会话模式 */
   mode: SessionMode;
+  /** 子会话指向父会话；主会话为空（见 plans/stage-7c-subagents.md） */
+  parentSessionId: string | null;
+  /** 子会话的角色 slug（如 general / explore）；主会话为空 */
+  agent: string | null;
   /** 会话正文文件；为 null 表示还没落盘 */
   sourcePath: string | null;
   preview: string;
@@ -61,6 +68,11 @@ export type SessionRecord = {
 export type SessionSearchInput = {
   q?: string;
   limit: number;
+  /**
+   * 父子过滤：传字符串时列出该会话的子会话；缺省 / null 只出根会话。
+   * 子智能体会话因此默认不进主列表（见 plans/stage-7c-subagents.md）。
+   */
+  parentSessionId?: string | null;
 };
 
 export type SessionSearchResult = {
@@ -77,6 +89,8 @@ const SESSION_COLUMNS = [
   "model",
   "thinking_level",
   "mode",
+  "parent_session_id",
+  "agent",
   "source_path",
   "preview",
   "created_at",
@@ -91,6 +105,8 @@ const rowSchema = z.object({
   model: z.string().nullable(),
   thinking_level: z.string().nullable(),
   mode: z.string().nullable(),
+  parent_session_id: z.string().nullable(),
+  agent: z.string().nullable(),
   source_path: z.string().nullable(),
   preview: z.string(),
   created_at: z.string(),
@@ -107,6 +123,8 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   model: row.model,
   thinkingLevel: row.thinking_level,
   mode: toSessionMode(row.mode),
+  parentSessionId: row.parent_session_id,
+  agent: row.agent,
   sourcePath: row.source_path,
   preview: row.preview,
   createdAt: row.created_at,
@@ -139,6 +157,8 @@ export const overrideOf = (record: SessionRecord | undefined): SessionOverride =
     ...(record.model ? { model: record.model } : {}),
     ...(thinkingLevel ? { thinkingLevel } : {}),
     mode: record.mode,
+    ...(record.parentSessionId ? { parentSessionId: record.parentSessionId } : {}),
+    ...(record.agent ? { agent: record.agent } : {}),
     ...(record.deletedAt ? { deletedAt: record.deletedAt } : {}),
   };
 };
@@ -161,6 +181,39 @@ export class SessionRepository {
         override.model ?? null,
         override.thinkingLevel ?? null,
         override.mode ?? null,
+        now,
+        now,
+      );
+  }
+
+  /** 新建子智能体会话行：父会话 id 与角色 slug 一并落库，cwd 继承父会话 */
+  createChild(
+    id: string,
+    input: {
+      parentId: string;
+      cwd: string;
+      mode: SessionMode;
+      agent: string;
+      name: string;
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    },
+  ): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, agent, parent_session_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        input.name,
+        input.cwd,
+        input.model ?? null,
+        input.thinkingLevel ?? null,
+        input.mode,
+        input.agent,
+        input.parentId,
         now,
         now,
       );
@@ -207,6 +260,14 @@ export class SessionRepository {
     this.db.prepare("DELETE FROM session WHERE id = ?").run(id);
   }
 
+  /**
+   * 丢弃一条从未落盘的会话行（如子智能体装配失败时刚建的行）。
+   * 只删 `source_path IS NULL` 的行：文件一旦写出就该走归档 / 对账，不能硬删。
+   */
+  discardChild(id: string): void {
+    this.db.prepare("DELETE FROM session WHERE id = ? AND source_path IS NULL").run(id);
+  }
+
   /** 软删：只写 `deleted_at`，行与文件都保留 */
   archive(id: string): void {
     this.db
@@ -238,6 +299,14 @@ export class SessionRepository {
     const needle = query.q?.trim().toLowerCase();
     const conditions = ["deleted_at IS NULL"];
     const params: string[] = [];
+
+    // 子智能体会话默认不进主列表；传 parentSessionId 时改为列出它的子会话
+    if (typeof query.parentSessionId === "string") {
+      conditions.push("parent_session_id = ?");
+      params.push(query.parentSessionId);
+    } else {
+      conditions.push("parent_session_id IS NULL");
+    }
 
     if (needle) {
       const like = `%${escapeLike(needle)}%`;

@@ -14,13 +14,17 @@
 import { brand } from "@ucode/brand/values";
 import type { SessionMode } from "@ucode/contracts";
 
+import { type AgentProfile, primaryToolNames, type SubagentSlug } from "../agents";
 import { MEMORY_TOOL_NAMES } from "../memory/tools";
-import { toolsForMode } from "../modes";
 import { catalogFor, type PromptLocale } from "./locales";
 import { DEFAULT_PROMPT_VARIANT, type PromptCatalog, type PromptVariant } from "./types";
 
 export type PromptBuildInput = {
   mode: SessionMode;
+  /** 角色提示词约束正文；缺省按 mode 取语言目录。子角色与自定义角色显式传入 */
+  agentSection?: string;
+  /** 本次会话可用工具名；缺省取该模式的实际工具集。用来生成「工具使用」分节 */
+  tools?: readonly string[];
   /** 语言（多语言口子，默认中文目录；见 `prompt/locales`） */
   locale?: PromptLocale;
   /** 模型族变体（模型适配口子，默认 default；见 `prompt/variant.ts`） */
@@ -29,23 +33,28 @@ export type PromptBuildInput = {
   memoryEnabled?: boolean;
 };
 
-/** 当前可用工具名：默认集 / 白名单，加上 build 模式下开关打开才有的记忆工具 */
-const promptToolNames = (mode: SessionMode, memoryEnabled: boolean): string[] => [
-  ...toolsForMode(mode),
-  ...(memoryEnabled && mode === "build" ? [...MEMORY_TOOL_NAMES] : []),
-];
+/** 当前可用工具名：优先用显式传入的（已与父能力取交集），否则按模式解析 */
+const promptToolNames = (input: PromptBuildInput): string[] => {
+  const base = input.tools ? [...input.tools] : primaryToolNames(input.mode);
+  return [
+    ...base,
+    ...(input.memoryEnabled && input.mode === "build" ? [...MEMORY_TOOL_NAMES] : []),
+  ];
+};
 
-const modeBlock = (catalog: PromptCatalog, mode: SessionMode): string =>
-  `${catalog.modeHeading}\n${catalog.modeConstraints[mode]}`;
+const resolvedSection = (catalog: PromptCatalog, input: PromptBuildInput): string =>
+  input.agentSection ?? catalog.modeConstraints[input.mode];
+
+const modeBlock = (catalog: PromptCatalog, section: string): string =>
+  `${catalog.modeHeading}\n${section}`;
 
 /** 把一份目录拼成整段提示词；目录与拼装分开，便于单测模型变体等口子 */
 export const composeFullPrompt = (
   catalog: PromptCatalog,
   brandName: string,
-  mode: SessionMode,
-  variant: PromptVariant,
-  memoryEnabled = false,
+  input: PromptBuildInput,
 ): string => {
+  const variant = input.variant ?? DEFAULT_PROMPT_VARIANT;
   const parts = [
     catalog.identity(brandName),
     catalog.tone,
@@ -54,13 +63,13 @@ export const composeFullPrompt = (
     catalog.conventions,
     catalog.codeStyle,
     catalog.doingTasks,
-    catalog.toolPolicy(promptToolNames(mode, memoryEnabled)),
+    catalog.toolPolicy(promptToolNames(input)),
     catalog.codeReferences,
   ];
   const note = catalog.variantNotes[variant];
   if (note) parts.push(note);
-  if (memoryEnabled) parts.push(catalog.memory);
-  parts.push(modeBlock(catalog, mode), catalog.untrusted);
+  if (input.memoryEnabled) parts.push(catalog.memory);
+  parts.push(modeBlock(catalog, resolvedSection(catalog, input)), catalog.untrusted);
   return parts.join("\n\n");
 };
 
@@ -68,35 +77,31 @@ export const composeFullPrompt = (
 export const composeOverlayPrompt = (
   catalog: PromptCatalog,
   brandName: string,
-  mode: SessionMode,
-  variant: PromptVariant,
-  memoryEnabled = false,
+  input: PromptBuildInput,
 ): string => {
+  const variant = input.variant ?? DEFAULT_PROMPT_VARIANT;
   const parts = [catalog.overlayIdentity(brandName)];
   const note = catalog.variantNotes[variant];
   if (note) parts.push(note);
-  if (memoryEnabled) parts.push(catalog.memory);
-  parts.push(modeBlock(catalog, mode), catalog.untrusted);
+  if (input.memoryEnabled) parts.push(catalog.memory);
+  parts.push(modeBlock(catalog, resolvedSection(catalog, input)), catalog.untrusted);
   return parts.join("\n\n");
 };
 
 export const buildFullPrompt = (input: PromptBuildInput): string =>
-  composeFullPrompt(
-    catalogFor(input.locale),
-    brand.name,
-    input.mode,
-    input.variant ?? DEFAULT_PROMPT_VARIANT,
-    input.memoryEnabled ?? false,
-  );
+  composeFullPrompt(catalogFor(input.locale), brand.name, input);
 
 export const buildPromptOverlay = (input: PromptBuildInput): string =>
-  composeOverlayPrompt(
-    catalogFor(input.locale),
-    brand.name,
-    input.mode,
-    input.variant ?? DEFAULT_PROMPT_VARIANT,
-    input.memoryEnabled ?? false,
-  );
+  composeOverlayPrompt(catalogFor(input.locale), brand.name, input);
 
-export type { PromptVariant } from "./types";
+/** 解析角色的提示词约束正文：自定义角色用自己的正文，内置角色取语言目录 */
+export const promptSectionOf = (profile: AgentProfile, locale?: PromptLocale): string => {
+  if (profile.promptSection) return profile.promptSection;
+  const catalog = catalogFor(locale);
+  return profile.kind === "primary"
+    ? catalog.modeConstraints[profile.slug as SessionMode]
+    : (catalog.subagentConstraints[profile.slug as SubagentSlug] ?? "");
+};
+
 export { resolvePromptVariant } from "./variant";
+export type { PromptVariant, SubagentSlug };

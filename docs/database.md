@@ -49,9 +49,14 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 `session` 有意保持单表，列分两组语义，**新增列必须先归组**：
 
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
-  `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）
+  `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）/
+  `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）
 - **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写）：`source_path` /
   `preview` / `created_at` / `updated_at`
+
+`parent_session_id` / `agent` 让子智能体会话成为真实会话行：列表默认只出主会话
+（`parent_session_id IS NULL`），传 `parentSessionId` 才取某个会话的子会话（见
+[`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
 
 `cwd` 在建会话时按 pi 的 `resolvePath` 口径规范化（绝对化并折叠 `.` / `..`），
 草稿与落盘用同一个值，避免同一目录因写法不同被分成两组。
@@ -110,8 +115,10 @@ server/src/db/
   1. `pool.dispose(sessionId)`、`events.remove(sessionId)`
   2. `interactions.forget(sessionId)`、`permissions.clear(sessionId)`
   3. 回写 `deleted_at`
-- 硬删只剩一种用途：对账时删「有行无文件」的行（这种行没有任何内容，谈不上归档）；
-  仓储的 `delete(id)` 是硬删，只给对账与测试用
+- 硬删只剩两种用途：对账时删「有行无文件」的行，以及丢弃子智能体「建了行但装配失败、从未落盘」的行；
+  两者都是「无内容、谈不上归档」的行
+  - 仓储的 `delete(id)` 是硬删，只给对账与测试用
+  - 仓储的 `discardChild(id)` 用于运行期丢弃未落盘的子会话行（带 `source_path IS NULL` 守卫，文件一旦写出就不删）
 - 有活跃生成时先拒绝并返回 `409 session_busy`，不允许归档进行中的会话
 - 禁止无条件 `DELETE`（不带 `WHERE`）
 - 不再有草稿 TTL：会话在首条消息时才创建，空行由对账清理

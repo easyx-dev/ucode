@@ -199,6 +199,8 @@ export const sessionInfoToDTO = (
   model: override.model ?? defaultModel,
   thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
   mode: override.mode ?? DEFAULT_SESSION_MODE,
+  parentSessionId: override.parentSessionId ?? null,
+  agent: override.agent ?? null,
   running,
   deletedAt: override.deletedAt ?? null,
 });
@@ -227,6 +229,8 @@ export const draftSessionSummary = (
     model: override.model ?? defaultModel,
     thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
     mode: override.mode ?? DEFAULT_SESSION_MODE,
+    parentSessionId: override.parentSessionId ?? null,
+    agent: override.agent ?? null,
     running,
     deletedAt: override.deletedAt ?? null,
   };

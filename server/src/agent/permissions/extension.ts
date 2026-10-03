@@ -12,7 +12,7 @@
 import type { ExtensionFactory, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import type { PermissionDecision } from "@ucode/contracts";
 
-import { decidePermission, type PermissionAsk, type PermissionRule } from "./engine";
+import { decidePermission, type PermissionAsk, type PermissionRule, severityOf } from "./engine";
 import { isMcpToolName, mcpPermission, mcpSubject } from "./mcp-rules";
 
 export type PermissionGate = {
@@ -20,6 +20,8 @@ export type PermissionGate = {
   cwd: string;
   /** 当前规则（模式规则 + 本会话已追加的授权）；每次调用现取，授权即时生效 */
   rules: () => readonly PermissionRule[];
+  /** 子会话的父会话规则；提供时与 `rules` 的判定取较严者，保证能力只可收窄 */
+  parentRules?: () => readonly PermissionRule[];
   /** 记下本会话恒允：追加一条 allow 规则 */
   grant: (rule: PermissionRule) => void;
   /** 发起审批；返回用户答复，超时 / 断连按 `deny` */
@@ -47,7 +49,13 @@ export const createPermissionExtension =
   (pi) => {
     pi.on("tool_call", async (event): Promise<ToolCallEventResult | undefined> => {
       const input = event.input as Record<string, unknown>;
-      const verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
+      let verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
+      // 子会话再算一遍父会话的判定，取较严者，保证角色权限放宽不了父的限制
+      const parentRules = gate.parentRules?.();
+      if (parentRules) {
+        const parentVerdict = decidePermission(parentRules, event.toolName, input, gate.cwd);
+        if (severityOf(parentVerdict.action) > severityOf(verdict.action)) verdict = parentVerdict;
+      }
       // MCP 工具没有显式规则时按服务器声明的 annotations 兜底：只读放行，其余审批
       const mcp =
         verdict.rule === undefined && isMcpToolName(event.toolName)

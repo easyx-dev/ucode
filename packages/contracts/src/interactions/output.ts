@@ -11,6 +11,9 @@ export type PermissionInteraction = {
   subject: string;
   /** 本次授权覆盖的范围：规则类 ask 是规则串，越界检查是父目录通配 */
   scope: string;
+  /** 发起请求的子会话 id 与描述；主会话自身发起时为空（来源标注用） */
+  sourceSessionId?: string;
+  sourceDescription?: string;
   createdAt: string;
 };
 
@@ -37,6 +40,9 @@ export type QuestionInteraction = {
   kind: "question";
   sessionId: string;
   questions: QuestionItem[];
+  /** 发起提问的子会话 id 与描述；主会话自身发起时为空（来源标注用） */
+  sourceSessionId?: string;
+  sourceDescription?: string;
   createdAt: string;
 };
 

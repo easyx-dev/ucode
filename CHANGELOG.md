@@ -35,6 +35,15 @@
 
 ### 新增
 
+- 新增**子智能体**（`build` / `plan` / `ask` 都可委派）：父会话经 `subagent` 工具把一段独立任务
+  交给真实子会话（`general` 继承当前能力 / `explore` 只读），前台运行、只回传最终文本。
+  子会话能力 =「父会话 ∩ 角色定义」，工具取交集、权限取较严，保证只读父会话不会靠委派越权；
+  子会话默认不能再派子会话。
+  子会话是真实会话：`session` 表新增 `parent_session_id` / `agent`（schema v2 追加迁移），
+  落 JSONL、默认不进主列表、可按父会话下钻；`sessions/list` 支持 `parentSessionId` 过滤。
+  子会话触发的审批 / 提问归属父会话并标注来源（`interactions` 契约新增 `sourceSessionId` /
+  `sourceDescription`）。角色与能力解析落在新的 `agent/agents/`，会话装配从「按模式」改为「按角色能力」；
+  只有继承默认工具集的子会话（`general`）才挂 MCP / `tool_search` 扩展，`explore` 与只读模式下的子会话不连。
 - 接入 pi 内置 **MCP（Model Context Protocol）**：`build` 模式加载 `$APP_HOME/agent/mcp.json`
   （用户级；自定义 `loadConfig` 排除 pi 默认的项目级 `.pi/mcp.json`），并在 `session_start` 时连接；
   `plan` / `ask` 不加载该扩展——连接成功会激活 `codemode`，绕过只读白名单。

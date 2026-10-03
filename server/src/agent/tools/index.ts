@@ -1,38 +1,37 @@
 /**
- * 工具集声明：内置工具清单（供模式声明的默认集使用）与自研工具装配。
+ * 工具集声明：工具名清单与自研工具装配。
  *
- * 「本次会话启用哪些工具」由 `modes` 声明（`toolSelection`），这里只负责产出 `customTools`。
- * `customTools` 注册即启用，但 plan / ask 的白名单是过滤器：自研工具没进白名单就会被过滤掉，
- * 所以 `MODES` 声明的只读集与这里的工具名必须成对维护。
+ * 「本次会话启用哪些工具」由角色能力决定；`buildCustomTools` 按**实际可用的工具名集合**注册，
+ * 集合里没有的（被角色档位或能力交集去掉的）就不注册，避免出现「声明与注册脱节」的静默失效。
  */
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { SessionMode, WebsearchConfig } from "@ucode/contracts";
+import type { WebsearchConfig } from "@ucode/contracts";
 
+import { createSubagentTool, type SubagentHooks } from "../subagents";
 import { createPresentPlanTool } from "./present-plan";
 import { createQuestionTool, type QuestionHooks } from "./question";
 import { createWebfetchTool } from "./webfetch";
 import { createWebsearchTool } from "./websearch/index";
 
-/** 内置工具：读写执行 + 只读检索（grep / find / ls） */
-export const DEFAULT_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+export { CUSTOM_TOOL_NAMES, DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "./names";
 
-/** 内置扩展工具：注册即存在但不默认激活，由 `build` 的默认集一并开启 */
-export const DEFAULT_EXTENSION_TOOLS = ["codemode"];
+export type CustomToolInput = {
+  /** 本次会话实际可用的工具名（已与父能力取交集、已去掉排除项） */
+  names: readonly string[];
+  readWebsearchConfig: () => WebsearchConfig;
+  question?: QuestionHooks;
+  subagents?: SubagentHooks;
+  memoryTools?: ToolDefinition[];
+};
 
-/** 自研工具名：经 `customTools` 注册即启用，不在 `defaultTools` 里，默认集的提示词要单独补上 */
-export const CUSTOM_TOOL_NAMES = ["webfetch", "websearch", "question"] as const;
-
-export const buildCustomTools = (
-  readWebsearchConfig: () => WebsearchConfig,
-  mode: SessionMode,
-  question: QuestionHooks,
-  memoryTools: ToolDefinition[] = [],
-): ToolDefinition[] => [
-  createWebfetchTool(),
-  createWebsearchTool(readWebsearchConfig),
-  createQuestionTool(question),
-  // 计划提交只在 plan 模式提供：它是「计划就绪」的信号，build / ask 用不到
-  ...(mode === "plan" ? [createPresentPlanTool()] : []),
-  // 记忆工具由装配层按「记忆开关 + build 模式」筛过再传入
-  ...memoryTools,
-];
+export const buildCustomTools = (input: CustomToolInput): ToolDefinition[] => {
+  const has = (name: string): boolean => input.names.includes(name);
+  return [
+    ...(has("webfetch") ? [createWebfetchTool()] : []),
+    ...(has("websearch") ? [createWebsearchTool(input.readWebsearchConfig)] : []),
+    ...(has("question") && input.question ? [createQuestionTool(input.question)] : []),
+    ...(has("present_plan") ? [createPresentPlanTool()] : []),
+    ...(has("subagent") && input.subagents ? [createSubagentTool(input.subagents)] : []),
+    ...(input.memoryTools ?? []),
+  ];
+};

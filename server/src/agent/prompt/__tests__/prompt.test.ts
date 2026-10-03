@@ -83,6 +83,10 @@ describe("模型变体口子", () => {
       ...catalog,
       variantNotes: { default: "## 模型叮嘱\n只回一句话。" },
     };
-    assert.ok(composeFullPrompt(withNote, brand.name, "build", "default").includes("只回一句话"));
+    assert.ok(
+      composeFullPrompt(withNote, brand.name, { mode: "build", variant: "default" }).includes(
+        "只回一句话",
+      ),
+    );
   });
 });
