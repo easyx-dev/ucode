@@ -29,7 +29,7 @@
 | 4 · 自研系统提示词 | 已完成 | `b18ab50` |
 | 5 · question 双向通道 | 已完成 | `d77231e` |
 | 6 · 项目级 Memory | 已完成 | `049b798` |
-| 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a 已完成） | `eba5bbc` |
+| 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a、7b 已完成） | `4770c53` |
 
 ## 一、已锁定的决策
 
@@ -381,12 +381,28 @@ server/src/agent/
 - 超时（`timeout`）纳入表单与契约往返，否则编辑一次就会把已有 timeout 抹掉。
 - 权限兜底放在 `permissions/mcp-rules.ts`（纯函数）+ 扩展里；`mcp__*` 未命中显式规则时按
   `ToolInfo.annotations` 判定，只读放行、其余审批；显式规则与会话恒允仍「最后命中者胜」。
-  `exposure: deferred` / `codemode-deferred` 仍显式报错（属 7b，`tool_search` 未接线）。
+  `exposure: deferred` / `codemode-deferred` 当时仍显式报错（阶段 7b 已放开）。
 - 验收：`pnpm check` 全绿（148 单测 + 6 项约定校验）；真实服务 curl 走通 CRUD 与坏配置；
   `agent-browser` 走查设置页新增 / 编辑（名称锁定）/ 删除。
 - 已知边界：MCP 文件类工具的入参不做 `external_directory` 越界审批（非路径类工具），
   只靠服务器 annotations 约束；`mcp/list` 明文返回 `env` / `headers`（按「明文回显」的决策）。
   未做真实 MCP server 的端到端验证，`build` 经 codemode 调用 `mcp__*` 的链路只按 pi 文档接线 + 单测兜住。
+
+**阶段 7b 复盘（落地时的偏差）**
+
+- 母文档只给了一行概要，落地范围在本次会话拍板：`deferred` 与 `codemode-deferred` 一起放开
+  （同属契约枚举 + UI 文案，`codemode-deferred` 靠已启用的 codemode 的 `searchTools()`，无需额外接线），
+  不单独写细化文档。
+- `tool_search` **只注册、不激活**：`build` 的 `extensionFactories` 追加 `createToolSearchExtension()`
+  （`defaultActive: false`），不进 `defaultTools`；配置了 `deferred` 服务器时由 MCP 扩展
+  `setActiveTools` 自动激活并加载工具，没有时不占用模型工具声明。`plan` / `ask` 不注册。
+- 契约 `MCP_EXPOSURES` 补齐 pi 的五档；写入与交给 pi 的装载器原样透传暴露方式，
+  `mcp/config.ts` 的读写逻辑无需改动。
+- 设置页暴露方式标签由三元链改为 `Record<McpExposure, string>` 映射，枚举再扩展会编译失败。
+- 验收：`pnpm check` 全绿（151 单测 + 6 项约定校验）；`agent-browser` 走查设置页五档下拉渲染正常。
+- 已知边界 / 待办：自研提示词的 `toolPolicy` 未覆盖 `tool_search`（它不在 `defaultTools`、无常驻指引），
+  `deferred` 服务器激活后提示词不提它，靠工具自身 description 说明用途——是否需要提示词指引待评估。
+  未做真实 MCP server 端到端，激活链路只有「注册 / 默认不激活」单测（沿用 7a 边界）。
 
 ## 四、测试方案
 
