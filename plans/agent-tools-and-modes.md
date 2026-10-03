@@ -30,7 +30,7 @@
 | 5 · question 双向通道 | 已完成 | `d77231e` |
 | 6 · 项目级 Memory | 已完成 | `049b798` |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a、7b 已完成） | `4770c53` |
-| 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 进行中（7c-1a 已完成） | `a4271e6` |
+| 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 进行中（7c-1a、7c-1b 已完成） | `0370c6f` |
 
 ## 一、已锁定的决策
 

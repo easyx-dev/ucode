@@ -208,6 +208,20 @@ SUB-06 仓储父子与列表过滤；SUB-07 交互来源；SUB-08 真实模型�
 - 前端 `use-session-stream` 收集 `subagent_*`，`MessageList` 传给对应工具卡；卡片内联渲染子会话的工具调用与文本，可折叠。
 - 验收：父流式期间实时显示子进度；刷新后由 `messages/list` 投影重建。
 
+**7c-1b 复盘（落地时的偏差）**
+
+- **不重发子会话事件，只发关联帧**：原设计是 `spawn.ts` 订阅子会话事件、经父会话总线重发 `subagent_event`。
+  落地时改为只发 `subagent_start` / `subagent_end` 两个关联帧（契约只加这两个事件名，无 `subagent_event`）：
+  子会话自身的帧从 7c-1a 起就已挂在同一条 `/events` 总线上按其 `sessionId` 广播，重发会让每个子 token 在
+  同一条流上发两遍。前端 `use-session-stream` 用 `childId → toolCallId` 映射把子帧直接归入嵌套视图。
+- 进度**不落盘**：刷新 / 重连不重建嵌套进度（与「事件不落盘、刷新重取快照」一致）。中途刷新会丢掉
+  `subagent_start`，正在跑的子会话嵌套为空，直到外层结果卡出现；查看完整过程留给 7c-1c 导航。
+- 前端把嵌套进度挂在**工具结果卡**（role `tool`）上，不挂 assistant 里的 toolCall 声明块，避免同一调用两份。
+- 顺带修一处会随本功能显性化的 UI 缺陷：工具结果项在 `message_end` 合并时 `id` 从 `live-tool-*` 换成服务端 id，
+  按 `item.id` 作 React key 会重挂、把展开的嵌套卡收起；改为工具项按 `toolCallId` 作 key。
+- 验收：`pnpm check` 全绿（173 单测 + 6 项约定校验）；真实模型浏览器走查——build 父委派 `explore`，
+  运行中工具卡实时显示子会话的 `ls/find/read` 与文本、结束后保留展开态并显示完整结论，审批弹窗带「来自子智能体」。
+
 ### 7c-1c · 子会话导航
 
 - 侧栏父条目下钻列子会话；进入子会话切到该会话视图，有「返回父会话」；归档父会话级联归档子会话。
