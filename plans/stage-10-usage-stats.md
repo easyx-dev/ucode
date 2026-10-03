@@ -3,7 +3,7 @@
 > 计划母文档：[`agent-tools-and-modes.md`](./agent-tools-and-modes.md) 阶段 7「后续」与阶段 10 概要。
 > 参考：opencode `cli/cmd/stats.ts`（逐会话读消息记录现算）、[zcode 使用统计](https://zcode.z.ai/cn/docs/usage-stats)（统计本地会话记录）。
 >
-> 状态：**进行中（实现完成，待 review）**。本轮定稿的关键取舍：**不建表**，从 pi 会话记录（JSONL）现算 + 内存缓存；
+> 状态：**已完成**（`297eb00`）。本轮定稿的关键取舍：**不建表**，从 pi 会话记录（JSONL）现算 + 内存缓存；
 > 只用 token 不计成本；子会话 / 分叉计入全局并标注来源。
 
 ## 一、目标与范围
