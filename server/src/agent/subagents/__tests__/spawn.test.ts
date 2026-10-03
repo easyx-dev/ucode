@@ -64,6 +64,7 @@ const fakeChild = (
 const depsOf = (over: Partial<SubagentSpawnDeps> = {}): SubagentSpawnDeps => ({
   createChild: () => {},
   discardChild: () => {},
+  findChild: () => undefined,
   ensure: async () => assert.fail("未提供 ensure"),
   refresh: () => {},
   settleInteractions: () => {},
@@ -250,6 +251,163 @@ describe("spawnSubagent", () => {
     );
     assert.equal(emits.at(-1)?.[0], "subagent_end");
     assert.equal(emits.at(-1)?.[1]?.isError, true);
+  });
+
+  describe("续跑（task_id）", () => {
+    const childRecord = (over: Partial<SessionRecord> = {}): SessionRecord => ({
+      ...parentRecord,
+      id: "sub-old",
+      parentSessionId: "parent-1",
+      agent: "general",
+      name: "旧任务",
+      sourcePath: "/tmp/sub-old.jsonl",
+      ...over,
+    });
+
+    it("复用已有子会话：不建行、按原 id 取实例、沿用原会话名", async () => {
+      const { session } = fakeChild({ entries: [assistantEntry("续跑结论")] });
+      const ensured: string[] = [];
+      const emits: Array<[string, Record<string, unknown>]> = [];
+
+      const result = await spawnSubagent(
+        {
+          parent: parentRecord,
+          toolCallId: "call-resume",
+          cwd: "/tmp/project",
+          request: { taskId: "sub-old", task: "接着做" },
+        },
+        depsOf({
+          findChild: (id) => (id === "sub-old" ? childRecord() : undefined),
+          createChild: () => assert.fail("续跑不应新建子会话行"),
+          ensure: async (id) => {
+            ensured.push(id);
+            return session;
+          },
+          emit: (type, data) => emits.push([type, data]),
+        }),
+      );
+
+      assert.equal(result.sessionId, "sub-old");
+      assert.equal(result.text, "续跑结论");
+      assert.deepEqual(ensured, ["sub-old"]);
+      assert.equal(emits[0]?.[1]?.sessionId, "sub-old");
+      assert.equal(emits[0]?.[1]?.description, "旧任务");
+    });
+
+    it("未指定角色时沿用原子会话角色，仍按该角色解析", async () => {
+      const { session } = fakeChild({ entries: [assistantEntry("ok")] });
+
+      const result = await spawnSubagent(
+        {
+          parent: parentRecord,
+          toolCallId: "call-resume",
+          cwd: "/tmp/project",
+          request: { taskId: "sub-old", task: "接着做" },
+        },
+        depsOf({
+          findChild: () => childRecord({ agent: "explore" }),
+          ensure: async () => session,
+        }),
+      );
+      assert.equal(result.sessionId, "sub-old");
+    });
+
+    it("task_id 不属于当前会话时拒绝，不建行也不发起。", async () => {
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "sub-old", task: "x" },
+          },
+          depsOf({
+            findChild: () => childRecord({ parentSessionId: "other-parent" }),
+            createChild: () => assert.fail("不应建行"),
+          }),
+        ),
+        /不属于当前会话/,
+      );
+    });
+
+    it("未知 task_id 时拒绝", async () => {
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "ghost", task: "x" },
+          },
+          depsOf({ findChild: () => undefined }),
+        ),
+        /找不到可续跑的子会话/,
+      );
+    });
+
+    it("已归档的子会话不能续跑", async () => {
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "sub-old", task: "x" },
+          },
+          depsOf({
+            findChild: () => childRecord({ deletedAt: "2026-02-01T00:00:00.000Z" }),
+          }),
+        ),
+        /已归档/,
+      );
+    });
+
+    it("续跑携带 model / thinkingLevel 时显式拒绝，不静默忽略", async () => {
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "sub-old", model: "openai/gpt", task: "x" },
+          },
+          depsOf({ findChild: () => childRecord() }),
+        ),
+        /续跑不支持覆盖模型/,
+      );
+    });
+
+    it("角色与原子会话不一致时拒绝", async () => {
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "sub-old", agent: "explore", task: "x" },
+          },
+          depsOf({ findChild: () => childRecord({ agent: "general" }) }),
+        ),
+        /不一致/,
+      );
+    });
+
+    it("续跑校验失败时不发任何关联帧", async () => {
+      const emits: string[] = [];
+      await assert.rejects(
+        spawnSubagent(
+          {
+            parent: parentRecord,
+            toolCallId: "call-1",
+            cwd: "/tmp/project",
+            request: { taskId: "ghost", task: "x" },
+          },
+          depsOf({ findChild: () => undefined, emit: (type) => emits.push(type) }),
+        ),
+        /找不到可续跑/,
+      );
+      assert.deepEqual(emits, []);
+    });
   });
 
   it("装配失败或未知角色时不发任何关联帧", async () => {

@@ -5,7 +5,7 @@
  * 断言 `defaultTools` / 白名单两条路在 pi 侧的实际落点——这也兜住「工具名与 pi 注册名脱节后静默失效」。
  */
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -26,7 +26,9 @@ import type { SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
 import {
   type AgentProfile,
+  type AgentRegistry,
   agentRules,
+  loadAgentRegistry,
   PRIMARY_PROFILES,
   primaryCapability,
   type ResolvedCapability,
@@ -96,6 +98,7 @@ const sessionOf = async (
   promptSource: PromptSource = "custom",
   memory?: MemoryService,
   subagent?: { profile: AgentProfile; capability: ResolvedCapability },
+  agentRegistry?: AgentRegistry,
 ): Promise<AgentSession> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
@@ -135,6 +138,7 @@ const sessionOf = async (
         }
       : {}),
     ...(memory ? { memory } : {}),
+    ...(agentRegistry ? { agentRegistry } : {}),
     promptSource,
   });
   const { session }: { session: AgentSession } = await createAgentSession(options);
@@ -155,6 +159,21 @@ const snapshotOf = async (
   };
   session.dispose();
   return snapshot;
+};
+
+/** 从会话里 subagent 工具的 schema 取 agent 可选角色；兼容单值 Literal 与 Union */
+const agentOptionsOf = (session: AgentSession): string[] => {
+  const tool = session.getAllTools().find((item) => item.name === "subagent");
+  const agent = (
+    tool?.parameters as {
+      properties?: { agent?: { const?: string; anyOf?: { const?: string }[] } };
+    }
+  )?.properties?.agent;
+  if (!agent) return [];
+  if (typeof agent.const === "string") return [agent.const];
+  return (agent.anyOf ?? [])
+    .map((item) => item.const)
+    .filter((value): value is string => typeof value === "string");
 };
 
 describe("buildSessionOptions 工具装配", () => {
@@ -301,6 +320,55 @@ describe("buildSessionOptions 子智能体装配", () => {
     const { tools } = await snapshotOf("build", "custom", undefined, childOf("build", "general"));
     assert.ok(tools.includes("edit") && tools.includes("bash"));
     assert.ok(!tools.includes("subagent"));
+  });
+
+  it("角色声明的模型不可用时装配报错，不静默回落默认模型", async () => {
+    const runtime = {
+      resolveModelRef: () => null,
+      getStatus: () => ({ thinkingLevel: "off" }),
+      requireRuntime: () => assert.fail("校验应在建会话前就拦住"),
+    } as unknown as PiRuntime;
+
+    await assert.rejects(
+      buildSessionOptions({
+        record: undefined,
+        cwd,
+        mode: "build",
+        sessionManager: SessionManager.inMemory(),
+        runtime,
+        profile: PRIMARY_PROFILES.build,
+        capability: { ...primaryCapability("build"), model: "nope/model" },
+        websearch: () => ({ provider: "tavily", apiKey: "", baseUrl: "" }),
+        permission: {
+          listGrants: () => [],
+          grant: () => {},
+          request: async () => "deny" as const,
+        },
+      }),
+      /角色指定的模型不可用/,
+    );
+  });
+
+  it("注册表里的隐藏角色仍进 agent 入参枚举，只是不进描述", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "session-config-agents-"));
+    mkdirSync(join(agentDir, "agents"));
+    writeFileSync(
+      join(agentDir, "agents", "secret.md"),
+      ["---", 'description: "隐藏角色"', "advertise: false", "---", "正文"].join("\n"),
+    );
+
+    const session = await sessionOf(
+      "build",
+      "custom",
+      undefined,
+      undefined,
+      loadAgentRegistry(agentDir),
+    );
+    const tool = session.getAllTools().find((item) => item.name === "subagent");
+    assert.ok(tool, "主会话应注册 subagent");
+    assert.ok(agentOptionsOf(session).includes("secret"), "隐藏角色也应能被模型按名调用");
+    assert.doesNotMatch(tool.description, /secret/);
+    session.dispose();
   });
 
   it("子会话提示词用子角色约束", async () => {

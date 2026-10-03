@@ -9,6 +9,13 @@ export {
   usesDefaultToolSet,
 } from "./capability";
 export {
+  type AgentRegistry,
+  allSubagents,
+  type CustomAgentError,
+  loadAgentRegistry,
+  parseCustomAgent,
+} from "./custom";
+export {
   ALL_PROFILES,
   agentRules,
   DEFAULT_SUBAGENT_SLUG,

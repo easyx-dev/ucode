@@ -8,7 +8,9 @@ import { ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
 
 import {
   type AgentProfile,
+  type AgentRegistry,
   agentRules,
+  loadAgentRegistry,
   PRIMARY_PROFILES,
   primaryCapability,
   type ResolvedCapability,
@@ -103,7 +105,10 @@ export class SessionPool {
    * 解析会话的角色与能力：主会话直接用模式声明；子会话把父会话能力与子角色取交集。
    * v1 只禁一层递归，故父会话即主会话；放开嵌套时要沿 `parentSessionId` 链解析到根。
    */
-  private resolveAgent(record: SessionRecord): {
+  private resolveAgent(
+    record: SessionRecord,
+    registry: AgentRegistry,
+  ): {
     profile: AgentProfile;
     capability: ResolvedCapability;
     parentRules?: () => readonly PermissionRule[];
@@ -116,7 +121,7 @@ export class SessionPool {
     }
     const parent = this.repository.find(record.parentSessionId);
     const parentMode = parent?.mode ?? record.mode;
-    const profile = subagentProfile(record.agent);
+    const profile = subagentProfile(record.agent, registry);
     return {
       profile,
       capability: resolveSubagentCapability(profile, primaryCapability(parentMode)),
@@ -125,7 +130,11 @@ export class SessionPool {
   }
 
   /** 主会话的委派钩子：并发上限按父会话计数，超限立即报错而非排队 */
-  private subagentHooks(record: SessionRecord, cwd: string): SubagentHooks {
+  private subagentHooks(
+    record: SessionRecord,
+    cwd: string,
+    registry: AgentRegistry,
+  ): SubagentHooks {
     let active = 0;
     return {
       spawn: async (toolCallId, request, signal) => {
@@ -141,10 +150,18 @@ export class SessionPool {
         active += 1;
         try {
           return await spawnSubagent(
-            { parent: record, toolCallId, cwd, request, ...(signal ? { signal } : {}) },
+            {
+              parent: record,
+              toolCallId,
+              cwd,
+              request,
+              registry,
+              ...(signal ? { signal } : {}),
+            },
             {
               createChild: (id, input) => this.repository.createChild(id, input),
               discardChild: (id) => this.repository.discardChild(id),
+              findChild: (id) => this.repository.find(id),
               ensure: (id) => this.ensure(id),
               refresh: (id) => this.refreshIndex(id),
               settleInteractions: (id) => this.permissions.interactions.forgetSource(record.id, id),
@@ -188,7 +205,12 @@ export class SessionPool {
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
-    const { profile, capability, parentRules } = this.resolveAgent(record);
+    // 自定义子角色按 agentDir 现读：用户新加 / 改角色文件后，新建或重开的会话即生效
+    const registry = loadAgentRegistry(env.agentDir);
+    if (registry.errors.length > 0) {
+      logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
+    }
+    const { profile, capability, parentRules } = this.resolveAgent(record, registry);
     // 子会话的审批 / 提问归属根（v1 即父）会话，并带上来源标注
     const interactionSessionId = record.parentSessionId ?? sessionId;
     const source: InteractionSource | undefined =
@@ -209,7 +231,8 @@ export class SessionPool {
         profile,
         capability,
         ...(parentRules ? { parentRules } : {}),
-        ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd) }),
+        ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
+        agentRegistry: registry,
         websearch: this.websearch,
         permission: {
           listGrants: () => this.permissions.allow.list(interactionSessionId),

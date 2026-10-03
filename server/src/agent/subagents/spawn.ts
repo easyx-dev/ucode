@@ -11,7 +11,7 @@ import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
 import { SUBAGENT_DESCRIPTION_MAX_LENGTH, SUBAGENT_TIMEOUT_MS } from "../../constants";
 import type { SessionRecord } from "../../db/session-repository";
 import { isRecord } from "../../utils/object";
-import { subagentProfile } from "../agents";
+import { type AgentRegistry, subagentProfile } from "../agents";
 import { resolveContextPlan } from "./context";
 import type { SubagentRequest, SubagentResult } from "./types";
 
@@ -31,6 +31,8 @@ export type SubagentSpawnDeps = {
   /** 装配失败时丢弃刚建的行（此时还没有文件，硬删） */
   discardChild: (sessionId: string) => void;
   ensure: (sessionId: string) => Promise<AgentSession>;
+  /** 查子会话行；续跑（`task_id`）时校验归属与角色，并复用已有会话 */
+  findChild: (sessionId: string) => SessionRecord | undefined;
   /** 子会话落定后回写索引（source_path / preview），供列表与导航使用 */
   refresh: (sessionId: string) => void;
   /** 结算该子会话发起的挂起交互（归属父会话，但只清来源是它的） */
@@ -136,37 +138,64 @@ export const spawnSubagent = async (
     /** 父会话工作目录；子会话在同一个目录里干活 */
     cwd: string;
     request: SubagentRequest;
+    /** 子角色注册表（含自定义角色）；缺省只认内置角色 */
+    registry?: AgentRegistry;
     signal?: AbortSignal;
   },
   deps: SubagentSpawnDeps,
 ): Promise<SubagentResult> => {
-  const profile = subagentProfile(input.request.agent);
+  const { request } = input;
+  // 续跑：先取出原子会话，校验归属 / 归档 / 角色一致性，再据此解析角色
+  const resumed = request.taskId ? deps.findChild(request.taskId) : undefined;
+  if (request.taskId) {
+    if (!resumed || resumed.parentSessionId !== input.parent.id) {
+      throw new SubagentError("找不到可续跑的子会话，或它不属于当前会话。");
+    }
+    if (resumed.deletedAt) throw new SubagentError("该子会话已归档，无法续跑。");
+    if (request.agent && request.agent !== resumed.agent) {
+      throw new SubagentError(
+        `该子会话的角色是 ${resumed.agent}，与指定的 ${request.agent} 不一致，无法续跑。`,
+      );
+    }
+    // 模型 / 档位只在新建时写入子会话行，续跑时无法生效；显式拒绝好过静默忽略
+    if (request.model || request.thinkingLevel) {
+      throw new SubagentError("续跑不支持覆盖模型 / 思考档位；如需更换请新建子会话。");
+    }
+  }
+
+  const profile = subagentProfile(request.agent ?? resumed?.agent ?? undefined, input.registry);
   const contextPlan = resolveContextPlan(profile);
   // fork 上下文与「会话分叉」共用原语，尚未实现；这里失败关闭而不是静默按 fresh 跑
   if (contextPlan.kind !== "fresh") {
     throw new Error("子智能体的 fork 上下文尚未开放。");
   }
 
-  const childId = `sub-${randomUUID()}`;
+  const childId = resumed?.id ?? `sub-${randomUUID()}`;
   const name =
-    input.request.description.trim().slice(0, SUBAGENT_DESCRIPTION_MAX_LENGTH) || profile.label;
+    resumed?.name?.trim() ||
+    request.description?.trim().slice(0, SUBAGENT_DESCRIPTION_MAX_LENGTH) ||
+    profile.label;
 
-  deps.createChild(childId, {
-    parentId: input.parent.id,
-    cwd: input.cwd,
-    mode: input.parent.mode,
-    agent: profile.slug,
-    name,
-    ...(input.request.model ? { model: input.request.model } : {}),
-    ...(input.request.thinkingLevel ? { thinkingLevel: input.request.thinkingLevel } : {}),
-  });
+  // 续跑复用已有子会话行与 JSONL；只有新建才落行
+  if (!resumed) {
+    deps.createChild(childId, {
+      parentId: input.parent.id,
+      cwd: input.cwd,
+      mode: input.parent.mode,
+      agent: profile.slug,
+      name,
+      ...(request.model ? { model: request.model } : {}),
+      ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+    });
+  }
 
   let child: AgentSession;
   try {
     child = await deps.ensure(childId);
   } catch (error) {
-    // 装配失败（模型未配置等）：删掉刚建的空行，否则会留一条永远没有文件的子会话
-    deps.discardChild(childId);
+    // 装配失败（模型未配置等）：删掉刚建的空行，否则会留一条永远没有文件的子会话。
+    // 续跑时行是早已存在的，不能当空行删掉
+    if (!resumed) deps.discardChild(childId);
     throw error;
   }
 

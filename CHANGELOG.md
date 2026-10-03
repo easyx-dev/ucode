@@ -35,6 +35,15 @@
 
 ### 新增
 
+- 子智能体支持**自定义角色**：`$APP_HOME/agent/agents/*.md`（frontmatter + 提示词正文，文件名即角色
+  slug）。可声明 `name` / `description` / `tools`（缺省或 `inherit` 继承父会话，否则为工具名白名单）/
+  `model` / `thinking` / `advertise`；与内置 `general` / `explore` 合并、同名覆盖，与主模式
+  （`build` / `plan` / `ask`）同名则拒绝。frontmatter 复用 pi 的 `parseFrontmatter`（无新增依赖），
+  未知字段直接报错——避免把 `tools` 的拼写错误静默退回「继承」而放大能力；坏文件跳过并记入日志，
+  不影响其余角色。`subagent` 工具的可用角色与描述按注册表动态生成，`advertise: false` 的角色
+  不进描述但仍可按名调用。
+- 子智能体支持**续跑**：`subagent` 工具新增可选 `task_id`，命中「本会话的直接子会话」时在该子会话上
+  继续（校验归属 / 角色一致 / 未归档），不新建；未指定 `agent` 时沿用原子会话的角色。
 - 新增**子智能体**（`build` / `plan` / `ask` 都可委派）：父会话经 `subagent` 工具把一段独立任务
   交给真实子会话（`general` 继承当前能力 / `explore` 只读），前台运行、只回传最终文本。
   子会话能力 =「父会话 ∩ 角色定义」，工具取交集、权限取较严，保证只读父会话不会靠委派越权；
@@ -270,6 +279,8 @@
   由会话条目里的 `model_change` / `thinking_level_change` 逐条推进）；对话历史底部展示为
   「provider/model · 推理档位 · 时间」，关闭推理时不显示档位。
 - `CatalogModel` 新增 `vision`（是否接受图片输入）；聊天区的模型选择器对支持图片输入的模型展示「视觉」标签。
+- `$APP_HOME/agent/` 下新增 `agents/` 目录（自定义子角色），目录不存在时按「无自定义角色」处理，
+  不预建；服务启动时不主动创建该目录。
 
 ### 修复
 

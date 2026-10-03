@@ -7,6 +7,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { WebsearchConfig } from "@ucode/contracts";
 
+import type { AgentProfile } from "../agents";
 import { createSubagentTool, type SubagentHooks } from "../subagents";
 import { createPresentPlanTool } from "./present-plan";
 import { createQuestionTool, type QuestionHooks } from "./question";
@@ -21,6 +22,8 @@ export type CustomToolInput = {
   readWebsearchConfig: () => WebsearchConfig;
   question?: QuestionHooks;
   subagents?: SubagentHooks;
+  /** 供 `subagent` 工具列出可选角色；缺省回落内置子角色 */
+  subagentProfiles?: readonly AgentProfile[];
   memoryTools?: ToolDefinition[];
 };
 
@@ -31,7 +34,9 @@ export const buildCustomTools = (input: CustomToolInput): ToolDefinition[] => {
     ...(has("websearch") ? [createWebsearchTool(input.readWebsearchConfig)] : []),
     ...(has("question") && input.question ? [createQuestionTool(input.question)] : []),
     ...(has("present_plan") ? [createPresentPlanTool()] : []),
-    ...(has("subagent") && input.subagents ? [createSubagentTool(input.subagents)] : []),
+    ...(has("subagent") && input.subagents
+      ? [createSubagentTool(input.subagents, input.subagentProfiles ?? [])]
+      : []),
     ...(input.memoryTools ?? []),
   ];
 };

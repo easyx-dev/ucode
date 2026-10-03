@@ -3,6 +3,7 @@
  *
  * 模式与角色声明、装配层、提示词共用同一份名字，避免「声明与注册成对维护」的隐性耦合。
  */
+import { MEMORY_TOOL_NAMES } from "../memory/tools";
 
 /** 内置工具：读写执行 + 只读检索（grep / find / ls） */
 export const DEFAULT_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
@@ -34,3 +35,17 @@ export const SUBAGENT_EXCLUDED_TOOLS = [
   "remember",
   "forget",
 ] as const;
+
+/**
+ * 全部已知工具名：校验自定义角色 `tools` 声明的白名单，把拼写错误挡在装配之前。
+ * 自定义角色只能收窄能力，列错名字会静默少一个工具，所以这里宁可报错也不要放过。
+ */
+export const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set([
+  ...DEFAULT_BUILTIN_TOOLS,
+  ...DEFAULT_EXTENSION_TOOLS,
+  ...CUSTOM_TOOL_NAMES,
+  ...READ_ONLY_TOOLS,
+  "present_plan",
+  "tool_search",
+  ...MEMORY_TOOL_NAMES,
+]);

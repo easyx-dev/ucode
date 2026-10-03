@@ -21,8 +21,11 @@ import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
 import {
   type AgentProfile,
+  type AgentRegistry,
   agentRules,
+  allSubagents,
   effectiveToolNames,
+  loadAgentRegistry,
   PRIMARY_PROFILES,
   primaryCapability,
   type ResolvedCapability,
@@ -72,6 +75,8 @@ export type SessionAssemblyInput = {
   parentRules?: () => readonly PermissionRule[];
   /** 仅主会话提供：注册 `subagent` 工具；子会话不提供，天然禁递归 */
   subagents?: SubagentHooks;
+  /** 子角色注册表（含自定义角色）；缺省按 `agentDir` 加载，供 `subagent` 工具列角色 */
+  agentRegistry?: AgentRegistry;
   /** 实时读取联网搜索设置：设置页保存后新建的会话即按新 key 生效 */
   websearch: () => WebsearchConfig;
   /** 权限钩子：审批回调与会话恒允，由会话池按 sessionId 提供 */
@@ -175,7 +180,16 @@ export const buildSessionOptions = async (
       (name !== "question" || Boolean(input.question)) &&
       (name !== SUBAGENT_TOOL_NAME || Boolean(input.subagents)),
   );
+  // 注册表只用于列 `subagent` 工具的可用角色；子会话没有该工具，无需加载
+  const registry =
+    input.agentRegistry ??
+    (input.subagents ? loadAgentRegistry(input.agentDir ?? env.agentDir) : undefined);
   const override = overrideOf(input.record);
+  // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来。
+  // 会话覆盖值的模型在 create / update 已校验，这里只兜角色声明这一路
+  if (capability.model && !input.runtime.resolveModelRef(capability.model)) {
+    throw new Error(`角色指定的模型不可用：${capability.model}`);
+  }
   const modelRef = override.model ?? capability.model ?? null;
   const model = input.runtime.resolveModelRef(modelRef) ?? input.runtime.resolveModelRef(null);
   const thinkingLevel =
@@ -218,6 +232,8 @@ export const buildSessionOptions = async (
       readWebsearchConfig: input.websearch,
       ...(input.question ? { question: input.question } : {}),
       ...(input.subagents ? { subagents: input.subagents } : {}),
+      // 传全量：advertise 只决定是否写进描述，隐藏角色仍要进 `agent` 入参枚举
+      ...(registry ? { subagentProfiles: allSubagents(registry) } : {}),
       memoryTools,
     }),
     resourceLoader: loader,

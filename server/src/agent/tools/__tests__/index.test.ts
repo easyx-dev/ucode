@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 
 import type { WebsearchConfig } from "@ucode/contracts";
 
+import { parseCustomAgent } from "../../agents";
 import type { SubagentHooks } from "../../subagents";
 import { buildCustomTools, DEFAULT_BUILTIN_TOOLS } from "../index";
 import type { QuestionHooks } from "../question";
@@ -48,6 +49,18 @@ const plan = buildCustomTools({ names: PLAN_NAMES, readWebsearchConfig: readConf
 const namesOf = (tools: readonly { name: string }[]): string[] =>
   tools.map((tool) => tool.name).sort();
 
+/** 从 subagent 的参数 schema 取 agent 可选角色；兼容单值 Literal 与 Union 两种形状 */
+const agentOptions = (tool: { parameters?: unknown }): string[] => {
+  const agent = (
+    tool.parameters as { properties?: { agent?: { const?: string; anyOf?: { const?: string }[] } } }
+  )?.properties?.agent;
+  if (!agent) return [];
+  if (typeof agent.const === "string") return [agent.const];
+  return (agent.anyOf ?? [])
+    .map((item) => item.const)
+    .filter((value): value is string => typeof value === "string");
+};
+
 describe("buildCustomTools", () => {
   it("内置清单包含只读检索工具，不含未启用的 powershell", () => {
     for (const name of ["read", "bash", "edit", "write", "grep", "find", "ls"]) {
@@ -67,6 +80,29 @@ describe("buildCustomTools", () => {
 
   it("集合里没有 subagent 时不注册（子会话能力交集的落点）", () => {
     assert.ok(!namesOf(plan).includes("subagent"));
+  });
+
+  it("subagent 工具按传入角色生成描述，隐藏角色只进枚举不进描述", () => {
+    const visible = parseCustomAgent(
+      "reviewer",
+      ["---", 'description: "评审改动"', "---", "正文"].join("\n"),
+    );
+    const hidden = parseCustomAgent(
+      "secret",
+      ["---", 'description: "隐藏角色"', "advertise: false", "---", "正文"].join("\n"),
+    );
+    const tools = buildCustomTools({
+      names: ["subagent"],
+      readWebsearchConfig: readConfig,
+      subagents,
+      subagentProfiles: [visible, hidden],
+    });
+    const tool = tools.find((item) => item.name === "subagent");
+    assert.ok(tool, "应注册 subagent");
+    assert.match(tool.description, /reviewer/);
+    assert.doesNotMatch(tool.description, /secret/);
+    // 隐藏角色仍必须进 `agent` 入参枚举，否则等于不可调用
+    assert.deepEqual(agentOptions(tool).sort(), ["reviewer", "secret"]);
   });
 
   it("自研工具都带系统提示词片段", () => {

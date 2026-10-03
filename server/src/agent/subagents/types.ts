@@ -8,12 +8,14 @@ import type { ThinkingLevel } from "@ucode/contracts";
 
 /** 一次委派请求：对应 `subagent` 工具入参 */
 export type SubagentRequest = {
-  /** 子角色 slug；缺省 general */
+  /** 子角色 slug；缺省 general（续跑且未指定时沿用原子会话角色） */
   agent?: string;
-  /** 任务简称，用于会话名与后续进度展示 */
-  description: string;
+  /** 任务简称，用于会话名与后续进度展示；续跑时可省 */
+  description?: string;
   /** 交给子会话的完整任务，必须自包含 */
   task: string;
+  /** 已有子会话 id；带上则在该子会话上续跑，不新建 */
+  taskId?: string;
   /** 覆盖模型 `provider/model`；缺省继承父会话 */
   model?: string;
   /** 覆盖思考档位；缺省继承父会话 */

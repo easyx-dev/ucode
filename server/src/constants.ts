@@ -75,6 +75,15 @@ export const SUBAGENT_TIMEOUT_MS = 10 * 60 * 1000;
 /** 子智能体会话名的长度上限（取任务简称） */
 export const SUBAGENT_DESCRIPTION_MAX_LENGTH = 60;
 
+/** 自定义子角色目录名（位于 agent 目录下）：`agents/*.md` */
+export const AGENTS_DIRNAME = "agents";
+
+/** 单个自定义角色文件的大小上限，超过即跳过，避免误放大文件撑爆装配 */
+export const CUSTOM_AGENT_MAX_BYTES = 256 * 1024;
+
+/** 自定义角色 slug（文件名）的长度上限 */
+export const CUSTOM_AGENT_SLUG_MAX_LENGTH = 64;
+
 /** 项目记忆根目录名（位于 `$APP_HOME/app` 下）：`memory/projects/<project>` */
 export const MEMORY_DIRNAME = "memory";
 

@@ -44,4 +44,6 @@ export type AgentProfile = {
   /** 自定义角色的提示词正文；内置角色缺省由语言目录按 slug 提供 */
   promptSection?: string;
   capability: AgentCapability;
+  /** 是否列进 `subagent` 工具的角色广告；缺省为是，显式 `false` 表示隐藏但仍可按名调用 */
+  advertise?: boolean;
 };
