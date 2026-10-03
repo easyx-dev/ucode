@@ -157,7 +157,10 @@ type AgentProfile = {
 | 7c-1a | 内核：AgentProfile + 能力交集、装配层重构、`subagent` 工具、general/explore、落盘与列表隔离、权限交集与来源标注、前台 / 中止 / 超时 / 并发 | — | 契约 + DB |
 | 7c-1b | 流式子会话进度：`subagent_*` 帧 + 工具卡内联渲染 | 1a | 契约（事件名） |
 | 7c-1c | 子会话导航：侧栏下钻 / 进入子会话 / 归档级联 | 1a | 契约（列表过滤） |
-| 7c-1d | 自定义 agent（`$APP_HOME/agent/agents/*.md`）、更多内置角色、resume(`task_id`)、深度 / spawn 预算、fork 口子 | 1a | 契约 + 设置 |
+| 7c-1d-a | 自定义 agent（`$APP_HOME/agent/agents/*.md`） | 1a | — |
+| 7c-1d-b | resume（`task_id` 续跑） | 1a | — |
+| 7c-1d-c | 深度 / spawn 预算（含交互沿父链解析到根） | 1a | — |
+| 7c-1d-d | fork 口子（并入后续「会话分叉」阶段） | 1a | — |
 
 ### 7c-1a · 内核
 
@@ -261,6 +264,31 @@ SUB-06 仓储父子与列表过滤；SUB-07 交互来源；SUB-08 真实模型�
 - 深度 / 预算：放开非根父的 `subagent`（`maxDepth` / `allowedAgents` / spawn 上限），交互沿父链解析到根。
 - `fork` 口子：`agent/subagents/context.ts` 定义 `fresh | fork` 策略接口；fork 走 pi `SessionManager.branch` / `forkFrom`。
   v1 只实现 `fresh`；`tool` 入参不暴露 `fork`，接口留在内部，待「会话分叉」一并落地。
+
+**7c-1d-a / 7c-1d-b 复盘（落地时的偏差）**
+
+- 本次只落地 **7c-1d-a（自定义 agent）** 与 **7c-1d-b（resume）**；深度 / 预算（7c-1d-c）与
+  fork 口子（7c-1d-d，并入「会话分叉」）留作后续独立阶段，子阶段表已相应拆分。
+- frontmatter 复用 pi 主入口导出的 `parseFrontmatter`，**不新增 yaml 依赖**。
+- `tools` 语义定为「缺省 / `inherit` 继承父能力 + 显式名单白名单」；交集仍在装配时算。
+  YAML 空键（`tools:` 解析为 `null`）按**失败关闭**报错，不退回 `inherit`——退回继承恰好是放大能力。
+- frontmatter 改 `.strict()` + 逐字段中文错误 + 未闭合分隔符单独提示：`tool:` / 全角冒号这类拼写错误
+  必须报错，不能把 `tools` 静默丢成「继承父会话全量工具」。为此 `custom.test.ts` 显式断言了错误文案。
+- 自定义角色**仅 subagent**、不新增主模式；与主模式同名拒绝，与内置 `general` / `explore` 同名覆盖。
+- 注册表按 `agentDir` 现读（`loadAgentRegistry`）：`pool.ensure` 每次读一次，用户改文件后新建 / 重开会话即生效。
+  坏文件只进 `registry.errors` 并 `logger.warn`，客户端暂无反馈（设置页后续）。
+- 目录只认普通文件（`readdirSync(..., { withFileTypes: true }).isFile()`）挡符号链接；大小上限先 `statSync` 再读。
+- 角色声明的 `model` 若不可解析，装配阶段直接报错，不静默回落默认模型（与 `subagent` 入参 model 的校验对齐）。
+- resume：`subagent` 增可选 `task_id`，命中「本会话的直接子会话」则复用（校验归属 / 角色一致 / 未归档），
+  未指定 `agent` 时沿用原子会话角色；续跑时装配失败不再 `discardChild`（行早已存在，不能当空行删）。
+  `model` / `thinkingLevel` 只在新建时写入子会话行，续跑携带会被**显式拒绝**（而不是静默忽略）。
+- `advertise: false` 只影响工具描述，角色仍留在 `agent` 入参枚举里（隐藏但可按名调用）；
+  为此装配层传**全量**子角色给 `subagent` 工具，过滤只发生在工具层一次。
+- 已知边界：删 / 改角色文件会让已有子会话重开时报「未知角色」（失败关闭，不静默换成别的角色）；
+  自定义角色无法声明 permissions（只读只靠 `tools` 白名单，同名覆盖 `explore` 不继承内置只读规则）；
+  角色文件错误只进日志；提示词正文无质量下限。
+- 验收：`pnpm check` 全绿（197 单测 + 6 项约定校验）。真实模型 E2E（临时脚本，已删）——
+  注册表解析出自定义 `reviewer`，`subagent` 工具委派后返回 `task_id`，带 `task_id` 续跑复用同一子会话（`E2E OK`）。
 
 ## 八、与 pi「会话树 / 分叉」的关系（口子）
 
