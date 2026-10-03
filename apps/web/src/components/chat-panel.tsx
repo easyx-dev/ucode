@@ -13,7 +13,13 @@ import type { ChatController } from "@/hooks/use-chat";
 import type { ComposerDraftsController } from "@/hooks/use-composer-drafts";
 import { composerKeyOf, emptyDraft } from "@/lib/composer-draft";
 import { isWorkspaceSession } from "@/lib/session-groups";
-import type { ModelsResponse, SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
+import type {
+  ChatItem,
+  ModelsResponse,
+  SessionMode,
+  SessionSummary,
+  ThinkingLevel,
+} from "@/lib/types";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
 const showSuggestions = (chat: ChatController): boolean =>
@@ -36,6 +42,10 @@ type ChatPanelProps = {
   onOpenSettings: () => void;
   /** 打开某个子会话（子智能体工具卡上的入口） */
   onOpenSession: (sessionId: string) => void;
+  /** 从某条消息分叉出新会话 */
+  onFork: (item: ChatItem) => void;
+  /** 本会话分叉自的源会话名；用于头部来源链接 */
+  forkedFromName?: string | null;
   /** 从子会话视图返回父会话 */
   onBackToParent?: () => void;
   /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
@@ -57,6 +67,8 @@ export function ChatPanel({
   onSelectMode,
   onOpenSettings,
   onOpenSession,
+  onFork,
+  forkedFromName,
   onBackToParent,
   planReady,
   onApprovePlan,
@@ -112,6 +124,8 @@ export function ChatPanel({
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
         onBackToParent={onBackToParent}
+        onOpenForkSource={onOpenSession}
+        forkedFromName={forkedFromName}
       />
 
       <DirectoryDialog
@@ -133,6 +147,7 @@ export function ChatPanel({
         pending={chat.pending}
         empty={empty}
         onOpenSession={onOpenSession}
+        onFork={isChild ? undefined : onFork}
       />
 
       {isChild ? (

@@ -27,6 +27,7 @@ import {
   type ServerEvent,
   type SessionArchiveResponse,
   type SessionCreateRequest,
+  type SessionForkRequest,
   type SessionIdRequest,
   type SessionInfoResponse,
   type SessionListRequest,
@@ -134,6 +135,7 @@ export const api = {
     info: (sessionId: string) =>
       post<SessionInfoResponse>("sessions/info", { sessionId } satisfies SessionIdRequest),
     update: (body: SessionUpdateRequest) => post<SessionSummary>("sessions/update", body),
+    fork: (body: SessionForkRequest) => post<SessionSummary>("sessions/fork", body),
     archive: (sessionId: string) =>
       post<SessionArchiveResponse>("sessions/archive", { sessionId } satisfies SessionIdRequest),
   },

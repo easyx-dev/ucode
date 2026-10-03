@@ -32,6 +32,8 @@ export type SessionOverride = {
   /** 子会话的父会话 id 与角色 slug（只读派生，不参与 upsert） */
   parentSessionId?: string;
   agent?: string;
+  /** 会话分叉自哪个会话（只读派生，不参与 upsert） */
+  forkedFromId?: string;
   /** 归档时间；非空表示已归档（软删） */
   deletedAt?: string;
 };
@@ -56,6 +58,8 @@ export type SessionRecord = {
   parentSessionId: string | null;
   /** 子会话的角色 slug（如 general / explore）；主会话为空 */
   agent: string | null;
+  /** 本会话分叉自哪个会话；非分叉会话为空 */
+  forkedFromId: string | null;
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */
@@ -96,6 +100,7 @@ const SESSION_COLUMNS = [
   "mode",
   "parent_session_id",
   "agent",
+  "forked_from_session_id",
   "source_path",
   "preview",
   "created_at",
@@ -117,6 +122,7 @@ const rowSchema = z.object({
   mode: z.string().nullable(),
   parent_session_id: z.string().nullable(),
   agent: z.string().nullable(),
+  forked_from_session_id: z.string().nullable(),
   source_path: z.string().nullable(),
   preview: z.string(),
   created_at: z.string(),
@@ -136,6 +142,7 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   mode: toSessionMode(row.mode),
   parentSessionId: row.parent_session_id,
   agent: row.agent,
+  forkedFromId: row.forked_from_session_id,
   childCount: row.child_count,
   sourcePath: row.source_path,
   preview: row.preview,
@@ -171,6 +178,7 @@ export const overrideOf = (record: SessionRecord | undefined): SessionOverride =
     mode: record.mode,
     ...(record.parentSessionId ? { parentSessionId: record.parentSessionId } : {}),
     ...(record.agent ? { agent: record.agent } : {}),
+    ...(record.forkedFromId ? { forkedFromId: record.forkedFromId } : {}),
     ...(record.deletedAt ? { deletedAt: record.deletedAt } : {}),
   };
 };
@@ -226,6 +234,40 @@ export class SessionRepository {
         input.mode,
         input.agent,
         input.parentId,
+        now,
+        now,
+      );
+  }
+
+  /**
+   * 新建分叉会话行：来源会话 id 与继承的 cwd / 模式 / 模型一并落库。
+   * `name` 为 null 时列表预览自然带出源会话内容。
+   */
+  createForked(
+    id: string,
+    input: {
+      forkedFromId: string;
+      cwd: string;
+      name: string | null;
+      mode: SessionMode;
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    },
+  ): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, forked_from_session_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        input.name,
+        input.cwd,
+        input.model ?? null,
+        input.thinkingLevel ?? null,
+        input.mode,
+        input.forkedFromId,
         now,
         now,
       );

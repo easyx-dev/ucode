@@ -20,6 +20,7 @@ const parentRecord: SessionRecord = {
   mode: "build",
   parentSessionId: null,
   agent: null,
+  forkedFromId: null,
   childCount: 0,
   sourcePath: null,
   preview: "",

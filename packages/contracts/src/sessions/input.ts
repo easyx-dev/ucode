@@ -12,6 +12,16 @@ export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[
 /** 只带 sessionId 的操作（详情、归档、中断等） */
 export const sessionIdInputSchema = z.object({ sessionId: sessionIdSchema });
 
+/**
+ * 会话分叉：`fromEntryId` 是源会话里的条目 id（消息 DTO 的 `id` 就是它），
+ * 缺省取当前叶子；服务端对着条目树校验，非法即 400。
+ */
+export const sessionForkInputSchema = z.object({
+  sessionId: sessionIdSchema,
+  fromEntryId: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
+});
+
 export const sessionListInputSchema = z.object({
   q: z.string().optional(),
   limit: z.number().int().positive().max(500).default(100),
@@ -40,6 +50,8 @@ export const sessionUpdateInputSchema = z.object({
 
 export type SessionIdRequest = z.input<typeof sessionIdInputSchema>;
 export type SessionIdInput = z.infer<typeof sessionIdInputSchema>;
+export type SessionForkRequest = z.input<typeof sessionForkInputSchema>;
+export type SessionForkInput = z.infer<typeof sessionForkInputSchema>;
 export type SessionListInput = z.infer<typeof sessionListInputSchema>;
 export type SessionListRequest = z.input<typeof sessionListInputSchema>;
 export type SessionCreateInput = z.infer<typeof sessionCreateInputSchema>;

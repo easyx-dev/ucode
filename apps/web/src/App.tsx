@@ -13,7 +13,7 @@ import { useInteractions } from "@/hooks/use-interactions";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { composerKeyOf, NEW_SESSION_KEY } from "@/lib/composer-draft";
 import { lastTurnPresentedPlan } from "@/lib/plan";
-import type { SessionMode, ThinkingLevel } from "@/lib/types";
+import type { ChatItem, SessionMode, ThinkingLevel } from "@/lib/types";
 
 export default function App() {
   const { t } = useTranslation();
@@ -64,6 +64,20 @@ export default function App() {
     composer.update(NEW_SESSION_KEY, { cwd: path });
   };
 
+  /** 从某条消息分叉出新会话，成功后切过去 */
+  const forkFrom = (item: ChatItem): void => {
+    if (!activeId) return;
+    void sessions.fork(activeId, item.id).then((session) => {
+      if (session) setActiveId(session.id);
+    });
+  };
+
+  // 分叉来源会话名：从当前列表取，取不到（已归档 / 未加载）则退化为 id
+  const forkSourceId = activeSession?.forkedFromId ?? null;
+  const forkSourceName = forkSourceId
+    ? (sessions.sessions.find((item) => item.id === forkSourceId)?.name ?? null)
+    : null;
+
   return (
     <TooltipProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -109,6 +123,8 @@ export default function App() {
           onSelectMode={selectMode}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
           onOpenSession={setActiveId}
+          onFork={forkFrom}
+          forkedFromName={forkSourceName}
           onBackToParent={() => {
             const parentId = activeSession?.parentSessionId;
             if (parentId) setActiveId(parentId);

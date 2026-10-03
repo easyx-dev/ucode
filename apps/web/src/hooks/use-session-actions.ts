@@ -80,5 +80,23 @@ export function useSessionActions(list: SessionListController) {
     [drop, t],
   );
 
-  return { create, rename, setModel, setThinkingLevel, setMode, archive };
+  /** 会话分叉：从某条消息抽出新会话；导航由调用方处理 */
+  const fork = useCallback(
+    async (sessionId: string, fromEntryId?: string): Promise<SessionSummary | null> => {
+      try {
+        const session = await api.sessions.fork({
+          sessionId,
+          ...(fromEntryId ? { fromEntryId } : {}),
+        });
+        addDraft(session);
+        return session;
+      } catch (error) {
+        toast.error(t("失败提示", { label: t("分叉失败"), reason: describeError(error) }));
+        return null;
+      }
+    },
+    [addDraft, t],
+  );
+
+  return { create, rename, setModel, setThinkingLevel, setMode, archive, fork };
 }

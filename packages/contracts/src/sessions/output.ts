@@ -23,6 +23,8 @@ export type SessionSummary = {
   parentSessionId: string | null;
   /** 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 */
   agent: string | null;
+  /** 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 */
+  forkedFromId: string | null;
   /** 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 */
   childCount: number;
   /** 是否有活跃生成（进程内的 run 或流式会话） */

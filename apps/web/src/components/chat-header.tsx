@@ -1,5 +1,5 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
-import { ChevronLeft, FolderOpen, Loader2, RefreshCw, Settings2 } from "lucide-react";
+import { ChevronLeft, FolderOpen, GitFork, Loader2, RefreshCw, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,10 @@ type ChatHeaderProps = {
   onOpenDirectory?: () => void;
   /** 子会话视图返回父会话；主会话不传 */
   onBackToParent?: () => void;
+  /** 打开本会话分叉自的源会话 */
+  onOpenForkSource?: (sessionId: string) => void;
+  /** 源会话名；列表里取不到时退化显示 id */
+  forkedFromName?: string | null;
 };
 
 export function ChatHeader({
@@ -26,6 +30,8 @@ export function ChatHeader({
   onOpenSettings,
   onOpenDirectory,
   onBackToParent,
+  onOpenForkSource,
+  forkedFromName,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
@@ -51,6 +57,18 @@ export function ChatHeader({
         <Badge variant="secondary" className="shrink-0">
           {t("子会话")}
         </Badge>
+      ) : null}
+      {session?.forkedFromId && onOpenForkSource ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 shrink-0 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+          title={t("打开源会话")}
+          onClick={() => onOpenForkSource(session.forkedFromId as string)}
+        >
+          <GitFork className="size-3.5" />
+          {t("分叉自", { name: forkedFromName || session.forkedFromId })}
+        </Button>
       ) : null}
       {session?.running ? (
         <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">

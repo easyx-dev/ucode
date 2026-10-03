@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { openDatabase } from "../index";
-import { SessionRepository } from "../session-repository";
+import { overrideOf, SessionRepository } from "../session-repository";
 
 describe("SessionRepository", () => {
   let dir: string;
@@ -180,6 +180,26 @@ describe("SessionRepository", () => {
     assert.deepEqual(new Set(repo.descendantIds("dd-root")), new Set(["dd-a", "dd-b"]));
     assert.equal(repo.descendantIds("dd-root").includes("dd-root"), false);
     assert.deepEqual(repo.descendantIds("dd-b"), []);
+  });
+
+  it("分叉会话是顶层会话，列表带出来源 id", () => {
+    repo.create("fork-src", { name: "源会话", cwd: "/tmp/project", mode: "build" });
+    repo.createForked("fork-new", {
+      forkedFromId: "fork-src",
+      cwd: "/tmp/project",
+      name: "源会话 · 分叉",
+      mode: "build",
+    });
+
+    const record = repo.find("fork-new");
+    assert.equal(record?.forkedFromId, "fork-src");
+    assert.equal(record?.name, "源会话 · 分叉");
+    assert.equal(record?.parentSessionId, null, "分叉会话是顶层会话，不是子智能体");
+    assert.equal(overrideOf(record).forkedFromId, "fork-src");
+    assert.ok(
+      repo.search({ limit: 50 }).records.some((item) => item.id === "fork-new"),
+      "分叉会话应出现在主列表",
+    );
   });
 
   it("级联归档父会话后子孙一起从列表消失", () => {

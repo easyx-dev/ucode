@@ -208,6 +208,12 @@ export default {
   "子会话.只读提示":
     "Sub-sessions are independent delegated conversations and are read-only. To continue, ask in the parent session.",
 
+  // Session fork
+  从此分叉: "Fork from here",
+  分叉自: 'Forked from "{{name}}"',
+  分叉失败: "Failed to fork",
+  打开源会话: "Open source session",
+
   // Empty states
   "夜深了，接下来交给我吧": "It's late. Leave it to me.",
   "早上好，接下来交给我吧": "Good morning. Leave it to me.",

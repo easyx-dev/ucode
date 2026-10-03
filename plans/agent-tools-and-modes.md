@@ -30,7 +30,11 @@
 | 5 · question 双向通道 | 已完成 | `d77231e` |
 | 6 · 项目级 Memory | 已完成 | `049b798` |
 | 7 · 后续（统计 / 编辑历史 / MCP / 子智能体 / goal） | 进行中（7a、7b 已完成） | `4770c53` |
-| 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 进行中（7c-1a、7c-1b、7c-1c、7c-1d-a、7c-1d-b 已完成） | `076a3c5` |
+| 7c-1 · 子智能体（细化见 [`stage-7c-subagents.md`](./stage-7c-subagents.md)） | 已完成（7c-1a ~ 7c-1d-b；7c-1d-c 暂缓，不放开嵌套） | `076a3c5` |
+| 8 · 会话分叉（细化见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)） | 待 review | — |
+| 9 · 编辑历史 | 未开始 | — |
+| 10 · 使用统计 | 未开始 | — |
+| 11 · goal 模式 | 未开始 | — |
 
 ## 一、已锁定的决策
 
@@ -367,8 +371,15 @@ server/src/agent/
   `plan` / `ask` 不加载 MCP 扩展——它连上后会主动 `setActiveTools()` 激活 `codemode`，绕过只读白名单。
   P0 鉴权暂缓（见 `TODO.md`），**不作为本阶段前置**；未落地前服务只能在本机 / 可信环境使用。
 - 7b `tool_search`（`deferred` 暴露的 MCP 工具）。
-- 7c 子智能体（复用组装层起子会话）、goal 模式（复用模式层）。
+- 7c 子智能体（复用组装层起子会话），已落地 7c-1a ~ 7c-1d-b；**7c-1d-c（放开嵌套）决定不做**，
+  维持单层（`SUBAGENT_MAX_DEPTH = 1`）——依据与语义见 [`stage-8-session-fork.md`](./stage-8-session-fork.md) 一、1.1。
 - 7d 使用统计（`agent_settled` / `message_end` → SQLite）、编辑历史（`SessionManager` fork）。
+
+**后续阶段顺序（已定）**：`会话分叉 → 编辑历史 → 使用统计 → goal 模式`。
+
+- 阶段 8 会话分叉 / 阶段 9 编辑历史 / 阶段 10 使用统计 / 阶段 11 goal 模式；
+  阶段 8 与后续路线见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)（阶段 9~11 只记概要，各自再定稿）。
+- 使用统计排在 goal 之前：goal 的「用量上限」依赖它。
 
 **阶段 7a 复盘（落地时的偏差）**
 
@@ -525,7 +536,7 @@ node --import tsx --test "src/**/__tests__/**/*.test.ts"
 
 ## 六、落地顺序
 
-`阶段 0 → 1a → 1b / 1c → 2 → 3 → 3.5 → 4 → 5 → 6 → 7`。
+`阶段 0 → 1a → 1b / 1c → 2 → 3 → 3.5 → 4 → 5 → 6 → 7 → 8（会话分叉）→ 9（编辑历史）→ 10（使用统计）→ 11（goal）`。
 
 阶段 1a 最快见效；**阶段 2（模式 / 权限）必须先于阶段 3（ask 成品）完成**，
 否则模式判断会散进工具代码，三个模式（ask / plan / goal）无法共用底座。

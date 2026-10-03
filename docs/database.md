@@ -50,13 +50,18 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
   `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）/
-  `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）
+  `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
+  `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）
 - **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写）：`source_path` /
   `preview` / `created_at` / `updated_at`
 
 `parent_session_id` / `agent` 让子智能体会话成为真实会话行：列表默认只出主会话
 （`parent_session_id IS NULL`），传 `parentSessionId` 才取某个会话的子会话（见
 [`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
+
+`forked_from_session_id` 记录会话分叉的来源（见
+[`plans/stage-8-session-fork.md`](../plans/stage-8-session-fork.md)）：分叉会话仍是**顶层主会话**
+（`parent_session_id` 为空、照常进列表），与子智能体的父子关系不是一回事。
 
 `cwd` 在建会话时按 pi 的 `resolvePath` 口径规范化（绝对化并折叠 `.` / `..`），
 草稿与落盘用同一个值，避免同一目录因写法不同被分成两组。

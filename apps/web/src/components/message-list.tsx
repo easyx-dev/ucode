@@ -15,6 +15,8 @@ type MessageListProps = {
   empty?: React.ReactNode;
   /** 打开子会话（子智能体工具卡中的入口） */
   onOpenSession?: (sessionId: string) => void;
+  /** 从某条消息分叉（仅主对话） */
+  onFork?: (item: ChatItem) => void;
 };
 
 export function MessageList({
@@ -24,6 +26,7 @@ export function MessageList({
   pending,
   empty,
   onOpenSession,
+  onFork,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +66,7 @@ export function MessageList({
             item={item}
             subagent={item.toolCallId ? subagents?.[item.toolCallId] : undefined}
             onOpenSession={onOpenSession}
+            onFork={onFork}
           />
         ))}
 

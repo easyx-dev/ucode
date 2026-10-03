@@ -35,6 +35,13 @@
 
 ### 新增
 
+- 新增**会话分叉**：从任一条已落盘消息「从此分叉」，生成一个独立的新会话（内容为该消息及其之前的历史，
+  可继续对话），原会话不变。新增 `sessions/fork` 接口（`sessionForkInputSchema`：`sessionId` /
+  `fromEntryId?` / `name?`，缺省分叉点为当前叶子）；`session` 表新增 `forked_from_session_id`
+  （schema v3 追加迁移），`SessionSummary` 带出来源 id 供界面显示「分叉自」。分叉复用 pi
+  `SessionManager.createBranchedSession`（新会话文件 header 的 `parentSession` 指向源文件），
+  新会话继承源的 cwd / 模式 / 模型 / 档位；源会话在跑、未落盘、已归档或分叉点非法时给出可读错误。
+  子智能体会话不可作为分叉源。
 - 子智能体支持**自定义角色**：`$APP_HOME/agent/agents/*.md`（frontmatter + 提示词正文，文件名即角色
   slug）。可声明 `name` / `description` / `tools`（缺省或 `inherit` 继承父会话，否则为工具名白名单）/
   `model` / `thinking` / `advertise`；与内置 `general` / `explore` 合并、同名覆盖，与主模式

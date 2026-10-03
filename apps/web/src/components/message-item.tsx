@@ -1,4 +1,4 @@
-import { Bot, Brain, ChevronRight } from "lucide-react";
+import { Bot, Brain, ChevronRight, GitFork } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -84,22 +84,42 @@ function SubagentProgress({
   );
 }
 
+/** 一条消息悬停时出现的分叉入口：从该条消息抽出新会话 */
+function ForkAction({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="shrink-0 self-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+      title={t("从此分叉")}
+      onClick={onClick}
+    >
+      <GitFork className="size-3.5" />
+    </button>
+  );
+}
+
 export function MessageItem({
   item,
   subagent,
   onOpenSession,
+  onFork,
 }: {
   item: ChatItem;
   /** 该条工具结果的子智能体内联进度（仅 subagent 工具调用会有） */
   subagent?: SubagentStream;
   /** 打开子会话；子会话自身的嵌套消息不再下传 */
   onOpenSession?: (sessionId: string) => void;
+  /** 从该条消息分叉；只有主对话传入，子智能体嵌套视图不提供 */
+  onFork?: (item: ChatItem) => void;
 }) {
   const { t } = useTranslation();
+  const canFork = Boolean(onFork) && !item.live;
   if (item.role === "user") {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
-      <div className="flex justify-end">
+      <div className="group flex items-center justify-end gap-1">
+        {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
         <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
           {text}
         </div>
@@ -131,26 +151,29 @@ export function MessageItem({
   }
 
   return (
-    <div className="space-y-1">
-      {item.blocks.map((block, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
-        <BlockView key={`${item.id}-${index}`} block={block} live={item.live} />
-      ))}
-      {item.live && item.blocks.length === 0 ? <ThinkingIndicator /> : null}
-      {!item.live && item.model ? (
-        <div className="text-xs text-muted-foreground">
-          {[
-            item.provider ? `${item.provider}/${item.model}` : item.model,
-            // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
-            item.thinkingLevel && item.thinkingLevel !== "off"
-              ? thinkingLevelLabel(item.thinkingLevel, t)
-              : "",
-            clockLabel(item.createdAt),
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </div>
-      ) : null}
+    <div className="group flex items-start gap-1">
+      <div className="min-w-0 flex-1 space-y-1">
+        {item.blocks.map((block, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
+          <BlockView key={`${item.id}-${index}`} block={block} live={item.live} />
+        ))}
+        {item.live && item.blocks.length === 0 ? <ThinkingIndicator /> : null}
+        {!item.live && item.model ? (
+          <div className="text-xs text-muted-foreground">
+            {[
+              item.provider ? `${item.provider}/${item.model}` : item.model,
+              // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
+              item.thinkingLevel && item.thinkingLevel !== "off"
+                ? thinkingLevelLabel(item.thinkingLevel, t)
+                : "",
+              clockLabel(item.createdAt),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+        ) : null}
+      </div>
+      {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
     </div>
   );
 }

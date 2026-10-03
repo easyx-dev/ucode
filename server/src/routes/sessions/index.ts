@@ -1,21 +1,26 @@
-/** /api/v1/sessions：会话的列表 / 新建 / 详情 / 更新 / 归档 */
+/** /api/v1/sessions：会话的列表 / 新建 / 详情 / 更新 / 归档 / 分叉 */
+import { rmSync } from "node:fs";
+
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
   type SessionArchiveResponse,
   type SessionCreateInput,
+  type SessionForkInput,
   type SessionInfoResponse,
   type SessionListInput,
   type SessionListResponse,
   type SessionSummary,
   type SessionUpdateInput,
   sessionCreateInputSchema,
+  sessionForkInputSchema,
   sessionIdInputSchema,
   sessionListInputSchema,
   sessionUpdateInputSchema,
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
+import { createForkedSessionFile, resolveForkSource } from "../../agent/fork";
 import { resolveSessionCwd } from "../../agent/session-config";
 import { workspaceDirOf } from "../../agent/workspace";
 import type { Services } from "../../app";
@@ -207,6 +212,49 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
   return { archived: true, sessionId };
 };
 
+/**
+ * 会话分叉：从某条消息（缺省当前叶子）抽出新会话，原会话不动。
+ * 子智能体会话只读且没有独立模式语义，不允许作为分叉源。
+ */
+const forkSession = (services: Services, input: SessionForkInput): SessionSummary => {
+  const source = resolveForkSource(
+    input.sessionId,
+    services.sessions.find(input.sessionId),
+    services.pool.isActive(input.sessionId),
+  );
+
+  // 分叉会话与源共用工作目录：新会话文件 header 与 DB 行都用源解析后的 cwd
+  const cwd = resolveSessionCwd(source);
+  const forked = createForkedSessionFile({
+    sourcePath: source.sourcePath,
+    cwd,
+    ...(input.fromEntryId ? { fromEntryId: input.fromEntryId } : {}),
+  });
+
+  const { model, thinkingLevel } = runtimeDefaults(services);
+  const override = overrideOf(source);
+  try {
+    services.sessions.createForked(forked.id, {
+      forkedFromId: source.id,
+      cwd,
+      name: input.name ?? (source.name ? `${source.name} · 分叉` : null),
+      mode: source.mode,
+      // 继承源会话的生效值，避免分叉后与源看到不一样的模型 / 档位
+      model: override.model ?? model ?? undefined,
+      thinkingLevel: override.thinkingLevel ?? thinkingLevel,
+    });
+  } catch (error) {
+    // 行没落上：刚写出的分叉文件没有主，清掉避免留孤儿
+    rmSync(forked.sourcePath, { force: true });
+    throw error;
+  }
+
+  const index = indexFromManager(forked.manager);
+  if (index) services.sessions.refresh(forked.id, index);
+
+  return describeSession(services, forked.id).session;
+};
+
 export const createSessionsRoute = (services: Services) => {
   const router = new Hono();
 
@@ -224,6 +272,9 @@ export const createSessionsRoute = (services: Services) => {
   );
   router.post("/archive", jsonBody(sessionIdInputSchema), (c) =>
     c.json(ok(archiveSession(services, c.req.valid("json").sessionId))),
+  );
+  router.post("/fork", jsonBody(sessionForkInputSchema), (c) =>
+    c.json(ok(forkSession(services, c.req.valid("json")))),
   );
 
   return router;
