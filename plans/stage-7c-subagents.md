@@ -228,6 +228,30 @@ SUB-06 仓储父子与列表过滤；SUB-07 交互来源；SUB-08 真实模型�
 - 子会话重新打开时按 `parent_session_id + agent` 还原能力（v1 深度 1：父是主会话，取 `MODES[父.mode]` 与之交集）。
 - 验收：进出子会话；归档级联；刷新保持。
 
+**7c-1c 复盘（落地时的偏差）**
+
+- 子会话视图**只读**：计划只说「进入子会话切到该会话视图」，落地明确为不发消息——输入区替换为只读提示。
+  因此子会话不会独立在跑，级联归档无需处理「运行中的下属」，`archive` 只对整棵子树做一次忙碌校验即可。
+- 侧栏下钻的显隐依据用 **`SessionSummary.childCount`**（契约新增；SQL 关联子查询数未归档的直接子会话），
+  仅在有子会话时显示展开箭头；搜索期间收起子会话，避免未参与过滤的子项混进结果。
+- 级联归档落在 `routes/sessions` 的 `archive`：`SessionRecord.descendantIds`（BFS 收集整棵子树，含已归档、
+  带环兜底）逐个 `dispose` / `events.remove` / `interactions.forget` / `permissions.clear` / `archive`；
+  归档确认在有子会话时用「一并归档」文案。
+- **当前会话解析改为经 `sessions/info`**：子会话不在主列表，旧的「不在列表即清空」会把它立刻清掉。
+  新的 `useActiveSession`：主列表有就直接取，否则请求详情，`deletedAt` 或确认不存在（404 / id 非法）才清空，
+  网络类临时故障保留选中项。为此顺带修服务端一处：`sessions/info` 此前对不存在的会话返回**合成的草稿摘要（200）**，
+  改为 404——草稿会话也有 DB 行，据此把「无行」与「有行未落盘」区分开，否则「点进子会话刷新」与
+  「URL 里已消失的会话」都会渲染成空会话。
+- 子会话入口补了工具卡一处：`SubagentStream` 增 `sessionId`（取自 `subagent_start`），
+  在工具结果卡的嵌套进度里给「打开子会话」；仅实时可见，刷新后进度不重建（沿用 7c-1b 边界）。
+- 顺带 UX：直接打开 / 刷新子会话时自动展开其父级，让当前项在侧栏可见。
+- 侧栏把逐项回调收敛为一个 `renderItem`，`SessionProjectGroup` 不再透传 `activeId` / `onSelect` 等。
+- 「重开还原能力」这条在 7c-1a 的 `pool.resolveAgent` 已实现，本次未改，由既有 SUB-01/02 用例兜住。
+- 验收：`pnpm check` 全绿（176 单测 + 6 项约定校验）。真实模型浏览器走查——build 父委派 `explore` →
+  侧栏出现展开箭头 → 展开见子会话 → 进入（URL `?session=sub-…`、返回按钮、只读页脚、子会话转录）→
+  返回父会话 → 直接刷新子会话 URL 仍保持且父级自动展开 → 工具卡「打开子会话」跳转成功；
+  归档父会话弹「一并归档」确认，确认后子会话 `deletedAt` 落库、列表清空、子会话视图自动退出。
+
 ### 7c-1d · 自定义 agent / resume / 深度 / fork 口子
 
 - 自定义 agent：`$APP_HOME/agent/agents/*.md`，frontmatter（`name` / `description` / `tools` / `model` / `thinking` / `advertise` 等）
