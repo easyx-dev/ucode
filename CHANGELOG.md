@@ -44,6 +44,9 @@
   子会话触发的审批 / 提问归属父会话并标注来源（`interactions` 契约新增 `sourceSessionId` /
   `sourceDescription`）。角色与能力解析落在新的 `agent/agents/`，会话装配从「按模式」改为「按角色能力」；
   只有继承默认工具集的子会话（`general`）才挂 MCP / `tool_search` 扩展，`explore` 与只读模式下的子会话不连。
+- 子智能体**流式进度**：新增 `subagent_start` / `subagent_end` 两个事件，只建立 / 解除
+  「父会话 `toolCallId` ↔ 子会话 id」关联，**不重发**子会话事件——子会话自身的帧已在同一事件流上按其
+  sessionId 广播，前端据此把子帧归入父会话里对应工具卡的嵌套视图（可折叠）；进度不落盘，刷新后不重建。
 - 接入 pi 内置 **MCP（Model Context Protocol）**：`build` 模式加载 `$APP_HOME/agent/mcp.json`
   （用户级；自定义 `loadConfig` 排除 pi 默认的项目级 `.pi/mcp.json`），并在 `session_start` 时连接；
   `plan` / `ask` 不加载该扩展——连接成功会激活 `codemode`，绕过只读白名单。

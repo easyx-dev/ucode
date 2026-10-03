@@ -116,6 +116,7 @@ export function ChatPanel({
 
       <MessageList
         items={chat.items}
+        subagents={chat.subagents}
         loading={chat.loadingHistory}
         pending={chat.pending}
         empty={empty}

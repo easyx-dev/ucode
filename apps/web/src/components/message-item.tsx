@@ -1,4 +1,4 @@
-import { Brain, ChevronRight } from "lucide-react";
+import { Bot, Brain, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,7 +8,7 @@ import { ToolCallCard } from "@/components/tool-call-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { thinkingLevelLabel } from "@/lib/thinking";
 import { clockLabel } from "@/lib/time";
-import type { ChatItem, MessageBlock } from "@/lib/types";
+import type { ChatItem, MessageBlock, SubagentStream } from "@/lib/types";
 
 function ThinkingBlock({ text }: { text: string }) {
   const { t } = useTranslation();
@@ -44,7 +44,39 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
   );
 }
 
-export function MessageItem({ item }: { item: ChatItem }) {
+/** 子智能体的内联进度：子会话自己的消息，折叠在父会话的工具卡里 */
+function SubagentProgress({ stream }: { stream: SubagentStream }) {
+  const { t } = useTranslation();
+  const status = stream.done ? (stream.isError ? t("失败") : t("完成")) : t("执行中");
+
+  return (
+    <div className="border-t border-border pt-2">
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Bot className="size-3.5 shrink-0" />
+        <span className="shrink-0">{t("子智能体过程")}</span>
+        {stream.description ? (
+          <span className="truncate text-foreground/70">{stream.description}</span>
+        ) : null}
+        <span className="ml-auto shrink-0">{status}</span>
+      </div>
+      <div className="space-y-3 border-l-2 border-border pl-3">
+        {stream.items.map((item) => (
+          // 子会话不能再派子智能体，嵌套不会再出现子进度
+          <MessageItem key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function MessageItem({
+  item,
+  subagent,
+}: {
+  item: ChatItem;
+  /** 该条工具结果的子智能体内联进度（仅 subagent 工具调用会有） */
+  subagent?: SubagentStream;
+}) {
   const { t } = useTranslation();
   if (item.role === "user") {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
@@ -65,7 +97,9 @@ export function MessageItem({ item }: { item: ChatItem }) {
         result={text}
         isError={item.isError}
         running={item.live}
-      />
+      >
+        {subagent ? <SubagentProgress stream={subagent} /> : null}
+      </ToolCallCard>
     );
   }
 

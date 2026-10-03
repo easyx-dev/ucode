@@ -28,7 +28,12 @@ export type SubagentResult = {
 };
 
 export type SubagentHooks = {
-  spawn: (request: SubagentRequest, signal?: AbortSignal) => Promise<SubagentResult>;
+  /** `toolCallId` 用于把子会话进度帧关联回父会话里的这次调用 */
+  spawn: (
+    toolCallId: string,
+    request: SubagentRequest,
+    signal?: AbortSignal,
+  ) => Promise<SubagentResult>;
 };
 
 /** 子会话上下文策略，`fresh` 现用；`fork` 与后续「会话分叉」共用原语 */

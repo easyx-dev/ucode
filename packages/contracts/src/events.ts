@@ -22,6 +22,12 @@ export const EVENT_NAMES = [
   "interaction_request",
   /** 交互请求已答复或超时，前端据此关闭对话框 */
   "interaction_resolved",
+  /**
+   * 子智能体开始 / 结束：只建立 `toolCallId ↔ 子会话 id` 关联，进度帧不重发。
+   * 子会话自身的事件已在同一事件流上按其 sessionId 广播，前端据此把子帧归入嵌套视图。
+   */
+  "subagent_start",
+  "subagent_end",
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];

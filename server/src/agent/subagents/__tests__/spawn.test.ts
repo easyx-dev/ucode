@@ -67,6 +67,7 @@ const depsOf = (over: Partial<SubagentSpawnDeps> = {}): SubagentSpawnDeps => ({
   refresh: () => {},
   settleInteractions: () => {},
   dispose: () => {},
+  emit: () => {},
   ...over,
 });
 
@@ -79,6 +80,7 @@ describe("spawnSubagent", () => {
     const result = await spawnSubagent(
       {
         parent: parentRecord,
+        toolCallId: "call-test",
         cwd: "/tmp/project",
         request: { description: "侦察影响面", task: "看看谁调用了它" },
       },
@@ -110,6 +112,7 @@ describe("spawnSubagent", () => {
       spawnSubagent(
         {
           parent: parentRecord,
+          toolCallId: "call-test",
           cwd: "/tmp/project",
           request: { agent: "nope", description: "x", task: "y" },
         },
@@ -126,6 +129,7 @@ describe("spawnSubagent", () => {
       spawnSubagent(
         {
           parent: parentRecord,
+          toolCallId: "call-test",
           cwd: "/tmp/project",
           request: { description: "x", task: "y" },
         },
@@ -150,6 +154,7 @@ describe("spawnSubagent", () => {
     const pending = spawnSubagent(
       {
         parent: parentRecord,
+        toolCallId: "call-test",
         cwd: "/tmp/project",
         request: { description: "长任务", task: "慢慢做" },
         signal: controller.signal,
@@ -176,6 +181,7 @@ describe("spawnSubagent", () => {
       spawnSubagent(
         {
           parent: parentRecord,
+          toolCallId: "call-test",
           cwd: "/tmp/project",
           request: { description: "x", task: "y" },
         },
@@ -183,5 +189,100 @@ describe("spawnSubagent", () => {
       ),
       /子智能体执行失败：upstream 500 boom/,
     );
+  });
+
+  it("只发关联帧：start 在 prompt 前、end 在 prompt 后且 isError=false", async () => {
+    const emits: Array<[string, Record<string, unknown>]> = [];
+    const order: string[] = [];
+    const { session } = fakeChild({
+      entries: [assistantEntry("结论")],
+      prompt: async () => {
+        order.push("prompt");
+      },
+    });
+
+    const result = await spawnSubagent(
+      {
+        parent: parentRecord,
+        toolCallId: "call-abc",
+        cwd: "/tmp/project",
+        request: { description: "侦察", task: "看" },
+      },
+      depsOf({
+        ensure: async () => session,
+        emit: (type, data) => {
+          emits.push([type, data]);
+          order.push(type);
+        },
+      }),
+    );
+
+    assert.deepEqual(
+      emits.map(([type]) => type),
+      ["subagent_start", "subagent_end"],
+    );
+    assert.equal(emits[0]?.[1]?.toolCallId, "call-abc");
+    assert.equal(emits[0]?.[1]?.sessionId, result.sessionId);
+    assert.equal(emits[0]?.[1]?.description, "侦察");
+    assert.equal(emits[1]?.[1]?.isError, false);
+    assert.deepEqual(order, ["subagent_start", "prompt", "subagent_end"]);
+  });
+
+  it("失败路径的 end 标记 isError", async () => {
+    const emits: Array<[string, Record<string, unknown>]> = [];
+    const { session } = fakeChild({ prompt: () => Promise.reject(new Error("boom")) });
+
+    await assert.rejects(
+      spawnSubagent(
+        {
+          parent: parentRecord,
+          toolCallId: "call-1",
+          cwd: "/tmp/project",
+          request: { description: "x", task: "y" },
+        },
+        depsOf({
+          ensure: async () => session,
+          emit: (type, data) => emits.push([type, data]),
+        }),
+      ),
+      /子智能体执行失败/,
+    );
+    assert.equal(emits.at(-1)?.[0], "subagent_end");
+    assert.equal(emits.at(-1)?.[1]?.isError, true);
+  });
+
+  it("装配失败或未知角色时不发任何关联帧", async () => {
+    const emits: string[] = [];
+
+    await assert.rejects(
+      spawnSubagent(
+        {
+          parent: parentRecord,
+          toolCallId: "call-1",
+          cwd: "/tmp/project",
+          request: { description: "x", task: "y" },
+        },
+        depsOf({
+          ensure: async () => {
+            throw new Error("模型未配置");
+          },
+          emit: (type) => emits.push(type),
+        }),
+      ),
+      /模型未配置/,
+    );
+    await assert.rejects(
+      spawnSubagent(
+        {
+          parent: parentRecord,
+          toolCallId: "call-2",
+          cwd: "/tmp/project",
+          request: { agent: "nope", description: "x", task: "y" },
+        },
+        depsOf({ emit: (type) => emits.push(type) }),
+      ),
+      /未知的子智能体角色/,
+    );
+    assert.deepEqual(emits, []);
   });
 });

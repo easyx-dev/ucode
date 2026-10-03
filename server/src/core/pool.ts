@@ -128,7 +128,7 @@ export class SessionPool {
   private subagentHooks(record: SessionRecord, cwd: string): SubagentHooks {
     let active = 0;
     return {
-      spawn: async (request, signal) => {
+      spawn: async (toolCallId, request, signal) => {
         // 模型覆盖先校验：拼错的 provider/model 应显式报错，而不是静默回落默认模型
         if (request.model && !this.runtime.resolveModelRef(request.model)) {
           throw new Error(`子智能体指定的模型不可用：${request.model}`);
@@ -141,7 +141,7 @@ export class SessionPool {
         active += 1;
         try {
           return await spawnSubagent(
-            { parent: record, cwd, request, ...(signal ? { signal } : {}) },
+            { parent: record, toolCallId, cwd, request, ...(signal ? { signal } : {}) },
             {
               createChild: (id, input) => this.repository.createChild(id, input),
               discardChild: (id) => this.repository.discardChild(id),
@@ -151,6 +151,7 @@ export class SessionPool {
               dispose: (id) => {
                 this.dispose(id);
               },
+              emit: (type, data) => this.events.emitFrame(record.id, type, data),
             },
           );
         } finally {

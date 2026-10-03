@@ -1,7 +1,7 @@
 /** 会话消息列表的事件归并（纯函数，便于复用与单测） */
 import type { ChatItem, MessageBlock, MessageDTO, MessageRole } from "./types";
 
-const asRecord = (value: unknown): Record<string, unknown> =>
+export const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 
 let localId = 0;
@@ -101,6 +101,7 @@ export const startToolItem = (items: ChatItem[], data: Record<string, unknown>):
     id: `live-tool-${String(data.toolCallId ?? nextLocalId())}`,
     role: "tool",
     blocks: [{ type: "text", text: "" }],
+    toolCallId: String(data.toolCallId ?? ""),
     toolName: String(data.toolName ?? "tool"),
     isError: false,
     live: true,

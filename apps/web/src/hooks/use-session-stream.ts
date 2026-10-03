@@ -2,9 +2,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, describeApiError, describeError } from "@/lib/api";
-import { reduceEvent, settle } from "@/lib/chat-reducer";
+import { asRecord, reduceEvent, settle } from "@/lib/chat-reducer";
 import { eventStream } from "@/lib/event-stream";
-import type { ChatItem, EventName, ServerEventPayload } from "@/lib/types";
+import type {
+  ChatItem,
+  EventName,
+  ServerEventPayload,
+  SubagentStream,
+  SubagentStreams,
+} from "@/lib/types";
 
 /** 会让界面进入「生成中」的事件；agent_settled 是唯一的结束边界 */
 const ACTIVITY_EVENTS = new Set<EventName>([
@@ -33,6 +39,8 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
   running: boolean;
   /** 已受理、还没收到首个活动事件；用来补上「点发送」到「首个事件」之间的空窗 */
   pending: boolean;
+  /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
+  subagents: SubagentStreams;
   /** 发送时调用，立即进入 pending；首个活动事件 / 收尾 / 出错时自动消除 */
   markPending: () => void;
   /** prompt 请求本身失败时调用，回收 pending */
@@ -41,6 +49,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [running, setRunning] = useState(false);
   const [pending, setPending] = useState(false);
+  const [subagents, setSubagents] = useState<SubagentStreams>({});
 
   const sessionIdRef = useRef(sessionId);
   const hydratingRef = useRef(false);
@@ -48,6 +57,10 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
   const tokenRef = useRef(0);
   const connectedOnceRef = useRef(false);
   const handlersRef = useRef({ readItems, apply, onError });
+  /** 子智能体进度以 ref 为准，供事件回调同步读写 */
+  const subagentsRef = useRef<SubagentStreams>({});
+  /** 子会话 id → 父会话里这次 subagent 调用的 toolCallId */
+  const childToolCallsRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     handlersRef.current = { readItems, apply, onError };
@@ -56,22 +69,103 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
   const markPending = useCallback(() => setPending(true), []);
   const clearPending = useCallback(() => setPending(false), []);
 
-  /** 应用一条事件帧：维护 running，再交给 reducer 归并 */
-  const applyFrame = useCallback((frame: ServerEventPayload) => {
-    const { apply: applyItems, readItems: read } = handlersRef.current;
-    if (frame.type === "agent_settled") {
-      setRunning(false);
-      setPending(false);
-      applyItems(settle(read()));
-      return;
-    }
-    // 首个活动事件到达即接手生成态，pending 让位给 running
-    if (ACTIVITY_EVENTS.has(frame.type)) {
-      setRunning(true);
-      setPending(false);
-    }
-    applyItems(reduceEvent(read(), frame.type, frame.data));
+  const applySubagents = useCallback((next: SubagentStreams) => {
+    subagentsRef.current = next;
+    setSubagents(next);
   }, []);
+
+  /** 就地更新某个子智能体的进度；没有对应条目时忽略 */
+  const updateSubagent = useCallback(
+    (toolCallId: string, update: (stream: SubagentStream) => SubagentStream) => {
+      const current = subagentsRef.current;
+      const existing = current[toolCallId];
+      if (!existing) return;
+      applySubagents({ ...current, [toolCallId]: update(existing) });
+    },
+    [applySubagents],
+  );
+
+  /** 子会话自身的帧经关联后归入对应嵌套视图；`agent_settled` 表示它已经跑完 */
+  const applyChildFrame = useCallback(
+    (toolCallId: string, frame: ServerEventPayload) => {
+      updateSubagent(toolCallId, (stream) =>
+        frame.type === "agent_settled"
+          ? { ...stream, items: settle(stream.items), done: true }
+          : { ...stream, items: reduceEvent(stream.items, frame.type, frame.data) },
+      );
+    },
+    [updateSubagent],
+  );
+
+  /** 应用一条事件帧：维护 running，再交给 reducer 归并 */
+  const applyFrame = useCallback(
+    (frame: ServerEventPayload) => {
+      const { apply: applyItems, readItems: read } = handlersRef.current;
+
+      // 子智能体只发关联帧：建立 / 解除 childId → toolCallId 映射，进度靠子会话自身的帧
+      if (frame.type === "subagent_start") {
+        const data = asRecord(frame.data);
+        const toolCallId = String(data.toolCallId ?? "");
+        const childId = String(data.sessionId ?? "");
+        if (!toolCallId || !childId) return;
+        childToolCallsRef.current.set(childId, toolCallId);
+        applySubagents({
+          ...subagentsRef.current,
+          [toolCallId]: {
+            description: String(data.description ?? ""),
+            items: subagentsRef.current[toolCallId]?.items ?? [],
+            done: false,
+            isError: false,
+          },
+        });
+        return;
+      }
+
+      if (frame.type === "subagent_end") {
+        const data = asRecord(frame.data);
+        const toolCallId = String(data.toolCallId ?? "");
+        const childId = String(data.sessionId ?? "");
+        if (childId) childToolCallsRef.current.delete(childId);
+        updateSubagent(toolCallId, (stream) => ({
+          ...stream,
+          items: settle(stream.items),
+          done: true,
+          isError: Boolean(data.isError),
+        }));
+        return;
+      }
+
+      if (frame.type === "agent_settled") {
+        setRunning(false);
+        setPending(false);
+        applyItems(settle(read()));
+        // 父会话整体收尾时，残留的子智能体一并收尾（正常路径 subagent_end 已收）
+        const leftovers = Object.entries(subagentsRef.current).filter(
+          ([, stream]) => !stream.done || stream.items.some((item) => item.live),
+        );
+        if (leftovers.length > 0) {
+          applySubagents({
+            ...subagentsRef.current,
+            ...Object.fromEntries(
+              leftovers.map(([id, stream]) => [
+                id,
+                { ...stream, items: settle(stream.items), done: true },
+              ]),
+            ),
+          });
+        }
+        return;
+      }
+
+      // 首个活动事件到达即接手生成态，pending 让位给 running
+      if (ACTIVITY_EVENTS.has(frame.type)) {
+        setRunning(true);
+        setPending(false);
+      }
+      applyItems(reduceEvent(read(), frame.type, frame.data));
+    },
+    [applySubagents, updateSubagent],
+  );
 
   /**
    * 取快照并接续。服务端把投影与快照序号放在同一次同步读取里返回，
@@ -136,7 +230,14 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
         handlersRef.current.onError(describeApiError(frame.code, frame.message, frame.params));
         return;
       }
-      if (frame.sessionId !== sessionIdRef.current) return;
+      if (frame.sessionId !== sessionIdRef.current) {
+        // 子会话自身的帧：只在已建立关联、且不在取快照时归入嵌套视图；
+        // 快照对嵌套进度不做重建，取快照期间直接丢弃
+        const toolCallId = childToolCallsRef.current.get(frame.sessionId);
+        if (!toolCallId || hydratingRef.current) return;
+        applyChildFrame(toolCallId, frame);
+        return;
+      }
       if (hydratingRef.current) {
         bufferRef.current.push(frame);
         return;
@@ -159,7 +260,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
       offFrame();
       offStatus();
     };
-  }, [applyFrame, hydrate]);
+  }, [applyChildFrame, applyFrame, hydrate]);
 
   // 切换会话：清空上一会话的内容与错误，作废在途 hydration 后重新取快照
   useEffect(() => {
@@ -167,6 +268,8 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
     tokenRef.current += 1;
     bufferRef.current = [];
     hydratingRef.current = false;
+    childToolCallsRef.current = new Map();
+    applySubagents({});
     setRunning(false);
     setPending(false);
 
@@ -179,7 +282,7 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
       return;
     }
     void hydrate();
-  }, [hydrate, sessionId]);
+  }, [applySubagents, hydrate, sessionId]);
 
-  return { loadingHistory, running, pending, markPending, clearPending };
+  return { loadingHistory, running, pending, subagents, markPending, clearPending };
 }

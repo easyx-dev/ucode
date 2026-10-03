@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useInterrupt } from "@/hooks/use-interrupt";
 import { type SessionSeed, useSendMessage } from "@/hooks/use-send-message";
 import { useSessionStream } from "@/hooks/use-session-stream";
-import type { ChatItem, SessionSummary } from "@/lib/types";
+import type { ChatItem, SessionSummary, SubagentStreams } from "@/lib/types";
 
 /** 发送结果：消息投给哪个会话（`null` 表示连会话都没建出来），以及是否已被受理 */
 export type SendResult = {
@@ -14,6 +14,8 @@ export type SendResult = {
 
 export type ChatController = {
   items: ChatItem[];
+  /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
+  subagents: SubagentStreams;
   streaming: boolean;
   /** 已发送、还没出现任何生成内容：消息区尾部显示等待指示 */
   pending: boolean;
@@ -49,12 +51,13 @@ export function useChat(sessionId: string | null, options: ChatOptions): ChatCon
   }, []);
 
   const readItems = useCallback(() => itemsRef.current, []);
-  const { loadingHistory, running, pending, markPending, clearPending } = useSessionStream({
-    sessionId,
-    readItems,
-    apply,
-    onError: setError,
-  });
+  const { loadingHistory, running, pending, subagents, markPending, clearPending } =
+    useSessionStream({
+      sessionId,
+      readItems,
+      apply,
+      onError: setError,
+    });
   const { sending, send: sendTo } = useSendMessage({
     readItems,
     apply,
@@ -90,6 +93,7 @@ export function useChat(sessionId: string | null, options: ChatOptions): ChatCon
 
   return {
     items,
+    subagents,
     streaming: running || sending || pending,
     // 活动事件可能先于 prompt 回执到达，此时 running 已接手，pending 不应再显示
     pending: pending && !running,

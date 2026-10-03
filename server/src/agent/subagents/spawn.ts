@@ -36,6 +36,8 @@ export type SubagentSpawnDeps = {
   /** 结算该子会话发起的挂起交互（归属父会话，但只清来源是它的） */
   settleInteractions: (sessionId: string) => void;
   dispose: (sessionId: string) => void;
+  /** 只发关联帧（`toolCallId ↔ 子会话 id`），子会话进度帧仍由它自身的广播承载 */
+  emit: (type: "subagent_start" | "subagent_end", data: Record<string, unknown>) => void;
 };
 
 /**
@@ -129,6 +131,8 @@ const promptChild = (child: AgentSession, task: string, signal?: AbortSignal): P
 export const spawnSubagent = async (
   input: {
     parent: SessionRecord;
+    /** 父会话里这次 `subagent` 调用的 id，用于关联子会话进度 */
+    toolCallId: string;
     /** 父会话工作目录；子会话在同一个目录里干活 */
     cwd: string;
     request: SubagentRequest;
@@ -166,10 +170,22 @@ export const spawnSubagent = async (
     throw error;
   }
 
+  // 只发关联帧：前端据此把该子会话自身的进度帧归入父会话里这次工具调用，不重发子会话事件
+  deps.emit("subagent_start", {
+    toolCallId: input.toolCallId,
+    sessionId: childId,
+    description: name,
+  });
+
+  let isError = false;
   try {
     await promptChild(child, input.request.task, input.signal);
     return { sessionId: childId, text: lastAssistantText(child) };
+  } catch (error) {
+    isError = true;
+    throw error;
   } finally {
+    deps.emit("subagent_end", { toolCallId: input.toolCallId, sessionId: childId, isError });
     // 失败（超时 / 中止）也要回写：子会话可能已写出 JSONL，不回写会永远停在「未落盘」的草稿口径
     deps.refresh(childId);
     // 子会话挂起的审批 / 提问归属父会话，结束时一并结算，避免它超时前一直挂在前端

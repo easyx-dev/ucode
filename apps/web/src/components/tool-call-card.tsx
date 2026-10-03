@@ -1,4 +1,5 @@
 import { CheckCircle2, ChevronRight, CircleDashed, TriangleAlert, Wrench } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -10,11 +11,21 @@ type ToolCallCardProps = {
   result?: string;
   isError?: boolean;
   running?: boolean;
+  /** 额外内容（如子智能体的内联进度），渲染在参数 / 结果下方 */
+  children?: ReactNode;
 };
 
-export function ToolCallCard({ name, args, result, isError, running }: ToolCallCardProps) {
+export function ToolCallCard({
+  name,
+  args,
+  result,
+  isError,
+  running,
+  children,
+}: ToolCallCardProps) {
   const { t } = useTranslation();
-  const hasBody = args !== undefined || (result !== undefined && result !== "");
+  const hasBody =
+    args !== undefined || (result !== undefined && result !== "") || Boolean(children);
 
   return (
     <Collapsible className="my-2 rounded-lg bg-muted/50 ring-1 ring-foreground/10">
@@ -63,6 +74,7 @@ export function ToolCallCard({ name, args, result, isError, running }: ToolCallC
               {result}
             </pre>
           ) : null}
+          {children}
         </div>
       </CollapsibleContent>
     </Collapsible>

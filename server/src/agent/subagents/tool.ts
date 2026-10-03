@@ -56,8 +56,9 @@ export const createSubagentTool = (hooks: SubagentHooks) =>
         ),
       ),
     }),
-    async execute(_toolCallId, { agent, description, task, model, thinkingLevel }, signal) {
+    async execute(toolCallId, { agent, description, task, model, thinkingLevel }, signal) {
       const result = await hooks.spawn(
+        toolCallId,
         {
           ...(agent ? { agent } : {}),
           description,

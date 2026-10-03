@@ -189,6 +189,7 @@ export default {
 
   // Messages
   思考过程: "Reasoning",
+  子智能体过程: "Subagent progress",
   上下文已压缩: "(context compacted)",
   扩展消息: "(extended message)",
   "思考中…": "Thinking…",

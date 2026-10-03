@@ -3,17 +3,19 @@ import { useEffect, useRef } from "react";
 import { MessageItem } from "@/components/message-item";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ChatItem } from "@/lib/types";
+import type { ChatItem, SubagentStreams } from "@/lib/types";
 
 type MessageListProps = {
   items: ChatItem[];
+  /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
+  subagents?: SubagentStreams;
   loading?: boolean;
   /** 已发送、首个生成内容未到：尾部显示等待指示 */
   pending?: boolean;
   empty?: React.ReactNode;
 };
 
-export function MessageList({ items, loading, pending, empty }: MessageListProps) {
+export function MessageList({ items, subagents, loading, pending, empty }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -45,7 +47,13 @@ export function MessageList({ items, loading, pending, empty }: MessageListProps
         {!loading && items.length === 0 ? empty : null}
 
         {items.map((item) => (
-          <MessageItem key={item.id} item={item} />
+          <MessageItem
+            // 工具项在 `message_end` 合并时 id 会从 `live-tool-*` 换成服务端 id；
+            // 用 toolCallId 作 key，避免重挂导致展开的嵌套进度被收起
+            key={item.role === "tool" && item.toolCallId ? `tool-${item.toolCallId}` : item.id}
+            item={item}
+            subagent={item.toolCallId ? subagents?.[item.toolCallId] : undefined}
+          />
         ))}
 
         {pending ? <ThinkingIndicator /> : null}
