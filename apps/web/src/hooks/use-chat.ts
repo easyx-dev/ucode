@@ -1,6 +1,7 @@
 /** 会话消息流：持有消息列表，装配快照/接续与发送 */
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useEditMessage } from "@/hooks/use-edit-message";
 import { useInterrupt } from "@/hooks/use-interrupt";
 import { type SessionSeed, useSendMessage } from "@/hooks/use-send-message";
 import { useSessionStream } from "@/hooks/use-session-stream";
@@ -23,6 +24,8 @@ export type ChatController = {
   loadingHistory: boolean;
   /** 发送一条消息；还没有会话时先建会话（`seed` 是它的初始设置） */
   send: (text: string, seed?: SessionSeed) => Promise<SendResult>;
+  /** 编辑一条已发送的用户消息并重发；刷新由 transcript_reset 事件驱动 */
+  edit: (entryId: string, text: string) => Promise<boolean>;
   stop: () => Promise<void>;
 };
 
@@ -65,6 +68,7 @@ export function useChat(sessionId: string | null, options: ChatOptions): ChatCon
     markPending,
     clearPending,
   });
+  const { edit } = useEditMessage({ sessionId, onError: setError });
   const stop = useInterrupt(sessionId);
 
   const send = useCallback(
@@ -100,6 +104,7 @@ export function useChat(sessionId: string | null, options: ChatOptions): ChatCon
     error,
     loadingHistory,
     send,
+    edit,
     stop,
   };
 }

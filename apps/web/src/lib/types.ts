@@ -21,6 +21,7 @@ export type {
   MemoryView,
   MessageBlock,
   MessageDTO,
+  MessageEditRequest,
   MessageRole,
   ModelsResponse,
   PendingInteraction,

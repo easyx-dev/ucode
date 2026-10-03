@@ -44,6 +44,8 @@ type ChatPanelProps = {
   onOpenSession: (sessionId: string) => void;
   /** 从某条消息分叉出新会话 */
   onFork: (item: ChatItem) => void;
+  /** 编辑某条用户消息并重发（仅主对话、非生成中可用） */
+  onEdit: (item: ChatItem, text: string) => Promise<boolean>;
   /** 本会话分叉自的源会话名；用于头部来源链接 */
   forkedFromName?: string | null;
   /** 从子会话视图返回父会话 */
@@ -68,6 +70,7 @@ export function ChatPanel({
   onOpenSettings,
   onOpenSession,
   onFork,
+  onEdit,
   forkedFromName,
   onBackToParent,
   planReady,
@@ -148,6 +151,7 @@ export function ChatPanel({
         empty={empty}
         onOpenSession={onOpenSession}
         onFork={isChild ? undefined : onFork}
+        onEdit={isChild || chat.streaming ? undefined : onEdit}
       />
 
       {isChild ? (

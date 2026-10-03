@@ -35,6 +35,11 @@
 
 ### 新增
 
+- 新增**编辑历史**：在用户消息上「编辑并重新发送」，从该消息之前继续推进；被放弃的后续内容保留在会话
+  文件里（旧分支），不删除。新增 `messages/edit` 接口（`messageEditInputSchema`：`sessionId` /
+  `entryId` / `text`），复用 pi 的 `AgentSession.navigateTree`（`summarize: false`）把活动分支移回该
+  消息的父节点再重发；会话在跑 / 压缩 / 有排队消息时返回 `session_busy`，非活动分支或非用户消息返回
+  `invalid_request`。新增 `transcript_reset` 事件，客户端据此丢弃本地历史并重新取快照。无 DB / schema 变更。
 - 新增**会话分叉**：从任一条已落盘消息「从此分叉」，生成一个独立的新会话（内容为该消息及其之前的历史，
   可继续对话），原会话不变。新增 `sessions/fork` 接口（`sessionForkInputSchema`：`sessionId` /
   `fromEntryId?` / `name?`，缺省分叉点为当前叶子）；`session` 表新增 `forked_from_session_id`

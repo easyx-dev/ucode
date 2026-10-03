@@ -214,6 +214,10 @@ export default {
   分叉失败: "Failed to fork",
   打开源会话: "Open source session",
 
+  // Edit history
+  编辑并重新发送: "Edit and resend",
+  编辑后移除提示: "Sending will remove everything after this message (kept in the session record).",
+
   // Empty states
   "夜深了，接下来交给我吧": "It's late. Leave it to me.",
   "早上好，接下来交给我吧": "Good morning. Leave it to me.",

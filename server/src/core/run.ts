@@ -1,7 +1,8 @@
 /** 会话运行：把一条输入投递给会话，生成在服务端后台推进，结果走事件总线 */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { ERROR_CODES, type PromptInput } from "@ucode/contracts";
+import { ERROR_CODES, type MessageEditInput, type PromptInput } from "@ucode/contracts";
 
+import { resolveEditableUserEntry } from "../agent/edit";
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
 import { sleep } from "../utils/time";
@@ -88,4 +89,48 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
 
   // 占位者已经结束（可能失败）：退化成新的一轮
   startRun(services, sessionId, session, text);
+};
+
+/**
+ * 编辑一条已发送的用户消息并重发：把活动分支移回该消息之前，再以新文本开一轮。
+ *
+ * 旧分支条目原样留在会话文件里（不删除、不总结），因此这一步不是「修改历史」而是「换一条分支继续」。
+ * 与 prompt 不同，编辑不能在忙碌时排队——它改变的是本轮起点，必须等会话彻底空闲。
+ */
+export const admitEdit = async (services: Services, input: MessageEditInput): Promise<void> => {
+  const { sessionId, entryId, text } = input;
+
+  const record = services.sessions.find(sessionId);
+  if (!record || record.deletedAt) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
+  // 子智能体会话只读、没有独立的重发语义
+  if (record.parentSessionId || record.agent) {
+    throw new AppError(ERROR_CODES.invalidRequest, "子智能体会话不支持编辑", 400);
+  }
+
+  // 编辑先改活动分支再开生成，整段决策必须在同一把锁内完成：
+  // 否则并发编辑会各自通过空闲检查、重复 navigateTree，把叶子改乱。
+  // startRun 只做占位、不占用锁，串行化的是决策点而不是整轮生成。
+  await services.pool.withLock(sessionId, async () => {
+    const session = await services.pool.ensure(sessionId);
+    // 压缩 / 分支总结 / 重试 / 排队也算不空闲
+    if (services.pool.isActive(sessionId) || !session.isIdle) {
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断", 409);
+    }
+
+    resolveEditableUserEntry(session.sessionManager.getBranch(), entryId);
+    try {
+      await session.navigateTree(entryId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new AppError(ERROR_CODES.invalidRequest, `编辑失败：${reason}`, 400);
+    }
+
+    // 活动分支已改变：让所有在线客户端丢弃本地历史、重新取快照
+    services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
+    startRun(services, sessionId, session, text);
+  });
 };

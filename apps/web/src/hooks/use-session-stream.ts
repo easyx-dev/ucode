@@ -239,6 +239,11 @@ export function useSessionStream({ sessionId, readItems, apply, onError }: Sessi
         applyChildFrame(toolCallId, frame);
         return;
       }
+      // 活动分支变了：本地历史作废，重新取快照（token 守卫会作废在途的旧快照）
+      if (frame.type === "transcript_reset") {
+        void hydrate();
+        return;
+      }
       if (hydratingRef.current) {
         bufferRef.current.push(frame);
         return;

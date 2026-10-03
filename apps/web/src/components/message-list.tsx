@@ -17,6 +17,8 @@ type MessageListProps = {
   onOpenSession?: (sessionId: string) => void;
   /** 从某条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
+  /** 编辑某条用户消息并重发（仅主对话）；返回是否已受理 */
+  onEdit?: (item: ChatItem, text: string) => Promise<boolean>;
 };
 
 export function MessageList({
@@ -27,10 +29,20 @@ export function MessageList({
   empty,
   onOpenSession,
   onFork,
+  onEdit,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
+
+  // 最后一条用户消息之后的内容会在编辑重发时被移除，据此给出提示
+  let lastUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "user") {
+      lastUserIndex = index;
+      break;
+    }
+  }
 
   useEffect(() => {
     if (!pinnedRef.current) return;
@@ -58,7 +70,7 @@ export function MessageList({
 
         {!loading && items.length === 0 ? empty : null}
 
-        {items.map((item) => (
+        {items.map((item, index) => (
           <MessageItem
             // 工具项在 `message_end` 合并时 id 会从 `live-tool-*` 换成服务端 id；
             // 用 toolCallId 作 key，避免重挂导致展开的嵌套进度被收起
@@ -67,6 +79,8 @@ export function MessageList({
             subagent={item.toolCallId ? subagents?.[item.toolCallId] : undefined}
             onOpenSession={onOpenSession}
             onFork={onFork}
+            onEdit={onEdit}
+            isLastUser={index === lastUserIndex}
           />
         ))}
 

@@ -1,8 +1,9 @@
-/** /api/v1/messages：会话历史读取，以及发起生成（投递）与中断 */
+/** /api/v1/messages：会话历史读取，以及发起生成（投递）、编辑重发与中断 */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   type MessageInterruptResponse,
   type MessageListResponse,
+  messageEditInputSchema,
   messageListInputSchema,
   type PromptAdmittedResponse,
   promptInputSchema,
@@ -13,7 +14,7 @@ import { Hono } from "hono";
 import { resolveSessionCwd } from "../../agent/session-config";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
-import { admitPrompt } from "../../core/run";
+import { admitEdit, admitPrompt } from "../../core/run";
 import { transcriptStates } from "../../core/serialize";
 import { env } from "../../env";
 import { ok } from "../../lib/response";
@@ -59,6 +60,15 @@ export const createMessagesRoute = (services: Services) => {
   router.post("/prompt", jsonBody(promptInputSchema), async (c) => {
     const input = c.req.valid("json");
     await admitPrompt(services, input);
+    return c.json(
+      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+    );
+  });
+
+  // 编辑一条用户消息并重发：同样只做受理，生成在后台推进；旧分支保留在会话文件里
+  router.post("/edit", jsonBody(messageEditInputSchema), async (c) => {
+    const input = c.req.valid("json");
+    await admitEdit(services, input);
     return c.json(
       ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
     );

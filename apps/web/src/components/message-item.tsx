@@ -1,10 +1,12 @@
-import { Bot, Brain, ChevronRight, GitFork } from "lucide-react";
+import { Bot, Brain, ChevronRight, GitFork, Pencil } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { ToolCallCard } from "@/components/tool-call-card";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { thinkingLevelLabel } from "@/lib/thinking";
 import { clockLabel } from "@/lib/time";
@@ -99,11 +101,28 @@ function ForkAction({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** 用户消息悬停时的编辑入口：行内改写并重发 */
+function EditAction({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="shrink-0 self-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+      title={t("编辑并重新发送")}
+      onClick={onClick}
+    >
+      <Pencil className="size-3.5" />
+    </button>
+  );
+}
+
 export function MessageItem({
   item,
   subagent,
   onOpenSession,
   onFork,
+  onEdit,
+  isLastUser,
 }: {
   item: ChatItem;
   /** 该条工具结果的子智能体内联进度（仅 subagent 工具调用会有） */
@@ -112,13 +131,77 @@ export function MessageItem({
   onOpenSession?: (sessionId: string) => void;
   /** 从该条消息分叉；只有主对话传入，子智能体嵌套视图不提供 */
   onFork?: (item: ChatItem) => void;
+  /** 编辑该条用户消息并重发；成功后由事件刷新，返回是否已受理 */
+  onEdit?: (item: ChatItem, text: string) => Promise<boolean>;
+  /** 是否为本会话最后一条用户消息；非最后一条会提示其后内容将被移除 */
+  isLastUser?: boolean;
 }) {
   const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
   const canFork = Boolean(onFork) && !item.live;
+  const canEdit = Boolean(onEdit) && item.role === "user" && !item.live;
+
+  const startEdit = () => {
+    const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    setDraft(text);
+    setEditing(true);
+  };
+
+  const submitEdit = async () => {
+    const text = draft.trim();
+    if (!text || !onEdit || saving) return;
+    setSaving(true);
+    const ok = await onEdit(item, text);
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
+
   if (item.role === "user") {
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    if (editing) {
+      return (
+        <div className="flex justify-end">
+          <div className="w-full max-w-[85%] space-y-1.5">
+            <textarea
+              // biome-ignore lint/a11y/noAutofocus: 点击编辑后焦点应直接落在待改写的输入区
+              autoFocus
+              rows={3}
+              className="w-full resize-y rounded-2xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setEditing(false);
+                // 与输入区一致：Enter 换行，Cmd/Ctrl+Enter 发送
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submitEdit();
+                }
+              }}
+            />
+            {isLastUser === false ? (
+              <p className="text-[11px] text-muted-foreground">{t("编辑后移除提示")}</p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                {t("取消")}
+              </Button>
+              <Button
+                size="sm"
+                disabled={!draft.trim() || saving}
+                onClick={() => void submitEdit()}
+              >
+                {t("发送")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="group flex items-center justify-end gap-1">
+        {canEdit ? <EditAction onClick={startEdit} /> : null}
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
         <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
           {text}

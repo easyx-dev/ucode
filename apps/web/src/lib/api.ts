@@ -18,6 +18,7 @@ import {
   type McpListResponse,
   type McpUpsertRequest,
   type McpWriteResponse,
+  type MessageEditRequest,
   type MessageInterruptResponse,
   type MessageListRequest,
   type MessageListResponse,
@@ -158,6 +159,8 @@ export const api = {
     list: (sessionId: string) =>
       post<MessageListResponse>("messages/list", { sessionId } satisfies MessageListRequest),
     prompt: (body: PromptRequest) => post<PromptAdmittedResponse>("messages/prompt", body),
+    /** 编辑一条用户消息并重发；旧分支保留，客户端靠 transcript_reset 事件刷新 */
+    edit: (body: MessageEditRequest) => post<PromptAdmittedResponse>("messages/edit", body),
     interrupt: (sessionId: string) =>
       post<MessageInterruptResponse>("messages/interrupt", {
         sessionId,

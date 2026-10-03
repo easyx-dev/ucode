@@ -18,6 +18,11 @@ export const EVENT_NAMES = [
   "compaction_end",
   "session_info_changed",
   "agent_settled",
+  /**
+   * 会话活动分支已改变（当前是「编辑用户消息并重发」）：客户端收到的历史条目不再有效，
+   * 应丢弃本地消息列表并重新取快照。
+   */
+  "transcript_reset",
   /** 服务端挂起一条交互请求（当前是权限审批），等待前端回答 */
   "interaction_request",
   /** 交互请求已答复或超时，前端据此关闭对话框 */

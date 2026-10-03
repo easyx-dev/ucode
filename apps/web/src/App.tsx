@@ -72,6 +72,9 @@ export default function App() {
     });
   };
 
+  /** 编辑用户消息并重发；分支与刷新由服务端推进（transcript_reset 事件触发重取快照） */
+  const editMessage = (item: ChatItem, text: string): Promise<boolean> => chat.edit(item.id, text);
+
   // 分叉来源会话名：从当前列表取，取不到（已归档 / 未加载）则退化为 id
   const forkSourceId = activeSession?.forkedFromId ?? null;
   const forkSourceName = forkSourceId
@@ -124,6 +127,7 @@ export default function App() {
           onOpenSettings={() => workspace.setSettingsOpen(true)}
           onOpenSession={setActiveId}
           onFork={forkFrom}
+          onEdit={editMessage}
           forkedFromName={forkSourceName}
           onBackToParent={() => {
             const parentId = activeSession?.parentSessionId;
