@@ -377,6 +377,9 @@ importers:
       lucide-react:
         specifier: ^0.545.0
         version: 0.545.0(react@19.3.0)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       radix-ui:
         specifier: ^1.6.7
         version: 1.6.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -389,6 +392,9 @@ importers:
       react-i18next:
         specifier: ^17.0.15
         version: 17.0.15(i18next@26.4.2(typescript@5.9.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
+      sonner:
+        specifier: ^2.0.8
+        version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@types/react':
         specifier: ^19.2.0

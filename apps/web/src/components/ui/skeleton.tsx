@@ -1,13 +1,2 @@
-import { cn } from "cn";
-
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="skeleton"
-      className={cn("animate-pulse rounded-md bg-muted", className)}
-      {...props}
-    />
-  );
-}
-
-export { Skeleton };
+/** 基础组件已迁入 @ucode/ui，这里转发以兼容既有引用 */
+export { Skeleton } from "@ucode/ui";

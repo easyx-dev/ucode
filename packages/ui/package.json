@@ -21,8 +21,10 @@
     "dayjs": "^1.11.23",
     "i18next": "^26.4.2",
     "lucide-react": "^0.545.0",
+    "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",
-    "react-i18next": "^17.0.15"
+    "react-i18next": "^17.0.15",
+    "sonner": "^2.0.8"
   },
   "peerDependencies": {
     "react": "^19.3.0",
