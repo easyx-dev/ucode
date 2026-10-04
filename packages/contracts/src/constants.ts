@@ -113,16 +113,10 @@ export const SEARCH_PROVIDER_LABELS: Record<SearchProviderId, string> = {
 
 /**
  * MCP 服务器的工具暴露方式，与 pi `McpExposure` 对齐：
- * `codemode` 只可从 codemode 脚本调用、不进模型工具声明；`codemode-deferred` 同上但不列进 codemode 描述、
- * 由脚本按需检索；`deferred` 由 `tool_search` 检索后声明给模型；`direct` 直接声明给模型；`hidden` 注册但不可达。
+ * `codemode` 只可从 codemode 脚本调用、不进模型工具声明，由脚本按需检索；`deferred` 由 `tool_search`
+ * 检索后声明给模型；`direct` 直接声明给模型；`hidden` 注册但不可达。
  */
-export const MCP_EXPOSURES = [
-  "codemode",
-  "codemode-deferred",
-  "deferred",
-  "direct",
-  "hidden",
-] as const;
+export const MCP_EXPOSURES = ["codemode", "deferred", "direct", "hidden"] as const;
 
 export type McpExposure = (typeof MCP_EXPOSURES)[number];
 

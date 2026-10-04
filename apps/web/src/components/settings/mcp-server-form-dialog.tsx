@@ -101,7 +101,6 @@ export function McpServerFormDialog({
   // 暴露方式 → 文案；渲染顺序由 MCP_EXPOSURES 决定
   const exposureLabels = {
     codemode: t("脚本调用"),
-    "codemode-deferred": t("脚本内检索"),
     deferred: t("检索后调用"),
     direct: t("直接调用"),
     hidden: t("隐藏"),

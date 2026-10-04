@@ -296,15 +296,15 @@ export default {
   "MCP.表单说明":
     "stdio runs a local command, http talks to a remote URL; env vars and headers are one KEY=VALUE per line.",
   服务器名: "Server name",
-  "服务器名.说明": "Used in mcp__<server>__<tool>; letters, digits, and . _ - only.",
+  "服务器名.说明":
+    "Used in mcp__<server>__<tool>; characters other than letters, digits, and underscores become _ in the tool name. Letters, digits, and . _ - only.",
   传输方式: "Transport",
   本地进程: "Local process",
   "HTTP 端点": "HTTP endpoint",
   暴露方式: "Exposure",
   "暴露方式.说明":
-    "Scripts reach tools through codemode without declaring them to the model; in-script search keeps them out of the codemode description and finds them on demand; search-then-call declares them once tool_search loads them; Direct declares them right away.",
+    "Scripts reach tools through codemode without declaring them to the model, finding them on demand; Search then call declares them once tool_search loads them; Direct declares them right away.",
   脚本调用: "Scripts",
-  脚本内检索: "In-script search",
   检索后调用: "Search then call",
   直接调用: "Direct",
   隐藏: "Hidden",

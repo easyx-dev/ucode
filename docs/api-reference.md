@@ -573,7 +573,7 @@
 | --- | --- | --- | --- | --- |
 | `name` | string（格式 `^[A-Za-z0-9][A-Za-z0-9._-]*$`） | 是 | — | — |
 | `enabled` | boolean | 否 | `true` | — |
-| `exposure` | "codemode" \| "codemode-deferred" \| "deferred" \| "direct" \| "hidden" | 否 | `codemode` | — |
+| `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 否 | `codemode` | — |
 | `timeout` | integer（>0） | 否 | — | 单请求超时（秒），省略即用 pi 默认 60 |
 | `type` | "stdio" | 是 | — | — |
 | `command` | string（长度≥1） | 是 | — | — |
@@ -587,7 +587,7 @@
 | --- | --- | --- | --- | --- |
 | `name` | string（格式 `^[A-Za-z0-9][A-Za-z0-9._-]*$`） | 是 | — | — |
 | `enabled` | boolean | 否 | `true` | — |
-| `exposure` | "codemode" \| "codemode-deferred" \| "deferred" \| "direct" \| "hidden" | 否 | `codemode` | — |
+| `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 否 | `codemode` | — |
 | `timeout` | integer（>0） | 否 | — | 单请求超时（秒），省略即用 pi 默认 60 |
 | `type` | "http" | 是 | — | — |
 | `url` | string（长度≥1） | 是 | — | — |
@@ -927,7 +927,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | — |
 | `enabled` | boolean | 是 | — |
-| `exposure` | "codemode" \| "codemode-deferred" \| "deferred" \| "direct" \| "hidden" | 是 | — |
+| `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 是 | — |
 | `type` | "stdio" | 是 | — |
 | `command` | string | 是 | — |
 | `timeout` | number | 否 | 单请求超时（秒），省略即用 pi 默认 60 |
@@ -941,7 +941,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | — |
 | `enabled` | boolean | 是 | — |
-| `exposure` | "codemode" \| "codemode-deferred" \| "deferred" \| "direct" \| "hidden" | 是 | — |
+| `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 是 | — |
 | `type` | "http" | 是 | — |
 | `url` | string | 是 | — |
 | `timeout` | number | 否 | — |

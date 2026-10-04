@@ -67,7 +67,7 @@ describe("readMcpConfig", () => {
     assert.match(response.errors[0] ?? "", /bad/);
   });
 
-  it("deferred / codemode-deferred 暴露方式合法", () => {
+  it("deferred 暴露方式合法，codemode-deferred 不再支持", () => {
     const path = freshPath();
     writeFileSync(
       path,
@@ -80,11 +80,12 @@ describe("readMcpConfig", () => {
       "utf8",
     );
     const response = readMcpConfig(path);
-    assert.deepEqual(response.errors, []);
     assert.deepEqual(
       response.servers.map((server) => server.exposure),
-      ["deferred", "codemode-deferred"],
+      ["deferred"],
     );
+    assert.equal(response.errors.length, 1);
+    assert.match(response.errors[0] ?? "", /服务器 b /);
   });
 });
 

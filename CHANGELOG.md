@@ -247,6 +247,11 @@
 
 ### 变更
 
+- 升级 pi（`@earendil-works/pi-coding-agent` `^0.99.1` → `^1.0.2`）；MCP 暴露方式收敛：
+  pi 1.0 起 `codemode-deferred` 已成为 `codemode` 的运行时别名，`MCP_EXPOSURES` 同步删去该项，
+  存量写 `codemode-deferred` 的 `mcp.json` 按「不做历史兼容」不迁移，改成 `codemode` 即可。
+  另随 pi 1.0 起 MCP 工具名把非字母、数字、下划线的字符（含 `-` `.`）转为 `_`，
+  含这类字符的服务器名与工具名在工具调用里的实际名字随之变化。
 - 根 `pnpm verify` / `pnpm check` 改由 `tsx` 运行 `scripts/verify/index.ts`（原先用 `node`），
   以便校验脚本直接复用契约的 TS 源码；根目录新增 devDependencies `tsx` / `typescript`
   （`typescript` 用于生成器读取响应类型）；契约包导出 zod 的 `toJSONSchema`，供生成器把请求
