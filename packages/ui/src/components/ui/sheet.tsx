@@ -24,6 +24,7 @@ function SheetContent({
       />
       <DialogPrimitive.Content
         data-slot="sheet-content"
+        // 只留入场动画：退场若用 `data-closed:animate-out`，Radix Presence 会在动画结束前一直挂着节点
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col border-r border-border bg-sidebar shadow-lg outline-none data-open:animate-in data-open:slide-in-from-left",
           className,

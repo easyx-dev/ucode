@@ -29,7 +29,7 @@ import type {
   SessionSummary,
   ThinkingLevel,
 } from "@ucode/ui/lib/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -43,6 +43,16 @@ export default function App() {
   const [usageOpen, setUsageOpen] = useState(false);
   /** 移动端会话侧栏抽屉 */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 拉宽到桌面断点时自动收起抽屉，避免被已隐藏的菜单按钮困在遮罩里
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const onChange = (): void => {
+      if (mql.matches) setSidebarOpen(false);
+    };
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
   /** 重命名对话框的目标；侧栏右键与 `/rename` 命令共用同一个对话框 */
   const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
   // 本会话累计用量：切换会话时取一次，生成落定后刷新
@@ -240,12 +250,12 @@ export default function App() {
     <TooltipProvider>
       <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
         {/* 桌面端固定侧栏；移动端收进抽屉 */}
-        <div className="hidden h-full md:flex">
+        <div className="hidden h-full w-72 shrink-0 md:flex">
           <SessionSidebar {...sidebarProps} />
         </div>
 
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent title={t("会话列表")}>
+          <SheetContent title={t("会话列表")} className="md:hidden">
             <SessionSidebar
               {...sidebarProps}
               onSelect={(sessionId) => {

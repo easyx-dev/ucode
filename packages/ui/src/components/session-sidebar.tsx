@@ -83,7 +83,7 @@ export function SessionSidebar({
   }, [activeParentId, onLoadChildren]);
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col">
+    <aside className="flex h-full w-full flex-col">
       <SessionSidebarHeader
         query={query}
         canCreate={configured}
