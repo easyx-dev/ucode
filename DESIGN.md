@@ -1,6 +1,7 @@
 # 设计规范
 
-ucode 对话界面的视觉系统。实现落位：`apps/web/src/index.css`（token）与 `apps/web/src/components/`（组件）。
+ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme.css`（token）与 `packages/ui/src/components/`（组件）；
+各端在 tailwind 入口 `@import "@ucode/ui/theme.css"` 并用 `@source` 扫描包内 className。
 
 ## 定位与气质
 
@@ -15,7 +16,7 @@ ucode 对话界面的视觉系统。实现落位：`apps/web/src/index.css`（to
 
 | 层 | 位置 | 规则 |
 | --- | --- | --- |
-| primitive | `index.css` 里的 `oklch()` 字面量 | 只描述颜色本身，不带业务含义，不出现在组件里 |
+| primitive | `theme.css` 里的 `oklch()` 字面量 | 只描述颜色本身，不带业务含义，不出现在组件里 |
 | semantic | `--background` / `--primary` / `--success` 等 | 组件唯一可用的层 |
 | 组件 | `components/` 里的 class | 通过 Tailwind 语义类使用，如 `bg-card`、`text-muted-foreground` |
 
@@ -152,6 +153,6 @@ ucode 对话界面的视觉系统。实现落位：`apps/web/src/index.css`（to
 
 当前只有浅色与深色两套。未来加主题时：
 
-- 在 `index.css` 新增 `[data-theme="<名>"]` 层，只覆盖 semantic token，**不动 primitve 结构之外的组件**
+- 在 `theme.css` 新增 `[data-theme="<名>"]` 层，只覆盖 semantic token，**不动 primitve 结构之外的组件**
 - 主题名只影响 token，不影响任何 `className`
 - 新增主题必须同时给出浅色与深色两套值

@@ -7,20 +7,26 @@
 
 ## 组件来源与维护
 
-`apps/web/src/components/ui/**` 由 shadcn CLI 生成（配置见 `apps/web/components.json`），但**只生成一次**：
+组件与 hooks 位于 `packages/ui`（`@ucode/ui`），web 与桌面端共用。基础组件
+`packages/ui/src/components/ui/**` 由 shadcn CLI 生成（配置见 `packages/ui/components.json`），但**只生成一次**：
 之后与其它代码一样由我们维护，同等适用本仓库的格式化、命名、颜色 token 与行数规则。
 
-- 新增基础组件仍可用 `npx shadcn@latest add <name>` 生成，生成完即视为项目代码，按本规范整理
+- 新增基础组件用 `npx shadcn@latest add <name>` 生成，生成完即视为项目代码，按本规范整理
+- 生成后要把 `@/` 导入改成包内相对路径，`@/lib/utils` 改成从 `cn` 包导入
 - 对已经改过的组件再跑 CLI 会覆盖我们的改动，需要手工合并
 - 唯一豁免：`ui/` 下都是对 Radix 的薄封装，不要求写文件级注释
 
 ## 目录与命名
 
 ```
-components/
-  ui/                 # 基础组件（shadcn 生成后归我们维护）
-  <feature>/          # 业务组件，按功能分组
-  <kebab-name>.tsx    # 顶层业务组件
+packages/ui/src/
+  components/
+    ui/                 # 基础组件（shadcn 生成后归我们维护）
+    <feature>/          # 业务组件，按功能分组
+    <kebab-name>.tsx    # 顶层业务组件
+  hooks/                # 数据与状态 hooks
+  lib/                  # 纯逻辑
+  runtime.ts            # 运行时注入（SDK / 翻译 / 语言切换）
 ```
 
 - 一个文件一个主组件，文件名 kebab-case，与组件名对应（`xxx-card.tsx` → `XxxCard`）
@@ -31,10 +37,10 @@ components/
 
 | 层 | 位置 | 职责 | 禁止 |
 | --- | --- | --- | --- |
-| 基础组件 | `components/ui/` | 纯展示，只关心 props | 调接口、读全局状态 |
-| 业务组件 | `components/` | 组合基础组件、渲染业务数据 | 直接 `fetch`、直接操作 DOM 存储 |
-| 状态层 | `hooks/` | 数据获取、订阅、派生状态、副作用 | 渲染 JSX |
-| 纯逻辑 | `lib/` | 无 React 依赖的纯函数（归并、格式化、接口封装） | 依赖组件 |
+| 基础组件 | `packages/ui/src/components/ui/` | 纯展示，只关心 props | 调接口、读全局状态 |
+| 业务组件 | `packages/ui/src/components/` | 组合基础组件、渲染业务数据 | 直接 `fetch`、直接操作 DOM 存储 |
+| 状态层 | `packages/ui/src/hooks/` | 数据获取、订阅、派生状态、副作用 | 渲染 JSX |
+| 纯逻辑 | `packages/ui/src/lib/` | 无 React 依赖的纯函数（归并、格式化、接口封装） | 依赖组件 |
 
 - 业务组件通过 props 接数据，数据由 `hooks/use-*` 提供，组件内部不发请求
 - 事件回调从上层传入（`onSelect` / `onSend` / `onDelete`）；组件不自己决定导航或调接口

@@ -1,5 +1,3 @@
-import { fileURLToPath } from "node:url";
-
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import react from "@vitejs/plugin-react";
@@ -29,11 +27,6 @@ export default defineConfig({
     tailwindcss(),
     brandHtml(),
   ],
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
   server: {
     port: 5173,
     proxy: {

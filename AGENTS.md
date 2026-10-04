@@ -109,7 +109,7 @@
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify` |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand / i18n） |
-| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `server` / `apps/web`） |
+| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
@@ -153,6 +153,14 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
   与 `assets/`（资源引用在 `src/assets.ts`，换格式改 import 扩展名即可）；默认数据目录名 `appHomeDirname`
   也由它派生（`~/.<slug>`），server 用包的 node 入口 `@ucode/brand/values` 取值。
   源码里禁止硬编码品牌名，`pnpm check` 的 brand 校验会拦下。
+- `packages/sdk/`（`@ucode/sdk`）是 server `/api/v1` 的跨端客户端单一事实源：传输层（封套拆解、baseUrl /
+  token 注入）、SSE 解析与事件流、会话流等状态 store，**不依赖 React / DOM**，web / Electron / TUI 共用。
+  web 通过 `configureUi`（`@ucode/ui/runtime`）注入 `createSdk` 实例；`createClient` 是无状态接口层，
+  可单独使用。
+- `packages/ui/`（`@ucode/ui`）是 web 与桌面端共享的 UI 单一事实源：设计 token / 基础样式
+  （`src/styles/theme.css`）、基础组件与业务组件、数据 hooks 与纯逻辑，经 `configureUi` 注入运行时
+  （SDK 实例 + 翻译函数 + 语言切换）。子路径导出：`@ucode/ui/components/*`、`@ucode/ui/hooks/*`、
+  `@ucode/ui/lib/*`、`@ucode/ui/runtime`、`@ucode/ui/theme.css`。
 - `packages/i18n/`（`@ucode/i18n`）是跨端 i18n 运行时与共享文案的单一事实源：house i18next 配置
   （`createI18n`）、协议级通用文案（`common`）、错误码文案（`domain`）、产品界面文案
   （`ui`，web / Electron / TUI 共用），以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射。
@@ -186,11 +194,12 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 
 ### 组件来源
 
-`apps/web/src/components/ui/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
+`packages/ui/src/components/ui/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
 同样适用本文件的命名、行数、颜色 token 与格式化规则。
 
 - 唯一豁免：不要求写文件级注释（都是对 Radix 的薄封装）
-- 新增基础组件仍可用 CLI 生成，生成后按本仓库规则整理；对已改过的组件再跑 CLI 会覆盖改动，需手工合并
+- 新增基础组件用 CLI 在 `packages/ui`（配置见 `packages/ui/components.json`）生成；生成后把 `@/` 导入改成
+  包内相对路径、`@/lib/utils` 改成从 `cn` 包导入，再按本仓库规则整理。对已改过的组件再跑 CLI 会覆盖改动，需手工合并
 
 ### 已知边界
 

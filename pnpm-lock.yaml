@@ -335,6 +335,9 @@ importers:
       '@ucode/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ucode/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@ucode/sdk':
         specifier: workspace:*
         version: link:../sdk

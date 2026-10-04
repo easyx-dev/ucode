@@ -5,12 +5,7 @@
  * 耦合进共享包；各端启动时调用一次 `configureUi` 即可。
  */
 import type { Locale } from "@ucode/contracts";
-import {
-  describeApiError as describeCode,
-  describeError as describeSdkError,
-  type Sdk,
-  type Translate,
-} from "@ucode/sdk";
+import { describeError as describeSdkError, type Sdk, type Translate } from "@ucode/sdk";
 
 export type UiRuntime = {
   sdk: Sdk;
@@ -39,10 +34,3 @@ export const getRuntime = (): UiRuntime => {
 /** 把接口异常转成当前语言的文案 */
 export const describeError = (error: unknown): string =>
   describeSdkError(error, getRuntime().translate);
-
-/** 按错误码与兜底文案解析展示文本（事件流的错误帧没有 SdkError 实例） */
-export const describeApiError = (
-  code: string,
-  message: string,
-  params?: Record<string, string>,
-): string => describeCode(code, message, params, getRuntime().translate);

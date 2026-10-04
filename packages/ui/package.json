@@ -31,6 +31,7 @@
     "@tiptap/suggestion": "^3.31.4",
     "@ucode/brand": "workspace:*",
     "@ucode/contracts": "workspace:*",
+    "@ucode/i18n": "workspace:*",
     "@ucode/sdk": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

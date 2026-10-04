@@ -36,13 +36,15 @@
 ### 新增
 
 - 新增 `@ucode/ui`（`packages/ui`）：web 与桌面端共享的 UI 包，含设计 token / 基础样式
-  （`theme.css`，由 tailwind 入口 `@import`）、基础组件与业务组件。本次先迁入基础组件、
-  时间与会话标题工具、会话列表行；`apps/web` 对应文件改为转发，`index.css` 加 `@source` 扫描包内 className；
-  `scripts/verify` 的 tokens / i18n / brand 扫描范围纳入 `packages/ui/src`。
+  （`src/styles/theme.css`）、基础组件、业务组件、数据 hooks 与纯逻辑。web 的组件、hooks 与纯逻辑
+  整体迁入，经 `src/runtime.ts` 的 `configureUi` 注入 SDK / 翻译 / 语言切换；`apps/web` 瘦身为外壳
+  （入口、i18n 接线、SDK 装配），`index.css` 改为 `@import "@ucode/ui/theme.css"` + `@source` 扫描包内
+  className；`scripts/verify` 的 tokens / i18n / brand 扫描范围纳入 `packages/ui/src`；shadcn 配置移至
+  `packages/ui/components.json`。
 - 新增 `@ucode/sdk`（`packages/sdk`）：把 server `/api/v1` 封装成无 React / DOM 依赖的跨端客户端，
-  含传输层（封套拆解、baseUrl 与 token/头注入）、SSE 解析与指数退避重连的事件流；
-  `apps/web` 的 `lib/api.ts`、`lib/event-stream.ts` 改为消费它（`lib/sse.ts` 移除），
-  web 新增依赖 `@ucode/sdk`。
+  含传输层（封套拆解、baseUrl 与 token/头注入）、SSE 解析与指数退避重连的事件流，以及会话消息流等
+  状态 store（快照接续、事件归并、乐观发送）；`createClient` 为无状态接口层，`createSdk` 额外装配事件流
+  与 store，供 web / Electron / TUI 共用。web 经 `configureUi` 注入实例。
 - 新增 `POST /api/v1/attachments`（**请求体为原始字节**，`?name=` 带文件名）与附件元数据表
   （SQLite `attachment`，schema v5）：`id` 是内容 sha256，字节落 `$APP_HOME/app/attachments/<id>`，
   `GET /attachments/<id>` 的 `Content-Type` 取元数据。`referenced_at` 区分临时 / 永久：

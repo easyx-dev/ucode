@@ -12,5 +12,5 @@ export const api = new Proxy({} as Client, {
   },
 });
 
-export { describeApiError, describeError } from "../runtime";
+export { describeError } from "../runtime";
 export { SdkError as ApiRequestError };

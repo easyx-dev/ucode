@@ -350,6 +350,20 @@ packages/i18n/             # 跨端 i18n 运行时与共享文案（只依赖 i1
   src/locales/common/      # 协议级通用文案（中英）
   src/locales/domain/      # 错误码文案（中英）
   src/locales/ui/          # 产品界面文案（web / Electron / TUI 共用，中英）
+packages/sdk/              # @ucode/sdk：server /api/v1 的跨端客户端（无 React / DOM）
+  src/client.ts            # createClient：按域组装的接口方法
+  src/transport.ts         # 封套拆解、baseUrl / token 注入与自定义头
+  src/events.ts            # 事件流：指数退避重连与订阅
+  src/stream/              # 会话流等状态 store（快照接续、事件归并）
+  src/app.ts               # createSdk：client + events + stores
+packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
+  src/components/ui/       # 基础组件（shadcn 生成后归我们维护）
+  src/components/          # 业务组件（侧栏、消息区、Composer、设置…）
+  src/hooks/               # 数据与状态 hooks
+  src/lib/                 # 纯逻辑（类型出口、消息归并、草稿、格式化…）
+  src/runtime.ts           # configureUi：注入 SDK / 翻译 / 语言切换
+  src/styles/theme.css     # 设计 token、base 层与 markdown 样式
+  components.json          # shadcn CLI 配置
 server/src/
   env.ts                   # APP_HOME 派生 pi/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
@@ -393,13 +407,12 @@ server/src/
     eval.ts                # 提示词评测：真实模型跑固定用例，按提示词源对比
     lib/local-gateway.ts   # smoke / eval 共用的本地端点装配
 apps/web/src/
-  lib/                     # 接口封装、契约类型出口、SSE 与事件流、消息归并、纯函数
-    i18n.ts                # i18next 接线与语言切换（文案在 @ucode/i18n）
-  hooks/                   # 数据获取与订阅（use-chat / use-session-list / use-models …）
-  components/
-    ui/                    # 基础组件（shadcn 生成后归我们维护）
-    <feature>/             # 业务组件，如 settings/
-    *.tsx                  # 侧栏、消息列表、工具卡片、Composer、主题与分段控件
+  App.tsx                  # 应用外壳：组合 @ucode/ui 的组件与 hooks
+  main.tsx                 # 入口：主题、i18n 接线与 SDK 运行时注入
+  components/brand-head.tsx # 文档级品牌元素（favicon）
+  lib/i18n.ts              # i18next 接线与语言切换（文案在 @ucode/i18n）
+  lib/sdk.ts               # 创建 SDK 实例并注入 @ucode/ui 运行时
+  index.css                # tailwind 入口：import @ucode/ui/theme.css + @source 包源码
 ```
 
 ### 实现要点
