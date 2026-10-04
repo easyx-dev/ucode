@@ -17,7 +17,13 @@ import { brand } from "../src/brand.ts";
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".tmp"]);
 
 /** 扫描范围：会渲染品牌名或引用品牌资源的源码、入口 HTML 与构建插件 */
-const SCAN_TARGETS = ["apps/web/src", "apps/web/plugins", "apps/web/index.html", "server/src"];
+const SCAN_TARGETS = [
+  "apps/web/src",
+  "apps/web/plugins",
+  "apps/web/index.html",
+  "packages/ui/src",
+  "server/src",
+];
 
 const SCAN_FILE = /\.(?:ts|tsx|html)$/;
 

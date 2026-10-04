@@ -9,7 +9,7 @@
  * 2. 冗余：zh-CN 里 key === value 的条目没有意义（回退即可），报错要求删除。
  * 3. 合并冲突：同一语言下 common / domain / ui 之间不得有重复 key（运行时扁平合并会静默覆盖）。
  * 4. 错误码映射：`errorMessageKeys` 的每个值都必须在 domain en 目录里存在（覆盖性由类型保证）。
- * 5. 硬编码中文（只扫 `apps/web/src` 与 `packages/i18n/src`）：中文必须走 `t(...)`；
+ * 5. 硬编码中文（只扫 `apps/web/src`、`packages/ui/src` 与 `packages/i18n/src`）：中文必须走 `t(...)`；
  *    注释、`logger` / `console` 日志与带 `i18n-ignore` 标记的行除外。服务端不做本地化，
  *    它的中文是固定兜底文案与日志，不在扫描范围。
  *
@@ -221,7 +221,7 @@ const hardcodedProblems = (root: string, file: string): string[] => {
  * 只扫客户端与文案包：服务端已不做本地化，它的中文是「固定兜底文案 + 日志」，按设计允许。
  */
 const sourceProblems = (root: string): string[] =>
-  ["apps/web/src", "packages/i18n/src"].flatMap((dir) =>
+  ["apps/web/src", "packages/ui/src", "packages/i18n/src"].flatMap((dir) =>
     listFiles(root, dir, (path) => /\.tsx?$/.test(path))
       .filter((file) => !isCatalogData(file))
       .flatMap((file) => hardcodedProblems(root, file)),

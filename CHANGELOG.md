@@ -35,6 +35,10 @@
 
 ### 新增
 
+- 新增 `@ucode/ui`（`packages/ui`）：web 与桌面端共享的 UI 包，含设计 token / 基础样式
+  （`theme.css`，由 tailwind 入口 `@import`）、基础组件与业务组件。本次先迁入基础组件、
+  时间与会话标题工具、会话列表行；`apps/web` 对应文件改为转发，`index.css` 加 `@source` 扫描包内 className；
+  `scripts/verify` 的 tokens / i18n / brand 扫描范围纳入 `packages/ui/src`。
 - 新增 `@ucode/sdk`（`packages/sdk`）：把 server `/api/v1` 封装成无 React / DOM 依赖的跨端客户端，
   含传输层（封套拆解、baseUrl 与 token/头注入）、SSE 解析与指数退避重连的事件流；
   `apps/web` 的 `lib/api.ts`、`lib/event-stream.ts` 改为消费它（`lib/sse.ts` 移除），
