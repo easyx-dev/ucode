@@ -54,7 +54,7 @@ export const docToPayload = (doc: ComposerNode | null | undefined): ComposerPayl
     lines.push(line);
   }
 
-  return { text: lines.join("\n"), contexts, images: [], attachmentIds: [] };
+  return { text: lines.join("\n"), contexts, attachments: [] };
 };
 
 /** 文档是否为空（无任何文本与 mention） */

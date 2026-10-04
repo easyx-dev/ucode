@@ -5,6 +5,7 @@ import {
   API_BASE_PATH,
   type ApiResponse,
   type AppConfigPatchRequest,
+  type AttachmentUploadResponse,
   type CommandsListRequest,
   type CommandsListResponse,
   type ConfigSnapshot,
@@ -101,6 +102,21 @@ const post = async <T>(action: string, body: unknown = {}): Promise<T> => {
   return unwrap<T>(response);
 };
 
+/** 二进制请求体的 POST：body 是原始字节（附件上传），响应仍走 JSON 封套 */
+const postBinary = async <T>(
+  action: string,
+  body: Blob,
+  query?: Record<string, string>,
+): Promise<T> => {
+  const search = query ? `?${new URLSearchParams(query).toString()}` : "";
+  const response = await fetch(`${BASE}/${action}${search}`, {
+    method: "POST",
+    headers: { "content-type": body.type || "application/octet-stream" },
+    body,
+  });
+  return unwrap<T>(response);
+};
+
 /** 按错误码取当前语言的文案；未登记的错误码回落服务端下发的中文兜底 */
 export const describeApiError = (
   code: string,
@@ -181,6 +197,11 @@ export const api = {
   commands: {
     /** 列出可用的提示词命令与技能（按会话 / cwd 解析目录） */
     list: (body: CommandsListRequest = {}) => post<CommandsListResponse>("commands/list", body),
+  },
+  attachments: {
+    /** 上传附件：body 为原始字节，`name` 走查询串；返回入库后的引用视图 */
+    upload: (file: Blob, name?: string) =>
+      postBinary<AttachmentUploadResponse>("attachments", file, name ? { name } : undefined),
   },
   agents: {
     /** 列出可选的 primary / subagent 角色 */

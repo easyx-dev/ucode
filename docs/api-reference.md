@@ -5,7 +5,7 @@
 
 ## 约定速览
 
-- 前缀 `/api/v1`；除 `GET /api/v1/health` 与 `GET /api/v1/attachments/<id>` 外一律 `POST` + JSON body，无参数接口也要发 `{}`
+- 前缀 `/api/v1`；除 `GET /api/v1/health`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外一律 `POST` + JSON body，无参数接口也要发 `{}`
 - 非流式响应共用封套：成功 `{ success: true, code: "ok", message: "", data }`；失败 `{ success, code, message, data, params? }`
 - 字段一律 camelCase；请求里指向资源的 id 用 `<资源>Id`，响应里资源自身用 `id`
 - 类型文本中的链接指向文末「公共类型」；`（…）` 内为该字段的取值约束
@@ -41,6 +41,7 @@
 | POST | `/api/v1/mcp/upsert` | 按 name 覆盖写入 MCP 服务器 |
 | POST | `/api/v1/mcp/delete` | 按 name 删除 MCP 服务器 |
 | POST | `/api/v1/agents/list` | 列出可选的 primary / subagent 角色 |
+| POST | `/api/v1/attachments` | 上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库） |
 | GET | `/api/v1/attachments/:id` | 按 id 返回附件原始字节（非 JSON，不走封套） |
 | POST | `/api/v1/commands/list` | 列出可用的提示词命令与技能 |
 | POST | `/api/v1/goals/set` | 设定 / 替换当前会话目标 |
@@ -421,9 +422,8 @@
 | `contexts[].path` | string（长度≥1） | 是 | — | — |
 | `contexts[].startLine` | integer（>0） | 否 | — | — |
 | `contexts[].endLine` | integer（>0） | 否 | — | — |
-| `images` | object[]（≤8 项） | 否 | — | — |
-| `images[].data` | string（长度 1–5242880） | 是 | — | base64 编码的图片字节（不含 `data:` URL 前缀） |
-| `images[].mimeType` | "image/png" \| "image/jpeg" \| "image/webp" \| "image/gif" | 是 | — | — |
+| `attachments` | object[]（≤8 项） | 否 | — | — |
+| `attachments[].id` | string（格式 `^[0-9a-f]{64}$`） | 是 | — | — |
 | `behavior` | "follow-up" \| "steer" | 否 | `follow-up` | 生成中再发消息时的投递方式 |
 
 **响应类型**：`PromptAdmittedResponse`
@@ -688,6 +688,24 @@
 | `subagents` | [AgentView](#agentview)[] | 是 | 子角色：内置 general / explore 与自定义 subagent |
 
 ## 附件（`attachments`）
+
+### POST /api/v1/attachments
+
+上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`AttachmentUploadResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 内容 id：归一化（图片）或原始字节（其它）的 sha256，64 位小写 hex |
+| `mimeType` | string | 是 | — |
+| `name` | string \| null | 是 | 原始文件名；未提供时为 null |
+| `size` | number | 是 | 入库字节数（图片是归一化之后的大小） |
+| `kind` | "file" \| "image" | 是 | 图片走 vision，其余只存与引用 |
 
 ### GET /api/v1/attachments/:id
 

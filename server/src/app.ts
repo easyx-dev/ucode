@@ -1,17 +1,19 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
 import type { AppConfigPatchInput } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
-
+import { expireTempAttachments } from "./agent/attachment";
 import { GoalService } from "./agent/goal";
 import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
 import { UsageService } from "./agent/usage";
 import { ConfigStore } from "./config/store";
+import { ATTACHMENT_SWEEP_INTERVAL_MS, ATTACHMENT_TEMP_TTL_MS } from "./constants";
 import { SessionEventBus } from "./core/event-bus";
 import { InteractionBroker } from "./core/interactions";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
+import { AttachmentRepository } from "./db/attachment-repository";
 import { SessionRepository } from "./db/session-repository";
 import { logger } from "./lib/logger";
 import { AppError } from "./lib/response";
@@ -20,6 +22,8 @@ export type Services = {
   config: ConfigStore;
   /** 会话元数据与索引（SQLite） */
   sessions: SessionRepository;
+  /** 附件元数据（SQLite）；字节在 `$APP_HOME/app/attachments` */
+  attachments: AttachmentRepository;
   runtime: PiRuntime;
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
@@ -45,6 +49,7 @@ export const createServices = async (): Promise<Services> => {
   const db = openDatabase();
   const config = new ConfigStore();
   const sessions = new SessionRepository(db);
+  const attachments = new AttachmentRepository(db);
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
@@ -80,6 +85,19 @@ export const createServices = async (): Promise<Services> => {
   }
   pool.startSweeper();
 
+  // 草稿临时附件过期清理：只在草稿里引用过、从未随消息发送的附件按 TTL 回收
+  const sweepAttachments = (): void => {
+    try {
+      const before = new Date(Date.now() - ATTACHMENT_TEMP_TTL_MS).toISOString();
+      expireTempAttachments({ repo: attachments }, before);
+    } catch (error) {
+      logger.warn(`清理过期附件失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  sweepAttachments();
+  const attachmentSweeper = setInterval(sweepAttachments, ATTACHMENT_SWEEP_INTERVAL_MS);
+  attachmentSweeper.unref();
+
   const guardIdle = (): void => {
     if (pool.hasActiveRun()) {
       throw new AppError(ERROR_CODES.sessionBusy, "有会话正在生成，请先中断再更新配置", 409);
@@ -92,6 +110,7 @@ export const createServices = async (): Promise<Services> => {
   return {
     config,
     sessions,
+    attachments,
     runtime,
     pool,
     events,
@@ -118,6 +137,7 @@ export const createServices = async (): Promise<Services> => {
     close() {
       if (closed) return;
       closed = true;
+      clearInterval(attachmentSweeper);
       db.close();
     },
   };

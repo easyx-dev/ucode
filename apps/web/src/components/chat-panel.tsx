@@ -124,7 +124,7 @@ export function ChatPanel({
         thinkingLevel: draft.thinkingLevel,
         mode: draft.mode,
       };
-      const isPlainText = payload.contexts.length === 0 && payload.images.length === 0;
+      const isPlainText = payload.contexts.length === 0 && payload.attachments.length === 0;
       const command = isPlainText ? parseGoalCommand(payload.text) : null;
       if (command) {
         composer.clear(draftKey);
@@ -139,8 +139,8 @@ export function ChatPanel({
           doc: textToDoc(payload.text),
           ...seed,
         };
-        // 图片附件也还回输入框：草稿只存本地库 id，字节已在 IndexedDB
-        if (payload.attachmentIds.length > 0) restored.attachments = payload.attachmentIds;
+        // 附件视图也还回输入框：字节已在服务端，草稿只存引用
+        if (payload.attachments.length > 0) restored.attachments = payload.attachments;
         composer.update(composerKeyOf(target), restored);
       });
     },
@@ -221,10 +221,10 @@ export function ChatPanel({
           cwd={cwd}
           cwdPath={session?.cwd ?? draft.cwd}
           initialDoc={initialDoc}
-          initialAttachmentIds={draft.attachments}
+          initialAttachments={draft.attachments}
           editorKey={draftKey}
           onDocChange={(doc) => composer.update(draftKey, { doc, text: docToPayload(doc).text })}
-          onAttachmentsChange={(ids) => composer.update(draftKey, { attachments: ids })}
+          onAttachmentsChange={(attachments) => composer.update(draftKey, { attachments })}
           onSend={submit}
           streaming={chat.streaming}
           onStop={() => void chat.stop()}

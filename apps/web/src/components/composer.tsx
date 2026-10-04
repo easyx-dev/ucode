@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "@/lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "@/lib/composer-document";
 import type { ComposerPayload } from "@/lib/composer-payload";
-import type { CatalogProvider, ThinkingLevel } from "@/lib/types";
+import type { AttachmentView, CatalogProvider, ThinkingLevel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ComposerProps = {
@@ -28,13 +28,13 @@ type ComposerProps = {
   cwdPath?: string;
   /** 草稿里恢复的初始文档 */
   initialDoc?: ComposerNode;
-  /** 草稿里恢复的附件 id（本地库内容 hash） */
-  initialAttachmentIds?: readonly string[];
+  /** 草稿里恢复的附件视图 */
+  initialAttachments?: readonly AttachmentView[];
   /** 编辑器重挂载键：上下文 + 外部填充版本 */
   editorKey: string;
   onDocChange: (doc: ComposerNode) => void;
   /** 附件集合变化（增删）时回写草稿 */
-  onAttachmentsChange: (ids: string[]) => void;
+  onAttachmentsChange: (attachments: AttachmentView[]) => void;
   onSend: (payload: ComposerPayload) => void;
   onStop: () => void;
   streaming: boolean;
@@ -67,7 +67,7 @@ export function Composer({
   cwd,
   cwdPath,
   initialDoc,
-  initialAttachmentIds,
+  initialAttachments,
   editorKey,
   onDocChange,
   onAttachmentsChange,
@@ -89,12 +89,12 @@ export function Composer({
   const {
     items: attachmentItems,
     error: attachmentError,
+    uploading,
+    hasPendingUploads,
     addFiles,
     remove: removeAttachment,
-    toImages,
-    ids: attachmentIds,
   } = useComposerAttachments({
-    initialIds: initialAttachmentIds ?? [],
+    initialAttachments: initialAttachments ?? [],
     onChange: onAttachmentsChange,
   });
 
@@ -171,31 +171,25 @@ export function Composer({
     [onBuiltin, providers.length, t],
   );
 
-  const submit = useCallback(async () => {
-    if (streaming) return;
-    const payload: ComposerPayload = {
-      ...docToPayload(docRef.current),
-      images: await toImages(),
-      attachmentIds: attachmentIds(),
-    };
-    if (
-      payload.text.trim() === "" &&
-      payload.contexts.length === 0 &&
-      payload.images.length === 0
-    ) {
+  const submit = useCallback(() => {
+    // 附件还在上传时不发：否则会把没背上的附件漏掉，上传完成后又回填进草稿
+    if (streaming || hasPendingUploads()) return;
+    const doc = docToPayload(docRef.current);
+    const attachments = attachmentItems;
+    if (doc.text.trim() === "" && doc.contexts.length === 0 && attachments.length === 0) {
       return;
     }
     // 手动输入的整条内置命令（如 `/new`）：直接执行，不当作消息发出去
-    if (payload.contexts.length === 0 && payload.images.length === 0) {
-      const builtin = builtinIdOf(payload.text);
+    if (doc.contexts.length === 0 && attachments.length === 0) {
+      const builtin = builtinIdOf(doc.text);
       if (builtin) {
         resetEditor(EMPTY_DOC);
         handleBuiltin(builtin);
         return;
       }
     }
-    onSend(payload);
-  }, [attachmentIds, handleBuiltin, onSend, resetEditor, streaming, toImages]);
+    onSend({ ...doc, attachments });
+  }, [attachmentItems, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -324,7 +318,7 @@ export function Composer({
 
           {attachmentError ? (
             <p className="px-3 pt-2 text-xs text-destructive">
-              {t("不支持的附件：{{names}}", { names: attachmentError })}
+              {t("附件过大：{{names}}", { names: attachmentError })}
             </p>
           ) : null}
 
@@ -371,7 +365,7 @@ export function Composer({
                   <Square className="size-3.5" />
                 </Button>
               ) : (
-                <Button size="icon" onClick={submit} title={t("发送")}>
+                <Button size="icon" onClick={submit} disabled={uploading} title={t("发送")}>
                   <ArrowUp className="size-4" />
                 </Button>
               )}

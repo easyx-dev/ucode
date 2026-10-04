@@ -48,7 +48,7 @@ v1.route("/interactions", createInteractionsRoute(services));
 v1.route("/fs", createFsRoute());
 v1.route("/mcp", createMcpRoute());
 v1.route("/commands", createCommandsRoute(services));
-v1.route("/attachments", createAttachmentsRoute());
+v1.route("/attachments", createAttachmentsRoute(services));
 v1.route("/agents", createAgentsRoute(services));
 
 app.route(API_BASE_PATH, v1);

@@ -145,7 +145,7 @@ export default {
   发送: "Send",
   移除附件: "Remove attachment",
   图片预览: "Image preview",
-  "不支持的附件：{{names}}": "Unsupported attachments: {{names}}",
+  "附件过大：{{names}}": "Attachment too large: {{names}}",
 
   // 内置命令说明（`/` 菜单提示与 /help 清单）
   重命名当前会话: "Rename the current session",

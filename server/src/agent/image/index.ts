@@ -1,44 +1,49 @@
 /**
- * 图片归一化：把客户端上传的 base64 图片经 pi 的 `resizeImage` 压到限内，
- * 入内容寻址附件库，并产出 pi 的 image 内容块（`prompt` / `steer` / `followUp` 直接可收）。
+ * 图片归一化：上传的图片经 pi `resizeImage` 压到限内后入内容寻址附件库；
+ * 发送时按附件 id 读回**入库时的字节**再 base64，转成 pi 的 image 内容块。
  *
  * 无法归一化（格式不支持、超限且不可压缩）统一抛 `image_invalid`，不把坏图透给模型。
  */
+import { readFileSync } from "node:fs";
+
 import { resizeImage } from "@earendil-works/pi-coding-agent";
-import { ERROR_CODES, type MessageImageInput } from "@ucode/contracts";
+import { ERROR_CODES } from "@ucode/contracts";
 
 import { IMAGE_MAX_BYTES, IMAGE_MAX_DIMENSION } from "../../constants";
-import { env } from "../../env";
+import type { AttachmentRecord } from "../../db/attachment-repository";
 import { AppError } from "../../lib/response";
-import { putAttachment } from "../attachment";
+import { type AttachmentDeps, putAttachment, type ResolvedAttachment } from "../attachment";
 
 /** pi 的 ImageContent 结构（未从包根导出，按 `session.prompt` 的签名对齐） */
 export type PromptImage = { type: "image"; data: string; mimeType: string };
 
-export type NormalizedImage = { id: string; mimeType: string; content: PromptImage };
-
-export const normalizeImages = async (
-  images: readonly MessageImageInput[],
-  dir = env.attachmentsDir,
-): Promise<NormalizedImage[]> => {
-  const normalized: NormalizedImage[] = [];
-  for (const image of images) {
-    const resized = await resizeImage(Buffer.from(image.data, "base64"), image.mimeType, {
-      maxWidth: IMAGE_MAX_DIMENSION,
-      maxHeight: IMAGE_MAX_DIMENSION,
-      maxBytes: IMAGE_MAX_BYTES,
-    });
-    if (!resized) {
-      throw new AppError(ERROR_CODES.imageInvalid, "图片无法归一化", 400, undefined, {
-        reason: image.mimeType,
-      });
-    }
-    const { id } = putAttachment(Buffer.from(resized.data, "base64"), resized.mimeType, dir);
-    normalized.push({
-      id,
-      mimeType: resized.mimeType,
-      content: { type: "image", data: resized.data, mimeType: resized.mimeType },
+/** 归一化并入库单张图片；返回入库后的附件记录 */
+export const storeImage = async (
+  bytes: Uint8Array,
+  mimeType: string,
+  name: string | null,
+  deps: AttachmentDeps,
+): Promise<AttachmentRecord> => {
+  const resized = await resizeImage(Buffer.from(bytes), mimeType, {
+    maxWidth: IMAGE_MAX_DIMENSION,
+    maxHeight: IMAGE_MAX_DIMENSION,
+    maxBytes: IMAGE_MAX_BYTES,
+  });
+  if (!resized) {
+    throw new AppError(ERROR_CODES.imageInvalid, "图片无法归一化", 400, undefined, {
+      reason: mimeType,
     });
   }
-  return normalized;
+  return putAttachment(
+    Buffer.from(resized.data, "base64"),
+    { mimeType: resized.mimeType, name },
+    deps,
+  );
 };
+
+/** 附件 → pi 的 image 内容块：按 id 读回库里的字节，保证与 JSONL 里的内容一致 */
+export const toPromptImage = (attachment: ResolvedAttachment): PromptImage => ({
+  type: "image",
+  data: readFileSync(attachment.path).toString("base64"),
+  mimeType: attachment.mimeType,
+});

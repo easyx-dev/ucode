@@ -9,10 +9,10 @@
 ## 传输约定
 
 - 前缀 `API_BASE_PATH`（`/api/v1`，由 `API_VERSION` 拼出）
-- 除 `GET /api/v1/health` 与 `GET /api/v1/attachments/<id>` 外，一律 `POST` + JSON body
+- 除 `GET /api/v1/health`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外，一律 `POST` + JSON body
 - **请求参数只放 body，不进路径**：路径只表达「域 + 动作」（`attachments` 的 `<id>` 例外，见「附件」）
 - `Content-Type: application/json`；无参数的接口也要发 `{}`（对应的 schema 是 `emptyInputSchema`）
-- 事件流 `/events` 是 SSE、附件路由返回原始字节，都不适用上面的 JSON 约定，见各自小节
+- 事件流 `/events` 是 SSE、附件路由收发原始字节，都不适用上面的 JSON 约定，见各自小节
 
 ## 响应封套
 
@@ -187,11 +187,21 @@
 
 ## 附件（attachments）
 
-`GET /api/v1/attachments/<id>` 是**按 id 走路径、返回原始字节**的接口（非 JSON、不走封套）：
-`<id>` 是内容的 sha256（64 位小写 hex），`Content-Type` 取自存储时的 mimeType，
-带 `Cache-Control: immutable` 与 `ETag`；非法 id 或缺失返回 404。
-图片由 `messages/prompt` 的 `images` 归一化后写入内容寻址附件库（落 `$APP_HOME/app/attachments`），
-消息 `image` 区块的 `url` 即指向此路由。
+附件库是**内容寻址**的：`id` 是内容 sha256（64 位小写 hex），字节落 `$APP_HOME/app/attachments/<id>`，
+元数据（mimeType / 文件名 / 大小）在 SQLite 的 `attachment` 表。`messages/prompt` 的 `attachments`
+传引用 id，消息里图片的 `url` 指向 `GET` 路由。
+
+- `POST /api/v1/attachments`：上传附件。**请求体是原始字节（非 JSON）**，`Content-Type` 为附件类型，
+  文件名走查询串 `?name=`；图片经 pi 归一化（2000px / 5MB）后入库，其它类型原样入库。
+  响应走封套，返回 `{ id, mimeType, name, size, kind }`（`kind` 为 `image` / `file`）。
+  超过 32MB 返回 `payload_too_large`；图片无法归一化返回 `image_invalid`。
+- `GET /api/v1/attachments/<id>`：按 id 返回原始字节（**非 JSON、不走封套**），`Content-Type` 取自
+  元数据，带 `Cache-Control: immutable` 与 `ETag`；非法 id 或缺失返回 404。
+- 非图片附件（pdf / word 等）本期**只存与引用**：服务端在正文里附一行
+  `[附件: <name> (id: <hash>)]`，不解析内容（留给后续 `read_attachment` / MCP）。
+- **临时与永久**：上传的附件先是「临时」（`referenced_at` 为空），被 `messages/prompt` 引用后
+  转为永久；未被引用的临时附件超过 7 天由服务端后台清理（`referenced_at IS NULL AND
+  created_at < now - TTL`）。同一份内容只有一个 id，一旦永久不会回退。
 
 ## 交互请求（interactions）
 

@@ -1,3 +1,4 @@
+import { API_BASE_PATH } from "@ucode/contracts";
 import { Bot, Brain, ChevronRight, FileText, GitFork, Pencil, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -230,7 +231,7 @@ export function MessageItem({
         {canEdit ? <EditAction onClick={startEdit} /> : null}
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
         <div className="flex max-w-[85%] flex-col items-end gap-1.5">
-          {parsed.skill || parsed.contexts.length > 0 ? (
+          {parsed.skill || parsed.contexts.length > 0 || parsed.attachments.length > 0 ? (
             <div className="flex flex-wrap justify-end gap-1.5">
               {parsed.skill ? (
                 <span
@@ -251,6 +252,19 @@ export function MessageItem({
                   <FileText className="size-3 shrink-0" />
                   {context.lines ? `${context.path}:${context.lines}` : context.path}
                 </span>
+              ))}
+              {parsed.attachments.map((attachment, index) => (
+                <a
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 同一文件可被引用多次，位置即身份
+                  key={`${item.id}-att-${index}`}
+                  href={`${API_BASE_PATH}/attachments/${attachment.id}`}
+                  download={attachment.name}
+                  title={attachment.name}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <FileText className="size-3 shrink-0" />
+                  {attachment.name}
+                </a>
               ))}
             </div>
           ) : null}

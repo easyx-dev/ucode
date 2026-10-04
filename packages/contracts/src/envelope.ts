@@ -73,6 +73,8 @@ export const ERROR_CODES = {
 
   /** 图片无法归一化（格式不支持、超限且不可压缩等） */
   imageInvalid: "image_invalid",
+  /** 上传体积超过上限 */
+  payloadTooLarge: "payload_too_large",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

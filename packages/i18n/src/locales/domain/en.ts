@@ -19,4 +19,5 @@ export default {
   创建目录失败: "Failed to create directory: {{path}}",
   项目不存在: "Project does not exist: {{path}}",
   图片无效: "Invalid image: {{reason}}",
+  上传过大: "Attachment exceeds the size limit ({{max}})",
 };

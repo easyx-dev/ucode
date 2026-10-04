@@ -1,59 +1,77 @@
 /**
- * 内容寻址附件库：按 sha256 存原始字节，图片与文档共用。
+ * 附件存取：内容寻址（sha256），元数据落 SQLite（见 `db/attachment-repository`），
+ * 字节写 `<dir>/<id>`。图片与非图片共用同一套 id 与路径规则。
  *
- * 存 `<sha256>.<ext>`；`id` 就是 sha256，天然去重。字节路由按 id 找回并带上
- * 存储时的 mimeType（未知类型落成 `.bin`）。
+ * 存的是「最终字节」：图片是归一化之后的内容，所以 pi 回写进会话 JSONL 的 base64
+ * 与这里完全一致，历史投影按 JSONL 重算的 sha256 才能命中同一个附件。
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { AttachmentRecord, AttachmentRepository } from "../../db/attachment-repository";
 import { env } from "../../env";
+
+/** 存取依赖：仓储必传，目录缺省取 `$APP_HOME/app/attachments`（测试可覆盖） */
+export type AttachmentDeps = { repo: AttachmentRepository; dir?: string };
+
+/** 附件记录 + 磁盘路径 */
+export type ResolvedAttachment = AttachmentRecord & { path: string };
 
 /** 附件 id：64 位小写 hex（sha256） */
 const ID_PATTERN = /^[0-9a-f]{64}$/;
 
-/** 允许的附件类型：扩展名与 mimeType 一一对应；未知类型按 `bin` 落盘 */
-const ATTACHMENT_TYPES = [
-  { ext: "png", mimeType: "image/png" },
-  { ext: "jpg", mimeType: "image/jpeg" },
-  { ext: "webp", mimeType: "image/webp" },
-  { ext: "gif", mimeType: "image/gif" },
-  { ext: "bin", mimeType: "application/octet-stream" },
-] as const;
-
-export type StoredAttachment = { id: string; path: string };
-
-export type ResolvedAttachment = { path: string; mimeType: string };
+/** 是否为合法的附件 id（路由与仓储共用同一套校验） */
+export const isAttachmentId = (value: string): boolean => ID_PATTERN.test(value);
 
 export const attachmentIdOf = (bytes: Uint8Array): string =>
   createHash("sha256").update(bytes).digest("hex");
 
-const extFor = (mimeType: string): string =>
-  ATTACHMENT_TYPES.find((type) => type.mimeType === mimeType)?.ext ?? "bin";
-
-/** 写入附件库；同内容已存在则跳过（内容寻址天然去重） */
+/** 写入附件：字节落盘（同内容跳过重复写），元数据入库；同内容已存在时返回已有记录 */
 export const putAttachment = (
   bytes: Uint8Array,
-  mimeType: string,
-  dir = env.attachmentsDir,
-): StoredAttachment => {
-  mkdirSync(dir, { recursive: true });
+  meta: { mimeType: string; name?: string | null },
+  deps: AttachmentDeps,
+): AttachmentRecord => {
+  const dir = deps.dir ?? env.attachmentsDir;
   const id = attachmentIdOf(bytes);
-  const path = join(dir, `${id}.${extFor(mimeType)}`);
-  if (!existsSync(path)) writeFileSync(path, bytes);
-  return { id, path };
+  const path = join(dir, id);
+  if (!existsSync(path)) {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path, bytes);
+  }
+
+  const existing = deps.repo.find(id);
+  if (existing) return existing;
+
+  const record: AttachmentRecord = {
+    id,
+    mimeType: meta.mimeType,
+    name: meta.name ?? null,
+    size: bytes.length,
+    createdAt: new Date().toISOString(),
+    referencedAt: null,
+  };
+  deps.repo.insert(record);
+  return record;
 };
 
-/** 按 id 找回附件；非法 id 或不存在返回 null */
-export const resolveAttachment = (
-  id: string,
-  dir = env.attachmentsDir,
-): ResolvedAttachment | null => {
+/** 按 id 取回附件（元数据 + 磁盘路径）；非法 id、无元数据或文件缺失都返回 null */
+export const resolveAttachment = (id: string, deps: AttachmentDeps): ResolvedAttachment | null => {
   if (!ID_PATTERN.test(id)) return null;
-  for (const type of ATTACHMENT_TYPES) {
-    const path = join(dir, `${id}.${type.ext}`);
-    if (existsSync(path)) return { path, mimeType: type.mimeType };
-  }
-  return null;
+  const record = deps.repo.find(id);
+  if (!record) return null;
+  const path = join(deps.dir ?? env.attachmentsDir, id);
+  return existsSync(path) ? { ...record, path } : null;
+};
+
+/**
+ * 清理「从未被消息引用、且早于 `before` 创建」的草稿临时附件（元数据 + 字节）。
+ * 被引用过的附件永久保留，不受 TTL 影响。返回删除数量。
+ */
+export const expireTempAttachments = (deps: AttachmentDeps, before: string): number => {
+  const ids = deps.repo.deleteExpired(before);
+  const dir = deps.dir ?? env.attachmentsDir;
+  for (const id of ids) rmSync(join(dir, id), { force: true });
+  return ids.length;
 };

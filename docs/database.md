@@ -71,6 +71,20 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 文件尚未写出）。**不再从文件回读任何元数据**（外部导入能力已放弃），所以删库重建后
 `name` / `cwd` / `model` / `thinking_level` / `mode` 会丢失——这是有意的取舍。
 
+### `attachment` 表
+
+附件库的元数据表（schema v5，见 [`plans/input-commands-skills.md`](../plans/input-commands-skills.md)）：
+字节在 `$APP_HOME/app/attachments/<id>`，这里只存索引（`mime_type` / `name` / `size` /
+`created_at` / `referenced_at`）。
+
+`id` 是**内容 sha256**（不是「主键用 `randomUUID`」那条约定的写法）——内容寻址要求
+「同一份内容同一个 id」，因此 `insert` 冲突即已存在、直接跳过，文件名以先入库的为准。
+
+`referenced_at` 区分临时与永久：上传（贴图 / 草稿）时为 `NULL`，当附件随消息发送、
+被 `messages/prompt` 引用时置为时间，且**只从空置为有值、不回退**（同一份内容被多条消息
+共享时也成立）。清理只删「`referenced_at IS NULL` 且 `created_at` 早于 TTL（7 天）」的行与文件，
+由服务启动后的定时器（`ATTACHMENT_SWEEP_INTERVAL_MS`）执行；被引用过的附件永久保留。
+
 ## 类型映射
 
 | 语义 | SQLite | JS / TS | zod |

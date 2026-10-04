@@ -35,17 +35,20 @@
 
 ### 新增
 
+- 新增 `POST /api/v1/attachments`（**请求体为原始字节**，`?name=` 带文件名）与附件元数据表
+  （SQLite `attachment`，schema v5）：`id` 是内容 sha256，字节落 `$APP_HOME/app/attachments/<id>`，
+  `GET /attachments/<id>` 的 `Content-Type` 取元数据。`referenced_at` 区分临时 / 永久：
+  未被消息引用的草稿附件超期（7 天）由服务端清理。上传上限 32MB（`payload_too_large`）。
 - 输入区由 `<textarea>` 换成 **Tiptap 富文本编辑器**（只装结构节点与两个 mention，无排版 marks）：
   `/` 菜单分「内置动作 / 命令 / 技能」三组（内置动作立即执行、不落正文；命令与技能序列化为
   `/name` / `/skill:name`，仅文档开头生效），`@` 按会话 cwd 检索文件 / 目录并以 `contextMention`
   引用（发送时剥离为 `contexts[]`）；数据来源 `commands/list` 与 `fs/search`。新增 web 依赖
   `@tiptap/react`、`@tiptap/core`、`@tiptap/pm` 及 document / paragraph / text / hard-break /
   mention / suggestion / placeholder 扩展。
-- 输入区图片附件：粘贴 / 拖拽进编辑器先按最长边 2000px 预压缩，字节存本地 IndexedDB
-  （内容寻址，库名由品牌 slug 派生），编辑器上方附件行显示缩略图（可点开预览）与移除按钮；
-  发送时读成 base64 随 `images` 上传，乐观消息先用本地预览，发送失败时连同附件一起还回输入框。
-  草稿新增 `attachments`（内容 id 列表），刷新后按 id 从本地库恢复；非图片文件拒收并提示。
-  发送后历史里的用户消息也会渲染这些图片（此前用户消息只渲染文本块）。
+- 输入区附件：粘贴 / 拖拽即上传到服务端，编辑器上方附件行显示图片缩略图（可点开预览）或文件
+  chip、可移除；草稿只存附件视图，发送时按 id 引用，发送失败原样回填。草稿期上传的附件在服务端
+  是「临时」状态（`referenced_at` 为空），未被消息引用的按 TTL（7 天）回收；图片走原生 vision，
+  非图片（pdf / word 等）本期只存与引用。
 - 内置命令补齐到 12 个（`/new` `/rename` `/archive` `/fork` `/stop` `/compact` `/models`
   `/thinking` `/mode` `/settings` `/goal` `/help`）：草稿态（无会话）的 `/` 菜单只列不需要会话的命令；
   `/models` `/thinking` `/mode` 用受控弹出层就地打开工具栏里的同一个选择器，`/rename` 与侧栏共用
@@ -294,6 +297,14 @@
 
 ### 变更
 
+- 附件改为「先上传、再按 id 引用」：`messages/prompt` 的 `images`（内联 base64）改为
+  `attachments: [{ id }]`，图片仍由服务端 `resizeImage` 归一化后入库，非图片（pdf / word 等）
+  原样入库、正文只附一行引用 `[附件: <name> (id: <hash>)]`（内容解析留给后续）。
+  请求体不再内联 base64，去掉约 33% 膨胀与 base64 上限。
+  （本地已按中间实现建过 `app.db` 的环境需删除重建：v5 迁移项在提交前被就地修改过。）
+- web 去掉本地附件库（删掉 `lib/image-encode.ts`、`lib/draft-store.ts`）：不再在客户端压缩、
+  不再需要本地回收；草稿只保存附件视图（`{ id, mimeType, name, size, kind }`），预览直接走
+  附件路由。附件在贴图时上传，发送不再等待上传。
 - 升级 pi（`@earendil-works/pi-coding-agent` `^0.99.1` → `^1.0.2`）；MCP 暴露方式收敛：
   pi 1.0 起 `codemode-deferred` 已成为 `codemode` 的运行时别名，`MCP_EXPOSURES` 同步删去该项，
   存量写 `codemode-deferred` 的 `mcp.json` 按「不做历史兼容」不迁移，改成 `codemode` 即可。
@@ -398,6 +409,16 @@
   会从错误目录解析项目级资源（`composer.tsx`）。
 - 切换会话时编辑器不再短暂沿用上一个会话的文档：外部填充记下所属 `editorKey`，
   仅在该键匹配时作为初始文档（`composer.tsx`）。
+- 附件仍在上传时按发送会漏掉该附件、且上传完成后又回填进已清空的草稿：上传在途时禁用发送，
+  并让 `submit` 以同步计数兜底（`use-composer-attachments.ts`、`composer.tsx`）。
+- 非图片附件在历史里直接把内部引用行 `[附件: name (id: …)]` 显示给用户：改为还原成可下载的
+  文件 chip，与发送瞬间的乐观视图一致（`message-chips.ts`、`message-item.tsx`）。
+- `POST /attachments` 在读完整个请求体之后才判体积上限，超大上传会先被完整缓冲：改为先按
+  `content-length` 拒绝，再在读完后兜底（`routes/attachments/index.ts`）。
+- 附件过期清理的 DELETE 补上 `referenced_at IS NULL` 条件并只看真正删掉的行，避免与
+  `markReferenced` 竞态时误删刚转永久的附件与其文件（`attachment-repository.ts`）。
+- 附件转永久的时机改到会话装配成功之后：未配模型等装配失败时不再留下永不清理的永久附件
+  （`run.ts`）。
 
 ### 移除
 

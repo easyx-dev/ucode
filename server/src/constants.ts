@@ -96,8 +96,14 @@ export const ATTACHMENTS_DIRNAME = "attachments";
 /** 图片归一化的最长边（像素） */
 export const IMAGE_MAX_DIMENSION = 2000;
 
-/** 图片归一化后的编码字节上限（与契约的 `MESSAGE_IMAGE_MAX_BASE64_BYTES` 同档） */
+/** 图片归一化后的编码字节上限 */
 export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** 草稿临时附件的保留时长：只在草稿里引用过、从未随消息发送的附件超期清理 */
+export const ATTACHMENT_TEMP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 临时附件的扫描间隔 */
+export const ATTACHMENT_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 
 /** `@` 单次引用的文件数上限（目录展开后一并计入） */
 export const CONTEXT_MAX_FILES = 64;

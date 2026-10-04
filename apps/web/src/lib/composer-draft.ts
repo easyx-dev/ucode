@@ -1,5 +1,8 @@
-/** 输入区草稿：还没发出去的文本与初始设置，按上下文持久化在 localStorage */
+/** 输入区草稿：还没发出去的文本、附件与初始设置，按上下文持久化在 localStorage */
+
 import { brand } from "@ucode/brand";
+import type { AttachmentView } from "@ucode/contracts";
+
 import type { ThinkingLevel } from "@/lib/types";
 
 export type ComposerDraft = {
@@ -7,8 +10,8 @@ export type ComposerDraft = {
   text: string;
   /** 编辑器文档（命令 / 技能 mention 的原样保存）；缺省时按 `text` 还原 */
   doc?: unknown;
-  /** 图片附件的本地库 id（content hash）；字节在 IndexedDB，见 `lib/draft-store` */
-  attachments?: string[];
+  /** 已上传的附件视图（草稿期就落在服务端，超期由服务端按 TTL 回收） */
+  attachments?: AttachmentView[];
   /** 会话级设置的草稿；只在「还没有会话」时作为新会话的初始设置生效 */
   model?: string;
   thinkingLevel?: ThinkingLevel;
@@ -40,17 +43,33 @@ export const hasDraftContent = (draft: ComposerDraft | undefined): boolean =>
         (draft.attachments !== undefined && draft.attachments.length > 0)),
   );
 
+/** 单个附件视图的校验：形状不对的直接丢掉，避免脏草稿把渲染带崩 */
+const toAttachment = (value: unknown): AttachmentView | null => {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string") return null;
+  if (item.kind !== "image" && item.kind !== "file") return null;
+  return {
+    id: item.id,
+    mimeType: typeof item.mimeType === "string" ? item.mimeType : "application/octet-stream",
+    name: typeof item.name === "string" ? item.name : null,
+    size: typeof item.size === "number" ? item.size : 0,
+    kind: item.kind,
+  };
+};
+
 /** 单条草稿的校验：`text` 必须是字符串，其余字段按需保留 */
 const toDraft = (value: unknown): ComposerDraft | null => {
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
   if (typeof item.text !== "string") return null;
+  const attachments = Array.isArray(item.attachments)
+    ? item.attachments.map(toAttachment).filter((entry): entry is AttachmentView => entry !== null)
+    : [];
   return {
     text: item.text,
     ...(item.doc && typeof item.doc === "object" ? { doc: item.doc } : {}),
-    ...(Array.isArray(item.attachments)
-      ? { attachments: item.attachments.filter((id): id is string => typeof id === "string") }
-      : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
     ...(typeof item.model === "string" ? { model: item.model } : {}),
     ...(typeof item.thinkingLevel === "string"
       ? { thinkingLevel: item.thinkingLevel as ComposerDraft["thinkingLevel"] }

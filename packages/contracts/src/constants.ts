@@ -136,14 +136,19 @@ export const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image
 
 export type ImageMimeType = (typeof IMAGE_MIME_TYPES)[number];
 
-/** 单轮 prompt 的图片数量上限；超出直接 400，避免请求体过大 */
-export const PROMPT_MAX_IMAGES = 8;
+/** 附件类别：图片会作为 vision 内容块发给模型，其余（pdf/word 等）本期只存与引用 */
+export const ATTACHMENT_KINDS = ["image", "file"] as const;
+
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+/** 单张附件的上传体积上限；客户端预检 + 服务端兜底 */
+export const ATTACHMENT_MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
+
+/** 单轮 prompt 的附件数量上限；超出直接 400，避免请求体过大 */
+export const PROMPT_MAX_ATTACHMENTS = 8;
 
 /** 单轮 prompt 的 `@` 上下文引用数量上限 */
 export const PROMPT_MAX_CONTEXTS = 32;
-
-/** 单张图片 base64 编码后的字节上限（与 pi 图片归一化的 5MB 一致） */
-export const MESSAGE_IMAGE_MAX_BASE64_BYTES = 5 * 1024 * 1024;
 
 /**
  * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：

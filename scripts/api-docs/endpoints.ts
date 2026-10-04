@@ -283,6 +283,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
 
   {
     domain: "attachments",
+    action: "",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "AttachmentUploadResponse",
+    summary: "上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库）",
+  },
+  {
+    domain: "attachments",
     action: ":id",
     method: "GET",
     input: null,

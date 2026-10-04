@@ -1,19 +1,21 @@
-/** 编辑器上方的附件行：图片缩略图（点开预览）+ 悬停删除 */
-import { X } from "lucide-react";
+/** 编辑器上方的附件行：图片缩略图（点开预览）、其它类型文件 chip，均可移除 */
+import { API_BASE_PATH, type AttachmentView } from "@ucode/contracts";
+import { FileText, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ComposerAttachment } from "@/components/composer/use-composer-attachments";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 type AttachmentStripProps = {
-  attachments: ComposerAttachment[];
+  attachments: AttachmentView[];
   onRemove: (id: string) => void;
 };
 
+const urlOf = (id: string): string => `${API_BASE_PATH}/attachments/${id}`;
+
 export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps) {
   const { t } = useTranslation();
-  const [preview, setPreview] = useState<ComposerAttachment | null>(null);
+  const [preview, setPreview] = useState<AttachmentView | null>(null);
 
   if (attachments.length === 0) return null;
 
@@ -21,14 +23,23 @@ export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps)
     <div className="flex flex-wrap gap-2 px-3 pt-2.5">
       {attachments.map((item) => (
         <div key={item.id} className="relative">
-          <button
-            type="button"
-            onClick={() => setPreview(item)}
-            title={item.name}
-            className="block size-14 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            <img src={item.url} alt={item.name} className="size-full object-cover" />
-          </button>
+          {item.kind === "image" ? (
+            <button
+              type="button"
+              onClick={() => setPreview(item)}
+              title={item.name ?? item.id}
+              className="block size-14 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <img src={urlOf(item.id)} alt={item.name ?? ""} className="size-full object-cover" />
+            </button>
+          ) : (
+            <div className="flex h-14 max-w-40 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground">
+              <FileText className="size-4 shrink-0" />
+              <span className="truncate" title={item.name ?? item.id}>
+                {item.name ?? item.id}
+              </span>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => onRemove(item.id)}
@@ -50,8 +61,8 @@ export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps)
           <DialogTitle>{t("图片预览")}</DialogTitle>
           {preview ? (
             <img
-              src={preview.url}
-              alt={preview.name}
+              src={urlOf(preview.id)}
+              alt={preview.name ?? ""}
               className="max-h-[70vh] w-full rounded-md object-contain"
             />
           ) : null}

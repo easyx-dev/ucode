@@ -8,10 +8,12 @@
  */
 export type SkillChip = { name: string };
 export type ContextChip = { path: string; lines?: string };
+export type AttachmentChip = { id: string; name: string };
 
 export type ParsedUserMessage = {
   skill?: SkillChip;
   contexts: ContextChip[];
+  attachments: AttachmentChip[];
   /** 用户原文（已剥掉前置的展开块） */
   text: string;
 };
@@ -19,11 +21,15 @@ export type ParsedUserMessage = {
 const SKILL_PATTERN = /^<skill name="([^"]*)" location="[^"]*">\n[\s\S]*?\n<\/skill>\n{0,2}/;
 const CONTEXT_PATTERN =
   /^<context path="([^"]*)"(?: lines="([^"]*)")?>\n[\s\S]*?\n<\/context>\n{0,2}/;
+/** 非图片附件的引用行（服务端前置进正文）：`[附件: name (id: <sha256>)]` */
+// i18n-ignore：协议字面量，与 server 的 run.ts 保持一致，不是界面文案
+const ATTACHMENT_PATTERN = /^\[附件: (.*?) \(id: ([0-9a-f]{64})\)\]\n{0,2}/;
 
 export const parseUserMessage = (raw: string): ParsedUserMessage => {
   let text = raw;
   let skill: SkillChip | undefined;
   const contexts: ContextChip[] = [];
+  const attachments: AttachmentChip[] = [];
 
   const skillMatch = text.match(SKILL_PATTERN);
   if (skillMatch) {
@@ -39,5 +45,13 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
     match = text.match(CONTEXT_PATTERN);
   }
 
-  return { skill, contexts, text };
+  // 紧随其后是非图片附件的引用行（一行一个）
+  let attachment = text.match(ATTACHMENT_PATTERN);
+  while (attachment) {
+    attachments.push({ name: attachment[1] ?? "", id: attachment[2] ?? "" });
+    text = text.slice(attachment[0].length);
+    attachment = text.match(ATTACHMENT_PATTERN);
+  }
+
+  return { skill, contexts, attachments, text };
 };

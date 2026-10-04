@@ -1,4 +1,5 @@
 /** 发送消息：乐观插入用户消息并向服务端投递，生成结果由全局事件流回传 */
+import { API_BASE_PATH } from "@ucode/contracts";
 import { useCallback, useState } from "react";
 
 import { api, describeError } from "@/lib/api";
@@ -25,15 +26,23 @@ type SendMessageOptions = {
   clearPending: () => void;
 };
 
-/** 载荷 → 乐观区块：正文 + 图片（本地用 data URL 立即预览，权威消息到达后替换） */
+/** 载荷 → 乐观区块：正文 + 附件（图片直接用附件路由的地址预览，权威消息到达后替换） */
 const optimisticBlocks = (payload: ComposerPayload): MessageBlock[] => [
   ...(payload.text ? [{ type: "text", text: payload.text } as const] : []),
-  ...payload.images.map((image) => ({
-    type: "image" as const,
-    id: "",
-    mimeType: image.mimeType,
-    url: `data:${image.mimeType};base64,${image.data}`,
-  })),
+  ...payload.attachments.map((attachment): MessageBlock => {
+    const url = `${API_BASE_PATH}/attachments/${attachment.id}`;
+    if (attachment.kind === "image") {
+      return { type: "image", id: attachment.id, mimeType: attachment.mimeType, url };
+    }
+    return {
+      type: "file",
+      id: attachment.id,
+      mimeType: attachment.mimeType,
+      name: attachment.name ?? attachment.id,
+      size: attachment.size,
+      url,
+    };
+  }),
 ];
 
 export function useSendMessage({
@@ -63,7 +72,9 @@ export function useSendMessage({
           sessionId,
           text: payload.text,
           ...(payload.contexts.length > 0 ? { contexts: payload.contexts } : {}),
-          ...(payload.images.length > 0 ? { images: payload.images } : {}),
+          ...(payload.attachments.length > 0
+            ? { attachments: payload.attachments.map((attachment) => ({ id: attachment.id })) }
+            : {}),
         });
         return true;
       } catch (error) {

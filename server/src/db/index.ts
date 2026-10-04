@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -46,6 +46,19 @@ const migrations: Record<number, string> = {
   // 目标模式：会话目标状态以 JSON 存一列（见 plans/stage-11-goal.md）
   4: `
     ALTER TABLE session ADD COLUMN goal_state TEXT;
+  `,
+  // 附件：内容寻址的元数据；字节在 $APP_HOME/app/attachments/<id>，见 plans/input-commands-skills.md。
+  // `referenced_at` 为空表示「只被草稿引用过、随时可过期」，被消息引用后置为时间且不再回退。
+  5: `
+    CREATE TABLE attachment (
+      id            TEXT PRIMARY KEY,
+      mime_type     TEXT NOT NULL,
+      name          TEXT,
+      size          INTEGER NOT NULL,
+      created_at    TEXT NOT NULL,
+      referenced_at TEXT
+    );
+    CREATE INDEX idx_attachment_created_at ON attachment(created_at);
   `,
 };
 
