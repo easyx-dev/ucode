@@ -1,4 +1,2 @@
-/** 全局事件流：SDK 连接实例（应用级单例）；React 侧只订阅，不关心连接细节 */
-import { sdk } from "@/lib/sdk";
-
-export const eventStream = sdk.events;
+/** 全局事件流已迁入 @ucode/ui，这里转发以兼容既有引用 */
+export * from "@ucode/ui/lib/event-stream";

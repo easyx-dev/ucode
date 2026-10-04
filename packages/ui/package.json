@@ -9,7 +9,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts",
     "./lib/*": "./src/lib/*.ts",
+    "./runtime": "./src/runtime.ts",
     "./theme.css": "./src/styles/theme.css"
   },
   "types": "./src/index.ts",
