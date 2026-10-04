@@ -4,7 +4,7 @@
 > 参考：[zcode 目标模式](https://zcode.z.ai/cn/docs/goal)、[Codex `/goal`](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex)、
 > [Claude Code `/goal`](https://code.claude.com/docs/en/goal)、[`@schovest/pi-goal`](https://pi.dev/packages/@schovest/pi-goal)。
 >
-> 状态：**待 review**（实现完成，`pnpm check` 全绿；未经批准不提交）。本文是阶段 11 的细化方案与落地记录。
+> 状态：**已完成**（`68abc27`）。本文是阶段 11 的细化方案与落地记录。
 
 ## 一、目标与范围
 

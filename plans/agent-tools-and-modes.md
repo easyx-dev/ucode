@@ -34,7 +34,7 @@
 | 8 · 会话分叉（细化见 [`stage-8-session-fork.md`](./stage-8-session-fork.md)） | 已完成 | `6ead508` |
 | 9 · 编辑历史（细化见 [`stage-9-edit-history.md`](./stage-9-edit-history.md)） | 已完成 | `e35c16f` |
 | 10 · 使用统计（细化见 [`stage-10-usage-stats.md`](./stage-10-usage-stats.md)） | 已完成 | `297eb00` |
-| 11 · goal 模式（细化见 [`stage-11-goal.md`](./stage-11-goal.md)） | 待 review | — |
+| 11 · goal 模式（细化见 [`stage-11-goal.md`](./stage-11-goal.md)） | 已完成 | `68abc27` |
 
 ## 一、已锁定的决策
 
