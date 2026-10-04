@@ -1,5 +1,7 @@
 /** 会话消息列表的事件归并（纯函数，便于复用与单测） */
-import type { ChatItem, MessageBlock, MessageDTO, MessageRole } from "./types";
+import type { MessageBlock, MessageDTO, MessageRole } from "@ucode/contracts";
+
+import type { ChatItem } from "./types";
 
 export const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};

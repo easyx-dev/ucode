@@ -15,7 +15,6 @@ import { UsageDialog } from "@/components/usage-dialog";
 import { WelcomePanel } from "@/components/welcome-panel";
 import { useGoal } from "@/hooks/use-goal";
 import { useInteractions } from "@/hooks/use-interactions";
-import type { SessionSeed } from "@/hooks/use-send-message";
 import { useSessionUsage } from "@/hooks/use-session-usage";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { api, describeError } from "@/lib/api";
@@ -26,7 +25,7 @@ import type { GoalCommand } from "@/lib/goal-command";
 import { lastTurnPresentedPlan } from "@/lib/plan";
 import { sessionTitle } from "@/lib/session";
 import { isWorkspaceSession } from "@/lib/session-groups";
-import type { ChatItem, SessionSummary, ThinkingLevel } from "@/lib/types";
+import type { ChatItem, SessionCreateRequest, SessionSummary, ThinkingLevel } from "@/lib/types";
 
 export default function App() {
   const { t } = useTranslation();
@@ -116,7 +115,7 @@ export default function App() {
    * `/goal` 命令：草稿态先建会话再设目标；其余命令作用于当前会话。
    * 目标模式只在编码模式可用，服务端会再校验一次。
    */
-  const runGoalCommand = (command: GoalCommand, seed: SessionSeed = {}): void => {
+  const runGoalCommand = (command: GoalCommand, seed: SessionCreateRequest = {}): void => {
     void (async () => {
       if (command.kind === "set") {
         if (activeId) {

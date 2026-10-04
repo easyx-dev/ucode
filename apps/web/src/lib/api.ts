@@ -1,13 +1,14 @@
-/** web 侧的 SDK 装配：浏览器 fetch + i18n 错误文案；对外保持既有 api / 错误工具的调用形态 */
-import { errorMessageKey } from "@ucode/i18n";
-import { createClient, describeError as describeSdkError, SdkError } from "@ucode/sdk";
+/** web 侧的接口入口：转发 SDK 客户端与错误文案工具，保持既有调用形态 */
+import {
+  describeApiError as describeCode,
+  describeError as describeRaw,
+  SdkError,
+} from "@ucode/sdk";
 
-import i18n from "./i18n";
+import { sdk, translate } from "./sdk";
 
-const t = i18n.t as unknown as (key: string, params?: Record<string, string>) => string;
-
-/** 默认客户端：同源请求，错误文案走 web 的 i18n 实例 */
-export const api = createClient({ translate: t });
+/** 默认客户端：同源请求 */
+export const api = sdk.client;
 
 export { SdkError as ApiRequestError };
 
@@ -16,10 +17,7 @@ export const describeApiError = (
   code: string,
   message: string,
   params?: Record<string, string>,
-): string => {
-  const key = errorMessageKey(code);
-  return key ? t(key, params) : message;
-};
+): string => describeCode(code, message, params, translate);
 
 /** 把接口异常转成可直接展示的文案 */
-export const describeError = (error: unknown): string => describeSdkError(error, t);
+export const describeError = (error: unknown): string => describeRaw(error, translate);

@@ -42,6 +42,17 @@ export const describeError = (error: unknown, translate?: Translate): string => 
   return key && translate ? translate(key, error.params) : error.message;
 };
 
+/** 按错误码与兜底文案解析展示文本（用于事件流的错误帧，那里没有 SdkError 实例） */
+export const describeApiError = (
+  code: string,
+  message: string,
+  params?: Record<string, string>,
+  translate?: Translate,
+): string => {
+  const key = errorMessageKey(code);
+  return key && translate ? translate(key, params) : message;
+};
+
 /** 把 `{{占位}}` 替换为 params；未注入 translate 时用于兜底文案 */
 export const interpolate = (text: string, params?: Record<string, string>): string =>
   params ? text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => params[key] ?? match) : text;

@@ -12,7 +12,6 @@ import { PlanDecisionForm } from "@/components/plan-decision-form";
 import { Button } from "@/components/ui/button";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ComposerDraftsController } from "@/hooks/use-composer-drafts";
-import type { SessionSeed } from "@/hooks/use-send-message";
 import type { BuiltinCommandId } from "@/lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "@/lib/composer-document";
 import { type ComposerDraft, composerKeyOf, emptyDraft } from "@/lib/composer-draft";
@@ -23,6 +22,7 @@ import type {
   ChatItem,
   GoalView,
   ModelsResponse,
+  SessionCreateRequest,
   SessionSummary,
   ThinkingLevel,
   UsageTotals,
@@ -58,7 +58,7 @@ type ChatPanelProps = {
   /** 当前会话目标；用于输入区上方的目标栏 */
   goal?: GoalView | null;
   /** 处理 `/goal` 命令（设定 / 暂停 / 恢复 / 清除 / 查看） */
-  onGoalCommand: (command: GoalCommand, seed?: SessionSeed) => void;
+  onGoalCommand: (command: GoalCommand, seed?: SessionCreateRequest) => void;
   /** 执行内置命令（`/` 菜单里的动作型命令） */
   onBuiltin: (id: BuiltinCommandId) => void;
   /** 本会话累计 token 用量；用于头部徽标 */
