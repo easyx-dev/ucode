@@ -264,7 +264,7 @@ export function Composer({
   );
 
   return (
-    <div className="border-t border-border bg-card px-4 py-3">
+    <div className="border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-3xl space-y-2">
         {suggestions && suggestions.length > 0 ? (
           <div className="flex flex-wrap gap-2">

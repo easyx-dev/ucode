@@ -17,6 +17,7 @@ export default {
   新建会话: "New session",
   新会话: "New session",
   搜索会话: "Search sessions",
+  会话列表: "Session list",
   设置: "Settings",
   取消: "Cancel",
   保存: "Save",

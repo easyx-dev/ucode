@@ -48,6 +48,8 @@ type ChatPanelProps = {
   onOpenSettings: () => void;
   /** 打开某个子会话（子智能体工具卡上的入口） */
   onOpenSession: (sessionId: string) => void;
+  /** 移动端打开会话侧栏抽屉 */
+  onOpenSidebar?: () => void;
   /** 从某条消息分叉出新会话 */
   onFork: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话、非生成中可用） */
@@ -85,6 +87,7 @@ export function ChatPanel({
   onSelectMode,
   onOpenSettings,
   onOpenSession,
+  onOpenSidebar,
   onFork,
   onEdit,
   forkedFromName,
@@ -162,12 +165,13 @@ export function ChatPanel({
   const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
   return (
-    <main className="m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:m-2 md:ml-0 md:rounded-xl md:border md:border-border">
       <ChatHeader
         session={session}
         models={models}
         onReloadModels={onReloadModels}
         onOpenSettings={onOpenSettings}
+        onOpenSidebar={onOpenSidebar}
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
         onBackToParent={onBackToParent}

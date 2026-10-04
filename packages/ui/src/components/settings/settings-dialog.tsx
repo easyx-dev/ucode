@@ -32,7 +32,7 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-3xl">
+      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-3xl max-md:h-dvh max-md:max-h-none max-md:w-screen max-md:max-w-none max-md:rounded-none">
         <DialogHeader>
           <DialogTitle>{t("设置")}</DialogTitle>
           <DialogDescription>

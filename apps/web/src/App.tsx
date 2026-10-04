@@ -6,6 +6,7 @@ import { QuestionDialog } from "@ucode/ui/components/question-dialog";
 import { RenameSessionDialog } from "@ucode/ui/components/rename-session-dialog";
 import { SessionSidebar } from "@ucode/ui/components/session-sidebar";
 import { SettingsDialog } from "@ucode/ui/components/settings/settings-dialog";
+import { Sheet, SheetContent } from "@ucode/ui/components/ui/sheet";
 import { Toaster } from "@ucode/ui/components/ui/sonner";
 import { TooltipProvider } from "@ucode/ui/components/ui/tooltip";
 import { UsageDialog } from "@ucode/ui/components/usage-dialog";
@@ -40,6 +41,8 @@ export default function App() {
   const interactions = useInteractions(activeId);
   const goal = useGoal(activeId);
   const [usageOpen, setUsageOpen] = useState(false);
+  /** 移动端会话侧栏抽屉 */
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   /** 重命名对话框的目标；侧栏右键与 `/rename` 命令共用同一个对话框 */
   const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
   // 本会话累计用量：切换会话时取一次，生成落定后刷新
@@ -211,30 +214,59 @@ export default function App() {
     ? (sessions.sessions.find((item) => item.id === forkSourceId)?.name ?? null)
     : null;
 
+  const sidebarProps = {
+    sessions: sessions.sessions,
+    workspaceRoot,
+    activeId,
+    loading: sessions.loading,
+    configured,
+    onSelect: setActiveId,
+    onCreate: startNewSession,
+    onCreateInDirectory: startInDirectory,
+    onRenameRequest: requestRename,
+    onDelete: (sessionId: string) => {
+      void sessions.archive(sessionId);
+      // 归档后这个会话的输入草稿也没有再恢复的意义
+      composer.clear(composerKeyOf(sessionId));
+    },
+    onOpenSettings: () => workspace.setSettingsOpen(true),
+    childrenByParent: sessions.childrenByParent,
+    childrenLoading: sessions.childrenLoading,
+    onLoadChildren: sessions.loadChildren,
+    activeParentId: activeSession?.parentSessionId ?? null,
+  };
+
   return (
     <TooltipProvider>
-      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <SessionSidebar
-          sessions={sessions.sessions}
-          workspaceRoot={workspaceRoot}
-          activeId={activeId}
-          loading={sessions.loading}
-          configured={configured}
-          onSelect={setActiveId}
-          onCreate={startNewSession}
-          onCreateInDirectory={startInDirectory}
-          onRenameRequest={requestRename}
-          onDelete={(sessionId) => {
-            void sessions.archive(sessionId);
-            // 归档后这个会话的输入草稿也没有再恢复的意义
-            composer.clear(composerKeyOf(sessionId));
-          }}
-          onOpenSettings={() => workspace.setSettingsOpen(true)}
-          childrenByParent={sessions.childrenByParent}
-          childrenLoading={sessions.childrenLoading}
-          onLoadChildren={sessions.loadChildren}
-          activeParentId={activeSession?.parentSessionId ?? null}
-        />
+      <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+        {/* 桌面端固定侧栏；移动端收进抽屉 */}
+        <div className="hidden h-full md:flex">
+          <SessionSidebar {...sidebarProps} />
+        </div>
+
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent title={t("会话列表")}>
+            <SessionSidebar
+              {...sidebarProps}
+              onSelect={(sessionId) => {
+                setActiveId(sessionId);
+                setSidebarOpen(false);
+              }}
+              onCreate={() => {
+                startNewSession();
+                setSidebarOpen(false);
+              }}
+              onCreateInDirectory={(path) => {
+                startInDirectory(path);
+                setSidebarOpen(false);
+              }}
+              onOpenSettings={() => {
+                setSidebarOpen(false);
+                workspace.setSettingsOpen(true);
+              }}
+            />
+          </SheetContent>
+        </Sheet>
 
         <ChatPanel
           session={activeSession}
@@ -256,6 +288,7 @@ export default function App() {
           onSelectMode={selectMode}
           onOpenSettings={() => workspace.setSettingsOpen(true)}
           onOpenSession={setActiveId}
+          onOpenSidebar={() => setSidebarOpen(true)}
           onFork={forkFrom}
           onEdit={editMessage}
           forkedFromName={forkSourceName}

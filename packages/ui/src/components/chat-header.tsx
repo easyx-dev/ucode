@@ -5,6 +5,7 @@ import {
   Gauge,
   GitFork,
   Loader2,
+  PanelLeftOpen,
   RefreshCw,
   Settings2,
 } from "lucide-react";
@@ -33,6 +34,8 @@ type ChatHeaderProps = {
   usage?: UsageTotals | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
+  /** 移动端打开会话侧栏抽屉 */
+  onOpenSidebar?: () => void;
 };
 
 export function ChatHeader({
@@ -46,11 +49,23 @@ export function ChatHeader({
   forkedFromName,
   usage,
   onOpenUsage,
+  onOpenSidebar,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
   return (
     <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+      {onOpenSidebar ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 md:hidden"
+          title={t("会话列表")}
+          onClick={onOpenSidebar}
+        >
+          <PanelLeftOpen className="size-4" />
+        </Button>
+      ) : null}
       {session?.parentSessionId && onBackToParent ? (
         <Button
           variant="ghost"
