@@ -1,0 +1,309 @@
+/**
+ * 接口清单：生成 `docs/api-reference.md` 与做路由交叉校验的单一来源。
+ *
+ * 路径与 method 只在 server 的路由文件里真实存在，这里登记一份镜像；
+ * `scripts/verify/checks/api-docs.ts` 会扫 server 路由与之双向核对，漏登记或多登记都会让 `pnpm check` 失败。
+ */
+
+export type ApiEndpoint = {
+  /** 域，对应路由挂载点（`/api/v1/<domain>`） */
+  domain: string;
+  /** 动作，对应路由文件里的相对路径（`/<action>`） */
+  action: string;
+  method: "GET" | "POST";
+  /** 请求 schema 的导出名；`null` 表示无参数接口（body 传 `{}`） */
+  input: string | null;
+  /** 与请求 schema 对应的 `*Input` 类型名，用于取字段说明；`null` 表示无参数 */
+  requestType: string | null;
+  /** 响应类型名；SSE 接口用 `stream` 标记，不看此字段 */
+  output: string;
+  /** 是否 SSE 事件流（不套封套） */
+  stream?: boolean;
+  /** 一句话说明 */
+  summary: string;
+};
+
+/** 全部对外接口，按域分组、组内按动作 */
+export const API_ENDPOINTS: ApiEndpoint[] = [
+  {
+    domain: "health",
+    action: "",
+    method: "GET",
+    input: null,
+    requestType: null,
+    output: "HealthResponse",
+    summary: "存活探针 + 当前模型接入状态",
+  },
+
+  {
+    domain: "models",
+    action: "list",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "ModelsResponse",
+    summary: "供应商目录（内置 + 自定义）与各自的模型、接入状态",
+  },
+  {
+    domain: "models",
+    action: "refresh",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "ModelsResponse",
+    summary: "按当前配置重建运行时后返回最新目录",
+  },
+
+  {
+    domain: "config",
+    action: "info",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "ConfigSnapshot",
+    summary: "当前配置（apiKey 脱敏）与运行时状态",
+  },
+  {
+    domain: "config",
+    action: "update",
+    method: "POST",
+    input: "appConfigPatchSchema",
+    requestType: "AppConfigPatchInput",
+    output: "ConfigSnapshot",
+    summary: "局部更新配置并热重载",
+  },
+  {
+    domain: "config",
+    action: "test",
+    method: "POST",
+    input: "configTestSchema",
+    requestType: "ConfigTestInput",
+    output: "ConfigTestResponse",
+    summary: "按给定端点做一次连通性测试",
+  },
+
+  {
+    domain: "sessions",
+    action: "list",
+    method: "POST",
+    input: "sessionListInputSchema",
+    requestType: "SessionListInput",
+    output: "SessionListResponse",
+    summary: "会话列表，可按名称搜索、按父子过滤",
+  },
+  {
+    domain: "sessions",
+    action: "create",
+    method: "POST",
+    input: "sessionCreateInputSchema",
+    requestType: "SessionCreateInput",
+    output: "SessionSummary",
+    summary: "新建会话（首次回复后才落盘）",
+  },
+  {
+    domain: "sessions",
+    action: "info",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "SessionInfoResponse",
+    summary: "会话详情 + 用量 + 当前目标",
+  },
+  {
+    domain: "sessions",
+    action: "update",
+    method: "POST",
+    input: "sessionUpdateInputSchema",
+    requestType: "SessionUpdateInput",
+    output: "SessionSummary",
+    summary: "重命名 / 换模型 / 换推理等级 / 换模式",
+  },
+  {
+    domain: "sessions",
+    action: "archive",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "SessionArchiveResponse",
+    summary: "归档会话（软删：从列表隐藏，文件保留）",
+  },
+  {
+    domain: "sessions",
+    action: "fork",
+    method: "POST",
+    input: "sessionForkInputSchema",
+    requestType: "SessionForkInput",
+    output: "SessionSummary",
+    summary: "从某个条目分叉出新会话",
+  },
+
+  {
+    domain: "messages",
+    action: "list",
+    method: "POST",
+    input: "messageListInputSchema",
+    requestType: "MessageListInput",
+    output: "MessageListResponse",
+    summary: "会话历史快照（compaction 感知，带接续 seq）",
+  },
+  {
+    domain: "messages",
+    action: "prompt",
+    method: "POST",
+    input: "promptInputSchema",
+    requestType: "PromptInput",
+    output: "PromptAdmittedResponse",
+    summary: "投递一轮生成，返回受理 ack；结果走 /events",
+  },
+  {
+    domain: "messages",
+    action: "edit",
+    method: "POST",
+    input: "messageEditInputSchema",
+    requestType: "MessageEditInput",
+    output: "PromptAdmittedResponse",
+    summary: "编辑一条已发送的用户消息并重发",
+  },
+  {
+    domain: "messages",
+    action: "interrupt",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "MessageInterruptResponse",
+    summary: "中断当前生成",
+  },
+
+  {
+    domain: "events",
+    action: "",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "ServerEvent",
+    stream: true,
+    summary: "全局 SSE 事件流（所有会话的实时事件）",
+  },
+
+  {
+    domain: "interactions",
+    action: "list",
+    method: "POST",
+    input: "interactionListInputSchema",
+    requestType: "InteractionListInput",
+    output: "InteractionListResponse",
+    summary: "列出会话中尚未回答的交互请求",
+  },
+  {
+    domain: "interactions",
+    action: "respond",
+    method: "POST",
+    input: "interactionRespondInputSchema",
+    requestType: "InteractionRespondInput",
+    output: "InteractionRespondResponse",
+    summary: "回答一条挂起的交互请求（按 kind 判别）",
+  },
+
+  {
+    domain: "fs",
+    action: "list",
+    method: "POST",
+    input: "fsListInputSchema",
+    requestType: "FsListInput",
+    output: "FsListResponse",
+    summary: "浏览目录条目",
+  },
+  {
+    domain: "fs",
+    action: "mkdir",
+    method: "POST",
+    input: "fsMkdirInputSchema",
+    requestType: "FsMkdirInput",
+    output: "FsMkdirResponse",
+    summary: "新建目录（单层）",
+  },
+
+  {
+    domain: "mcp",
+    action: "list",
+    method: "POST",
+    input: "mcpListInputSchema",
+    requestType: "McpListInput",
+    output: "McpListResponse",
+    summary: "列出已配置的 MCP 服务器",
+  },
+  {
+    domain: "mcp",
+    action: "upsert",
+    method: "POST",
+    input: "mcpUpsertInputSchema",
+    requestType: "McpUpsertInput",
+    output: "McpWriteResponse",
+    summary: "按 name 覆盖写入 MCP 服务器",
+  },
+  {
+    domain: "mcp",
+    action: "delete",
+    method: "POST",
+    input: "mcpDeleteInputSchema",
+    requestType: "McpDeleteInput",
+    output: "McpDeleteResponse",
+    summary: "按 name 删除 MCP 服务器",
+  },
+
+  {
+    domain: "goals",
+    action: "set",
+    method: "POST",
+    input: "goalSetInputSchema",
+    requestType: "GoalSetInput",
+    output: "GoalResponse",
+    summary: "设定 / 替换当前会话目标",
+  },
+  {
+    domain: "goals",
+    action: "status",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "GoalResponse",
+    summary: "查看当前会话目标状态",
+  },
+  {
+    domain: "goals",
+    action: "pause",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "GoalResponse",
+    summary: "暂停目标自动续跑",
+  },
+  {
+    domain: "goals",
+    action: "resume",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "GoalResponse",
+    summary: "恢复目标自动续跑",
+  },
+  {
+    domain: "goals",
+    action: "clear",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "GoalResponse",
+    summary: "清除当前会话目标",
+  },
+
+  {
+    domain: "stats",
+    action: "summary",
+    method: "POST",
+    input: "statsSummaryInputSchema",
+    requestType: "StatsSummaryInput",
+    output: "StatsSummaryResponse",
+    summary: "全局 token 用量统计（按模型 / 会话聚合）",
+  },
+];

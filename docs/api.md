@@ -3,8 +3,8 @@
 对外 HTTP 接口的传输约定、字段命名与通用结构。契约实现是唯一事实源：请求 zod schema 与响应类型都在
 `packages/contracts/`（`@ucode/contracts`），server 与 web 共用同一入口。**本文档与契约不一致时以契约为准。**
 
-本文只声明规范，**不维护接口清单**——否则每加一个接口都要回来改文档。对外说明见 `README` 的接口表，
-契约见 `packages/contracts/`。
+本文只声明规范；**逐个接口的请求参数与响应结构**见自动生成的 [`api-reference.md`](./api-reference.md)
+（由 `pnpm api:docs` 从 `packages/contracts/` 生成，`pnpm check` 校验其与契约一致），契约实现见 `packages/contracts/`。
 
 ## 传输约定
 

@@ -7,6 +7,7 @@
 import { resolve } from "node:path";
 
 import { run as runBrand } from "../../packages/brand/scripts/verify.ts";
+import { run as runApiDocs } from "./checks/api-docs.ts";
 import { run as runContracts } from "./checks/contracts.ts";
 import { run as runI18n } from "./checks/i18n.ts";
 import { run as runMigrations } from "./checks/migrations.ts";
@@ -18,6 +19,7 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const CHECKS: Array<{ name: string; run: (root: string) => string[] }> = [
   { name: "migrations", run: runMigrations },
   { name: "contracts", run: runContracts },
+  { name: "api-docs", run: runApiDocs },
   { name: "tokens", run: runTokens },
   { name: "brand", run: runBrand },
   { name: "i18n", run: runI18n },

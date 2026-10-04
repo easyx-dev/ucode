@@ -10,15 +10,18 @@
     "start": "pnpm -F @ucode/server start",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "check": "biome check . && pnpm -r typecheck && pnpm -r test && node scripts/verify/index.ts",
-    "verify": "node scripts/verify/index.ts",
+    "check": "biome check . && pnpm -r typecheck && pnpm -r test && tsx scripts/verify/index.ts",
+    "verify": "tsx scripts/verify/index.ts",
     "brand:replace": "node packages/brand/scripts/replace.ts",
     "format": "biome format --write .",
     "smoke": "pnpm -F @ucode/server smoke",
-    "eval": "pnpm -F @ucode/server eval"
+    "eval": "pnpm -F @ucode/server eval",
+    "api:docs": "tsx scripts/api-docs/generate.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,4 +1,7 @@
 /** @ucode/contracts：接口契约的单一事实源，server 与 web 共用 */
+
+// 接口文档生成器复用契约包同一实例的 zod 把请求 schema 转 JSON Schema，避免与根依赖解析出两份
+export { toJSONSchema } from "zod";
 export * from "./common";
 export * from "./config/input";
 export * from "./config/output";

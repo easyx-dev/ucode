@@ -241,9 +241,16 @@
   对话框遮罩由 `bg-black/10` 改用 `bg-overlay`。
 - 前端新增依赖 `dayjs`：会话列表的相对时间与消息时刻改用它（`relativeTime` 插件 + `zh-cn` locale），
   替换手写的差量计算。列表文案随之变为「几秒前 / 55 分钟前 / 1 天前」。
+- 新增**接口参考文档**：`pnpm api:docs` 从 `packages/contracts/` 生成 `docs/api-reference.md`，
+  逐接口列出请求参数（类型 / 必填 / 默认 / 约束 / 说明）与响应结构，作为 `docs/api.md` 的清单补充；
+  `pnpm check` 新增 `api-docs` 校验：重生成后与文档逐字节比对，并把端点清单与 server 路由双向核对。
 
 ### 变更
 
+- 根 `pnpm verify` / `pnpm check` 改由 `tsx` 运行 `scripts/verify/index.ts`（原先用 `node`），
+  以便校验脚本直接复用契约的 TS 源码；根目录新增 devDependencies `tsx` / `typescript`
+  （`typescript` 用于生成器读取响应类型）；契约包导出 zod 的 `toJSONSchema`，供生成器把请求
+  schema 转 JSON Schema，避免与根依赖解析出两份 zod。
 - agent 数据目录由 `$APP_HOME/pi` 更名为 `$APP_HOME/agent`（去掉上游品牌字样，`env.piDir` → `env.agentDir`）。
   开发初期不做兼容：旧 `pi/` 目录不会被自动迁移，按新布局删除重建即可（见 `AGENTS.md`「编码原则」）。
 - `session` 表从 16 列收敛到 11 列：删 `workspace_dir` / `pi_name` / `pi_cwd` / `persisted` /

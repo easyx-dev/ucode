@@ -252,25 +252,8 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&fo
 请求校验与响应结构定义在 `@ucode/contracts`（`packages/contracts/`），web 直接引用同一份类型。
 失败响应带 `code` + 中文兜底 `message` + 插值 `params`，客户端按 `code` 渲染当前语言（见 `docs/api.md`「语言与本地化」）。
 
-| 方法 | 路径 | body | 说明 |
-| --- | --- | --- | --- |
-| GET | `/api/v1/health` | — | 存活 + `configured` / 当前模型 |
-| POST | `/api/v1/models/list` | `{}` | 供应商目录（pi 内置 + 自定义）与各自的模型、接入状态 |
-| POST | `/api/v1/models/refresh` | `{}` | 丢弃内存会话、按当前配置重建运行时 |
-| POST | `/api/v1/config/info` | `{}` | 当前配置（apiKey 脱敏） |
-| POST | `/api/v1/config/update` | `{ providers?, defaultModel?, thinkingLevel?, websearch? }` | 更新配置并热重载；provider 的 `apiKey` 留空表示沿用已保存的，内置供应商只需 `id` + `apiKey`；`websearch` 为 `{ provider?, apiKey?, baseUrl? }`（`searxng` 用 `baseUrl`） |
-| POST | `/api/v1/config/test` | `{ baseUrl, apiKey?, providerId?, api?, model }` | 连通性测试 |
-| POST | `/api/v1/sessions/list` | `{ q?, limit? }` | 会话列表（含每个会话生效的 `model` / `thinkingLevel` / `mode`） |
-| POST | `/api/v1/sessions/create` | `{ name?, cwd?, model?, thinkingLevel?, mode? }` | 新建会话（返回 id；首次回复后才落盘） |
-| POST | `/api/v1/sessions/info` | `{ sessionId }` | 会话详情 |
-| POST | `/api/v1/sessions/update` | `{ sessionId, name?, model?, thinkingLevel?, mode? }` | 重命名 / 换模型 / 换模式 |
-| POST | `/api/v1/sessions/archive` | `{ sessionId }` | 归档会话（软删：从列表隐藏，对话与文件都保留） |
-| POST | `/api/v1/fs/list` | `{ path?, q?, type? }` | 浏览目录（`path` 省略时从用户 home 开始；`type` 过滤条目，默认 `all`；`q` 按名称模糊过滤条目） |
-| POST | `/api/v1/fs/mkdir` | `{ path }` | 新建目录（单层） |
-| POST | `/api/v1/messages/list` | `{ sessionId }` | 会话历史快照（compaction 感知，带接续用的 `seq`） |
-| POST | `/api/v1/messages/prompt` | `{ sessionId, text, behavior? }` | 投递一轮生成，返回受理 ack；会话须先由 `sessions/create` 建好；结果走 `/events` |
-| POST | `/api/v1/messages/interrupt` | `{ sessionId }` | 中断当前生成 |
-| POST | `/api/v1/events` | `{}` | 全局 SSE 事件流（所有会话的实时事件） |
+逐个接口的**请求参数与响应结构**见自动生成的 [`docs/api-reference.md`](docs/api-reference.md)
+（由 `pnpm api:docs` 从 `packages/contracts/` 生成，`pnpm check` 校验其与契约一致）。
 
 ### 全局事件流
 
@@ -333,8 +316,10 @@ DESIGN.md                  # 设计系统（品牌 / 主题 / token / 深浅色�
 docs/
   database.md              # 数据库规范
   api.md                   # 接口与字段规范
+  api-reference.md         # 接口参考（由 pnpm api:docs 生成，勿手改）
   components.md            # 组件规范
-scripts/verify/            # 约定校验（migrations / contracts / tokens / brand / i18n），由 pnpm check 调用
+scripts/api-docs/          # 接口参考生成器（endpoints 清单 + 生成 + 校验）
+scripts/verify/            # 约定校验（migrations / contracts / api-docs / tokens / brand / i18n），由 pnpm check 调用
 packages/contracts/
   src/
     envelope.ts            # { success, code, message, data } 封套与错误码
