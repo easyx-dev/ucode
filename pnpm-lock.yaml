@@ -223,6 +223,9 @@ importers:
       '@ucode/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@ucode/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -331,6 +334,22 @@ importers:
         specifier: ^26.4.2
         version: 26.4.2(typescript@5.9.3)
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/sdk:
+    dependencies:
+      '@ucode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ucode/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.19.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

@@ -35,6 +35,10 @@
 
 ### 新增
 
+- 新增 `@ucode/sdk`（`packages/sdk`）：把 server `/api/v1` 封装成无 React / DOM 依赖的跨端客户端，
+  含传输层（封套拆解、baseUrl 与 token/头注入）、SSE 解析与指数退避重连的事件流；
+  `apps/web` 的 `lib/api.ts`、`lib/event-stream.ts` 改为消费它（`lib/sse.ts` 移除），
+  web 新增依赖 `@ucode/sdk`。
 - 新增 `POST /api/v1/attachments`（**请求体为原始字节**，`?name=` 带文件名）与附件元数据表
   （SQLite `attachment`，schema v5）：`id` 是内容 sha256，字节落 `$APP_HOME/app/attachments/<id>`，
   `GET /attachments/<id>` 的 `Content-Type` 取元数据。`referenced_at` 区分临时 / 永久：

@@ -1,9 +1,9 @@
 /** 解析 Hono streamSSE 输出：`event: x\ndata: y\n\n` */
-export async function readSseStream(
+export const readSseStream = async (
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: unknown) => void,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<void> => {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -25,7 +25,7 @@ export async function readSseStream(
   } finally {
     reader.releaseLock();
   }
-}
+};
 
 const dispatchFrame = (frame: string, onEvent: (event: string, data: unknown) => void): void => {
   let event = "message";
