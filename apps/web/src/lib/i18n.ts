@@ -6,9 +6,8 @@
 import { localeStorageKey } from "@ucode/brand";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@ucode/contracts";
 import { createI18n } from "@ucode/i18n";
+import { setDayjsLocale } from "@ucode/ui/lib/time";
 import { initReactI18next } from "react-i18next";
-
-import { setDayjsLocale } from "./time";
 
 /** 读取持久化的语言偏好；缺失或非法时回落 DEFAULT_LOCALE */
 export const readStoredLocale = (): Locale => {

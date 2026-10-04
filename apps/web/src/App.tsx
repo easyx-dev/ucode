@@ -1,31 +1,36 @@
 /** 应用外壳：会话侧栏 + 对话区 + 设置对话框 */
+
+import { ChatPanel } from "@ucode/ui/components/chat-panel";
+import { PermissionDialog } from "@ucode/ui/components/permission-dialog";
+import { QuestionDialog } from "@ucode/ui/components/question-dialog";
+import { RenameSessionDialog } from "@ucode/ui/components/rename-session-dialog";
+import { SessionSidebar } from "@ucode/ui/components/session-sidebar";
+import { SettingsDialog } from "@ucode/ui/components/settings/settings-dialog";
+import { Toaster } from "@ucode/ui/components/ui/sonner";
+import { TooltipProvider } from "@ucode/ui/components/ui/tooltip";
+import { UsageDialog } from "@ucode/ui/components/usage-dialog";
+import { WelcomePanel } from "@ucode/ui/components/welcome-panel";
+import { useGoal } from "@ucode/ui/hooks/use-goal";
+import { useInteractions } from "@ucode/ui/hooks/use-interactions";
+import { useSessionUsage } from "@ucode/ui/hooks/use-session-usage";
+import { useWorkspace } from "@ucode/ui/hooks/use-workspace";
+import { api, describeError } from "@ucode/ui/lib/api";
+import { BUILTIN_COMMANDS, type BuiltinCommandId } from "@ucode/ui/lib/builtin-commands";
+import { composerKeyOf, NEW_SESSION_KEY } from "@ucode/ui/lib/composer-draft";
+import { textPayload } from "@ucode/ui/lib/composer-payload";
+import type { GoalCommand } from "@ucode/ui/lib/goal-command";
+import { lastTurnPresentedPlan } from "@ucode/ui/lib/plan";
+import { sessionTitle } from "@ucode/ui/lib/session";
+import { isWorkspaceSession } from "@ucode/ui/lib/session-groups";
+import type {
+  ChatItem,
+  SessionCreateRequest,
+  SessionSummary,
+  ThinkingLevel,
+} from "@ucode/ui/lib/types";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-
-import { ChatPanel } from "@/components/chat-panel";
-import { PermissionDialog } from "@/components/permission-dialog";
-import { QuestionDialog } from "@/components/question-dialog";
-import { RenameSessionDialog } from "@/components/rename-session-dialog";
-import { SessionSidebar } from "@/components/session-sidebar";
-import { SettingsDialog } from "@/components/settings/settings-dialog";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { UsageDialog } from "@/components/usage-dialog";
-import { WelcomePanel } from "@/components/welcome-panel";
-import { useGoal } from "@/hooks/use-goal";
-import { useInteractions } from "@/hooks/use-interactions";
-import { useSessionUsage } from "@/hooks/use-session-usage";
-import { useWorkspace } from "@/hooks/use-workspace";
-import { api, describeError } from "@/lib/api";
-import { BUILTIN_COMMANDS, type BuiltinCommandId } from "@/lib/builtin-commands";
-import { composerKeyOf, NEW_SESSION_KEY } from "@/lib/composer-draft";
-import { textPayload } from "@/lib/composer-payload";
-import type { GoalCommand } from "@/lib/goal-command";
-import { lastTurnPresentedPlan } from "@/lib/plan";
-import { sessionTitle } from "@/lib/session";
-import { isWorkspaceSession } from "@/lib/session-groups";
-import type { ChatItem, SessionCreateRequest, SessionSummary, ThinkingLevel } from "@/lib/types";
 
 export default function App() {
   const { t } = useTranslation();
