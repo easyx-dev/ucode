@@ -8,6 +8,8 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./lib/*": "./src/lib/*.ts",
     "./theme.css": "./src/styles/theme.css"
   },
   "types": "./src/index.ts",
@@ -15,7 +17,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ucode/brand": "workspace:*",
     "@ucode/contracts": "workspace:*",
+    "@ucode/sdk": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "dayjs": "^1.11.23",

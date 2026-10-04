@@ -359,9 +359,15 @@ importers:
 
   packages/ui:
     dependencies:
+      '@ucode/brand':
+        specifier: workspace:*
+        version: link:../brand
       '@ucode/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ucode/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
