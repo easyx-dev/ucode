@@ -11,7 +11,7 @@ import {
 } from "@ucode/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api } from "@/lib/api";
+import { api } from "../../lib/api";
 
 /** 从 DataTransfer / FileList 取文件数组；粘贴与拖拽共用 */
 export const filesOf = (transfer: DataTransfer | null): File[] =>

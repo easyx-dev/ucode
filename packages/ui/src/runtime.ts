@@ -4,6 +4,7 @@
  * 组件与 hooks 通过 `getRuntime()` 取用，避免把平台相关的实例（i18n、baseUrl）
  * 耦合进共享包；各端启动时调用一次 `configureUi` 即可。
  */
+import type { Locale } from "@ucode/contracts";
 import {
   describeApiError as describeCode,
   describeError as describeSdkError,
@@ -15,6 +16,8 @@ export type UiRuntime = {
   sdk: Sdk;
   /** 错误码文案的翻译函数（各端的 i18n 实例） */
   translate: Translate;
+  /** 切换界面语言；由各端注入（web 落 localStorage 并同步 html lang） */
+  setLocale?: (locale: Locale) => void;
 };
 
 let runtime: UiRuntime | null = null;
