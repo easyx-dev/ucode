@@ -96,12 +96,12 @@ function QuestionForm({
         <DialogDescription>
           {request.sourceSessionId ? (
             <span className="mb-1 block text-xs text-muted-foreground">
-              {t("子智能体来源", {
+              {t("来自子智能体「{{description}}」的请求：", {
                 description: request.sourceDescription ?? request.sourceSessionId,
               })}
             </span>
           ) : null}
-          {t("提问.说明")}
+          {t("agent 需要你的输入才能继续；选择一个选项，或自行填写答案。")}
         </DialogDescription>
       </DialogHeader>
 
@@ -145,14 +145,14 @@ function QuestionForm({
               </fieldset>
               <Input
                 value={draft.custom}
-                aria-label={t("其他.占位")}
+                aria-label={t("也可以直接输入你的答案")}
                 onChange={(event) => setCustom(index, event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") return;
                   event.preventDefault();
                   submit();
                 }}
-                placeholder={t("其他.占位")}
+                placeholder={t("也可以直接输入你的答案")}
               />
             </div>
           );

@@ -82,7 +82,7 @@ export function ChatHeader({
           onClick={() => onOpenForkSource(session.forkedFromId as string)}
         >
           <GitFork className="size-3.5" />
-          {t("分叉自", { name: forkedFromName || session.forkedFromId })}
+          {t("分叉自「{{name}}」", { name: forkedFromName || session.forkedFromId })}
         </Button>
       ) : null}
       {session?.running ? (
@@ -146,7 +146,7 @@ export function ChatHeader({
               <RefreshCw className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t("重建运行时.说明")}</TooltipContent>
+          <TooltipContent>{t("丢弃内存会话并按当前配置重建运行时")}</TooltipContent>
         </Tooltip>
       </div>
     </header>

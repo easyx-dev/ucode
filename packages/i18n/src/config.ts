@@ -8,7 +8,7 @@ import type { InitOptions } from "i18next";
 
 export const houseOptions = (lng: Locale): InitOptions => ({
   lng,
-  // key 即文案，找不到时回退到 key 本身；各目录 key 是否齐平由 scripts/verify 保证
+  // key 即文案，找不到时回退到 key 本身并照常插值；各语言的登记范围由 scripts/verify 保证
   fallbackLng: false,
   supportedLngs: [...LOCALES],
   // 出参多是 JSON / 终端文本而非 HTML，统一关闭插值转义

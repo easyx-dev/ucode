@@ -14,7 +14,12 @@ export function useMcpServers() {
     try {
       setData(await api.mcp.list());
     } catch (error) {
-      toast.error(t("失败提示", { label: t("MCP 服务器加载失败"), reason: describeError(error) }));
+      toast.error(
+        t("失败提示.模板", {
+          label: t("MCP 服务器加载失败"),
+          reason: describeError(error),
+        }),
+      );
     }
   }, [t]);
 
@@ -30,7 +35,10 @@ export function useMcpServers() {
         return true;
       } catch (error) {
         toast.error(
-          t("失败提示", { label: t("MCP 服务器保存失败"), reason: describeError(error) }),
+          t("失败提示.模板", {
+            label: t("MCP 服务器保存失败"),
+            reason: describeError(error),
+          }),
         );
         return false;
       }
@@ -46,7 +54,10 @@ export function useMcpServers() {
         return true;
       } catch (error) {
         toast.error(
-          t("失败提示", { label: t("MCP 服务器删除失败"), reason: describeError(error) }),
+          t("失败提示.模板", {
+            label: t("MCP 服务器删除失败"),
+            reason: describeError(error),
+          }),
         );
         return false;
       }

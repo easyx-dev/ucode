@@ -71,7 +71,9 @@ export function DirectoryDialog({ open, onOpenChange, path }: DirectoryDialogPro
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("目录")}</DialogTitle>
-          <DialogDescription>{t("目录.说明")}</DialogDescription>
+          <DialogDescription>
+            {t("这个会话的工作目录：agent 读写文件、执行命令都在这里。")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center gap-2">

@@ -31,7 +31,11 @@ export function SettingsMcp() {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs leading-relaxed text-muted-foreground">{t("MCP.说明")}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t(
+            "接入 MCP（Model Context Protocol）服务器，为 agent 增加外部工具；改动写入本机配置文件，新会话生效。",
+          )}
+        </p>
         <Button variant="outline" size="sm" onClick={openAdd}>
           <Plus className="size-4" />
           {t("添加服务器")}
@@ -40,7 +44,7 @@ export function SettingsMcp() {
 
       {data && data.servers.length === 0 ? (
         <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
-          {t("MCP.空态")}
+          {t("还没有配置 MCP 服务器。")}
         </p>
       ) : null}
 
@@ -73,7 +77,7 @@ export function SettingsMcp() {
 
       {data && data.errors.length > 0 ? (
         <div className="space-y-1 rounded-xl border border-destructive/40 px-3 py-2">
-          <p className="text-xs font-medium text-destructive">{t("MCP.配置有误")}</p>
+          <p className="text-xs font-medium text-destructive">{t("配置文件有无法解析的条目：")}</p>
           {data.errors.map((error) => (
             <p key={error} className="font-mono text-xs break-all text-muted-foreground">
               {error}
@@ -83,7 +87,7 @@ export function SettingsMcp() {
       ) : null}
 
       <p className="text-[11px] break-all text-muted-foreground">
-        {t("MCP.路径", { path: data?.configPath ?? "" })}
+        {t("配置文件：{{path}}", { path: data?.configPath ?? "" })}
       </p>
 
       {formOpen ? (

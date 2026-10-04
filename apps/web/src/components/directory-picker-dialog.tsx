@@ -171,7 +171,7 @@ export function DirectoryPickerDialog({
       setFolderName("");
       await navigateTo(listing.path);
     } catch (err) {
-      toast.error(t("失败提示", { label: t("创建文件夹失败"), reason: describeError(err) }));
+      toast.error(t("失败提示.模板", { label: t("创建文件夹失败"), reason: describeError(err) }));
     }
   };
 

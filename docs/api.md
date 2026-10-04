@@ -88,8 +88,11 @@
 - 前端仍以 `code` 分支决定行为。
 - 文案目录：`@ucode/i18n` 的 `common`（协议级）、`domain`（错误码文案）、`ui`（产品界面词汇，各端共用）
   都在 `packages/i18n/src/locales/`；各端补充文案走 `createI18n` 的 `appCatalogs`。
-  key 用中文原文（长文案用中文摘要 key），同组中英 key 必须齐平、组间不得重名，
-  `pnpm check` 的 i18n 校验会拦下漂移、重名、错误码映射缺失与（web 侧的）硬编码中文。
+  key 用中文文案本身（含 `{{占位}}`），中文目录无需登记——缺失时 i18next 回退为 key 本身并插值；
+  只有纯占位模板这类「key 无法表达语义」的文案才用带 `.` 的摘要 key（如 `失败提示.模板`），
+  在中英目录各写一份，`en` 是完整目录也是 `t()` 的类型来源。
+  组间不得重名，`pnpm check` 的 i18n 校验会拦下越界 / 冗余 key、摘要 key 漏中文、
+  错误码映射缺失与（web 侧的）硬编码中文。
 - i18n 运行时（house 配置 `createI18n`、目录合并）在 `@ucode/i18n`，只依赖 `i18next`，
   供 web / 未来的 TUI、Electron 复用；各端自持存储（localStorage / 配置）。
 

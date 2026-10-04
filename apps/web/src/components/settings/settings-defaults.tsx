@@ -33,7 +33,7 @@ export function SettingsDefaults({
     <SettingsGroup>
       <SettingsRow
         title={t("默认模型")}
-        description={t("默认模型.说明")}
+        description={t("新建会话时使用的模型；会话内可以单独覆盖。")}
         control={
           <Select
             value={options.some((option) => option.value === defaultModel) ? defaultModel : ""}
@@ -55,7 +55,7 @@ export function SettingsDefaults({
 
       <SettingsRow
         title={t("默认思考档位")}
-        description={t("默认思考档位.说明")}
+        description={t("未单独设置档位的会话使用该值；模型本身需支持思考。")}
         control={
           <Select
             value={thinkingLevel}

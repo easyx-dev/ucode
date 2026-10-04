@@ -36,7 +36,11 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t("设置")}</DialogTitle>
-          <DialogDescription>{t("设置.说明")}</DialogDescription>
+          <DialogDescription>
+            {t(
+              "外观、模型与联网搜索配置。保存后会重建模型运行时；apiKey 留空表示沿用已保存的 key。",
+            )}
+          </DialogDescription>
         </DialogHeader>
 
         {/*

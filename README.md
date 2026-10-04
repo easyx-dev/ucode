@@ -430,7 +430,7 @@ pnpm verify    # 只跑约定校验（scripts/verify）
 ```
 
 约定校验覆盖六项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
-业务组件不得出现裸色值或非语义颜色 utility、i18n 目录中英齐平且禁止硬编码中文、源码禁止硬编码品牌名、
+业务组件不得出现裸色值或非语义颜色 utility、i18n 目录范围与冗余合规且禁止硬编码中文、源码禁止硬编码品牌名、
 有测试用例的包必须声明 `test` 脚本。对应规范见 `docs/`、`AGENTS.md` 与 `DESIGN.md`。
 
 ## 冒烟测试

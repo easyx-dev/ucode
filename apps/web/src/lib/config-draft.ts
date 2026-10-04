@@ -178,9 +178,10 @@ export const validateDrafts = (drafts: DraftProvider[], t: TFunction): string | 
   for (const provider of drafts) {
     const label = provider.name || provider.id || t("(未命名)");
     if (provider.source === "builtin") continue;
-    if (!provider.baseUrl.trim()) return t("校验.缺baseUrl", { label });
-    if (provider.models.length === 0) return t("校验.缺模型", { label });
-    if (provider.models.some((model) => !model.id.trim())) return t("校验.缺模型id", { label });
+    if (!provider.baseUrl.trim()) return t("{{label}} 缺少 baseUrl", { label });
+    if (provider.models.length === 0) return t("{{label}} 至少要有一个模型", { label });
+    if (provider.models.some((model) => !model.id.trim()))
+      return t("{{label}} 里有模型没填 id", { label });
   }
   return null;
 };

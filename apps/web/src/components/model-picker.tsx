@@ -23,8 +23,8 @@ type ModelPickerProps = {
 /** 条目说明：上下文与输出上限、是否支持思考，用于区分同名模型 */
 const describeModel = (model: CatalogModel, t: TFunction): string => {
   const parts: string[] = [];
-  if (model.contextWindow) parts.push(t("上下文", { n: model.contextWindow }));
-  if (model.maxTokens) parts.push(t("输出", { n: model.maxTokens }));
+  if (model.contextWindow) parts.push(t("{{n}} 上下文", { n: model.contextWindow }));
+  if (model.maxTokens) parts.push(t("{{n}} 输出", { n: model.maxTokens }));
   if (model.reasoning) parts.push(t("思考"));
   return parts.join(" · ");
 };

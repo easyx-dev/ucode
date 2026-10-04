@@ -32,7 +32,7 @@ export function SettingsAppearance() {
     <SettingsGroup>
       <SettingsRow
         title={t("界面主题")}
-        description={t("界面主题.说明")}
+        description={t("深色模式下的配色与浅色模式一一对应，切换后立即生效并记住选择。")}
         control={
           <SegmentedControl
             label={t("界面主题")}
@@ -44,7 +44,7 @@ export function SettingsAppearance() {
       />
       <SettingsRow
         title={t("语言")}
-        description={t("语言.说明")}
+        description={t("界面语言，切换后立即生效并记住选择。")}
         control={
           <SegmentedControl
             label={t("语言")}

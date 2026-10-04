@@ -29,12 +29,12 @@ export function PermissionDialog({ request, onRespond }: PermissionDialogProps) 
           <DialogDescription>
             {request?.sourceSessionId ? (
               <span className="mb-1 block text-xs text-muted-foreground">
-                {t("子智能体来源", {
+                {t("来自子智能体「{{description}}」的请求：", {
                   description: request.sourceDescription ?? request.sourceSessionId,
                 })}
               </span>
             ) : null}
-            {t("授权.说明", { tool: request?.tool ?? "" })}
+            {t("agent 想调用「{{tool}}」，操作对象：", { tool: request?.tool ?? "" })}
             <code className="mt-1 block max-h-32 overflow-auto rounded-md bg-muted px-2 py-1 font-mono text-xs break-all whitespace-pre-wrap">
               {request?.subject}
             </code>
@@ -42,7 +42,7 @@ export function PermissionDialog({ request, onRespond }: PermissionDialogProps) 
         </DialogHeader>
 
         <div className="text-xs text-muted-foreground">
-          {t("授权范围", { scope: request?.scope ?? "" })}
+          {t("授权范围：{{scope}}", { scope: request?.scope ?? "" })}
         </div>
 
         <DialogFooter>

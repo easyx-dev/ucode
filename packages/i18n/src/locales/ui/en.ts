@@ -1,10 +1,12 @@
 /**
  * Product UI catalog (English): interface vocabulary shared by web / Electron / TUI.
  *
+ * This is the canonical, complete catalog: every key lives here, as the Simplified-Chinese copy
+ * itself (with `{{placeholders}}`). Only pure placeholder templates use a `.`-namespaced summary
+ * key that `zh-CN.ts` maps back to Chinese (see `zh-CN.ts`).
  * A few browser/desktop-only keys (theme, Shift+Enter, starter suggestions) go unused by a
  * TUI — ignore them. Surface-specific extras go through `createI18n`'s `appCatalogs`.
- * Keys are the Simplified-Chinese source strings (see `zh-CN.ts`); keys must match `zh-CN.ts`
- * and must not collide with common/domain — `scripts/verify` fails on drift.
+ * `scripts/verify` fails on drift.
  */
 export default {
   // Common
@@ -29,53 +31,55 @@ export default {
   未配置模型: "No model configured",
   去设置: "Open settings",
   重建运行时: "Rebuild runtime",
-  "重建运行时.说明": "Discard in-memory sessions and rebuild the runtime from the current config",
+  丢弃内存会话并按当前配置重建运行时:
+    "Discard in-memory sessions and rebuild the runtime from the current config",
 
   // Settings dialog
-  "设置.说明":
+  "外观、模型与联网搜索配置。保存后会重建模型运行时；apiKey 留空表示沿用已保存的 key。":
     "Appearance, model and web search configuration. Saving rebuilds the model runtime; leave apiKey blank to keep the saved key.",
   保存并生效: "Save and apply",
   外观: "Appearance",
   模型: "Models",
   默认值: "Defaults",
-  "供应商.空态":
+  "还没有接入供应商，从下面的目录里选一个，或添加自定义供应商。":
     "No provider configured yet. Pick one from the catalog below, or add a custom provider.",
   添加自定义供应商: "Add custom provider",
 
   // Web search
   联网搜索: "Web search",
   搜索服务商: "Search provider",
-  "搜索服务商.说明": "Which search API the websearch tool calls.",
-  "搜索key.说明":
+  "websearch 工具调用哪家搜索接口。": "Which search API the websearch tool calls.",
+  "留空表示沿用已保存的 key；未配置时 websearch 会返回可读错误。":
     "Leave blank to keep the saved key; without a key the websearch tool returns a readable error.",
   实例地址: "Instance URL",
-  "实例地址.说明":
+  "自建 SearXNG 的地址，需在 settings.yml 里开启 JSON 输出（search.formats 加 json）。":
     "URL of your SearXNG instance; enable JSON output in settings.yml (add json to search.formats).",
 
   // Memory
   记忆: "Memory",
   项目记忆: "Project memory",
-  "项目记忆.说明":
+  "开启后，每轮对话结束会在后台回顾并保存项目级长期记忆，同一项目的后续会话自动带上；记忆只保存在本机，并按项目目录隔离。":
     "When on, each conversation is reviewed in the background and durable facts are saved per project; later sessions in the same project load them automatically. Memory is stored locally and isolated by project directory.",
   开启: "On",
 
   // Appearance
   界面主题: "Theme",
-  "界面主题.说明":
+  "深色模式下的配色与浅色模式一一对应，切换后立即生效并记住选择。":
     "Dark mode mirrors the light palette one-to-one. Changes apply immediately and are remembered.",
   浅色: "Light",
   深色: "Dark",
   跟随系统: "System",
   语言: "Language",
-  "语言.说明": "Interface language. Changes take effect immediately and are remembered.",
+  "界面语言，切换后立即生效并记住选择。":
+    "Interface language. Changes take effect immediately and are remembered.",
 
   // Provider catalog
   接入内置供应商: "Add a built-in provider",
-  可选数量: "{{n}} available",
+  "{{n}} 个可选": "{{n}} available",
   "搜索供应商，如 deepseek": "Search providers, e.g. deepseek",
   "没有匹配的供应商。": "No matching provider.",
   已加入: "Added",
-  模型数量: "{{n}} models",
+  "{{n}} 个模型": "{{n}} models",
 
   // Reasoning levels
   关闭: "Off",
@@ -87,32 +91,34 @@ export default {
   最高: "Max",
   推理等级映射: "Reasoning level map",
   添加等级: "Add level",
-  "推理等级.空态": "Unspecified levels use the vendor default; all 7 levels are usable.",
+  "未指定时按厂商默认处理，7 个档位都能用。":
+    "Unspecified levels use the vendor default; all 7 levels are usable.",
   推理等级: "Reasoning level",
   思考档位: "Reasoning level",
-  厂商取值: "Vendor value; blank = unsupported",
-  "厂商取值.aria": "Vendor value for {{level}}",
+  "厂商取值；留空 = 该档不支持": "Vendor value; blank = unsupported",
+  "{{level}}档的厂商取值": "Vendor value for {{level}}",
   删除该档映射: "Remove this level",
 
   // Provider card
   内置: "Built-in",
   自定义: "Custom",
-  已保存key: "Key saved {{masked}}",
+  "已保存 key {{masked}}": "Key saved {{masked}}",
   "未保存 key": "No key saved",
   测试连接: "Test connection",
   "删除 provider": "Remove provider",
-  "模型清单.自定义":
+  "模型清单已被自定义（{{n}} 个），不再随内置目录更新。":
     "The model list is customized ({{n}}), so it no longer follows the built-in catalog.",
   恢复默认: "Reset",
-  "模型清单.继承":
+  "端点与 {{n}} 个模型来自内置目录，随应用升级自动更新。":
     "The endpoint and {{n}} models come from the built-in catalog and update with the app.",
 
   // Defaults
   默认模型: "Default model",
-  "默认模型.说明": "Model used for new sessions; each session can override it.",
+  "新建会话时使用的模型；会话内可以单独覆盖。":
+    "Model used for new sessions; each session can override it.",
   选择默认模型: "Select default model",
   默认思考档位: "Default reasoning level",
-  "默认思考档位.说明":
+  "未单独设置档位的会话使用该值；模型本身需支持思考。":
     "Sessions without their own setting use this value; the model must support reasoning.",
 
   // Model row
@@ -131,8 +137,8 @@ export default {
   添加模型: "Add model",
 
   // Model picker
-  上下文: "{{n}} context",
-  输出: "{{n}} output",
+  "{{n}} 上下文": "{{n}} context",
+  "{{n}} 输出": "{{n}} output",
   切换模型: "Switch model",
   选择模型: "Select model",
   搜索模型: "Search models",
@@ -140,7 +146,8 @@ export default {
   视觉: "Vision",
 
   // Composer
-  输入消息占位: "Type a message. Enter to send, Shift+Enter for a new line.",
+  "输入消息，Enter 发送，Shift+Enter 换行":
+    "Type a message. Enter to send, Shift+Enter for a new line.",
   停止生成: "Stop generating",
   发送: "Send",
   移除附件: "Remove attachment",
@@ -158,40 +165,43 @@ export default {
 
   // Assistant modes
   模式: "Mode",
-  编码模式: "Build",
-  计划模式: "Plan",
-  问答模式: "Ask",
-  "编码模式.说明": "Read, write and run commands directly.",
-  "计划模式.说明": "Produce a plan first; read-only research without code changes.",
-  "问答模式.说明": "Read-only analysis and answers; no file writes or commands.",
+  编码: "Build",
+  计划: "Plan",
+  问答: "Ask",
+  "可直接读写文件、执行命令。": "Read, write and run commands directly.",
+  "先给出方案，只读调研不改代码。":
+    "Produce a plan first; read-only research without code changes.",
+  "只读分析与回答，不改文件、不执行命令。":
+    "Read-only analysis and answers; no file writes or commands.",
   切换模式失败: "Failed to switch mode",
 
   // Interaction request (permission / question)
   交互请求: "Interaction request",
   需要授权: "Approval required",
-  "授权.说明": 'The agent wants to call "{{tool}}", target:',
-  授权范围: "Grant scope: {{scope}}",
-  子智能体来源: 'Request from subagent "{{description}}":',
+  "agent 想调用「{{tool}}」，操作对象：": 'The agent wants to call "{{tool}}", target:',
+  "授权范围：{{scope}}": "Grant scope: {{scope}}",
+  "来自子智能体「{{description}}」的请求：": 'Request from subagent "{{description}}":',
   允许一次: "Allow once",
   本会话恒允: "Allow for this session",
   拒绝: "Deny",
 
   // Question (question tool)
   需要你回答: "Your input is needed",
-  "提问.说明": "The agent needs your input to continue. Pick an option, or type your own answer.",
+  "agent 需要你的输入才能继续；选择一个选项，或自行填写答案。":
+    "The agent needs your input to continue. Pick an option, or type your own answer.",
   可多选: "Multiple choice",
-  "其他.占位": "Or type your own answer",
+  也可以直接输入你的答案: "Or type your own answer",
   提交回答: "Submit answers",
   跳过回答: "Skip",
 
   // Plan decision
   计划已就绪: "Plan ready",
-  "计划已就绪.说明":
+  "批准后切换到编码模式开始执行；也可以在下方补充意见，继续讨论计划。":
     "Approve to switch to Build mode and start, or add feedback below to keep discussing.",
   批准并执行: "Approve and run",
   提交反馈: "Send feedback",
-  反馈占位: "Add feedback or objections to keep refining the plan",
-  计划已批准: "The plan is approved. Please start executing.",
+  "对计划有补充或异议？写在这里继续讨论": "Add feedback or objections to keep refining the plan",
+  "计划已批准，请开始执行。": "The plan is approved. Please start executing.",
 
   // Starter suggestions
   了解这个项目: "Learn about this project",
@@ -202,8 +212,8 @@ export default {
   // Messages
   思考过程: "Reasoning",
   子智能体过程: "Subagent progress",
-  上下文已压缩: "(context compacted)",
-  扩展消息: "(extended message)",
+  "（上下文已压缩）": "(context compacted)",
+  "（扩展消息）": "(extended message)",
   "思考中…": "Thinking…",
   执行中: "Running",
   失败: "Failed",
@@ -217,18 +227,19 @@ export default {
   收起子会话: "Collapse sub-sessions",
   无子会话: "No sub-sessions",
   子会话加载失败: "Failed to load sub-sessions",
-  "子会话.只读提示":
+  "子会话是委派产生的独立对话，只能查看；需要它继续请在父会话里说明。":
     "Sub-sessions are independent delegated conversations and are read-only. To continue, ask in the parent session.",
 
   // Session fork
   从此分叉: "Fork from here",
-  分叉自: 'Forked from "{{name}}"',
+  "分叉自「{{name}}」": 'Forked from "{{name}}"',
   分叉失败: "Failed to fork",
   打开源会话: "Open source session",
 
   // Edit history
   编辑并重新发送: "Edit and resend",
-  编辑后移除提示: "Sending will remove everything after this message (kept in the session record).",
+  "发送后将移除这条消息之后的内容（仍保留在会话记录中）。":
+    "Sending will remove everything after this message (kept in the session record).",
 
   // Empty states
   "夜深了，接下来交给我吧": "It's late. Leave it to me.",
@@ -236,21 +247,22 @@ export default {
   "下午好，接下来交给我吧": "Good afternoon. Leave it to me.",
   "晚上好，接下来交给我吧": "Good evening. Leave it to me.",
   还没有配置模型: "No model configured yet",
-  "未配置.说明":
+  "填入一个 OpenAI 兼容端点（baseUrl / apiKey / 模型 id）后即可开始对话。":
     "Add an OpenAI-compatible endpoint (baseUrl / apiKey / model id) to start chatting.",
   打开设置: "Open settings",
   开始第一个会话: "Start your first session",
-  "就绪.说明": "Model ready: {{model}}. Each session has its own workspace under ",
-  "就绪.说明.后缀": ", where the agent reads, writes and runs commands.",
+  "模型已就绪：{{model}}。每个会话有独立的工作区":
+    "Model ready: {{model}}. Each session has its own workspace under ",
+  "，agent 在其中读写文件并执行命令。": ", where the agent reads, writes and runs commands.",
 
   // Rename dialog
   重命名会话: "Rename session",
 
   // Archive
   归档: "Archive",
-  归档确认:
+  "归档会话「{{name}}」？会话会从列表里隐藏，对话与文件都保留。":
     'Archive session "{{name}}"? It disappears from the list; the conversation and files are kept.',
-  "归档确认.含子会话":
+  "归档会话「{{name}}」？它的子会话会一并归档，对话与文件都保留。":
     'Archive session "{{name}}"? Its sub-sessions are archived too; the conversations and files are kept.',
   已归档: "Archived",
   归档失败: "Archive failed",
@@ -271,70 +283,75 @@ export default {
 
   // Session directory
   目录: "Directory",
-  "目录.说明": "This session's working directory: the agent reads, writes and runs commands here.",
+  "这个会话的工作目录：agent 读写文件、执行命令都在这里。":
+    "This session's working directory: the agent reads, writes and runs commands here.",
   暂无文件: "No files",
 
   // Requests and toasts
   "(未命名)": "(unnamed)",
-  "校验.缺baseUrl": "{{label}} is missing baseUrl",
-  "校验.缺模型": "{{label}} needs at least one model",
-  "校验.缺模型id": "{{label}} has a model without an id",
-  失败提示: "{{label}}: {{reason}}",
+  "{{label}} 缺少 baseUrl": "{{label}} is missing baseUrl",
+  "{{label}} 至少要有一个模型": "{{label}} needs at least one model",
+  "{{label}} 里有模型没填 id": "{{label}} has a model without an id",
+  "失败提示.模板": "{{label}}: {{reason}}",
   模型列表加载失败: "Failed to load models",
   重建运行时失败: "Failed to rebuild the runtime",
   配置已保存: "Configuration saved",
   保存失败: "Failed to save",
-  先填写供应商信息: "Fill in baseUrl and at least one model id first",
-  连接成功: "Connected · {{latency}}ms · {{model}}",
+  "先填写 baseUrl 和至少一个模型 id": "Fill in baseUrl and at least one model id first",
+  "连接成功 · {{latency}}ms · {{model}}": "Connected · {{latency}}ms · {{model}}",
   连接失败: "Connection failed",
   配置加载失败: "Failed to load configuration",
   新建会话失败: "Failed to create session",
   重命名失败: "Rename failed",
   切换模型失败: "Failed to switch model",
-  设置thinking失败: "Failed to set thinking level",
+  "设置 thinking level 失败": "Failed to set thinking level",
   会话列表加载失败: "Failed to load sessions",
 
   // MCP
-  "MCP.说明":
+  "接入 MCP（Model Context Protocol）服务器，为 agent 增加外部工具；改动写入本机配置文件，新会话生效。":
     "Connect MCP (Model Context Protocol) servers to give the agent extra tools; changes are written to the local config file and apply to new sessions.",
-  "MCP.空态": "No MCP server configured yet.",
+  "还没有配置 MCP 服务器。": "No MCP server configured yet.",
   添加服务器: "Add server",
   编辑: "Edit",
   已停用: "Disabled",
-  "MCP.配置有误": "The config file has entries that could not be parsed:",
-  "MCP.路径": "Config file: {{path}}",
+  "配置文件有无法解析的条目：": "The config file has entries that could not be parsed:",
+  "配置文件：{{path}}": "Config file: {{path}}",
   "添加 MCP 服务器": "Add MCP server",
   "编辑 MCP 服务器": "Edit MCP server",
-  "MCP.表单说明":
+  "stdio 走本地命令，http 走远端地址；环境变量与请求头一行一条 KEY=VALUE。":
     "stdio runs a local command, http talks to a remote URL; env vars and headers are one KEY=VALUE per line.",
   服务器名: "Server name",
-  "服务器名.说明":
+  "用于拼出 mcp__<服务器名>__<工具名>；名字里的非字母、数字、下划线字符在工具名中会转为 _。只允许字母、数字与 . _ -。":
     "Used in mcp__<server>__<tool>; characters other than letters, digits, and underscores become _ in the tool name. Letters, digits, and . _ - only.",
   传输方式: "Transport",
   本地进程: "Local process",
   "HTTP 端点": "HTTP endpoint",
   暴露方式: "Exposure",
-  "暴露方式.说明":
+  "脚本调用经 codemode 使用、不声明给模型、由脚本按需查找；检索后调用经 tool_search 加载后再声明给模型；直接调用会立即声明给模型。":
     "Scripts reach tools through codemode without declaring them to the model, finding them on demand; Search then call declares them once tool_search loads them; Direct declares them right away.",
   脚本调用: "Scripts",
   检索后调用: "Search then call",
   直接调用: "Direct",
   隐藏: "Hidden",
   启动命令: "Command",
-  "启动命令.说明": "Executable that starts the MCP server, such as npx or uvx.",
+  "启动 MCP 服务器的可执行文件，如 npx / uvx。":
+    "Executable that starts the MCP server, such as npx or uvx.",
   参数: "Arguments",
-  "参数.说明": "Arguments passed to the command, one per line.",
+  "传给启动命令的参数，一行一个。": "Arguments passed to the command, one per line.",
   环境变量: "Environment",
-  "环境变量.说明": "Environment variables for the child process; values may use ${NAME}.",
+  "传给子进程的环境变量，值可写 ${NAME} 引用环境变量。":
+    "Environment variables for the child process; values may use ${NAME}.",
   工作目录: "Working directory",
-  "工作目录.说明":
+  "服务器的工作目录，相对路径按会话工作目录解析；留空即用会话工作目录。":
     "Server working directory; relative paths resolve against the session cwd. Empty uses the session cwd.",
   端点地址: "Endpoint URL",
-  "端点地址.说明": "HTTP endpoint of the MCP server.",
+  "MCP 服务器的 HTTP 端点。": "HTTP endpoint of the MCP server.",
   请求头: "Headers",
-  "请求头.说明": "HTTP headers sent with requests; values may use ${NAME}.",
+  "请求时携带的 HTTP 头，值可写 ${NAME} 引用环境变量。":
+    "HTTP headers sent with requests; values may use ${NAME}.",
   超时: "Timeout",
-  "超时.说明": "Per-request timeout in seconds; empty uses the default (60s).",
+  "单次请求的超时秒数；留空即用默认值（60 秒）。":
+    "Per-request timeout in seconds; empty uses the default (60s).",
   状态: "Status",
   启用: "Enabled",
   停用: "Disabled",
@@ -344,41 +361,41 @@ export default {
 
   // Usage statistics
   使用统计: "Usage",
-  "使用统计.说明":
+  "从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。":
     "Token usage aggregated from local session records; model cost is not included, and subagent / forked sessions are counted.",
-  "用量.输入": "Input",
-  "用量.输出": "Output",
-  "用量.缓存读": "Cache read",
-  "用量.缓存写": "Cache write",
-  "用量.合计": "Total tokens",
-  "用量.模型": "By model",
-  "用量.会话": "By session",
-  "用量.工具": "{{value}} tool calls",
-  "用量.全部": "All time",
-  "用量.最近30天": "Last 30 days",
-  "用量.最近7天": "Last 7 days",
-  "用量.空": "No usage recorded yet.",
+  输入: "Input",
+  输出: "Output",
+  缓存读: "Cache read",
+  缓存写: "Cache write",
+  "合计 token": "Total tokens",
+  按模型: "By model",
+  按会话: "By session",
+  "工具调用 {{value}} 次": "{{value}} tool calls",
+  全部时间: "All time",
+  "最近 30 天": "Last 30 days",
+  "最近 7 天": "Last 7 days",
+  "还没有用量记录。": "No usage recorded yet.",
   主会话: "Primary",
   分叉: "Forked",
 
   // Goal mode
   目标: "Goal",
-  "目标.进行中": "Active",
-  "目标.已完成": "Completed",
-  "目标.暂停": "Pause",
-  "目标.恢复": "Resume",
-  "目标.清除": "Clear",
-  "目标.轮数": "Turn {{n}}",
-  "目标.用量": "{{used}} tokens",
-  "目标.用量.限额": "{{used}} / {{budget}} tokens",
-  "目标.暂无": "No goal set yet",
-  "目标.暂停.用户": "Paused",
-  "目标.暂停.模式": "Paused: mode switched",
-  "目标.暂停.中断": "Interrupted",
-  "目标.暂停.无进展": "Paused: no progress",
-  "目标.暂停.轮数": "Paused: turn limit",
-  "目标.暂停.预算": "Paused: token budget",
-  "目标.暂停.错误": "Paused: error",
+  进行中: "Active",
+  已完成: "Completed",
+  暂停: "Pause",
+  恢复: "Resume",
+  清除: "Clear",
+  "第 {{n}} 轮": "Turn {{n}}",
+  "{{used}} token": "{{used}} tokens",
+  "{{used}} / {{budget}} token": "{{used}} / {{budget}} tokens",
+  还没有设置目标: "No goal set yet",
+  已暂停: "Paused",
+  因切换模式暂停: "Paused: mode switched",
+  已中断: "Interrupted",
+  无进展已暂停: "Paused: no progress",
+  达到轮数上限: "Paused: turn limit",
+  达到用量上限: "Paused: token budget",
+  生成出错已暂停: "Paused: error",
   设置目标失败: "Failed to set the goal",
   暂停目标失败: "Failed to pause the goal",
   恢复目标失败: "Failed to resume the goal",
@@ -397,6 +414,6 @@ export default {
   压缩当前会话的上下文: "Compact this session's context",
   查看或设定会话目标: "View or set the session goal",
   查看全部命令: "Show all commands",
-  "目标.命令提示": "Start the input with /goal to set or view the goal",
-  "内置命令.帮助": "See the / menu in the composer for built-in commands",
+  "在输入框以 /goal 开头设定或查看目标": "Start the input with /goal to set or view the goal",
+  "可用内置命令见输入框的 / 菜单": "See the / menu in the composer for built-in commands",
 };

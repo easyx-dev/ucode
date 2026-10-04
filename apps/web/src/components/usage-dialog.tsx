@@ -39,15 +39,17 @@ function TotalsBlock({ totals, toolCalls }: { totals: UsageTotals; toolCalls: nu
         <span className="text-2xl font-semibold tabular-nums">
           {formatTokens(totals.totalTokens)}
         </span>
-        <span className="text-xs text-muted-foreground">{t("用量.合计")}</span>
+        <span className="text-xs text-muted-foreground">{t("合计 token")}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <TotalRow label={t("用量.输入")} value={formatTokens(totals.inputTokens)} />
-        <TotalRow label={t("用量.输出")} value={formatTokens(totals.outputTokens)} />
-        <TotalRow label={t("用量.缓存读")} value={formatTokens(totals.cacheReadTokens)} />
-        <TotalRow label={t("用量.缓存写")} value={formatTokens(totals.cacheWriteTokens)} />
+        <TotalRow label={t("输入")} value={formatTokens(totals.inputTokens)} />
+        <TotalRow label={t("输出")} value={formatTokens(totals.outputTokens)} />
+        <TotalRow label={t("缓存读")} value={formatTokens(totals.cacheReadTokens)} />
+        <TotalRow label={t("缓存写")} value={formatTokens(totals.cacheWriteTokens)} />
       </div>
-      <div className="text-xs text-muted-foreground">{t("用量.工具", { value: toolCalls })}</div>
+      <div className="text-xs text-muted-foreground">
+        {t("工具调用 {{value}} 次", { value: toolCalls })}
+      </div>
     </div>
   );
 }
@@ -57,7 +59,7 @@ function ModelList({ items }: { items: ModelUsage[] }) {
   if (items.length === 0) return null;
   return (
     <section className="space-y-1.5">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("用量.模型")}</h3>
+      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("按模型")}</h3>
       <ul className="space-y-1">
         {items.map((item) => (
           <li
@@ -87,7 +89,7 @@ function SessionList({
   if (items.length === 0) return null;
   return (
     <section className="space-y-1.5">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("用量.会话")}</h3>
+      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("按会话")}</h3>
       <ul className="space-y-1">
         {items.map((item) => (
           <li key={item.sessionId}>
@@ -130,9 +132,9 @@ export function UsageDialog({ open, onOpenChange, onOpenSession }: UsageDialogPr
   const { data, loading, error } = useUsage(open, daysOf(range));
 
   const options = [
-    { value: "all", label: t("用量.全部") },
-    { value: "30", label: t("用量.最近30天") },
-    { value: "7", label: t("用量.最近7天") },
+    { value: "all", label: t("全部时间") },
+    { value: "30", label: t("最近 30 天") },
+    { value: "7", label: t("最近 7 天") },
   ] as const satisfies ReadonlyArray<SegmentedOption<RangeValue>>;
 
   const openSession = (sessionId: string): void => {
@@ -145,7 +147,9 @@ export function UsageDialog({ open, onOpenChange, onOpenSession }: UsageDialogPr
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("使用统计")}</DialogTitle>
-          <DialogDescription>{t("使用统计.说明")}</DialogDescription>
+          <DialogDescription>
+            {t("从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。")}
+          </DialogDescription>
         </DialogHeader>
 
         <SegmentedControl
@@ -166,7 +170,7 @@ export function UsageDialog({ open, onOpenChange, onOpenSession }: UsageDialogPr
           {data ? (
             data.total.totalTokens === 0 ? (
               <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                {t("用量.空")}
+                {t("还没有用量记录。")}
               </p>
             ) : (
               <div className="space-y-4 py-1">

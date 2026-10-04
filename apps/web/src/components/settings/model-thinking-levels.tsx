@@ -68,7 +68,9 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">{t("推理等级.空态")}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {t("未指定时按厂商默认处理，7 个档位都能用。")}
+        </p>
       ) : (
         <div className="space-y-1.5">
           {rows.map((level) => (
@@ -92,8 +94,8 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
               <Input
                 className="h-7 flex-1 text-xs"
                 value={mapped[level] ?? ""}
-                placeholder={t("厂商取值")}
-                aria-label={t("厂商取值.aria", { level: thinkingLevelLabel(level, t) })}
+                placeholder={t("厂商取值；留空 = 该档不支持")}
+                aria-label={t("{{level}}档的厂商取值", { level: thinkingLevelLabel(level, t) })}
                 onChange={(event) => changeValue(level, event.target.value)}
               />
 

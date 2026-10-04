@@ -10,6 +10,8 @@ export const sessionTitle = (session: SessionSummary, fallback: string): string 
 export const confirmArchiveSession = (session: SessionSummary, t: TFunction): boolean => {
   const name = sessionTitle(session, t("新会话"));
   return window.confirm(
-    session.childCount > 0 ? t("归档确认.含子会话", { name }) : t("归档确认", { name }),
+    session.childCount > 0
+      ? t("归档会话「{{name}}」？它的子会话会一并归档，对话与文件都保留。", { name })
+      : t("归档会话「{{name}}」？会话会从列表里隐藏，对话与文件都保留。", { name }),
   );
 };

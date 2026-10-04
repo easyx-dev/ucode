@@ -31,7 +31,7 @@ export function PlanDecisionForm({ onApprove, onFeedback, disabled }: PlanDecisi
           <div className="px-3 pt-2.5 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{t("计划已就绪")}</span>
             {" · "}
-            {t("计划已就绪.说明")}
+            {t("批准后切换到编码模式开始执行；也可以在下方补充意见，继续讨论计划。")}
           </div>
 
           <textarea
@@ -45,7 +45,7 @@ export function PlanDecisionForm({ onApprove, onFeedback, disabled }: PlanDecisi
               }
             }}
             rows={2}
-            placeholder={t("反馈占位")}
+            placeholder={t("对计划有补充或异议？写在这里继续讨论")}
             className="min-h-11 w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           />
 

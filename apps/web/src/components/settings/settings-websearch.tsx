@@ -34,7 +34,7 @@ export function SettingsWebsearch({ websearch, onPatch }: SettingsWebsearchProps
     <SettingsGroup>
       <SettingsRow
         title={t("搜索服务商")}
-        description={t("搜索服务商.说明")}
+        description={t("websearch 工具调用哪家搜索接口。")}
         control={
           <Select
             value={websearch.provider}
@@ -57,7 +57,9 @@ export function SettingsWebsearch({ websearch, onPatch }: SettingsWebsearchProps
       {isKeyless(websearch.provider) ? (
         <SettingsRow
           title={t("实例地址")}
-          description={t("实例地址.说明")}
+          description={t(
+            "自建 SearXNG 的地址，需在 settings.yml 里开启 JSON 输出（search.formats 加 json）。",
+          )}
           control={
             <Input
               className="w-56"
@@ -70,7 +72,7 @@ export function SettingsWebsearch({ websearch, onPatch }: SettingsWebsearchProps
       ) : (
         <SettingsRow
           title="apiKey"
-          description={t("搜索key.说明")}
+          description={t("留空表示沿用已保存的 key；未配置时 websearch 会返回可读错误。")}
           control={
             <Input
               type="password"

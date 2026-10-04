@@ -208,7 +208,9 @@ export function MessageItem({
               }}
             />
             {isLastUser === false ? (
-              <p className="text-[11px] text-muted-foreground">{t("编辑后移除提示")}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {t("发送后将移除这条消息之后的内容（仍保留在会话记录中）。")}
+              </p>
             ) : null}
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
@@ -304,7 +306,7 @@ export function MessageItem({
     const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
       <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
-        {item.role === "summary" ? t("上下文已压缩") : t("扩展消息")} {text.slice(0, 400)}
+        {item.role === "summary" ? t("（上下文已压缩）") : t("（扩展消息）")} {text.slice(0, 400)}
       </div>
     );
   }

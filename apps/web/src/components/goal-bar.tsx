@@ -16,33 +16,33 @@ type GoalBarProps = {
 
 /** 状态文案：进行中 / 已完成，暂停时按原因区分 */
 const statusText = (goal: GoalView, t: TFunction): string => {
-  if (goal.status === "completed") return t("目标.已完成");
-  if (goal.status === "active") return t("目标.进行中");
+  if (goal.status === "completed") return t("已完成");
+  if (goal.status === "active") return t("进行中");
   switch (goal.cause) {
     case "mode":
-      return t("目标.暂停.模式");
+      return t("因切换模式暂停");
     case "interrupted":
-      return t("目标.暂停.中断");
+      return t("已中断");
     case "no_progress":
-      return t("目标.暂停.无进展");
+      return t("无进展已暂停");
     case "limit":
-      return t("目标.暂停.轮数");
+      return t("达到轮数上限");
     case "budget":
-      return t("目标.暂停.预算");
+      return t("达到用量上限");
     case "error":
-      return t("目标.暂停.错误");
+      return t("生成出错已暂停");
     default:
-      return t("目标.暂停.用户");
+      return t("已暂停");
   }
 };
 
 const usageText = (goal: GoalView, t: TFunction): string =>
   goal.tokenBudget
-    ? t("目标.用量.限额", {
+    ? t("{{used}} / {{budget}} token", {
         used: formatTokens(goal.tokensUsed),
         budget: formatTokens(goal.tokenBudget),
       })
-    : t("目标.用量", { used: formatTokens(goal.tokensUsed) });
+    : t("{{used}} token", { used: formatTokens(goal.tokensUsed) });
 
 export function GoalBar({ goal, onCommand }: GoalBarProps) {
   const { t } = useTranslation();
@@ -66,7 +66,7 @@ export function GoalBar({ goal, onCommand }: GoalBarProps) {
             <span className="shrink-0 text-muted-foreground">{statusText(goal, t)}</span>
             {goal.turns > 0 ? (
               <span className="shrink-0 text-muted-foreground">
-                {t("目标.轮数", { n: goal.turns })}
+                {t("第 {{n}} 轮", { n: goal.turns })}
               </span>
             ) : null}
             <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -91,7 +91,7 @@ export function GoalBar({ goal, onCommand }: GoalBarProps) {
               onClick={() => onCommand({ kind: "pause" })}
             >
               <Pause className="size-3" />
-              {t("目标.暂停")}
+              {t("暂停")}
             </Button>
           ) : null}
           {!active && !completed ? (
@@ -102,7 +102,7 @@ export function GoalBar({ goal, onCommand }: GoalBarProps) {
               onClick={() => onCommand({ kind: "resume" })}
             >
               <Play className="size-3" />
-              {t("目标.恢复")}
+              {t("恢复")}
             </Button>
           ) : null}
           <Button
@@ -112,7 +112,7 @@ export function GoalBar({ goal, onCommand }: GoalBarProps) {
             onClick={() => onCommand({ kind: "clear" })}
           >
             <Trash2 className="size-3" />
-            {t("目标.清除")}
+            {t("清除")}
           </Button>
         </div>
       </div>

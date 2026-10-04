@@ -42,7 +42,7 @@ export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCata
           />
           {t("接入内置供应商")}
           <span className="ml-auto text-xs text-muted-foreground">
-            {t("可选数量", { n: builtins.length })}
+            {t("{{n}} 个可选", { n: builtins.length })}
           </span>
         </Button>
       </CollapsibleTrigger>
@@ -85,7 +85,9 @@ export function ProviderCatalog({ catalog, configuredIds, onPick }: ProviderCata
                   ) : null}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {configured ? t("模型数量", { n: item.models.length }) : item.authName || item.id}
+                  {configured
+                    ? t("{{n}} 个模型", { n: item.models.length })
+                    : item.authName || item.id}
                 </span>
               </button>
             );

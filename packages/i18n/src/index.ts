@@ -18,13 +18,17 @@ import uiZhCN from "./locales/ui/zh-CN";
 
 export { type ErrorMessageKey, errorMessageKey, errorMessageKeys } from "./error-messages";
 
-/** 扁平文案目录：key 即文案，值是该语言的展示文本 */
+/** 扁平文案目录：key 即文案（中文原文或摘要 key），值是该语言的展示文本 */
 export type Catalog = Record<string, string>;
 
 /** 各端补充的文案目录，按语言给出（共享目录已含 common / domain / ui） */
 export type AppCatalogs = Partial<Record<Locale, Catalog>>;
 
-/** 共享目录的 key 集合（common + domain + ui），供各端 `i18next.d.ts` 做 key 类型约束 */
+/**
+ * 共享目录的 key 集合（common + domain + ui），供各端 `i18next.d.ts` 做 key 类型约束。
+ *
+ * 以 `en`（完整目录）为准：`zh-CN` 只登记摘要 key，其余 key 缺失时回退为 key 本身。
+ */
 export type SharedCatalog = typeof commonEn & typeof domainEn & typeof uiEn;
 
 /** 协议 / 客户端级通用文案 */

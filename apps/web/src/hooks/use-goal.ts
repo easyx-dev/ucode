@@ -59,7 +59,7 @@ export function useGoal(sessionId: string | null): GoalController {
         const { goal: next } = await action();
         setGoal(next);
       } catch (error) {
-        toast.error(t("失败提示", { label, reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label, reason: describeError(error) }));
       }
     },
     [t],

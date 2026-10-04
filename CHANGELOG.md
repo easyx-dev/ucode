@@ -297,6 +297,11 @@
 
 ### 变更
 
+- i18n 约定进一步收敛为「key 即中文文案」：长文案也用 key 本身（不再用 `.说明` 之类的摘要 key），
+  `packages/i18n/src/locales/*/zh-CN.ts` 只剩纯占位模板 `失败提示.模板`；`scripts/verify` 的 i18n
+  校验改为「zh ⊆ en + zh 只允许摘要 key（`分组.用途` 形态）+ 禁止 key === value 冗余 + 摘要 key
+  必须有中文」，错误码文案的 key 一并换成完整中文。
+
 - 附件改为「先上传、再按 id 引用」：`messages/prompt` 的 `images`（内联 base64）改为
   `attachments: [{ id }]`，图片仍由服务端 `resizeImage` 归一化后入库，非图片（pdf / word 等）
   原样入库、正文只附一行引用 `[附件: <name> (id: <hash>)]`（内容解析留给后续）。

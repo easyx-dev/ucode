@@ -40,7 +40,7 @@ export function useInteractions(sessionId: string | null): InteractionsControlle
       setPending(data.interactions);
     } catch (error) {
       if (token !== tokenRef.current) return;
-      toast.error(t("失败提示", { label: t("交互请求"), reason: describeError(error) }));
+      toast.error(t("失败提示.模板", { label: t("交互请求"), reason: describeError(error) }));
     }
   }, [sessionId, t]);
 

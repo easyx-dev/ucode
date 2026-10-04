@@ -35,7 +35,9 @@ export function WelcomePanel({
     return (
       <section className="flex flex-col items-center gap-3 py-12 text-center">
         <h2 className="text-xl font-semibold">{t("还没有配置模型")}</h2>
-        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{t("未配置.说明")}</p>
+        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+          {t("填入一个 OpenAI 兼容端点（baseUrl / apiKey / 模型 id）后即可开始对话。")}
+        </p>
         <Button onClick={onOpenSettings}>{t("打开设置")}</Button>
       </section>
     );
@@ -52,13 +54,13 @@ export function WelcomePanel({
       </span>
       <h2 className="text-xl font-semibold">{greeting()}</h2>
       <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-        {t("就绪.说明", { model: defaultModel ?? "-" })}
+        {t("模型已就绪：{{model}}。每个会话有独立的工作区", { model: defaultModel ?? "-" })}
         {workspaceRoot ? (
           <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
             {abbreviateHome(workspaceRoot)}
           </code>
         ) : null}
-        {t("就绪.说明.后缀")}
+        {t("，agent 在其中读写文件并执行命令。")}
       </p>
     </section>
   );

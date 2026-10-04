@@ -40,7 +40,9 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider"
       {customized ? (
         <div className="flex items-center gap-2">
           <p className="text-[11px] text-muted-foreground">
-            {t("模型清单.自定义", { n: provider.models.length })}
+            {t("模型清单已被自定义（{{n}} 个），不再随内置目录更新。", {
+              n: provider.models.length,
+            })}
           </p>
           <Button
             variant="ghost"
@@ -53,7 +55,9 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderCardProps, "provider"
         </div>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          {t("模型清单.继承", { n: provider.inheritedModels.length })}
+          {t("端点与 {{n}} 个模型来自内置目录，随应用升级自动更新。", {
+            n: provider.inheritedModels.length,
+          })}
         </p>
       )}
     </div>
@@ -80,7 +84,7 @@ export function ProviderCard({
         <span className="text-sm font-medium">{provider.name || provider.id}</span>
         <span className="text-xs text-muted-foreground">
           {provider.apiKeyMasked
-            ? t("已保存key", { masked: provider.apiKeyMasked })
+            ? t("已保存 key {{masked}}", { masked: provider.apiKeyMasked })
             : t("未保存 key")}
         </span>
         <Button variant="ghost" size="sm" className="ml-auto" onClick={onTest} disabled={testing}>

@@ -26,7 +26,7 @@ export function useSessionActions(list: SessionListController) {
         addDraft(session);
         return session;
       } catch (error) {
-        toast.error(t("失败提示", { label: t("新建会话失败"), reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label: t("新建会话失败"), reason: describeError(error) }));
         return null;
       }
     },
@@ -39,7 +39,7 @@ export function useSessionActions(list: SessionListController) {
       try {
         await api.sessions.update({ sessionId, ...next });
       } catch (error) {
-        toast.error(t("失败提示", { label: failureLabel, reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label: failureLabel, reason: describeError(error) }));
         void refresh();
       }
     },
@@ -58,7 +58,7 @@ export function useSessionActions(list: SessionListController) {
 
   const setThinkingLevel = useCallback(
     (sessionId: string, thinkingLevel: ThinkingLevel) =>
-      applyUpdate(sessionId, { thinkingLevel }, t("设置thinking失败")),
+      applyUpdate(sessionId, { thinkingLevel }, t("设置 thinking level 失败")),
     [applyUpdate, t],
   );
 
@@ -74,7 +74,7 @@ export function useSessionActions(list: SessionListController) {
         drop(sessionId);
         toast.success(t("已归档"));
       } catch (error) {
-        toast.error(t("失败提示", { label: t("归档失败"), reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label: t("归档失败"), reason: describeError(error) }));
       }
     },
     [drop, t],
@@ -91,7 +91,7 @@ export function useSessionActions(list: SessionListController) {
         addDraft(session);
         return session;
       } catch (error) {
-        toast.error(t("失败提示", { label: t("分叉失败"), reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label: t("分叉失败"), reason: describeError(error) }));
         return null;
       }
     },

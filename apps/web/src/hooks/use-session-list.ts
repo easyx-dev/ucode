@@ -47,7 +47,9 @@ export function useSessionList(): SessionListController {
         const list = await fetchChildren(parentId);
         setChildrenByParent((prev) => ({ ...prev, [parentId]: list }));
       } catch (error) {
-        toast.error(t("失败提示", { label: t("子会话加载失败"), reason: describeError(error) }));
+        toast.error(
+          t("失败提示.模板", { label: t("子会话加载失败"), reason: describeError(error) }),
+        );
       } finally {
         setChildrenLoading((prev) => ({ ...prev, [parentId]: false }));
       }
@@ -88,7 +90,12 @@ export function useSessionList(): SessionListController {
           return changed ? next : prev;
         });
       } catch (error) {
-        toast.error(t("失败提示", { label: t("会话列表加载失败"), reason: describeError(error) }));
+        toast.error(
+          t("失败提示.模板", {
+            label: t("会话列表加载失败"),
+            reason: describeError(error),
+          }),
+        );
       } finally {
         setLoading(false);
       }

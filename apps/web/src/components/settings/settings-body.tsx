@@ -52,7 +52,7 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
 
           {!draft.loading && draft.providers.length === 0 ? (
             <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
-              {t("供应商.空态")}
+              {t("还没有接入供应商，从下面的目录里选一个，或添加自定义供应商。")}
             </p>
           ) : null}
 

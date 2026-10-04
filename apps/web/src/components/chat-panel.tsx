@@ -208,7 +208,9 @@ export function ChatPanel({
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">
           <Bot className="size-4 shrink-0 text-muted-foreground" />
-          <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("子会话.只读提示")}</p>
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+            {t("子会话是委派产生的独立对话，只能查看；需要它继续请在父会话里说明。")}
+          </p>
           <Button variant="outline" size="sm" onClick={onBackToParent}>
             {t("返回父会话")}
           </Button>

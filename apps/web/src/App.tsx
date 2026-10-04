@@ -51,7 +51,7 @@ export default function App() {
     if (!activeId) return;
     void (async () => {
       await sessions.setMode(activeId, "build");
-      await chat.send(textPayload(t("计划已批准")));
+      await chat.send(textPayload(t("计划已批准，请开始执行。")));
     })();
   };
 
@@ -130,7 +130,7 @@ export default function App() {
         return;
       }
       if (!activeId) {
-        toast.info(t("目标.暂无"));
+        toast.info(t("还没有设置目标"));
         return;
       }
       switch (command.kind) {
@@ -145,7 +145,7 @@ export default function App() {
           break;
         case "status":
           if (goal.goal) await goal.refresh(activeId);
-          else toast.info(t("目标.暂无"));
+          else toast.info(t("还没有设置目标"));
           break;
       }
     })();
@@ -191,10 +191,10 @@ export default function App() {
         });
         break;
       case "goal":
-        toast.info(t("目标.命令提示"));
+        toast.info(t("在输入框以 /goal 开头设定或查看目标"));
         break;
       case "help":
-        toast.info(t("内置命令.帮助"), {
+        toast.info(t("可用内置命令见输入框的 / 菜单"), {
           description: BUILTIN_COMMANDS.map((command) => `/${command.name}`).join("  "),
         });
         break;

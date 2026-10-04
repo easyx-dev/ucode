@@ -16,7 +16,7 @@ export function useModels() {
       try {
         setData(await action());
       } catch (error) {
-        toast.error(t("失败提示", { label: failure, reason: describeError(error) }));
+        toast.error(t("失败提示.模板", { label: failure, reason: describeError(error) }));
       }
     },
     [t],

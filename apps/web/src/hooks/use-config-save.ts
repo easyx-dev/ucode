@@ -42,7 +42,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
       onSaved();
       return true;
     } catch (error) {
-      toast.error(t("失败提示", { label: t("保存失败"), reason: describeError(error) }));
+      toast.error(t("失败提示.模板", { label: t("保存失败"), reason: describeError(error) }));
       return false;
     } finally {
       setSaving(false);
@@ -54,7 +54,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
     // 自定义供应商以表单值为准（resolvedBaseUrl 是加载时的快照），内置供应商回落到目录端点
     const baseUrl = provider.baseUrl.trim() || provider.resolvedBaseUrl.trim();
     if (!baseUrl || !model) {
-      toast.error(t("先填写供应商信息"));
+      toast.error(t("先填写 baseUrl 和至少一个模型 id"));
       return;
     }
 
@@ -67,9 +67,14 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
         api: provider.api,
         model,
       });
-      toast.success(t("连接成功", { latency: result.latencyMs, model: result.modelEcho ?? "-" }));
+      toast.success(
+        t("连接成功 · {{latency}}ms · {{model}}", {
+          latency: result.latencyMs,
+          model: result.modelEcho ?? "-",
+        }),
+      );
     } catch (error) {
-      toast.error(t("失败提示", { label: t("连接失败"), reason: describeError(error) }));
+      toast.error(t("失败提示.模板", { label: t("连接失败"), reason: describeError(error) }));
     } finally {
       setTestingKey(null);
     }

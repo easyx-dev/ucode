@@ -5,11 +5,11 @@ import type { TFunction } from "i18next";
 export const modeLabel = (mode: string, t: TFunction): string => {
   switch (mode) {
     case "build":
-      return t("编码模式");
+      return t("编码");
     case "plan":
-      return t("计划模式");
+      return t("计划");
     case "ask":
-      return t("问答模式");
+      return t("问答");
     default:
       return mode;
   }
@@ -19,11 +19,11 @@ export const modeLabel = (mode: string, t: TFunction): string => {
 export const modeDescription = (mode: string, t: TFunction): string => {
   switch (mode) {
     case "build":
-      return t("编码模式.说明");
+      return t("可直接读写文件、执行命令。");
     case "plan":
-      return t("计划模式.说明");
+      return t("先给出方案，只读调研不改代码。");
     case "ask":
-      return t("问答模式.说明");
+      return t("只读分析与回答，不改文件、不执行命令。");
     default:
       return "";
   }

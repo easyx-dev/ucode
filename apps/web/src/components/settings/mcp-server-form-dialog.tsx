@@ -111,11 +111,18 @@ export function McpServerFormDialog({
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{initial ? t("编辑 MCP 服务器") : t("添加 MCP 服务器")}</DialogTitle>
-          <DialogDescription>{t("MCP.表单说明")}</DialogDescription>
+          <DialogDescription>
+            {t("stdio 走本地命令，http 走远端地址；环境变量与请求头一行一条 KEY=VALUE。")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
-          <Field label={t("服务器名")} description={t("服务器名.说明")}>
+          <Field
+            label={t("服务器名")}
+            description={t(
+              "用于拼出 mcp__<服务器名>__<工具名>；名字里的非字母、数字、下划线字符在工具名中会转为 _。只允许字母、数字与 . _ -。",
+            )}
+          >
             <Input
               value={form.name}
               disabled={Boolean(initial)}
@@ -143,7 +150,12 @@ export function McpServerFormDialog({
               </Select>
             </Field>
 
-            <Field label={t("暴露方式")} description={t("暴露方式.说明")}>
+            <Field
+              label={t("暴露方式")}
+              description={t(
+                "脚本调用经 codemode 使用、不声明给模型、由脚本按需查找；检索后调用经 tool_search 加载后再声明给模型；直接调用会立即声明给模型。",
+              )}
+            >
               <Select
                 value={form.exposure}
                 onValueChange={(value) => patch({ exposure: value as McpExposure })}
@@ -162,7 +174,7 @@ export function McpServerFormDialog({
             </Field>
           </div>
 
-          <Field label={t("超时")} description={t("超时.说明")}>
+          <Field label={t("超时")} description={t("单次请求的超时秒数；留空即用默认值（60 秒）。")}>
             <Input
               type="number"
               min={1}
@@ -174,14 +186,17 @@ export function McpServerFormDialog({
 
           {form.type === "stdio" ? (
             <>
-              <Field label={t("启动命令")} description={t("启动命令.说明")}>
+              <Field
+                label={t("启动命令")}
+                description={t("启动 MCP 服务器的可执行文件，如 npx / uvx。")}
+              >
                 <Input
                   value={form.command}
                   placeholder="npx"
                   onChange={(event) => patch({ command: event.target.value })}
                 />
               </Field>
-              <Field label={t("参数")} description={t("参数.说明")}>
+              <Field label={t("参数")} description={t("传给启动命令的参数，一行一个。")}>
                 <textarea
                   className={TEXTAREA_CLASS}
                   rows={3}
@@ -189,7 +204,10 @@ export function McpServerFormDialog({
                   onChange={(event) => patch({ argsText: event.target.value })}
                 />
               </Field>
-              <Field label={t("环境变量")} description={t("环境变量.说明")}>
+              <Field
+                label={t("环境变量")}
+                description={t("传给子进程的环境变量，值可写 ${NAME} 引用环境变量。")}
+              >
                 <textarea
                   className={TEXTAREA_CLASS}
                   rows={3}
@@ -198,20 +216,28 @@ export function McpServerFormDialog({
                   onChange={(event) => patch({ envText: event.target.value })}
                 />
               </Field>
-              <Field label={t("工作目录")} description={t("工作目录.说明")}>
+              <Field
+                label={t("工作目录")}
+                description={t(
+                  "服务器的工作目录，相对路径按会话工作目录解析；留空即用会话工作目录。",
+                )}
+              >
                 <Input value={form.cwd} onChange={(event) => patch({ cwd: event.target.value })} />
               </Field>
             </>
           ) : (
             <>
-              <Field label={t("端点地址")} description={t("端点地址.说明")}>
+              <Field label={t("端点地址")} description={t("MCP 服务器的 HTTP 端点。")}>
                 <Input
                   value={form.url}
                   placeholder="https://example.com/mcp"
                   onChange={(event) => patch({ url: event.target.value })}
                 />
               </Field>
-              <Field label={t("请求头")} description={t("请求头.说明")}>
+              <Field
+                label={t("请求头")}
+                description={t("请求时携带的 HTTP 头，值可写 ${NAME} 引用环境变量。")}
+              >
                 <textarea
                   className={TEXTAREA_CLASS}
                   rows={3}

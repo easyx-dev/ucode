@@ -56,7 +56,7 @@ export function useConfigDraft(open: boolean) {
       setWebsearch(toDraftWebsearch(config.websearch));
       setMemoryEnabled(config.memory.enabled);
     } catch (error) {
-      toast.error(t("失败提示", { label: t("配置加载失败"), reason: describeError(error) }));
+      toast.error(t("失败提示.模板", { label: t("配置加载失败"), reason: describeError(error) }));
     } finally {
       setLoading(false);
     }

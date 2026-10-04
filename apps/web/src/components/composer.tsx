@@ -325,7 +325,7 @@ export function Composer({
           <ComposerEditor
             key={`${editorKey}:${version}`}
             initialDoc={externalDoc && externalDoc.key === editorKey ? externalDoc.doc : initialDoc}
-            placeholder={t("输入消息占位")}
+            placeholder={t("输入消息，Enter 发送，Shift+Enter 换行")}
             onChange={handleDocChange}
             onSend={submit}
             contextItems={contextItems}

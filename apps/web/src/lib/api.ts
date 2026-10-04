@@ -78,7 +78,7 @@ const unwrap = async <T>(response: Response): Promise<T> => {
   } catch {
     throw new ApiRequestError(
       "invalid_response",
-      i18n.t("响应.非JSON", { status: response.status }),
+      i18n.t("服务返回了非 JSON 响应（HTTP {{status}}）", { status: response.status }),
     );
   }
 
@@ -87,7 +87,7 @@ const unwrap = async <T>(response: Response): Promise<T> => {
 
   throw new ApiRequestError(
     record?.code ?? "unknown_error",
-    record?.message ?? i18n.t("请求失败", { status: response.status }),
+    record?.message ?? i18n.t("请求失败（HTTP {{status}}）", { status: response.status }),
     record?.data,
     record?.params,
   );
@@ -141,7 +141,7 @@ const readErrorMessage = async (response: Response): Promise<string> => {
   } catch {
     // 非 JSON，退回状态码
   }
-  return i18n.t("事件流失败", { status: response.status });
+  return i18n.t("事件流连接失败（HTTP {{status}}）", { status: response.status });
 };
 
 export const api = {
