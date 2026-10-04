@@ -1,8 +1,16 @@
 /** 会话运行：把一条输入投递给会话，生成在服务端后台推进，结果走事件总线 */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { ERROR_CODES, type MessageEditInput, type PromptInput } from "@ucode/contracts";
+import {
+  ERROR_CODES,
+  type MessageCompactInput,
+  type MessageEditInput,
+  type PromptInput,
+} from "@ucode/contracts";
 
+import { expandContexts } from "../agent/context";
 import { resolveEditableUserEntry } from "../agent/edit";
+import { normalizeImages, type PromptImage } from "../agent/image";
+import { resolveSessionCwd } from "../agent/session-config";
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
 import { sleep } from "../utils/time";
@@ -32,8 +40,9 @@ const startRun = (
   sessionId: string,
   session: AgentSession,
   text: string,
+  images: readonly PromptImage[] = [],
 ): void => {
-  services.pool.startRun(sessionId, session, text);
+  services.pool.startRun(sessionId, session, text, images);
 };
 
 /**
@@ -42,32 +51,44 @@ const startRun = (
  */
 export const admitPrompt = async (services: Services, input: PromptInput): Promise<void> => {
   const { sessionId, text, behavior } = input;
+  const contexts = input.contexts ?? [];
+  const images = input.images ?? [];
 
   // 会话必须先存在：查不到的 id 会一路走到「以会话工作目录当 cwd」的推导上，
   // 而那一步现在只认已有记录（见 `resolveSessionCwd`），这里提前给出明确的 404。
-  if (!services.sessions.find(sessionId)) {
+  const record = services.sessions.find(sessionId);
+  if (!record) {
     throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
       path: sessionId,
     });
   }
+  if (text.length === 0 && contexts.length === 0 && images.length === 0) {
+    throw new AppError(ERROR_CODES.invalidRequest, "消息不能为空", 400);
+  }
+
+  // 先展开引用与归一化图片：越界路径、坏图片在这里就报错，不必先建出会话实例
+  const expanded = expandContexts(resolveSessionCwd(record), contexts);
+  const body = [expanded, text].filter((part) => part.length > 0).join("\n\n");
+  const content = (await normalizeImages(images)).map((image) => image.content);
 
   // 只在「创建/取回 AgentSession」这段加锁；run 本身不占锁，
   // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效。
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
 
   if (!services.pool.isRunning(sessionId) && !session.isStreaming) {
-    startRun(services, sessionId, session, text);
+    startRun(services, sessionId, session, body, content);
     return;
   }
 
   if (await waitForBusy(session, () => services.pool.isRunning(sessionId))) {
-    if (behavior === "steer") await session.steer(text);
-    else await session.followUp(text);
+    const attachments = content.length > 0 ? content : undefined;
+    if (behavior === "steer") await session.steer(body, attachments);
+    else await session.followUp(body, attachments);
     return;
   }
 
   // 占位者已经结束（可能失败）：退化成新的一轮
-  startRun(services, sessionId, session, text);
+  startRun(services, sessionId, session, body, content);
 };
 
 /**
@@ -112,6 +133,28 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
     services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
     startRun(services, sessionId, session, text);
   });
+};
+
+/**
+ * 手动压缩：只在会话空闲时受理，压缩在服务端后台推进。
+ * 与 prompt 不同不排队——忙碌时直接 409，避免改变正在进行的这一轮。
+ */
+export const admitCompact = async (
+  services: Services,
+  input: MessageCompactInput,
+): Promise<void> => {
+  const { sessionId, instructions } = input;
+  const record = services.sessions.find(sessionId);
+  if (!record) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
+  const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
+  if (services.pool.isActive(sessionId) || !session.isIdle) {
+    throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请先中断", 409);
+  }
+  services.pool.startCompaction(sessionId, session, instructions);
 };
 
 /**

@@ -13,6 +13,9 @@ import { createServices } from "./app";
 import { env } from "./env";
 import { logger, requestLogger } from "./lib/logger";
 import { AppError, fail } from "./lib/response";
+import { createAgentsRoute } from "./routes/agents";
+import { createAttachmentsRoute } from "./routes/attachments";
+import { createCommandsRoute } from "./routes/commands";
 import { createConfigRoute } from "./routes/config";
 import { createEventsRoute } from "./routes/events";
 import { createFsRoute } from "./routes/fs";
@@ -44,6 +47,9 @@ v1.route("/events", createEventsRoute(services));
 v1.route("/interactions", createInteractionsRoute(services));
 v1.route("/fs", createFsRoute());
 v1.route("/mcp", createMcpRoute());
+v1.route("/commands", createCommandsRoute(services));
+v1.route("/attachments", createAttachmentsRoute());
+v1.route("/agents", createAgentsRoute(services));
 
 app.route(API_BASE_PATH, v1);
 

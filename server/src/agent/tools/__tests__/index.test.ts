@@ -86,11 +86,11 @@ describe("buildCustomTools", () => {
     const visible = parseCustomAgent(
       "reviewer",
       ["---", 'description: "评审改动"', "---", "正文"].join("\n"),
-    );
+    ).profile;
     const hidden = parseCustomAgent(
       "secret",
       ["---", 'description: "隐藏角色"', "advertise: false", "---", "正文"].join("\n"),
-    );
+    ).profile;
     const tools = buildCustomTools({
       names: ["subagent"],
       readWebsearchConfig: readConfig,

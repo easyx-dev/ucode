@@ -78,6 +78,42 @@ export const SUBAGENT_DESCRIPTION_MAX_LENGTH = 60;
 /** 自定义子角色目录名（位于 agent 目录下）：`agents/*.md` */
 export const AGENTS_DIRNAME = "agents";
 
+/** 全局技能目录名（位于 APP_HOME 下）：`skills/<id>/SKILL.md` */
+export const SKILLS_DIRNAME = "skills";
+
+/** 全局命令（提示词模板）目录名（位于 APP_HOME 下）：`prompts/<name>.md` */
+export const PROMPTS_DIRNAME = "prompts";
+
+/** 项目级配置目录名（位于会话 cwd 及其祖先）：品牌 slug 加前导点，如 `.<slug>` */
+export const PROJECT_CONFIG_DIRNAME = `.${brand.slug}`;
+
+/** 兼容生态的技能目录名（项目祖先或用户主目录下）：`.agents` */
+export const AGENTS_COMPAT_DIRNAME = ".agents";
+
+/** 附件库目录名（位于 `$APP_HOME/app` 下），按内容 sha256 寻址 */
+export const ATTACHMENTS_DIRNAME = "attachments";
+
+/** 图片归一化的最长边（像素） */
+export const IMAGE_MAX_DIMENSION = 2000;
+
+/** 图片归一化后的编码字节上限（与契约的 `MESSAGE_IMAGE_MAX_BASE64_BYTES` 同档） */
+export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** `@` 单次引用的文件数上限（目录展开后一并计入） */
+export const CONTEXT_MAX_FILES = 64;
+
+/** `@` 单个文件的读取字节上限 */
+export const CONTEXT_MAX_FILE_BYTES = 200 * 1024;
+
+/** `@` 单次引用的总字节上限 */
+export const CONTEXT_MAX_TOTAL_BYTES = 512 * 1024;
+
+/** fs/search 单次扫描的条目上限（交给 pi find 的 limit）；超出即标注截断 */
+export const FS_SEARCH_MAX_SCAN = 20_000;
+
+/** fs/search 跳过的目录名 */
+export const FS_SEARCH_SKIP_DIRS = ["node_modules", ".git", "dist", ".next", ".turbo", ".cache"];
+
 /** 单个自定义角色文件的大小上限，超过即跳过，避免误放大文件撑爆装配 */
 export const CUSTOM_AGENT_MAX_BYTES = 256 * 1024;
 

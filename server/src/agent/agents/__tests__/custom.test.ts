@@ -1,8 +1,8 @@
 /**
- * 自定义子角色单测：发现、解析、覆盖内置与坏文件跳过。
+ * 自定义角色单测：发现、解析、覆盖内置与坏文件跳过。
  *
- * 角色文件是用户可写的运行时数据，这里重点守住「坏文件不污染其余角色」与
- * 「自定义角色只作子角色、不能占主模式名」两条边界。
+ * 角色文件是用户可写的运行时数据，这里重点守住「坏文件不污染其余角色」、
+ * 「primary 可覆盖内置三模式」与「纯 subagent 不占主模式名」几条边界。
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -10,24 +10,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { AGENTS_DIRNAME } from "../../../constants";
 import {
   allSubagents,
   effectiveToolNames,
+  hasPrimaryMode,
   loadAgentRegistry,
   parseCustomAgent,
   primaryCapability,
+  primaryProfile,
   resolveSubagentCapability,
   subagentProfile,
 } from "../index";
 
 const makeRegistry = (files: Record<string, string>) => {
-  const agentDir = mkdtempSync(join(tmpdir(), "custom-agent-test-"));
+  const appHome = mkdtempSync(join(tmpdir(), "custom-agent-test-"));
   if (Object.keys(files).length > 0) {
-    const dir = join(agentDir, "agents");
+    const dir = join(appHome, AGENTS_DIRNAME);
     mkdirSync(dir);
     for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
   }
-  return loadAgentRegistry(agentDir);
+  return loadAgentRegistry({ cwd: appHome, appHome });
 };
 
 const valid = (over: { frontmatter?: string; body?: string } = {}): string =>
@@ -43,6 +46,7 @@ describe("loadAgentRegistry", () => {
   it("没有 agents 目录时只有内置角色", () => {
     const registry = makeRegistry({});
     assert.deepEqual(Object.keys(registry.subagents).sort(), ["explore", "general"]);
+    assert.deepEqual(registry.primary, {});
     assert.deepEqual(registry.errors, []);
   });
 
@@ -84,6 +88,40 @@ describe("loadAgentRegistry", () => {
     assert.equal(profile.promptSection, "自定义通用正文。");
   });
 
+  it("mode: primary 覆盖内置 build，并可用新 slug", () => {
+    const registry = makeRegistry({
+      "build.md": valid({
+        frontmatter: 'mode: primary\nname: "自定义编码"',
+        body: "自定义 build 正文。",
+      }),
+      "writer.md": valid({ frontmatter: "mode: primary", body: "写作正文。" }),
+    });
+    assert.deepEqual(registry.errors, []);
+
+    const build = primaryProfile("build", registry);
+    assert.equal(build.label, "自定义编码");
+    assert.equal(build.source, "global");
+    assert.equal(build.promptSection, "自定义 build 正文。");
+
+    assert.ok(hasPrimaryMode("writer", registry));
+    const writer = primaryProfile("writer", registry);
+    assert.equal(writer.kind, "primary");
+    assert.equal(writer.capability.toolSelection.kind, "defaultTools");
+  });
+
+  it("mode: all 同时进 primary 与 subagent", () => {
+    const registry = makeRegistry({ "both.md": valid({ frontmatter: "mode: all" }) });
+    assert.ok(hasPrimaryMode("both", registry));
+    assert.equal(primaryProfile("both", registry).kind, "primary");
+    assert.equal(subagentProfile("both", registry).kind, "subagent");
+  });
+
+  it("纯 subagent 仍拒绝与主模式同名", () => {
+    const registry = makeRegistry({ "plan.md": valid() });
+    assert.ok(!hasPrimaryMode("plan", registry) || registry.subagents.plan === undefined);
+    assert.ok(registry.errors.some((error) => error.file === "plan.md"));
+  });
+
   it("advertise: false 的角色仍进全量清单（可调用，只是不广告）", () => {
     const registry = makeRegistry({
       "hidden.md": valid({ frontmatter: "advertise: false" }),
@@ -96,15 +134,13 @@ describe("loadAgentRegistry", () => {
     const registry = makeRegistry({
       "good.md": valid(),
       "BadName.md": valid(),
-      "build.md": valid(),
       "nodefault.md": ["---", "---", "正文"].join("\n"),
       "notools.md": valid({ frontmatter: "tools: read, nope" }),
       "empty.md": ["---", 'description: "x"', "---"].join("\n"),
     });
     assert.ok(subagentProfile("good", registry).slug === "good");
     const files = registry.errors.map((entry) => entry.file).sort();
-    assert.deepEqual(files, ["BadName.md", "build.md", "empty.md", "nodefault.md", "notools.md"]);
-    assert.ok(!("build" in registry.subagents), "主模式名不能被自定义角色占用");
+    assert.deepEqual(files, ["BadName.md", "empty.md", "nodefault.md", "notools.md"]);
   });
 
   it("未带注册表时未知角色仍按内置集合报错", () => {
@@ -138,8 +174,23 @@ describe("parseCustomAgent", () => {
     );
   });
 
+  it("mode 缺省为 subagent，显式 primary 时 kind 也随之", () => {
+    assert.equal(parseCustomAgent("x", valid()).mode, "subagent");
+    assert.equal(parseCustomAgent("x", valid()).profile.kind, "subagent");
+    const primary = parseCustomAgent("x", valid({ frontmatter: "mode: primary" }));
+    assert.equal(primary.mode, "primary");
+    assert.equal(primary.profile.kind, "primary");
+  });
+
+  it("primary 不允许 tools: inherit", () => {
+    assert.throws(
+      () => parseCustomAgent("x", valid({ frontmatter: "mode: primary\ntools: inherit" })),
+      /不支持 tools: inherit/,
+    );
+  });
+
   it("tools 列表去重", () => {
-    const profile = parseCustomAgent("x", valid({ frontmatter: "tools: read, grep, read" }));
+    const { profile } = parseCustomAgent("x", valid({ frontmatter: "tools: read, grep, read" }));
     assert.deepEqual(profile.capability.toolSelection, {
       kind: "allowlist",
       tools: ["read", "grep"],

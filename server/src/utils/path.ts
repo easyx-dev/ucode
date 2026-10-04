@@ -1,11 +1,29 @@
 /** 路径归一化与校验：fs / 会话工作区 / 权限规则共用，保证路径与会话 cwd 能精确匹配 */
-import { realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve, sep } from "node:path";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 
 import { ERROR_CODES } from "@ucode/contracts";
 
 import { AppError } from "../lib/response";
+
+/**
+ * 从 cwd 逐级向上的目录链（近者在前）；遇到 `stopAt` 中的目录、含 `.git` 的项目根
+ * 或文件系统根即停（含该目录）。项目级资源与自定义角色目录共用同一口径。
+ */
+export const ancestorDirs = (cwd: string, stopAt: readonly string[] = []): string[] => {
+  const stops = new Set(stopAt.map((dir) => resolve(dir)));
+  const dirs: string[] = [];
+  let current = resolve(cwd);
+  while (true) {
+    dirs.push(current);
+    if (stops.has(current) || existsSync(resolve(current, ".git"))) break;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return dirs;
+};
 
 /** 展开开头的 `~`；只处理 `~` 与 `~/`，`~user` 交给 realpath 报「不存在」 */
 const expandHome = (input: string): string => {

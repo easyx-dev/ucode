@@ -35,6 +35,48 @@
 
 ### 新增
 
+- 输入区由 `<textarea>` 换成 **Tiptap 富文本编辑器**（只装结构节点与两个 mention，无排版 marks）：
+  `/` 菜单分「内置动作 / 命令 / 技能」三组（内置动作立即执行、不落正文；命令与技能序列化为
+  `/name` / `/skill:name`，仅文档开头生效），`@` 按会话 cwd 检索文件 / 目录并以 `contextMention`
+  引用（发送时剥离为 `contexts[]`）；数据来源 `commands/list` 与 `fs/search`。新增 web 依赖
+  `@tiptap/react`、`@tiptap/core`、`@tiptap/pm` 及 document / paragraph / text / hard-break /
+  mention / suggestion / placeholder 扩展。
+- 输入区图片附件：粘贴 / 拖拽进编辑器先按最长边 2000px 预压缩，字节存本地 IndexedDB
+  （内容寻址，库名由品牌 slug 派生），编辑器上方附件行显示缩略图（可点开预览）与移除按钮；
+  发送时读成 base64 随 `images` 上传，乐观消息先用本地预览，发送失败时连同附件一起还回输入框。
+  草稿新增 `attachments`（内容 id 列表），刷新后按 id 从本地库恢复；非图片文件拒收并提示。
+  发送后历史里的用户消息也会渲染这些图片（此前用户消息只渲染文本块）。
+- 内置命令补齐到 12 个（`/new` `/rename` `/archive` `/fork` `/stop` `/compact` `/models`
+  `/thinking` `/mode` `/settings` `/goal` `/help`）：草稿态（无会话）的 `/` 菜单只列不需要会话的命令；
+  `/models` `/thinking` `/mode` 用受控弹出层就地打开工具栏里的同一个选择器，`/rename` 与侧栏共用
+  重命名对话框（对话框由 App 承载），`/archive` `/fork` 接会话动作，`/help` 列出全部命令。
+- `fs/search` 改为对**相对路径**做模糊匹配，与 opencode 同口径：候选来自 pi 的 `find`（fd，尊重
+  `.gitignore`、含隐藏文件，目录带尾随 `/`），再用 `fuzzysort` 匹配整条路径并排序，因此 `src/`、`./`、
+  `src/a` 等路径片段能直接命中；server 新增依赖 `fuzzysort`。候选按 base 缓存 10s。
+- 新增 `POST /api/v1/messages/compact`（手动压缩上下文；后台执行，进度走 `compaction_*` 事件），
+  对应输入区的 `/compact` 内置动作。
+- 新增**自定义 primary agent**：全局 `$APP_HOME/agents/*.md` 与项目配置目录下的 `agents/*.md`
+  （cwd 祖先链，近者优先）均可定义 `mode: primary | subagent | all` 的角色；primary 允许覆盖内置
+  `build` / `plan` / `ask`。`mode` 契约放宽为 slug 字符串（不再限定枚举），`sessions/create|update`
+  按 agent 注册表校验；新增 `POST /api/v1/agents/list`。自定义角色目录由 `$APP_HOME/agent/agents`
+  移到 `$APP_HOME/agents`；MCP 扩展改为按「默认工具集」判定加载（自定义只读角色不再误连）。
+- 新增**命令与技能资源发现**：全局 `$APP_HOME/{skills,prompts}`、项目 `.ucode/{skills,prompts}`
+  （从会话 cwd 沿祖先链收集，止于项目根）、兼容 `.agents/skills`；同名优先级
+  项目 `.ucode` > 项目 `.agents` > 全局 `$APP_HOME` > 用户 `~/.agents`（pi 侧 first-wins）。
+  会话装配改为只认这些目录（禁用 pi 默认的 `agentDir/skills` 与 `cwd/.pi/*`），技能清单由 pi
+  自动注入系统提示词。目录解析与装载见 `server/src/agent/assets/`。
+- 新增 `POST /api/v1/commands/list`（契约域 `commands`）：按 `sessionId` / `cwd` 解析工作目录，
+  列出可用的提示词命令（`/name`）与技能（`/skill:name`）及其来源。
+- 新增 `@` 上下文、图片附件与附件路由的服务端能力：`agent/context`（展开文件 / 目录引用，限会话 cwd 内、
+  `<context>` 不可信包裹）、`agent/image`（pi `resizeImage` 归一化到 2000×2000 / 5MB）、
+  `agent/attachment`（sha256 内容寻址附件库，落 `$APP_HOME/app/attachments`）、
+  `GET /api/v1/attachments/<id>` 字节路由（非 JSON 例外，带缓存头与 ETag）、`POST /api/v1/fs/search`
+  受限检索；`messages/prompt` 接入 `contexts` / `images`，`MessageBlock` 的 image 区块改为
+  `{ id, mimeType, url }`。
+- 契约新增（部分待 web 阶段接入）：`agents` 与 `commands` 域、`IMAGE_MIME_TYPES` /
+  `PROMPT_MAX_IMAGES` / `PROMPT_MAX_CONTEXTS` / `MESSAGE_IMAGE_MAX_BASE64_BYTES` /
+  `COMMAND_ASSET_SOURCES` / `AGENT_KINDS` / `AGENT_SOURCES` 常量、错误码 `image_invalid`，
+  以及 `MessageBlock` 预留的 `file` 变体。
 - 新增开发期源码定位：接入 `@tanstack/devtools-vite`，dev 下给 JSX 注入 `data-tsd-source="文件:行:列"`，
   可在 Chrome DevTools 的 Elements 面板直接定位元素来源；仅 dev 生效、生产构建剥离，并用
   `injectSource.ignore.components` 排除基础 UI 组件。
@@ -247,6 +289,8 @@
 - 新增**接口参考文档**：`pnpm api:docs` 从 `packages/contracts/` 生成 `docs/api-reference.md`，
   逐接口列出请求参数（类型 / 必填 / 默认 / 约束 / 说明）与响应结构，作为 `docs/api.md` 的清单补充；
   `pnpm check` 新增 `api-docs` 校验：重生成后与文档逐字节比对，并把端点清单与 server 路由双向核对。
+- 历史消息把用户消息里展开的 `<skill>` / `<context>` 块还原成 chip，只显示用户真正输入的内容
+  （此前会看到整段展开的技能与文件内容）。
 
 ### 变更
 
@@ -319,6 +363,12 @@
 - `CatalogModel` 新增 `vision`（是否接受图片输入）；聊天区的模型选择器对支持图片输入的模型展示「视觉」标签。
 - `$APP_HOME/agent/` 下新增 `agents/` 目录（自定义子角色），目录不存在时按「无自定义角色」处理，
   不预建；服务启动时不主动创建该目录。
+- 技能目录读取放行：模型按技能说明读 `SKILL.md`（及其相对引用文件）落在会话工作目录之外时，
+  不再被 `external_directory` 判为越界审批；只读模式对 write / edit 的阻断更严，仍然生效
+  （`permissions/defaults.ts` 的 `skillDirectoryRules`）。
+- web 构建按 rolldown `output.codeSplitting` 分包：编辑器内核（Tiptap / ProseMirror）、
+  Markdown 渲染链、UI 库、React 各成独立 chunk，主 chunk 由约 1.14MB 降到约 207KB，
+  消除 vite 的体积告警并改善缓存。
 
 ### 修复
 
@@ -339,6 +389,15 @@
   消息区尾部立刻显示「思考中…」，直到首个生成事件或收尾、出错时消除。
 - 首轮回答完成前刷新不再丢失会话：当前选中会话同步到 URL（`?session=`），刷新后据此恢复；
   在途草稿会话也会出现在列表里，`messages/list` 改读活跃会话的内存条目，对话区不再空白。
+- 输入区发送后不再残留文本：Tiptap 编辑器不受控，此前清空草稿不会重置编辑器内容，
+  导致「发出去的消息还在输入框里、再次回车会重复发送」；改为按草稿变化同步重置编辑器，
+  且不会因打字触发重挂载（`composer.tsx`）。
+- 历史里只有引用、没有正文的用户消息（单独发一个 `@`、或 `/skill:name` 不带参数）不再原样显示
+  `<context>` / `<skill>` 展开块：chip 解析允许展开块位于消息末尾（`message-chips.ts`）。
+- 草稿态 `/` 菜单改用真实工作目录取命令与技能：此前传的是展示名（如「助理区」），
+  会从错误目录解析项目级资源（`composer.tsx`）。
+- 切换会话时编辑器不再短暂沿用上一个会话的文档：外部填充记下所属 `editorKey`，
+  仅在该键匹配时作为初始文档（`composer.tsx`）。
 
 ### 移除
 

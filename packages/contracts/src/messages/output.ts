@@ -5,7 +5,9 @@ import type { MessageRole, ThinkingLevel } from "../constants";
 export type MessageBlock =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
-  | { type: "toolCall"; id: string; name: string; args: unknown };
+  | { type: "toolCall"; id: string; name: string; args: unknown }
+  | { type: "image"; id: string; mimeType: string; url: string }
+  | { type: "file"; id: string; mimeType: string; name: string; size: number; url: string };
 
 export type MessageDTO = {
   id: string;

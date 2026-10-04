@@ -1,5 +1,6 @@
 /** thinking level 选择器：写入当前会话的覆盖值，用中文档位名展示 */
 import { Brain } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -15,15 +16,31 @@ import { THINKING_LEVELS, type ThinkingLevel } from "@/lib/types";
 type ThinkingPickerProps = {
   value: ThinkingLevel;
   disabled?: boolean;
+  /** 受控打开（`/thinking` 命令从外部唤起）；不传则内部自管 */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (level: ThinkingLevel) => void;
 };
 
-export function ThinkingPicker({ value, disabled, onSelect }: ThinkingPickerProps) {
+export function ThinkingPicker({
+  value,
+  disabled,
+  open,
+  onOpenChange,
+  onSelect,
+}: ThinkingPickerProps) {
   const { t } = useTranslation();
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = open !== undefined;
 
   return (
     <Select
       value={value}
+      open={open ?? internalOpen}
+      onOpenChange={(next) => {
+        if (!isControlled) setInternalOpen(next);
+        onOpenChange?.(next);
+      }}
       onValueChange={(next) => onSelect(next as ThinkingLevel)}
       disabled={disabled}
     >

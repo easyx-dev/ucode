@@ -3,7 +3,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { ERROR_CODES, type SessionMode, type ThinkingLevel } from "@ucode/contracts";
+import { ERROR_CODES, type ThinkingLevel } from "@ucode/contracts";
 
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
@@ -20,7 +20,8 @@ export type SessionSeed = {
   cwd?: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  mode?: SessionMode;
+  /** primary agent slug；缺省即内置 `build` */
+  mode?: string;
 };
 
 export const createSession = (services: Services, seed: SessionSeed): string => {

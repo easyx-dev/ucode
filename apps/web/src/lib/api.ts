@@ -1,8 +1,12 @@
 /** /api/v1 的接口封装与统一错误类型 */
 import {
+  type AgentsListRequest,
+  type AgentsListResponse,
   API_BASE_PATH,
   type ApiResponse,
   type AppConfigPatchRequest,
+  type CommandsListRequest,
+  type CommandsListResponse,
   type ConfigSnapshot,
   type ConfigTestRequest,
   type ConfigTestResponse,
@@ -10,6 +14,8 @@ import {
   type FsListResponse,
   type FsMkdirRequest,
   type FsMkdirResponse,
+  type FsSearchRequest,
+  type FsSearchResponse,
   type GoalResponse,
   type GoalSetRequest,
   type HealthResponse,
@@ -20,6 +26,7 @@ import {
   type McpListResponse,
   type McpUpsertRequest,
   type McpWriteResponse,
+  type MessageCompactRequest,
   type MessageEditRequest,
   type MessageInterruptResponse,
   type MessageListRequest,
@@ -168,7 +175,16 @@ export const api = {
   },
   fs: {
     list: (body: FsListRequest = {}) => post<FsListResponse>("fs/list", body),
+    search: (body: FsSearchRequest = {}) => post<FsSearchResponse>("fs/search", body),
     mkdir: (path: string) => post<FsMkdirResponse>("fs/mkdir", { path } satisfies FsMkdirRequest),
+  },
+  commands: {
+    /** 列出可用的提示词命令与技能（按会话 / cwd 解析目录） */
+    list: (body: CommandsListRequest = {}) => post<CommandsListResponse>("commands/list", body),
+  },
+  agents: {
+    /** 列出可选的 primary / subagent 角色 */
+    list: (body: AgentsListRequest = {}) => post<AgentsListResponse>("agents/list", body),
   },
   mcp: {
     list: () => post<McpListResponse>("mcp/list"),
@@ -185,6 +201,9 @@ export const api = {
       post<MessageInterruptResponse>("messages/interrupt", {
         sessionId,
       } satisfies SessionIdRequest),
+    /** 手动压缩上下文；进度走 compaction_* 事件 */
+    compact: (body: MessageCompactRequest) =>
+      post<PromptAdmittedResponse>("messages/compact", body),
   },
   events: {
     /** 订阅全局事件流；连接结束（含被 signal 中断）后返回 */

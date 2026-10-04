@@ -364,7 +364,7 @@ describe("buildSessionOptions 子智能体装配", () => {
       "custom",
       undefined,
       undefined,
-      loadAgentRegistry(agentDir),
+      loadAgentRegistry({ cwd: agentDir, appHome: agentDir }),
     );
     const tool = session.getAllTools().find((item) => item.name === "subagent");
     assert.ok(tool, "主会话应注册 subagent");

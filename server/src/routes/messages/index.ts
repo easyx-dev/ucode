@@ -3,6 +3,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   type MessageInterruptResponse,
   type MessageListResponse,
+  messageCompactInputSchema,
   messageEditInputSchema,
   messageListInputSchema,
   type PromptAdmittedResponse,
@@ -14,7 +15,7 @@ import { Hono } from "hono";
 import { resolveSessionCwd } from "../../agent/session-config";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
-import { admitEdit, admitPrompt } from "../../core/run";
+import { admitCompact, admitEdit, admitPrompt } from "../../core/run";
 import { transcriptStates } from "../../core/serialize";
 import { env } from "../../env";
 import { ok } from "../../lib/response";
@@ -78,6 +79,15 @@ export const createMessagesRoute = (services: Services) => {
     const { sessionId } = c.req.valid("json");
     const aborted = await services.pool.abort(sessionId);
     return c.json(ok({ sessionId, aborted } satisfies MessageInterruptResponse));
+  });
+
+  // 手动压缩：只做受理，压缩在后台推进，进度与结果走 /events 的 compaction_* 帧
+  router.post("/compact", jsonBody(messageCompactInputSchema), async (c) => {
+    const input = c.req.valid("json");
+    await admitCompact(services, input);
+    return c.json(
+      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+    );
   });
 
   return router;

@@ -4,12 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DirectoryPickerDialog } from "@/components/directory-picker-dialog";
-import { RenameSessionDialog } from "@/components/rename-session-dialog";
 import { SessionList } from "@/components/session-list";
 import { SessionSidebarHeader } from "@/components/session-sidebar-header";
 import { Button } from "@/components/ui/button";
 import { useSessionFilter } from "@/hooks/use-session-filter";
-import { confirmArchiveSession, sessionTitle } from "@/lib/session";
+import { confirmArchiveSession } from "@/lib/session";
 import type { SessionSummary } from "@/lib/types";
 
 type SessionSidebarProps = {
@@ -24,7 +23,8 @@ type SessionSidebarProps = {
   onCreate: () => void;
   /** 在指定目录里新建会话 */
   onCreateInDirectory: (path: string) => void;
-  onRename: (sessionId: string, name: string) => void;
+  /** 请求重命名某个会话（对话框由 App 承载，便于 `/rename` 命令复用） */
+  onRenameRequest: (session: SessionSummary) => void;
   onDelete: (sessionId: string) => void;
   onOpenSettings: () => void;
   /** 已加载的子会话，按父会话 id 索引 */
@@ -45,7 +45,7 @@ export function SessionSidebar({
   onSelect,
   onCreate,
   onCreateInDirectory,
-  onRename,
+  onRenameRequest,
   onDelete,
   onOpenSettings,
   childrenByParent,
@@ -55,7 +55,6 @@ export function SessionSidebar({
 }: SessionSidebarProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
   const [picking, setPicking] = useState(false);
   /** 展开子会话的父会话 id；展开即拉取（重复展开会重取，保证楼层刷新后不过期） */
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -101,9 +100,7 @@ export function SessionSidebar({
         loading={loading}
         onSelect={onSelect}
         onCreate={onCreateInDirectory}
-        onRename={(session) =>
-          setRenaming({ sessionId: session.id, name: sessionTitle(session, t("新会话")) })
-        }
+        onRename={onRenameRequest}
         onDelete={(session) => {
           if (confirmArchiveSession(session, t)) onDelete(session.id);
         }}
@@ -120,14 +117,6 @@ export function SessionSidebar({
           {t("设置")}
         </Button>
       </div>
-
-      <RenameSessionDialog
-        target={renaming}
-        onOpenChange={(open) => {
-          if (!open) setRenaming(null);
-        }}
-        onSubmit={onRename}
-      />
 
       <DirectoryPickerDialog
         open={picking}

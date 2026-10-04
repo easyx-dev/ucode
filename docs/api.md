@@ -9,10 +9,10 @@
 ## 传输约定
 
 - 前缀 `API_BASE_PATH`（`/api/v1`，由 `API_VERSION` 拼出）
-- 除 `GET /api/v1/health` 外，一律 `POST` + JSON body
-- **请求参数只放 body，不进路径**：路径只表达「域 + 动作」
+- 除 `GET /api/v1/health` 与 `GET /api/v1/attachments/<id>` 外，一律 `POST` + JSON body
+- **请求参数只放 body，不进路径**：路径只表达「域 + 动作」（`attachments` 的 `<id>` 例外，见「附件」）
 - `Content-Type: application/json`；无参数的接口也要发 `{}`（对应的 schema 是 `emptyInputSchema`）
-- 事件流 `/events` 是 SSE，不适用上面的 JSON 约定，见「事件流」
+- 事件流 `/events` 是 SSE、附件路由返回原始字节，都不适用上面的 JSON 约定，见各自小节
 
 ## 响应封套
 
@@ -183,8 +183,15 @@
   不要把本服务暴露到公网或不可信网络（见 `TODO.md` P0）。
 
 **预留扩展**（本次未实现，形状已为其留白）：`fs/info` 用于单路径 stat / 读文件内容；
-图片等原始字节预览与「除 health 外一律 POST JSON」冲突，届时按 `/events` 的先例单列一条非封套例外，
-不影响 `fs/list` 的响应形状。
+`fs/search` 已实现（受限 walker，给输入区的 `@` 检索用），见 `docs/api-reference.md`。
+
+## 附件（attachments）
+
+`GET /api/v1/attachments/<id>` 是**按 id 走路径、返回原始字节**的接口（非 JSON、不走封套）：
+`<id>` 是内容的 sha256（64 位小写 hex），`Content-Type` 取自存储时的 mimeType，
+带 `Cache-Control: immutable` 与 `ETag`；非法 id 或缺失返回 404。
+图片由 `messages/prompt` 的 `images` 归一化后写入内容寻址附件库（落 `$APP_HOME/app/attachments`），
+消息 `image` 区块的 `url` 即指向此路由。
 
 ## 交互请求（interactions）
 

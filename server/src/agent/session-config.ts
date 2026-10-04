@@ -13,7 +13,7 @@ import {
   type SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { SessionMode, WebsearchConfig } from "@ucode/contracts";
+import type { WebsearchConfig } from "@ucode/contracts";
 
 import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
@@ -26,17 +26,19 @@ import {
   allSubagents,
   effectiveToolNames,
   loadAgentRegistry,
-  PRIMARY_PROFILES,
   primaryCapability,
+  primaryProfile,
   type ResolvedCapability,
   usesDefaultToolSet,
 } from "./agents";
-import { mcpExtensionForMode } from "./mcp";
+import { commandAssetPaths } from "./assets";
+import { mcpExtension } from "./mcp";
 import type { MemoryService } from "./memory";
 import {
   createPermissionExtension,
   type PermissionHooks,
   type PermissionRule,
+  skillDirectoryRules,
 } from "./permissions";
 import {
   buildFullPrompt,
@@ -63,8 +65,8 @@ export type SessionAssemblyInput = {
   record: SessionRecord | undefined;
   /** 已由 `resolveSessionCwd` 解析好的工作目录 */
   cwd: string;
-  /** 主会话模式；子会话沿用父会话的模式 */
-  mode: SessionMode;
+  /** 主会话模式（primary agent slug）；子会话沿用父会话的模式 */
+  mode: string;
   sessionManager: SessionManager;
   runtime: PiRuntime;
   /** 已解析的角色；缺省按 `mode` 取主角色 */
@@ -95,7 +97,7 @@ export type SessionAssemblyInput = {
 const promptLoaderOptions = (
   source: PromptSource,
   input: {
-    mode: SessionMode;
+    mode: string;
     agentSection: string;
     tools: readonly string[];
     variant: PromptVariant;
@@ -121,32 +123,42 @@ const createSessionLoader = async (
   settingsManager: SettingsManager,
   variant: PromptVariant,
 ): Promise<DefaultResourceLoader> => {
+  // 命令与技能只认我们的目录（全局 $APP_HOME + 项目祖先的项目配置目录 + .agents 兼容），
+  // 不读 pi 默认的 agentDir/skills 与 cwd/.pi/*；顺序即同名优先级（pi first-wins）
+  const assetPaths = commandAssetPaths({ cwd: input.cwd, appHome: env.homeDir });
   const gate = {
     cwd: input.cwd,
-    // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效
-    rules: () => [...agentRules(profile), ...input.permission.listGrants()],
+    // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效。
+    // 技能目录放行排在模式规则之后、会话授权之前——越界读 SKILL.md 不再走审批
+    rules: () => [
+      ...agentRules(profile),
+      ...skillDirectoryRules(assetPaths.skills.map((item) => item.path)),
+      ...input.permission.listGrants(),
+    ],
     parentRules: input.parentRules,
     grant: input.permission.grant,
     request: input.permission.request,
   };
   const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
-  // MCP / tool_search 只在「继承默认工具集」的会话里挂：白名单会话（plan / ask / explore）
+  // MCP / tool_search 只在「默认工具集」的会话里挂：白名单会话（plan / ask / explore，以及自定义只读角色）
   // 本就够不着扩展工具，连了也是白连；MCP 还会激活 codemode，绕过只读白名单（见 agent/mcp）
-  const withExtensions = input.mode === "build" && usesDefaultToolSet(capability);
-  const mcpExtension = withExtensions
-    ? mcpExtensionForMode(input.mode, input.agentDir ?? env.agentDir)
-    : undefined;
-  // tool_search 只注册、默认不激活：build 下 MCP 出现 deferred 服务器时由 MCP 扩展自动激活
+  const withExtensions = usesDefaultToolSet(capability);
+  const mcp = withExtensions ? mcpExtension(input.agentDir ?? env.agentDir) : undefined;
+  // tool_search 只注册、默认不激活：默认集会话出现 deferred MCP 服务器时由 MCP 扩展自动激活
   const discoveryExtension = withExtensions ? [createToolSearchExtension()] : [];
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
     agentDir: input.agentDir ?? env.agentDir,
     settingsManager,
+    noSkills: true,
+    noPromptTemplates: true,
+    additionalSkillPaths: assetPaths.skills.map((item) => item.path),
+    additionalPromptTemplatePaths: assetPaths.prompts.map((item) => item.path),
     extensionFactories: [
       createPermissionExtension(gate),
       createCodemodeExtension({ mode: "on" }),
       ...discoveryExtension,
-      ...(mcpExtension ? [mcpExtension] : []),
+      ...(mcp ? [mcp] : []),
     ],
     // 记忆索引作为额外的上下文文件拼进系统提示词；索引在会话创建时读一次即可
     ...(memoryFile
@@ -171,8 +183,11 @@ const createSessionLoader = async (
 export const buildSessionOptions = async (
   input: SessionAssemblyInput,
 ): Promise<CreateAgentSessionOptions> => {
-  const profile = input.profile ?? PRIMARY_PROFILES[input.mode];
-  const capability = input.capability ?? primaryCapability(input.mode);
+  // 注册表同时决定 primary 与子角色：primary 走自定义（可覆盖内置），子会话取交集时也要它
+  const registry =
+    input.agentRegistry ?? loadAgentRegistry({ cwd: input.cwd, appHome: env.homeDir });
+  const profile = input.profile ?? primaryProfile(input.mode, registry);
+  const capability = input.capability ?? primaryCapability(input.mode, registry);
   // 可用工具名同时决定「注册哪些自研工具」与「提示词列哪些工具」；
   // 依赖钩子的工具（question / subagent）在钩子缺失时一并去掉，避免提示词提到不存在的工具
   const toolNames = effectiveToolNames(capability).filter(
@@ -180,10 +195,6 @@ export const buildSessionOptions = async (
       (name !== "question" || Boolean(input.question)) &&
       (name !== SUBAGENT_TOOL_NAME || Boolean(input.subagents)),
   );
-  // 注册表只用于列 `subagent` 工具的可用角色；子会话没有该工具，无需加载
-  const registry =
-    input.agentRegistry ??
-    (input.subagents ? loadAgentRegistry(input.agentDir ?? env.agentDir) : undefined);
   const override = overrideOf(input.record);
   // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来。
   // 会话覆盖值的模型在 create / update 已校验，这里只兜角色声明这一路

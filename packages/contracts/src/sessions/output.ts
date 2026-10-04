@@ -1,6 +1,6 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
-import type { SessionMode, ThinkingLevel } from "../constants";
+import type { ThinkingLevel } from "../constants";
 import type { GoalView } from "../goals/output";
 import type { UsageTotals } from "../stats/output";
 
@@ -19,8 +19,8 @@ export type SessionSummary = {
   /** 生效的 "provider/model" */
   model: string | null;
   thinkingLevel: ThinkingLevel;
-  /** 会话模式：决定工具集与权限 */
-  mode: SessionMode;
+  /** 会话模式（primary agent slug）：决定工具集与权限 */
+  mode: string;
   /** 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） */
   parentSessionId: string | null;
   /** 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 */

@@ -14,6 +14,9 @@ type ModelPickerProps = {
   /** 当前生效的 "provider/model" */
   value: string;
   disabled?: boolean;
+  /** 受控打开（`/models` 命令从外部唤起）；不传则内部自管 */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (model: string) => void;
 };
 
@@ -26,10 +29,25 @@ const describeModel = (model: CatalogModel, t: TFunction): string => {
   return parts.join(" · ");
 };
 
-export function ModelPicker({ providers, value, disabled, onSelect }: ModelPickerProps) {
+export function ModelPicker({
+  providers,
+  value,
+  disabled,
+  open,
+  onOpenChange,
+  onSelect,
+}: ModelPickerProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const isControlled = open !== undefined;
+  const visible = open ?? internalOpen;
+
+  const setOpen = (next: boolean): void => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+    if (!next) setQuery("");
+  };
 
   /** 搜索按 provider 分组过滤；命中 provider 名或模型 id / 显示名都算匹配 */
   const groups = useMemo(() => {
@@ -49,13 +67,7 @@ export function ModelPicker({ providers, value, disabled, onSelect }: ModelPicke
   }, [providers, query]);
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
-      }}
-    >
+    <Popover.Root open={visible} onOpenChange={setOpen}>
       <Popover.Trigger asChild disabled={disabled}>
         <button
           type="button"

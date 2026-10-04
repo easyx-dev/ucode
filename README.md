@@ -36,7 +36,7 @@ pnpm build && pnpm start
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_PORT` | `2048` | HTTP 端口 |
-| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`agent/`、`app/`、`workspace/` 三个子目录 |
+| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`agent/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
 | `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
@@ -51,8 +51,15 @@ pnpm build && pnpm start
 $APP_HOME/                 # 默认 ~/.ucode
 ├── agent/                 # agent 私有：auth.json / sessions/
 ├── app/                   # 应用自有：config.json / app.db（SQLite）
+├── skills/                # 全局技能：<id>/SKILL.md
+├── prompts/               # 全局命令（提示词模板）：<name>.md
+├── agents/                # 全局自定义角色：<slug>.md（primary / subagent）
 └── workspace/<sessionId>  # 未绑定目录的会话的工作目录
 ```
+
+命令 / 技能还支持项目级目录 `<cwd>/.ucode/{skills,prompts}`，自定义角色支持 `<cwd>/.ucode/agents`
+（均沿 cwd 祖先链收集，止于项目根）；技能另有兼容目录 `.agents/skills`。
+同名优先级：项目 `.ucode` > 项目 `.agents/skills` > 全局 `$APP_HOME` > 用户 `~/.agents/skills`。
 
 配置 = `$APP_HOME/app/config.json`、agent 目录 = `$APP_HOME/agent`（`auth.json` / `sessions/`）、
 会话元数据与索引 = `$APP_HOME/app/app.db`。
@@ -368,6 +375,7 @@ server/src/
     events.ts              # AgentSessionEvent -> SSE 事件
   agent/                   # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
     session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
+    assets/                # 命令与技能目录解析 + 装载（pi ResourceLoader 只认我们的目录）
     prompt/                # 系统提示词：组装 + 多语言目录 + 模型族变体（pi / custom 两套源可切换）
       index.ts             # 按目录拼装整段提示词（custom 源）或 pi 源叠加片段
       locales/             # 语言目录：新增语言＝按 PromptCatalog 加文件并注册（当前仅 zh-CN）

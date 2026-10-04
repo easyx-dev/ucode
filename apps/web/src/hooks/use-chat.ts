@@ -5,6 +5,7 @@ import { useEditMessage } from "@/hooks/use-edit-message";
 import { useInterrupt } from "@/hooks/use-interrupt";
 import { type SessionSeed, useSendMessage } from "@/hooks/use-send-message";
 import { useSessionStream } from "@/hooks/use-session-stream";
+import type { ComposerPayload } from "@/lib/composer-payload";
 import type { ChatItem, SessionSummary, SubagentStreams } from "@/lib/types";
 
 /** 发送结果：消息投给哪个会话（`null` 表示连会话都没建出来），以及是否已被受理 */
@@ -23,7 +24,7 @@ export type ChatController = {
   error: string | null;
   loadingHistory: boolean;
   /** 发送一条消息；还没有会话时先建会话（`seed` 是它的初始设置） */
-  send: (text: string, seed?: SessionSeed) => Promise<SendResult>;
+  send: (payload: ComposerPayload, seed?: SessionSeed) => Promise<SendResult>;
   /** 编辑一条已发送的用户消息并重发；刷新由 transcript_reset 事件驱动 */
   edit: (entryId: string, text: string) => Promise<boolean>;
   stop: () => Promise<void>;
@@ -72,14 +73,14 @@ export function useChat(sessionId: string | null, options: ChatOptions): ChatCon
   const stop = useInterrupt(sessionId);
 
   const send = useCallback(
-    async (text: string, seed: SessionSeed = {}): Promise<SendResult> => {
-      if (sessionId) return { sessionId, admitted: await sendTo(text, sessionId) };
+    async (payload: ComposerPayload, seed: SessionSeed = {}): Promise<SendResult> => {
+      if (sessionId) return { sessionId, admitted: await sendTo(payload, sessionId) };
 
       // 首发：先把草稿提升成真会话，拿到 id 再投递，不依赖 React 状态的传播
       const created = await createSession(seed);
       if (!created) return { sessionId: null, admitted: false };
 
-      const admitted = await sendTo(text, created.id);
+      const admitted = await sendTo(payload, created.id);
       // 受理之后再切过去：切换会让事件流重新取快照，此时快照里必然已经有这条消息，
       // 乐观插入的那条会被服务端版本覆盖（失败时则是被清掉，不会在消息区留个发不出去的残影）
       onSessionCreated?.(created.id);

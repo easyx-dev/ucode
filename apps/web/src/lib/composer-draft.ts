@@ -1,14 +1,18 @@
 /** 输入区草稿：还没发出去的文本与初始设置，按上下文持久化在 localStorage */
 import { brand } from "@ucode/brand";
-import type { SessionMode, ThinkingLevel } from "@/lib/types";
+import type { ThinkingLevel } from "@/lib/types";
 
 export type ComposerDraft = {
-  /** 输入框里还没发出去的内容 */
+  /** 输入框里还没发出去的内容（纯文本镜像，用于空判定与旧数据） */
   text: string;
+  /** 编辑器文档（命令 / 技能 mention 的原样保存）；缺省时按 `text` 还原 */
+  doc?: unknown;
+  /** 图片附件的本地库 id（content hash）；字节在 IndexedDB，见 `lib/draft-store` */
+  attachments?: string[];
   /** 会话级设置的草稿；只在「还没有会话」时作为新会话的初始设置生效 */
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  mode?: SessionMode;
+  mode?: string;
   /** 「在目录中新建」选定的目录；未选时缺省（会话落到自己的工作区） */
   cwd?: string;
 };
@@ -26,10 +30,15 @@ export const emptyDraft = (): ComposerDraft => ({ text: "" });
 
 /**
  * 是否有值得恢复的内容（决定「重新打开时留在草稿态」）。
- * 选了目录也算：用户挑完目录就关掉，应该回到同一个目录的草稿上。
+ * 选了目录、带了附件也算：用户挑完目录 / 贴完图就关掉，应该回到同一份草稿上。
  */
 export const hasDraftContent = (draft: ComposerDraft | undefined): boolean =>
-  Boolean(draft && (draft.text.trim() !== "" || draft.cwd));
+  Boolean(
+    draft &&
+      (draft.text.trim() !== "" ||
+        draft.cwd ||
+        (draft.attachments !== undefined && draft.attachments.length > 0)),
+  );
 
 /** 单条草稿的校验：`text` 必须是字符串，其余字段按需保留 */
 const toDraft = (value: unknown): ComposerDraft | null => {
@@ -38,6 +47,10 @@ const toDraft = (value: unknown): ComposerDraft | null => {
   if (typeof item.text !== "string") return null;
   return {
     text: item.text,
+    ...(item.doc && typeof item.doc === "object" ? { doc: item.doc } : {}),
+    ...(Array.isArray(item.attachments)
+      ? { attachments: item.attachments.filter((id): id is string => typeof id === "string") }
+      : {}),
     ...(typeof item.model === "string" ? { model: item.model } : {}),
     ...(typeof item.thinkingLevel === "string"
       ? { thinkingLevel: item.thinkingLevel as ComposerDraft["thinkingLevel"] }

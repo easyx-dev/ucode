@@ -25,3 +25,13 @@ export type FsMkdirResponse = {
   /** 已创建目录的绝对路径 */
   path: string;
 };
+
+/** 文件检索结果；不是 ListResult（无 `total`），条数上限由 `truncated` 表达 */
+export type FsSearchResponse = {
+  /** 检索根目录的绝对路径 */
+  path: string;
+  /** 命中条目，服务端固定排序（目录在前，各自按名称） */
+  entries: FsEntry[];
+  /** 是否因条数上限被截断 */
+  truncated: boolean;
+};

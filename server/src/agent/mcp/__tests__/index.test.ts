@@ -1,8 +1,8 @@
-/** MCP 扩展按模式装配：build 加载，plan / ask 不加载（避免激活 codemode 绕过只读白名单） */
+/** MCP 扩展装配：按 agentDir 派生 mcp.json 路径（是否加载由调用方按角色能力判定） */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { mcpConfigPathOf, mcpExtensionForMode } from "../index";
+import { mcpConfigPathOf, mcpExtension } from "../index";
 
 const agentDir = "/tmp/agent";
 
@@ -12,13 +12,8 @@ describe("mcpConfigPathOf", () => {
   });
 });
 
-describe("mcpExtensionForMode", () => {
-  it("build 返回扩展工厂", () => {
-    assert.equal(typeof mcpExtensionForMode("build", agentDir), "function");
-  });
-
-  it("plan / ask 返回 undefined", () => {
-    assert.equal(mcpExtensionForMode("plan", agentDir), undefined);
-    assert.equal(mcpExtensionForMode("ask", agentDir), undefined);
+describe("mcpExtension", () => {
+  it("返回可用的扩展工厂", () => {
+    assert.equal(typeof mcpExtension(agentDir), "function");
   });
 });

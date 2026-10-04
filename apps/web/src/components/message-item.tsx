@@ -1,4 +1,4 @@
-import { Bot, Brain, ChevronRight, GitFork, Pencil } from "lucide-react";
+import { Bot, Brain, ChevronRight, FileText, GitFork, Pencil, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
@@ -8,6 +8,7 @@ import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { ToolCallCard } from "@/components/tool-call-card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { parseUserMessage } from "@/lib/message-chips";
 import { thinkingLevelLabel } from "@/lib/thinking";
 import { clockLabel } from "@/lib/time";
 import type { ChatItem, MessageBlock, SubagentStream } from "@/lib/types";
@@ -35,6 +36,29 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
   if (block.type === "thinking") return <ThinkingBlock text={block.text} />;
   if (block.type === "toolCall") {
     return <ToolCallCard name={block.name} args={block.args} running={live} />;
+  }
+  if (block.type === "image") {
+    return (
+      <a href={block.url} target="_blank" rel="noreferrer" className="my-2 inline-block">
+        <img
+          src={block.url}
+          alt=""
+          loading="lazy"
+          className="max-h-96 rounded-md border border-border"
+        />
+      </a>
+    );
+  }
+  if (block.type === "file") {
+    return (
+      <a
+        href={block.url}
+        download={block.name}
+        className="my-1 inline-flex items-center rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        {block.name}
+      </a>
+    );
   }
   return (
     <div className="md-content">
@@ -159,7 +183,9 @@ export function MessageItem({
   };
 
   if (item.role === "user") {
-    const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    const rawText = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    const parsed = parseUserMessage(rawText);
+    const media = item.blocks.filter((block) => block.type === "image" || block.type === "file");
     if (editing) {
       return (
         <div className="flex justify-end">
@@ -203,8 +229,44 @@ export function MessageItem({
       <div className="group flex items-center justify-end gap-1">
         {canEdit ? <EditAction onClick={startEdit} /> : null}
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
-          {text}
+        <div className="flex max-w-[85%] flex-col items-end gap-1.5">
+          {parsed.skill || parsed.contexts.length > 0 ? (
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {parsed.skill ? (
+                <span
+                  title={t("技能")}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  <Sparkles className="size-3 shrink-0" />
+                  {parsed.skill.name}
+                </span>
+              ) : null}
+              {parsed.contexts.map((context, index) => (
+                <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 同一文件可被引用多次，位置即身份
+                  key={`${item.id}-ctx-${index}`}
+                  title={t("文件")}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  <FileText className="size-3 shrink-0" />
+                  {context.lines ? `${context.path}:${context.lines}` : context.path}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {media.length > 0 ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              {media.map((block, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: 附件块按顺序排列，位置即身份
+                <BlockView key={`${item.id}-media-${index}`} block={block} />
+              ))}
+            </div>
+          ) : null}
+          {parsed.text ? (
+            <div className="rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
+              {parsed.text}
+            </div>
+          ) : null}
         </div>
       </div>
     );

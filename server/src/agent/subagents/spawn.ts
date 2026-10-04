@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
+import type { ThinkingLevel } from "@ucode/contracts";
 
 import { SUBAGENT_DESCRIPTION_MAX_LENGTH, SUBAGENT_TIMEOUT_MS } from "../../constants";
 import type { SessionRecord } from "../../db/session-repository";
@@ -21,7 +21,7 @@ export type SubagentSpawnDeps = {
     input: {
       parentId: string;
       cwd: string;
-      mode: SessionMode;
+      mode: string;
       agent: string;
       name: string;
       model?: string;

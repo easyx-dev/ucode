@@ -22,6 +22,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   events: "事件流",
   interactions: "交互请求",
   fs: "文件系统",
+  attachments: "附件",
+  agents: "角色",
   mcp: "MCP 服务器",
   goals: "目标模式",
   stats: "使用统计",
@@ -68,7 +70,14 @@ const renderEndpoint = (
     blocks.push("无参数（body 传 `{}`）", "");
   }
 
-  if (endpoint.stream) {
+  if (endpoint.binary) {
+    blocks.push(
+      "**响应**",
+      "",
+      "原始字节（非 JSON，不走封套）；`Content-Type` 取自附件自身的 mimeType，带 `Cache-Control: immutable` 与 `ETag`。",
+      "",
+    );
+  } else if (endpoint.stream) {
     blocks.push(
       "**响应**",
       "",
@@ -125,7 +134,7 @@ export const buildApiDoc = (): string => {
     "",
     "## 约定速览",
     "",
-    `- 前缀 \`${contracts.API_BASE_PATH}\`；除 \`GET /api/v1/health\` 外一律 \`POST\` + JSON body，无参数接口也要发 \`{}\``,
+    `- 前缀 \`${contracts.API_BASE_PATH}\`；除 \`GET /api/v1/health\` 与 \`GET /api/v1/attachments/<id>\` 外一律 \`POST\` + JSON body，无参数接口也要发 \`{}\``,
     '- 非流式响应共用封套：成功 `{ success: true, code: "ok", message: "", data }`；失败 `{ success, code, message, data, params? }`',
     "- 字段一律 camelCase；请求里指向资源的 id 用 `<资源>Id`，响应里资源自身用 `id`",
     "- 类型文本中的链接指向文末「公共类型」；`（…）` 内为该字段的取值约束",

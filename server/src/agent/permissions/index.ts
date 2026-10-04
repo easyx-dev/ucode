@@ -1,5 +1,5 @@
 /** 权限引擎：声明式规则（工具名 + pattern + 三态）与 `tool_call` 拦截 */
-export { DEFAULT_PERMISSION_RULES } from "./defaults";
+export { DEFAULT_PERMISSION_RULES, skillDirectoryRules } from "./defaults";
 export {
   decidePermission,
   evaluateRules,

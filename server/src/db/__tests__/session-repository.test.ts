@@ -44,11 +44,11 @@ describe("SessionRepository", () => {
     assert.equal(record?.mode, "plan");
   });
 
-  it("非法模式按默认值兜底", () => {
+  it("自定义模式 slug 原样保留（不再按枚举归一）", () => {
     repo.create("s4", {});
-    // 绕过写入层直接塞脏值，模拟手工改库
-    db.prepare("UPDATE session SET mode = ? WHERE id = ?").run("nonsense", "s4");
-    assert.equal(repo.find("s4")?.mode, "build");
+    // 绕过写入层直接塞自定义 slug，模拟自定义 primary agent 写下的模式
+    db.prepare("UPDATE session SET mode = ? WHERE id = ?").run("my-agent", "s4");
+    assert.equal(repo.find("s4")?.mode, "my-agent");
   });
 
   it("归档只写 deleted_at，行与文件都保留", () => {

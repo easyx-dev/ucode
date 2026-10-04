@@ -1,6 +1,12 @@
 /** 消息接口的请求 zod 模型；`*Request` 为客户端载荷（z.input），`*Input` 为服务端解析后（z.infer） */
 import { z } from "zod";
 
+import {
+  IMAGE_MIME_TYPES,
+  MESSAGE_IMAGE_MAX_BASE64_BYTES,
+  PROMPT_MAX_CONTEXTS,
+  PROMPT_MAX_IMAGES,
+} from "../constants";
 import { sessionIdSchema } from "../sessions/input";
 
 export const messageListInputSchema = z.object({ sessionId: sessionIdSchema });
@@ -16,20 +22,59 @@ export const messageEditInputSchema = z.object({
 });
 
 /**
+ * 单张图片附件：base64 与 mimeType。服务端按此归一化后入内容寻址附件库；
+ * 交给模型的是 pi 的 image 内容块（见 `plans/input-commands-skills.md`）。
+ */
+export const messageImageSchema = z.object({
+  /** base64 编码的图片字节（不含 `data:` URL 前缀） */
+  data: z.string().min(1).max(MESSAGE_IMAGE_MAX_BASE64_BYTES),
+  mimeType: z.enum(IMAGE_MIME_TYPES),
+});
+
+/** `@` 上下文引用：绝对路径 + 可选行范围；服务端读内容后前置进正文 */
+export const contextRefSchema = z.object({
+  path: z.string().min(1),
+  startLine: z.number().int().positive().optional(),
+  endLine: z.number().int().positive().optional(),
+});
+
+/**
  * 发起一轮生成；服务端受理后返回 ack，生成在后台继续、结果走 /events。
  * 会话必须先由 `sessions/create` 建好（工作目录也是那时定的）——服务端不做隐式创建，
  * 创建只有一条路径，所以这里不带任何会话级设置。
+ *
+ * `text` 允许为空串：只要 `contexts` 或 `images` 非空即可；「三者至少一项」由路由层校验，
+ * 这样纯图片 / 纯引用消息也能发送。
  */
 export const promptInputSchema = z.object({
   sessionId: sessionIdSchema,
-  text: z.string().min(1),
+  text: z.string().default(""),
+  contexts: z.array(contextRefSchema).max(PROMPT_MAX_CONTEXTS).optional(),
+  images: z.array(messageImageSchema).max(PROMPT_MAX_IMAGES).optional(),
   /** 生成中再发消息时的投递方式 */
   behavior: z.enum(["follow-up", "steer"]).default("follow-up"),
+});
+
+/**
+ * 手动压缩上下文；`instructions` 可给自定义总结要求，省略即用默认总结。
+ * 与生成一样只做受理，压缩在服务端后台执行、结果走 /events（`compaction_start` / `compaction_end`）。
+ */
+export const messageCompactInputSchema = z.object({
+  sessionId: sessionIdSchema,
+  instructions: z.string().trim().min(1).optional(),
 });
 
 export type MessageListRequest = z.input<typeof messageListInputSchema>;
 export type MessageListInput = z.infer<typeof messageListInputSchema>;
 export type MessageEditRequest = z.input<typeof messageEditInputSchema>;
 export type MessageEditInput = z.infer<typeof messageEditInputSchema>;
+export type MessageCompactRequest = z.input<typeof messageCompactInputSchema>;
+export type MessageCompactInput = z.infer<typeof messageCompactInputSchema>;
+export type MessageImageInput = z.infer<typeof messageImageSchema>;
+export type MessageImageRequest = z.input<typeof messageImageSchema>;
+export type MessageImage = MessageImageInput;
+export type ContextRefInput = z.infer<typeof contextRefSchema>;
+export type ContextRefRequest = z.input<typeof contextRefSchema>;
+export type ContextRef = ContextRefInput;
 export type PromptInput = z.infer<typeof promptInputSchema>;
 export type PromptRequest = z.input<typeof promptInputSchema>;

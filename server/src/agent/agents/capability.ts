@@ -4,7 +4,7 @@
  * 交集是这套机制的底座：子会话只能用父会话也有的工具、只能命中父会话也允许的权限，
  * 保证「计划模式只读」这样的父约束不会因为委派子角色而被放宽。
  */
-import type { SessionMode } from "@ucode/contracts";
+import { DEFAULT_SESSION_MODE } from "@ucode/contracts";
 
 import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS } from "../tools/names";
 import type { AgentRegistry } from "./custom";
@@ -26,9 +26,22 @@ export const effectiveToolNames = (capability: ResolvedCapability): string[] => 
   return base.filter((name) => !excluded.has(name));
 };
 
-/** 主会话角色解析为能力：它没有父会话，直接用声明值 */
-export const primaryCapability = (mode: SessionMode): ResolvedCapability => {
-  const profile = PRIMARY_PROFILES[mode];
+/**
+ * 解析 primary 角色：自定义（含覆盖内置）优先，其次内置三位；
+ * 未知 slug 回落默认模式——删掉自定义文件后旧会话仍要能打开。
+ */
+export const primaryProfile = (slug: string, registry?: AgentRegistry): AgentProfile =>
+  registry?.primary[slug] ??
+  (PRIMARY_PROFILES as Record<string, AgentProfile>)[slug] ??
+  PRIMARY_PROFILES[DEFAULT_SESSION_MODE];
+
+/** 该 slug 是否为可用的 primary（内置或已注册的自定义） */
+export const hasPrimaryMode = (slug: string, registry?: AgentRegistry): boolean =>
+  Object.hasOwn(registry?.primary ?? {}, slug) || Object.hasOwn(PRIMARY_PROFILES, slug);
+
+/** primary 能力解析：没有父会话，直接用角色声明值 */
+export const primaryCapability = (slug: string, registry?: AgentRegistry): ResolvedCapability => {
+  const profile = primaryProfile(slug, registry);
   return {
     toolSelection: profile.capability.toolSelection as ToolSelection,
     excludeTools: [],
@@ -40,9 +53,9 @@ export const primaryCapability = (mode: SessionMode): ResolvedCapability => {
   };
 };
 
-/** 主会话角色的实际工具名，供提示词生成可用工具清单 */
-export const primaryToolNames = (mode: SessionMode): string[] =>
-  effectiveToolNames(primaryCapability(mode));
+/** primary 角色的实际工具名，供提示词生成可用工具清单 */
+export const primaryToolNames = (slug: string, registry?: AgentRegistry): string[] =>
+  effectiveToolNames(primaryCapability(slug, registry));
 
 /** 是否为「继承默认工具集」的能力：扩展工具（codemode / MCP）对它可见 */
 export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>

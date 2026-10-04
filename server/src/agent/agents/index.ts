@@ -2,7 +2,9 @@
 
 export {
   effectiveToolNames,
+  hasPrimaryMode,
   primaryCapability,
+  primaryProfile,
   primaryToolNames,
   resolveSubagentCapability,
   subagentProfile,
@@ -10,9 +12,12 @@ export {
 } from "./capability";
 export {
   type AgentRegistry,
+  type AgentRegistryInput,
   allSubagents,
   type CustomAgentError,
+  type CustomAgentMode,
   loadAgentRegistry,
+  type ParsedCustomAgent,
   parseCustomAgent,
 } from "./custom";
 export {

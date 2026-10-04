@@ -43,4 +43,29 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // vite 8 走 rolldown。编辑器内核（Tiptap / ProseMirror）与 Markdown 渲染链
+    // 体积最大且相对独立，拆成各自 chunk：主 chunk 不再被顶到 1MB 以上，也便于缓存
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: "editor", test: /node_modules[\\/](@tiptap|prosemirror)/ },
+            {
+              name: "markdown",
+              test: /node_modules[\\/](react-markdown|remark-|rehype-|micromark|mdast-|hast-|unist-|unified|vfile|property-information|space-separated-tokens|comma-separated-tokens|character-entities|decode-named-character-reference|trim-lines|devlop|zwitch|longest-streak|ccount|escape-string-regexp|markdown-table|bail|trough|is-plain-obj|html-url-attributes)/,
+            },
+            {
+              name: "ui",
+              test: /node_modules[\\/](radix-ui|@radix-ui|@floating-ui|cmdk|sonner|lucide-react|class-variance-authority|clsx|tailwind-merge)/,
+            },
+            {
+              name: "react",
+              test: /node_modules[\\/](react|react-dom|scheduler|react-i18next|i18next)(?=[\\/])/,
+            },
+          ],
+        },
+      },
+    },
+  },
 });

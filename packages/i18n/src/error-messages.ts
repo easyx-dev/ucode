@@ -23,6 +23,7 @@ export const errorMessageKeys = {
   path_exists: "目录已存在",
   mkdir_failed: "创建目录失败",
   project_not_found: "项目不存在",
+  image_invalid: "图片无效",
 } as const satisfies Record<ErrorCode, string>;
 
 /** key 的联合，供客户端 `t()` 的类型收窄 */

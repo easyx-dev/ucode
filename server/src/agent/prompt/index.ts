@@ -12,7 +12,6 @@
  * pi 仍会追加 `<skills>` / `<project_context>` / `<cwd>`。两套源的取舍由真实模型评测决定（见 `server/scripts/eval.ts`）。
  */
 import { brand } from "@ucode/brand/values";
-import type { SessionMode } from "@ucode/contracts";
 
 import { type AgentProfile, primaryToolNames, type SubagentSlug } from "../agents";
 import { MEMORY_TOOL_NAMES } from "../memory/tools";
@@ -20,7 +19,7 @@ import { catalogFor, type PromptLocale } from "./locales";
 import { DEFAULT_PROMPT_VARIANT, type PromptCatalog, type PromptVariant } from "./types";
 
 export type PromptBuildInput = {
-  mode: SessionMode;
+  mode: string;
   /** 角色提示词约束正文；缺省按 mode 取语言目录。子角色与自定义角色显式传入 */
   agentSection?: string;
   /** 本次会话可用工具名；缺省取该模式的实际工具集。用来生成「工具使用」分节 */
@@ -43,7 +42,7 @@ const promptToolNames = (input: PromptBuildInput): string[] => {
 };
 
 const resolvedSection = (catalog: PromptCatalog, input: PromptBuildInput): string =>
-  input.agentSection ?? catalog.modeConstraints[input.mode];
+  input.agentSection ?? (catalog.modeConstraints as Record<string, string>)[input.mode] ?? "";
 
 const modeBlock = (catalog: PromptCatalog, section: string): string =>
   `${catalog.modeHeading}\n${section}`;
@@ -99,7 +98,7 @@ export const promptSectionOf = (profile: AgentProfile, locale?: PromptLocale): s
   if (profile.promptSection) return profile.promptSection;
   const catalog = catalogFor(locale);
   return profile.kind === "primary"
-    ? catalog.modeConstraints[profile.slug as SessionMode]
+    ? ((catalog.modeConstraints as Record<string, string>)[profile.slug] ?? "")
     : (catalog.subagentConstraints[profile.slug as SubagentSlug] ?? "");
 };
 

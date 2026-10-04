@@ -1,5 +1,6 @@
 /** 助手模式选择器：切换当前会话的能力三元组（工具 / 权限 / 提示词） */
 import { Compass } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -10,21 +11,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { modeDescription, modeLabel } from "@/lib/mode";
-import { SESSION_MODES, type SessionMode } from "@/lib/types";
+import { SESSION_MODES } from "@/lib/types";
 
 type ModePickerProps = {
-  value: SessionMode;
+  value: string;
   disabled?: boolean;
-  onSelect: (mode: SessionMode) => void;
+  /** 受控打开（`/mode` 命令从外部唤起）；不传则内部自管 */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSelect: (mode: string) => void;
 };
 
-export function ModePicker({ value, disabled, onSelect }: ModePickerProps) {
+export function ModePicker({ value, disabled, open, onOpenChange, onSelect }: ModePickerProps) {
   const { t } = useTranslation();
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = open !== undefined;
 
   return (
     <Select
       value={value}
-      onValueChange={(next) => onSelect(next as SessionMode)}
+      open={open ?? internalOpen}
+      onOpenChange={(next) => {
+        if (!isControlled) setInternalOpen(next);
+        onOpenChange?.(next);
+      }}
+      onValueChange={(next) => onSelect(next)}
       disabled={disabled}
     >
       <SelectTrigger

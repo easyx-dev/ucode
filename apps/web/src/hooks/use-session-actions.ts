@@ -4,14 +4,14 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SessionListController } from "@/hooks/use-session-list";
 import { api, describeError } from "@/lib/api";
-import type { SessionCreateRequest, SessionMode, SessionSummary, ThinkingLevel } from "@/lib/types";
+import type { SessionCreateRequest, SessionSummary, ThinkingLevel } from "@/lib/types";
 
 /** 可提交给 sessions/update 的字段，与 SessionSummary 的可选字段同名 */
 type SessionPatch = {
   name?: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  mode?: SessionMode;
+  mode?: string;
 };
 
 export function useSessionActions(list: SessionListController) {
@@ -63,7 +63,7 @@ export function useSessionActions(list: SessionListController) {
   );
 
   const setMode = useCallback(
-    (sessionId: string, mode: SessionMode) => applyUpdate(sessionId, { mode }, t("切换模式失败")),
+    (sessionId: string, mode: string) => applyUpdate(sessionId, { mode }, t("切换模式失败")),
     [applyUpdate, t],
   );
 

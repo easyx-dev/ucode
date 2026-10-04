@@ -20,6 +20,7 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
+import { hasPrimaryMode, loadAgentRegistry } from "../../agent/agents";
 import { createForkedSessionFile, resolveForkSource } from "../../agent/fork";
 import { resolveSessionCwd } from "../../agent/session-config";
 import { workspaceDirOf } from "../../agent/workspace";
@@ -31,6 +32,17 @@ import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
+import { resolveTargetPath } from "../../utils/path";
+
+/** primary 模式必须存在（内置或已注册的自定义角色）；否则新建 / 切换会落到未知 slug 上 */
+const assertPrimaryMode = (cwd: string, mode: string): void => {
+  const registry = loadAgentRegistry({ cwd, appHome: env.homeDir });
+  if (!hasPrimaryMode(mode, registry)) {
+    throw new AppError(ERROR_CODES.invalidRequest, `未知的会话模式：${mode}`, 400, undefined, {
+      mode,
+    });
+  }
+};
 
 const runtimeDefaults = (
   services: Services,
@@ -132,6 +144,9 @@ const createSessionRoute = (services: Services, input: SessionCreateInput): Sess
     );
   }
   if (input.model) assertModel(services, input.model);
+  if (input.mode) {
+    assertPrimaryMode(input.cwd ? resolveTargetPath(input.cwd) : env.workspaceRoot, input.mode);
+  }
 
   const sessionId = createSession(services, input);
 
@@ -180,8 +195,11 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     });
   }
   // 目标只跑在 build 上：切走执行模式即暂停，避免只读模式仍在自动续跑
-  if (patch.mode && patch.mode !== "build") {
-    services.goals.pause(record, "mode", services.pool.get(patch.sessionId));
+  if (patch.mode) {
+    assertPrimaryMode(resolveSessionCwd(record), patch.mode);
+    if (patch.mode !== "build") {
+      services.goals.pause(record, "mode", services.pool.get(patch.sessionId));
+    }
   }
   if (record.sourcePath) {
     const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);

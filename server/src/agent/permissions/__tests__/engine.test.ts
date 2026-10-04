@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { agentRules, PRIMARY_PROFILES } from "../../agents";
-import { DEFAULT_PERMISSION_RULES } from "../defaults";
+import { DEFAULT_PERMISSION_RULES, skillDirectoryRules } from "../defaults";
 import {
   decidePermission,
   evaluateRules,
@@ -81,6 +81,35 @@ describe("decidePermission", () => {
   it("未知工具没有匹配规则时默认放行", () => {
     assert.equal(
       decidePermission(DEFAULT_PERMISSION_RULES, "webfetch", { url: "https://a" }, CWD).action,
+      "allow",
+    );
+  });
+
+  it("技能目录内的越界读取放行，其它越界仍审批", () => {
+    const skillDir = "/Users/me/.agents/skills";
+    const rules: PermissionRule[] = [
+      ...DEFAULT_PERMISSION_RULES,
+      ...skillDirectoryRules([skillDir]),
+    ];
+    assert.equal(
+      decidePermission(rules, "read", { path: `${skillDir}/foo/SKILL.md` }, CWD).action,
+      "allow",
+    );
+    assert.equal(decidePermission(rules, "read", { path: "/etc/passwd" }, CWD).action, "ask");
+  });
+
+  it("只读模式对技能目录的写仍被更严的阻断压住", () => {
+    const skillDir = "/Users/me/.agents/skills";
+    const rules: PermissionRule[] = [
+      ...agentRules(PRIMARY_PROFILES.plan),
+      ...skillDirectoryRules([skillDir]),
+    ];
+    assert.equal(
+      decidePermission(rules, "write", { path: `${skillDir}/foo/SKILL.md` }, CWD).action,
+      "deny",
+    );
+    assert.equal(
+      decidePermission(rules, "read", { path: `${skillDir}/foo/SKILL.md` }, CWD).action,
       "allow",
     );
   });

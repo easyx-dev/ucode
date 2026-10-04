@@ -5,7 +5,7 @@
 
 ## 约定速览
 
-- 前缀 `/api/v1`；除 `GET /api/v1/health` 外一律 `POST` + JSON body，无参数接口也要发 `{}`
+- 前缀 `/api/v1`；除 `GET /api/v1/health` 与 `GET /api/v1/attachments/<id>` 外一律 `POST` + JSON body，无参数接口也要发 `{}`
 - 非流式响应共用封套：成功 `{ success: true, code: "ok", message: "", data }`；失败 `{ success, code, message, data, params? }`
 - 字段一律 camelCase；请求里指向资源的 id 用 `<资源>Id`，响应里资源自身用 `id`
 - 类型文本中的链接指向文末「公共类型」；`（…）` 内为该字段的取值约束
@@ -30,14 +30,19 @@
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
 | POST | `/api/v1/messages/edit` | 编辑一条已发送的用户消息并重发 |
 | POST | `/api/v1/messages/interrupt` | 中断当前生成 |
+| POST | `/api/v1/messages/compact` | 手动压缩上下文（后台执行，走 compaction_* 事件） |
 | POST | `/api/v1/events` | 全局 SSE 事件流（所有会话的实时事件） |
 | POST | `/api/v1/interactions/list` | 列出会话中尚未回答的交互请求 |
 | POST | `/api/v1/interactions/respond` | 回答一条挂起的交互请求（按 kind 判别） |
 | POST | `/api/v1/fs/list` | 浏览目录条目 |
+| POST | `/api/v1/fs/search` | 按名模糊检索文件（受跳目录 / 深度 / 条数约束） |
 | POST | `/api/v1/fs/mkdir` | 新建目录（单层） |
 | POST | `/api/v1/mcp/list` | 列出已配置的 MCP 服务器 |
 | POST | `/api/v1/mcp/upsert` | 按 name 覆盖写入 MCP 服务器 |
 | POST | `/api/v1/mcp/delete` | 按 name 删除 MCP 服务器 |
+| POST | `/api/v1/agents/list` | 列出可选的 primary / subagent 角色 |
+| GET | `/api/v1/attachments/:id` | 按 id 返回附件原始字节（非 JSON，不走封套） |
+| POST | `/api/v1/commands/list` | 列出可用的提示词命令与技能 |
 | POST | `/api/v1/goals/set` | 设定 / 替换当前会话目标 |
 | POST | `/api/v1/goals/status` | 查看当前会话目标状态 |
 | POST | `/api/v1/goals/pause` | 暂停目标自动续跑 |
@@ -255,7 +260,7 @@
 | `cwd` | string（长度≥1） | 否 | — | — |
 | `model` | string（长度≥1） | 否 | — | — |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
-| `mode` | "build" \| "plan" \| "ask" | 否 | — | — |
+| `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
 
 **响应类型**：`SessionSummary`
 
@@ -269,7 +274,7 @@
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
-| `mode` | "build" \| "plan" \| "ask" | 是 | 会话模式：决定工具集与权限 |
+| `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -307,7 +312,7 @@
 | `name` | string（长度≥1） | 否 | — | — |
 | `model` | string（长度≥1） | 否 | — | — |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
-| `mode` | "build" \| "plan" \| "ask" | 否 | — | — |
+| `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
 
 **响应类型**：`SessionSummary`
 
@@ -321,7 +326,7 @@
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
-| `mode` | "build" \| "plan" \| "ask" | 是 | 会话模式：决定工具集与权限 |
+| `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -370,7 +375,7 @@
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
-| `mode` | "build" \| "plan" \| "ask" | 是 | 会话模式：决定工具集与权限 |
+| `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -411,7 +416,14 @@
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `text` | string（长度≥1） | 是 | — | — |
+| `text` | string | 否 | `` | — |
+| `contexts` | object[]（≤32 项） | 否 | — | — |
+| `contexts[].path` | string（长度≥1） | 是 | — | — |
+| `contexts[].startLine` | integer（>0） | 否 | — | — |
+| `contexts[].endLine` | integer（>0） | 否 | — | — |
+| `images` | object[]（≤8 项） | 否 | — | — |
+| `images[].data` | string（长度 1–5242880） | 是 | — | base64 编码的图片字节（不含 `data:` URL 前缀） |
+| `images[].mimeType` | "image/png" \| "image/jpeg" \| "image/webp" \| "image/gif" | 是 | — | — |
 | `behavior` | "follow-up" \| "steer" | 否 | `follow-up` | 生成中再发消息时的投递方式 |
 
 **响应类型**：`PromptAdmittedResponse`
@@ -456,6 +468,24 @@
 | --- | --- | --- | --- |
 | `sessionId` | string | 是 | — |
 | `aborted` | boolean | 是 | 是否真的中断了一个正在跑的 run |
+
+### POST /api/v1/messages/compact
+
+手动压缩上下文（后台执行，走 compaction_* 事件）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+| `instructions` | string（长度≥1） | 否 | — | — |
+
+**响应类型**：`PromptAdmittedResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `admitted` | boolean | 是 | — |
 
 ## 交互请求（`interactions`）
 
@@ -526,6 +556,26 @@
 | `path` | string | 是 | 当前目录的绝对路径 |
 | `parent` | string \| null | 是 | 上级目录绝对路径；根目录为 null |
 | `entries` | [FsEntry](#fsentry)[] | 是 | 服务端固定排序：目录在前，各自按名称 |
+
+### POST /api/v1/fs/search
+
+按名模糊检索文件（受跳目录 / 深度 / 条数约束）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 否 | — | — |
+| `q` | string | 否 | — | — |
+| `limit` | integer（>0，≤500） | 否 | `100` | — |
+
+**响应类型**：`FsSearchResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `path` | string | 是 | 检索根目录的绝对路径 |
+| `entries` | [FsEntry](#fsentry)[] | 是 | 命中条目，服务端固定排序（目录在前，各自按名称） |
+| `truncated` | boolean | 是 | 是否因条数上限被截断 |
 
 ### POST /api/v1/fs/mkdir
 
@@ -616,6 +666,60 @@
 | --- | --- | --- | --- |
 | `removed` | boolean | 是 | 是否命中并删除了条目；目标不存在时为 false |
 | `configPath` | string | 是 | — |
+
+## 角色（`agents`）
+
+### POST /api/v1/agents/list
+
+列出可选的 primary / subagent 角色
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+
+**响应类型**：`AgentsListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `primary` | [AgentView](#agentview)[] | 是 | 主会话角色：内置 build / plan / ask 与自定义 primary |
+| `subagents` | [AgentView](#agentview)[] | 是 | 子角色：内置 general / explore 与自定义 subagent |
+
+## 附件（`attachments`）
+
+### GET /api/v1/attachments/:id
+
+按 id 返回附件原始字节（非 JSON，不走封套）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应**
+
+原始字节（非 JSON，不走封套）；`Content-Type` 取自附件自身的 mimeType，带 `Cache-Control: immutable` 与 `ETag`。
+
+## commands（`commands`）
+
+### POST /api/v1/commands/list
+
+列出可用的提示词命令与技能
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+
+**响应类型**：`CommandsListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `prompts` | [PromptCommandView](#promptcommandview)[] | 是 | — |
+| `skills` | [SkillCommandView](#skillcommandview)[] | 是 | — |
 
 ## 目标模式（`goals`）
 
@@ -834,7 +938,7 @@
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
-| `mode` | "build" \| "plan" \| "ask" | 是 | 会话模式：决定工具集与权限 |
+| `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -947,6 +1051,34 @@
 | `timeout` | number | 否 | — |
 | `headers` | Record<string, string> | 否 | — |
 
+### AgentView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `slug` | string | 是 | 角色 slug；主会话用它作 `mode`，子会话用它作 `agent` |
+| `label` | string | 是 | 展示名 |
+| `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
+| `kind` | "primary" \| "subagent" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" | 是 | — |
+| `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
+
+### PromptCommandView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 命令名；调用时序列化为 `/name` |
+| `description` | string | 是 | 一句话说明，供菜单展示 |
+| `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
+| `source` | "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+
+### SkillCommandView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
+| `description` | string | 是 | — |
+| `source` | "project" \| "global" \| "agents-project" \| "agents-user" | 是 | — |
+
 ### ModelUsage
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1035,6 +1167,26 @@
 | `id` | string | 是 | — |
 | `name` | string | 是 | — |
 | `args` | unknown | 是 | — |
+
+**取值之一（type = "image"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "image" | 是 | — |
+| `id` | string | 是 | — |
+| `mimeType` | string | 是 | — |
+| `url` | string | 是 | — |
+
+**取值之一（type = "file"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "file" | 是 | — |
+| `id` | string | 是 | — |
+| `mimeType` | string | 是 | — |
+| `name` | string | 是 | — |
+| `size` | number | 是 | — |
+| `url` | string | 是 | — |
 
 ### QuestionItem
 

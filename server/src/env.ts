@@ -8,6 +8,7 @@ import { appHomeDirname } from "@ucode/brand/values";
 import {
   AGENT_DIRNAME,
   APP_DIRNAME,
+  ATTACHMENTS_DIRNAME,
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
@@ -78,6 +79,8 @@ export const env = {
   agentDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
   appDir,
+  /** 附件库：按内容 sha256 存的原始字节，图片与文档共用 */
+  attachmentsDir: resolve(appDir, ATTACHMENTS_DIRNAME),
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
   sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
   authPath: resolve(agentDir, AUTH_FILENAME),

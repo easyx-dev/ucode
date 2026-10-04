@@ -1,6 +1,9 @@
 /** pi 的会话条目与消息 → 对外 DTO */
+import { createHash } from "node:crypto";
+
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import {
+  API_BASE_PATH,
   DEFAULT_SESSION_MODE,
   type MessageBlock,
   type MessageDTO,
@@ -39,7 +42,18 @@ export const blocksOf = (content: unknown): MessageBlock[] => {
         }
         break;
       case "image":
-        blocks.push({ type: "text", text: "[图片]" });
+        // 图片落库时按归一化后的字节算 sha256，与这里重算的一致，故 url 能直接命中附件路由
+        if (typeof part.data === "string" && typeof part.mimeType === "string") {
+          const id = createHash("sha256").update(Buffer.from(part.data, "base64")).digest("hex");
+          blocks.push({
+            type: "image",
+            id,
+            mimeType: part.mimeType,
+            url: `${API_BASE_PATH}/attachments/${id}`,
+          });
+        } else {
+          blocks.push({ type: "text", text: "[图片]" });
+        }
         break;
       default:
         break;

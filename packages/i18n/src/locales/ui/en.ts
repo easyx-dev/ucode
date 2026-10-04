@@ -143,6 +143,18 @@ export default {
   输入消息占位: "Type a message. Enter to send, Shift+Enter for a new line.",
   停止生成: "Stop generating",
   发送: "Send",
+  移除附件: "Remove attachment",
+  图片预览: "Image preview",
+  "不支持的附件：{{names}}": "Unsupported attachments: {{names}}",
+
+  // 内置命令说明（`/` 菜单提示与 /help 清单）
+  重命名当前会话: "Rename the current session",
+  归档当前会话: "Archive the current session",
+  从当前会话分叉: "Fork from the current session",
+  切换当前会话的模型: "Switch the current session's model",
+  切换思考档位: "Switch the thinking level",
+  切换助手模式: "Switch the assistant mode",
+  请先接入模型供应商: "Connect a model provider first",
 
   // Assistant modes
   模式: "Mode",
@@ -372,4 +384,19 @@ export default {
   恢复目标失败: "Failed to resume the goal",
   清除目标失败: "Failed to clear the goal",
   目标加载失败: "Failed to load the goal",
+
+  // Composer commands
+  内置动作: "Built-in",
+  命令: "Commands",
+  技能: "Skills",
+  文件: "Files",
+  帮助: "Help",
+  压缩上下文: "Compact context",
+  开始一个新会话: "Start a new session",
+  中断当前生成: "Interrupt the current run",
+  压缩当前会话的上下文: "Compact this session's context",
+  查看或设定会话目标: "View or set the session goal",
+  查看全部命令: "Show all commands",
+  "目标.命令提示": "Start the input with /goal to set or view the goal",
+  "内置命令.帮助": "See the / menu in the composer for built-in commands",
 };

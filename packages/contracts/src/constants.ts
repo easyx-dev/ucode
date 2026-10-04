@@ -39,6 +39,9 @@ export type MessageRole = (typeof MESSAGE_ROLES)[number];
 /**
  * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
  * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
+ *
+ * 这里是**内置默认集合**：`sessions` 的 `mode` 是字符串 slug，允许自定义 primary agent
+ * 覆盖同名内置项或另取新名，服务端按 agent 注册表校验（见 `plans/input-commands-skills.md`）。
  */
 export const SESSION_MODES = ["build", "plan", "ask"] as const;
 
@@ -127,6 +130,44 @@ export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
 /** 新建 MCP 服务器的默认暴露方式：经 codemode 调用，不占用模型工具声明 */
 export const DEFAULT_MCP_EXPOSURE: McpExposure = "codemode";
+
+/** 图片输入类型；与 pi 的 vision 输入对齐（`read` 工具与 prompt 附件共用） */
+export const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
+
+export type ImageMimeType = (typeof IMAGE_MIME_TYPES)[number];
+
+/** 单轮 prompt 的图片数量上限；超出直接 400，避免请求体过大 */
+export const PROMPT_MAX_IMAGES = 8;
+
+/** 单轮 prompt 的 `@` 上下文引用数量上限 */
+export const PROMPT_MAX_CONTEXTS = 32;
+
+/** 单张图片 base64 编码后的字节上限（与 pi 图片归一化的 5MB 一致） */
+export const MESSAGE_IMAGE_MAX_BASE64_BYTES = 5 * 1024 * 1024;
+
+/**
+ * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：
+ * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents`。
+ * 提示词命令只会有 `project` / `global` 两种。
+ */
+export const COMMAND_ASSET_SOURCES = [
+  "project",
+  "agents-project",
+  "global",
+  "agents-user",
+] as const;
+
+export type CommandAssetSource = (typeof COMMAND_ASSET_SOURCES)[number];
+
+/** 角色类别：primary 作会话主 agent，subagent 由 `subagent` 工具委派 */
+export const AGENT_KINDS = ["primary", "subagent"] as const;
+
+export type AgentKind = (typeof AGENT_KINDS)[number];
+
+/** 角色来源：内置 / 项目 `.ucode` / 全局 `$APP_HOME`（自定义 subagent 与 primary 共用） */
+export const AGENT_SOURCES = ["builtin", "project", "global"] as const;
+
+export type AgentSource = (typeof AGENT_SOURCES)[number];
 
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";

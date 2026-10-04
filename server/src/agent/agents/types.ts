@@ -4,7 +4,7 @@
  * 「角色声明」与「与父会话取交集后的能力」分成两个类型：前者是静态数据，
  * 后者是装配层真正消费的结果，避免装配层再去理解 `inherit` 这类声明的语义。
  */
-import type { ThinkingLevel } from "@ucode/contracts";
+import type { AgentSource, ThinkingLevel } from "@ucode/contracts";
 
 import type { PermissionRule } from "../permissions/engine";
 
@@ -46,4 +46,8 @@ export type AgentProfile = {
   capability: AgentCapability;
   /** 是否列进 `subagent` 工具的角色广告；缺省为是，显式 `false` 表示隐藏但仍可按名调用 */
   advertise?: boolean;
+  /** 是否对选择器隐藏（自定义 primary）；隐藏项仍可按名调用 */
+  hidden?: boolean;
+  /** 自定义角色的来源；内置角色缺省 */
+  source?: AgentSource;
 };

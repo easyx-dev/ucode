@@ -11,14 +11,15 @@ import {
   type AgentRegistry,
   agentRules,
   loadAgentRegistry,
-  PRIMARY_PROFILES,
   primaryCapability,
+  primaryProfile,
   type ResolvedCapability,
   resolveSubagentCapability,
   subagentProfile,
   usesDefaultToolSet,
 } from "../agent/agents";
 import type { GoalService } from "../agent/goal";
+import type { PromptImage } from "../agent/image";
 import type { MemoryService } from "../agent/memory";
 import type { PermissionRule, SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
@@ -108,12 +109,34 @@ export class SessionPool {
    * 开一轮后台生成：立即返回，不 await；生成所有权在服务端，结果走事件流。
    * HTTP 触发与目标续跑共用这一条路径，保证 `running` / 索引刷新 / 错误回传一致。
    */
-  startRun(sessionId: string, session: AgentSession, text: string): void {
+  startRun(
+    sessionId: string,
+    session: AgentSession,
+    text: string,
+    images: readonly PromptImage[] = [],
+  ): void {
     if (!this.beginRun(sessionId)) {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请稍后重试或改用 steer", 409);
     }
     void session
-      .prompt(text)
+      .prompt(text, images.length > 0 ? { images: [...images] } : undefined)
+      .catch((error) => this.reportRunError(sessionId, error))
+      .finally(() => {
+        this.endRun(sessionId);
+        this.refreshIndex(sessionId);
+      });
+  }
+
+  /**
+   * 手动压缩上下文：后台执行，结果走事件流（`compaction_start` / `compaction_end`）。
+   * 与一轮生成共用 `running` 占位，保证压缩期间不会被并发 prompt 打断。
+   */
+  startCompaction(sessionId: string, session: AgentSession, instructions?: string): void {
+    if (!this.beginRun(sessionId)) {
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请先中断", 409);
+    }
+    void session
+      .compact(instructions)
       .catch((error) => this.reportRunError(sessionId, error))
       .finally(() => {
         this.endRun(sessionId);
@@ -147,8 +170,8 @@ export class SessionPool {
   } {
     if (!record.parentSessionId || !record.agent) {
       return {
-        profile: PRIMARY_PROFILES[record.mode],
-        capability: primaryCapability(record.mode),
+        profile: primaryProfile(record.mode, registry),
+        capability: primaryCapability(record.mode, registry),
       };
     }
     const parent = this.repository.find(record.parentSessionId);
@@ -156,8 +179,8 @@ export class SessionPool {
     const profile = subagentProfile(record.agent, registry);
     return {
       profile,
-      capability: resolveSubagentCapability(profile, primaryCapability(parentMode)),
-      parentRules: () => agentRules(PRIMARY_PROFILES[parentMode]),
+      capability: resolveSubagentCapability(profile, primaryCapability(parentMode, registry)),
+      parentRules: () => agentRules(primaryProfile(parentMode, registry)),
     };
   }
 
@@ -237,8 +260,8 @@ export class SessionPool {
       ? SessionManager.open(record.sourcePath, env.sessionsRoot, cwd)
       : SessionManager.create(cwd, env.sessionsRoot, { id: sessionId });
 
-    // 自定义子角色按 agentDir 现读：用户新加 / 改角色文件后，新建或重开的会话即生效
-    const registry = loadAgentRegistry(env.agentDir);
+    // 自定义角色按 cwd 祖先链 + 全局目录现读：用户新加 / 改角色文件后，新建或重开的会话即生效
+    const registry = loadAgentRegistry({ cwd, appHome: env.homeDir });
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
     }

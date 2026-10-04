@@ -43,18 +43,15 @@ const replaceAt = (items: ChatItem[], index: number, item: ChatItem): ChatItem[]
 export const settle = (items: ChatItem[]): ChatItem[] =>
   items.map((item) => (item.live ? { ...item, live: false } : item));
 
-/** 乐观插入一条用户消息，等服务端回传权威消息后再合并；返回列表与新条目 id（失败时据此撤回） */
+/** 乐观插入一条用户消息（正文 + 图片区块），等权威消息后再合并；返回列表与新条目 id（失败时据此撤回） */
 export const appendUserItem = (
   items: ChatItem[],
-  text: string,
+  blocks: MessageBlock[],
 ): { items: ChatItem[]; id: string } => {
   const id = `live-user-${nextLocalId()}`;
   return {
     id,
-    items: [
-      ...items,
-      { id, role: "user", blocks: [{ type: "text", text }], live: true, createdAt: nowIso() },
-    ],
+    items: [...items, { id, role: "user", blocks, live: true, createdAt: nowIso() }],
   };
 };
 

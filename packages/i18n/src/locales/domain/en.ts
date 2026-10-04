@@ -18,4 +18,5 @@ export default {
   目录已存在: "Directory already exists: {{path}}",
   创建目录失败: "Failed to create directory: {{path}}",
   项目不存在: "Project does not exist: {{path}}",
+  图片无效: "Invalid image: {{reason}}",
 };

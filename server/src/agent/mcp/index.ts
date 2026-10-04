@@ -1,11 +1,10 @@
 /**
- * 内置 MCP 扩展接入：`build` 模式连接会话 agentDir 下的 `mcp.json`，只读模式不加载。
+ * 内置 MCP 扩展接入：随「默认工具集」的会话加载会话 agentDir 下的 `mcp.json`，只读白名单会话不挂。
  *
- * 不加载只读模式的理由：MCP 扩展在服务器连接成功后会主动 `setActiveTools()` 激活 codemode，
- * 这一步与模式白名单无关，会绕过 `plan` / `ask` 的只读工具集。
+ * 不挂只读会话的理由：MCP 扩展在服务器连接成功后会主动 `setActiveTools()` 激活 codemode，
+ * 这一步与白名单无关，会绕过 `plan` / `ask` 的只读工具集。是否加载由调用方按角色能力判定。
  */
 import { createMcpExtension, type ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { SessionMode } from "@ucode/contracts";
 
 import { mcpConfigPathOf, readMcpConfigForLoader } from "./config";
 
@@ -18,16 +17,10 @@ export {
 } from "./config";
 
 /**
- * 按模式取 MCP 扩展工厂；`build` 才返回，`plan` / `ask` 保持只读。
- * `agentDir` 必须由调用方传入会话实际使用的目录（评测 / 测试会覆盖它做隔离），
+ * MCP 扩展工厂。`agentDir` 必须由调用方传入会话实际使用的目录（评测 / 测试会覆盖它做隔离），
  * 工厂里不能用 `env.mcpConfigPath`，否则会读到用户真实数据目录。
  */
-export const mcpExtensionForMode = (
-  mode: SessionMode,
-  agentDir: string,
-): ExtensionFactory | undefined =>
-  mode === "build"
-    ? createMcpExtension({
-        loadConfig: () => readMcpConfigForLoader(mcpConfigPathOf(agentDir)),
-      })
-    : undefined;
+export const mcpExtension = (agentDir: string): ExtensionFactory =>
+  createMcpExtension({
+    loadConfig: () => readMcpConfigForLoader(mcpConfigPathOf(agentDir)),
+  });

@@ -7,13 +7,7 @@
  * 命名、SQL 与删除规则见 `docs/database.md`。
  */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import {
-  DEFAULT_SESSION_MODE,
-  SESSION_MODES,
-  type SessionMode,
-  THINKING_LEVELS,
-  type ThinkingLevel,
-} from "@ucode/contracts";
+import { DEFAULT_SESSION_MODE, THINKING_LEVELS, type ThinkingLevel } from "@ucode/contracts";
 import { z } from "zod";
 
 import { env } from "../env";
@@ -27,8 +21,8 @@ export type SessionOverride = {
   cwd?: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
-  /** 会话模式；未设置时回落 `DEFAULT_SESSION_MODE` */
-  mode?: SessionMode;
+  /** 会话模式（primary agent slug）；未设置时回落 `DEFAULT_SESSION_MODE` */
+  mode?: string;
   /** 子会话的父会话 id 与角色 slug（只读派生，不参与 upsert） */
   parentSessionId?: string;
   agent?: string;
@@ -52,8 +46,8 @@ export type SessionRecord = {
   cwd: string | null;
   model: string | null;
   thinkingLevel: string | null;
-  /** 已按白名单归一的会话模式 */
-  mode: SessionMode;
+  /** 会话模式（primary agent slug）；自定义 primary 可任意 slug，不再按枚举归一 */
+  mode: string;
   /** 子会话指向父会话；主会话为空（见 plans/stage-7c-subagents.md） */
   parentSessionId: string | null;
   /** 子会话的角色 slug（如 general / explore）；主会话为空 */
@@ -143,7 +137,7 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   cwd: row.cwd,
   model: row.model,
   thinkingLevel: row.thinking_level,
-  mode: toSessionMode(row.mode),
+  mode: row.mode ?? DEFAULT_SESSION_MODE,
   parentSessionId: row.parent_session_id,
   agent: row.agent,
   forkedFromId: row.forked_from_session_id,
@@ -161,12 +155,6 @@ const toThinkingLevel = (value: string | null): ThinkingLevel | undefined =>
   value && (THINKING_LEVELS as readonly string[]).includes(value)
     ? (value as ThinkingLevel)
     : undefined;
-
-/** 会话模式同理：非法或缺失一律回落默认模式 */
-const toSessionMode = (value: string | null): SessionMode =>
-  value && (SESSION_MODES as readonly string[]).includes(value)
-    ? (value as SessionMode)
-    : DEFAULT_SESSION_MODE;
 
 /** 搜索结果一律按字面量匹配，转义 LIKE 的 `%` / `_` / `\`（配合 `ESCAPE '\'`） */
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) => `\\${char}`);
@@ -217,7 +205,7 @@ export class SessionRepository {
     input: {
       parentId: string;
       cwd: string;
-      mode: SessionMode;
+      mode: string;
       agent: string;
       name: string;
       model?: string;
@@ -254,7 +242,7 @@ export class SessionRepository {
       forkedFromId: string;
       cwd: string;
       name: string | null;
-      mode: SessionMode;
+      mode: string;
       model?: string;
       thinkingLevel?: ThinkingLevel;
     },

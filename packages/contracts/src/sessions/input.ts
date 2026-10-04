@@ -1,13 +1,22 @@
 /** 会话接口的请求 zod 模型；`*Request` 为客户端载荷（z.input），`*Input` 为服务端解析后（z.infer） */
 import { z } from "zod";
 
-import { SESSION_MODES, THINKING_LEVELS } from "../constants";
+import { THINKING_LEVELS } from "../constants";
 
 /**
  * 会话 id 格式，与 pi 的 `assertValidSessionId` 一致。
  * 提前校验可以把非法 id 变成 400，而不是等到 SessionManager 抛错。
  */
 export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/);
+
+/**
+ * 会话模式 slug：小写字母开头、kebab-case。内置 `build` / `plan` / `ask`，
+ * 自定义 primary agent 可覆盖同名内置项或另取新名；服务端按 agent 注册表校验后才会落库。
+ */
+export const sessionModeSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]*$/)
+  .max(64);
 
 /** 只带 sessionId 的操作（详情、归档、中断等） */
 export const sessionIdInputSchema = z.object({ sessionId: sessionIdSchema });
@@ -37,7 +46,7 @@ export const sessionCreateInputSchema = z.object({
   cwd: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
-  mode: z.enum(SESSION_MODES).optional(),
+  mode: sessionModeSchema.optional(),
 });
 
 export const sessionUpdateInputSchema = z.object({
@@ -45,7 +54,7 @@ export const sessionUpdateInputSchema = z.object({
   name: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
-  mode: z.enum(SESSION_MODES).optional(),
+  mode: sessionModeSchema.optional(),
 });
 
 export type SessionIdRequest = z.input<typeof sessionIdInputSchema>;

@@ -70,6 +70,9 @@ export const ERROR_CODES = {
   mkdirFailed: "mkdir_failed",
   /** 指定的项目空间不存在 */
   projectNotFound: "project_not_found",
+
+  /** 图片无法归一化（格式不支持、超限且不可压缩等） */
+  imageInvalid: "image_invalid",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

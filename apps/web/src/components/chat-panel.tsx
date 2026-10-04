@@ -13,14 +13,16 @@ import { Button } from "@/components/ui/button";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ComposerDraftsController } from "@/hooks/use-composer-drafts";
 import type { SessionSeed } from "@/hooks/use-send-message";
-import { composerKeyOf, emptyDraft } from "@/lib/composer-draft";
+import type { BuiltinCommandId } from "@/lib/builtin-commands";
+import { type ComposerNode, docToPayload, textToDoc } from "@/lib/composer-document";
+import { type ComposerDraft, composerKeyOf, emptyDraft } from "@/lib/composer-draft";
+import type { ComposerPayload } from "@/lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "@/lib/goal-command";
 import { isWorkspaceSession } from "@/lib/session-groups";
 import type {
   ChatItem,
   GoalView,
   ModelsResponse,
-  SessionMode,
   SessionSummary,
   ThinkingLevel,
   UsageTotals,
@@ -43,7 +45,7 @@ type ChatPanelProps = {
   onReloadModels: () => void;
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
-  onSelectMode: (mode: SessionMode) => void;
+  onSelectMode: (mode: string) => void;
   onOpenSettings: () => void;
   /** 打开某个子会话（子智能体工具卡上的入口） */
   onOpenSession: (sessionId: string) => void;
@@ -57,6 +59,8 @@ type ChatPanelProps = {
   goal?: GoalView | null;
   /** 处理 `/goal` 命令（设定 / 暂停 / 恢复 / 清除 / 查看） */
   onGoalCommand: (command: GoalCommand, seed?: SessionSeed) => void;
+  /** 执行内置命令（`/` 菜单里的动作型命令） */
+  onBuiltin: (id: BuiltinCommandId) => void;
   /** 本会话累计 token 用量；用于头部徽标 */
   usage?: UsageTotals | null;
   /** 打开全局使用统计 */
@@ -87,6 +91,7 @@ export function ChatPanel({
   forkedFromName,
   goal,
   onGoalCommand,
+  onBuiltin,
   usage,
   onOpenUsage,
   onBackToParent,
@@ -100,31 +105,47 @@ export function ChatPanel({
   const draft = composer.drafts[draftKey] ?? emptyDraft();
 
   /**
-   * 发送：立即清空输入框（既是对发送的即时反馈，也挡住连按两次重复提交），
-   * 把草稿里的初始设置交给 useChat——还没有会话时它会先建会话，`seed` 就是新会话的初始设置；
-   * 没发出去就把原文还回输入框（会话可能已经建好，所以按返回的会话 id 定位上下文），别让用户重打。
+   * 草稿里的编辑器文档：优先用存下来的 doc；只有旧 `text` 的按单段落还原。
+   * 切换会话 / 失败回填会让编辑器重挂载，因此这里作为「初始文档」传入。
    */
-  const submit = useCallback(() => {
-    const text = draft.text.trim();
-    if (!text) return;
-    const seed = {
-      cwd: draft.cwd,
-      model: draft.model,
-      thinkingLevel: draft.thinkingLevel,
-      mode: draft.mode,
-    };
-    // 以 `/goal` 开头的是目标命令，不进普通消息流
-    const command = parseGoalCommand(text);
-    if (command) {
+  const initialDoc: ComposerNode | undefined =
+    (draft.doc as ComposerNode | undefined) ?? (draft.text ? textToDoc(draft.text) : undefined);
+
+  /**
+   * 发送：清空草稿（即时反馈 + 挡重复提交），把初始设置交给 useChat——还没有会话时先建会话；
+   * 没发出去就把正文还回输入框（会话可能已经建好，按返回的会话 id 定位上下文）。
+   * `/goal` 只在纯文本时才当命令解析，带引用 / 图片的消息按普通消息发。
+   */
+  const submit = useCallback(
+    (payload: ComposerPayload) => {
+      const seed = {
+        cwd: draft.cwd,
+        model: draft.model,
+        thinkingLevel: draft.thinkingLevel,
+        mode: draft.mode,
+      };
+      const isPlainText = payload.contexts.length === 0 && payload.images.length === 0;
+      const command = isPlainText ? parseGoalCommand(payload.text) : null;
+      if (command) {
+        composer.clear(draftKey);
+        onGoalCommand(command, seed);
+        return;
+      }
       composer.clear(draftKey);
-      onGoalCommand(command, seed);
-      return;
-    }
-    composer.clear(draftKey);
-    void chat.send(text, seed).then(({ sessionId: target, admitted }) => {
-      if (!admitted) composer.update(composerKeyOf(target), { text, ...seed });
-    });
-  }, [chat, composer, draft, draftKey, onGoalCommand]);
+      void chat.send(payload, seed).then(({ sessionId: target, admitted }) => {
+        if (admitted) return;
+        const restored: Partial<ComposerDraft> = {
+          text: payload.text,
+          doc: textToDoc(payload.text),
+          ...seed,
+        };
+        // 图片附件也还回输入框：草稿只存本地库 id，字节已在 IndexedDB
+        if (payload.attachmentIds.length > 0) restored.attachments = payload.attachmentIds;
+        composer.update(composerKeyOf(target), restored);
+      });
+    },
+    [chat, composer, draft, draftKey, onGoalCommand],
+  );
 
   // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」；
   // 空态显示草稿绑定的目录（「在目录中新建」选的）
@@ -196,13 +217,18 @@ export function ChatPanel({
         <PlanDecisionForm onApprove={onApprovePlan} onFeedback={onFeedbackPlan} />
       ) : (
         <Composer
-          value={draft.text}
-          onChange={(text) => composer.update(draftKey, { text })}
+          sessionId={session?.id ?? null}
+          cwd={cwd}
+          cwdPath={session?.cwd ?? draft.cwd}
+          initialDoc={initialDoc}
+          initialAttachmentIds={draft.attachments}
+          editorKey={draftKey}
+          onDocChange={(doc) => composer.update(draftKey, { doc, text: docToPayload(doc).text })}
+          onAttachmentsChange={(ids) => composer.update(draftKey, { attachments: ids })}
           onSend={submit}
           streaming={chat.streaming}
           onStop={() => void chat.stop()}
           suggestions={showSuggestions(chat) ? suggestions : undefined}
-          cwd={cwd}
           providers={providers}
           model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
           thinkingLevel={
@@ -212,6 +238,7 @@ export function ChatPanel({
           onSelectModel={onSelectModel}
           onSelectThinkingLevel={onSelectThinkingLevel}
           onSelectMode={onSelectMode}
+          onBuiltin={onBuiltin}
         />
       )}
     </main>

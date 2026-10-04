@@ -19,6 +19,8 @@ export type ApiEndpoint = {
   output: string;
   /** 是否 SSE 事件流（不套封套） */
   stream?: boolean;
+  /** 是否二进制响应（非 JSON，不套封套）；仅 GET，`output` 留空 */
+  binary?: boolean;
   /** 一句话说明 */
   summary: string;
 };
@@ -173,6 +175,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     output: "MessageInterruptResponse",
     summary: "中断当前生成",
   },
+  {
+    domain: "messages",
+    action: "compact",
+    method: "POST",
+    input: "messageCompactInputSchema",
+    requestType: "MessageCompactInput",
+    output: "PromptAdmittedResponse",
+    summary: "手动压缩上下文（后台执行，走 compaction_* 事件）",
+  },
 
   {
     domain: "events",
@@ -215,6 +226,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "fs",
+    action: "search",
+    method: "POST",
+    input: "fsSearchInputSchema",
+    requestType: "FsSearchInput",
+    output: "FsSearchResponse",
+    summary: "按名模糊检索文件（受跳目录 / 深度 / 条数约束）",
+  },
+  {
+    domain: "fs",
     action: "mkdir",
     method: "POST",
     input: "fsMkdirInputSchema",
@@ -249,6 +269,37 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     requestType: "McpDeleteInput",
     output: "McpDeleteResponse",
     summary: "按 name 删除 MCP 服务器",
+  },
+
+  {
+    domain: "agents",
+    action: "list",
+    method: "POST",
+    input: "agentsListInputSchema",
+    requestType: "AgentsListInput",
+    output: "AgentsListResponse",
+    summary: "列出可选的 primary / subagent 角色",
+  },
+
+  {
+    domain: "attachments",
+    action: ":id",
+    method: "GET",
+    input: null,
+    requestType: null,
+    output: "",
+    binary: true,
+    summary: "按 id 返回附件原始字节（非 JSON，不走封套）",
+  },
+
+  {
+    domain: "commands",
+    action: "list",
+    method: "POST",
+    input: "commandsListInputSchema",
+    requestType: "CommandsListInput",
+    output: "CommandsListResponse",
+    summary: "列出可用的提示词命令与技能",
   },
 
   {
