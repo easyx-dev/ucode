@@ -56,6 +56,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
   const running = services.pool.isActive(sessionId);
   // 池内会话直接读内存条目，避免每次 info 都重解析整份会话文件
   const usage = services.usage.usageOf(record, { live: services.pool.get(sessionId) });
+  const goal = services.goals.view(record, services.pool.get(sessionId));
 
   if (!record.sourcePath) {
     return {
@@ -70,6 +71,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
         { createdAt: record.createdAt, updatedAt: record.updatedAt },
       ),
       usage,
+      goal,
     };
   }
 
@@ -83,6 +85,7 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
       record.childCount,
     ),
     usage,
+    goal,
   };
 };
 
@@ -176,6 +179,10 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
       path: patch.sessionId,
     });
   }
+  // 目标只跑在 build 上：切走执行模式即暂停，避免只读模式仍在自动续跑
+  if (patch.mode && patch.mode !== "build") {
+    services.goals.pause(record, "mode", services.pool.get(patch.sessionId));
+  }
   if (record.sourcePath) {
     const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);
     const index = indexFromManager(manager);
@@ -207,9 +214,10 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
   for (const id of targets) {
     services.pool.dispose(id);
     services.events.remove(id);
-    // 会话归档后，挂起的审批与「本会话恒允」都失去意义
+    // 会话归档后，挂起的审批与「本会话恒允」都失去意义；目标状态一并清掉
     services.interactions.forget(id);
     services.permissions.clear(id);
+    services.sessions.setGoal(id, null);
     services.sessions.archive(id);
   }
 

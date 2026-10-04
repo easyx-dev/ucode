@@ -7,6 +7,8 @@ export * from "./envelope";
 export * from "./events";
 export * from "./fs/input";
 export * from "./fs/output";
+export * from "./goals/input";
+export * from "./goals/output";
 export * from "./health/output";
 export * from "./interactions/input";
 export * from "./interactions/output";

@@ -48,6 +48,33 @@ export type SessionMode = (typeof SESSION_MODES)[number];
 export const DEFAULT_SESSION_MODE: SessionMode = "build";
 
 /**
+ * 目标模式的状态：`active` 自动推进 / `paused` 已暂停（`cause` 说明原因）/
+ * `completed` 已达成。只有 `active` 才会触发自动续跑。
+ */
+export const GOAL_STATUSES = ["active", "paused", "completed"] as const;
+
+export type GoalStatus = (typeof GOAL_STATUSES)[number];
+
+/**
+ * 目标暂停的原因：用户主动暂停 / 切走 build 模式 / 当前轮被中断 /
+ * 连续无进展 / 达到轮数上限 / 达到 token 预算 / 生成出错。
+ */
+export const GOAL_PAUSE_CAUSES = [
+  "user",
+  "mode",
+  "interrupted",
+  "no_progress",
+  "limit",
+  "budget",
+  "error",
+] as const;
+
+export type GoalPauseCause = (typeof GOAL_PAUSE_CAUSES)[number];
+
+/** 目标描述的字符上限；与 Codex / pi-goal 的 4000 一致 */
+export const GOAL_MAX_OBJECTIVE_LENGTH = 4000;
+
+/**
  * 权限动作三态：`allow` 直接放行 / `ask` 交由用户确认 / `deny` 阻断。
  * 规则按工具名分键、pattern 匹配，**最后命中者胜**；未命中任何规则时默认 `allow`。
  */

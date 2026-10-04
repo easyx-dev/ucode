@@ -114,6 +114,24 @@ export const MEMORY_REVIEW_MAX_TOKENS = 1_024;
 /** 自动回顾调用的超时；超时只记日志，不影响会话 */
 export const MEMORY_REVIEW_TIMEOUT_MS = 60_000;
 
+/** 目标模式自动续跑的轮数上限（断路器，见 plans/stage-11-goal.md）；对齐 pi-goal 的 25 */
+export const GOAL_MAX_TURNS = 25;
+
+/** 目标模式连续无工具调用多少轮后暂停（无进展守卫）；对齐 Codex / Claude / pi-goal */
+export const GOAL_NO_PROGRESS_TURNS = 3;
+
+/** 目标校验调用的最长输出 token */
+export const GOAL_VERIFY_MAX_TOKENS = 1_024;
+
+/** 目标校验调用的超时；超时按「未达成」处理并计入止损 */
+export const GOAL_VERIFY_TIMEOUT_MS = 60_000;
+
+/** 目标校验时最多回看的用户轮数 */
+export const GOAL_EVIDENCE_MAX_USER_TURNS = 3;
+
+/** 目标校验时交流文本的字符上限 */
+export const GOAL_EVIDENCE_MAX_CHARS = 12_000;
+
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;
 

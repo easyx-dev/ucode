@@ -60,6 +60,8 @@ export type SessionRecord = {
   agent: string | null;
   /** 本会话分叉自哪个会话；非分叉会话为空 */
   forkedFromId: string | null;
+  /** 会话目标的 JSON 状态（见 plans/stage-11-goal.md）；为空表示未设置目标 */
+  goalState: string | null;
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */
@@ -101,6 +103,7 @@ const SESSION_COLUMNS = [
   "parent_session_id",
   "agent",
   "forked_from_session_id",
+  "goal_state",
   "source_path",
   "preview",
   "created_at",
@@ -123,6 +126,7 @@ const rowSchema = z.object({
   parent_session_id: z.string().nullable(),
   agent: z.string().nullable(),
   forked_from_session_id: z.string().nullable(),
+  goal_state: z.string().nullable(),
   source_path: z.string().nullable(),
   preview: z.string(),
   created_at: z.string(),
@@ -143,6 +147,7 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   parentSessionId: row.parent_session_id,
   agent: row.agent,
   forkedFromId: row.forked_from_session_id,
+  goalState: row.goal_state,
   childCount: row.child_count,
   sourcePath: row.source_path,
   preview: row.preview,
@@ -312,6 +317,14 @@ export class SessionRepository {
   /** 硬删本表行；只给对账与测试用（用户动作一律走 `archive`，见 docs/database.md） */
   delete(id: string): void {
     this.db.prepare("DELETE FROM session WHERE id = ?").run(id);
+  }
+
+  /**
+   * 写会话目标状态；`state` 为 null 表示清除。
+   * 不复用 `set`：那里用 COALESCE 合并覆盖值，无法把已有列显式置空。
+   */
+  setGoal(id: string, state: string | null): void {
+    this.db.prepare("UPDATE session SET goal_state = ? WHERE id = ?").run(state, id);
   }
 
   /**

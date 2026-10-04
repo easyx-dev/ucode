@@ -212,6 +212,7 @@ describe("UsageService", () => {
     parentSessionId: null,
     agent: null,
     forkedFromId: null,
+    goalState: null,
     childCount: 0,
     sourcePath,
     preview: "",

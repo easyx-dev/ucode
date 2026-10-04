@@ -22,21 +22,10 @@ const waitForBusy = async (
   return session.isStreaming;
 };
 
-/** 后台失败只能通过事件流回传，调用方连接此时可能早已断开 */
-const report = (services: Services, sessionId: string, error: unknown): void => {
-  const code = error instanceof AppError ? error.code : ERROR_CODES.internal;
-  const message = error instanceof Error ? error.message : String(error);
-  services.events.emitError(
-    sessionId,
-    code,
-    message,
-    error instanceof AppError ? error.params : undefined,
-  );
-};
-
 /**
  * 开一轮后台生成：立即返回，不 await。
  * 这正是「刷新后仍能看到输出」的前提——run 的所有权在服务端，不在请求连接上。
+ * 后台起轮与错误回传统一收敛在会话池，供 HTTP 触发与目标续跑共用。
  */
 const startRun = (
   services: Services,
@@ -44,17 +33,7 @@ const startRun = (
   session: AgentSession,
   text: string,
 ): void => {
-  if (!services.pool.beginRun(sessionId)) {
-    throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请稍后重试或改用 steer", 409);
-  }
-  void session
-    .prompt(text)
-    .catch((error) => report(services, sessionId, error))
-    .finally(() => {
-      services.pool.endRun(sessionId);
-      // 生成落定后立即刷新 SQLite 索引，列表 / 详情不必再读 JSONL
-      services.pool.refreshIndex(sessionId);
-    });
+  services.pool.startRun(sessionId, session, text);
 };
 
 /**
@@ -133,4 +112,17 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
     services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
     startRun(services, sessionId, session, text);
   });
+};
+
+/**
+ * 目标模式触发的后台轮（启动 / 恢复目标）：会话必须已在跑之前的空闲状态。
+ * 与 prompt 不同，这里不排队——目标续跑只在落定边界发生，运行中说明状态已变，直接拒绝。
+ */
+export const admitGoalRun = async (
+  services: Services,
+  sessionId: string,
+  text: string,
+): Promise<void> => {
+  const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
+  services.pool.startRun(sessionId, session, text);
 };

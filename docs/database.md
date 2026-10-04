@@ -51,7 +51,8 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
   `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
-  `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）
+  `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/
+  `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）
 - **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写）：`source_path` /
   `preview` / `created_at` / `updated_at`
 

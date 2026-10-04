@@ -18,6 +18,7 @@ import {
   subagentProfile,
   usesDefaultToolSet,
 } from "../agent/agents";
+import type { GoalService } from "../agent/goal";
 import type { MemoryService } from "../agent/memory";
 import type { PermissionRule, SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
@@ -65,6 +66,8 @@ export class SessionPool {
     },
     /** 项目级记忆：落定后自动回顾，并把索引 / 工具接进会话装配 */
     private readonly memory: MemoryService,
+    /** 目标模式：落定后校验并按需续跑 */
+    private readonly goals: GoalService,
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -99,6 +102,35 @@ export class SessionPool {
     if (!session) return;
     const index = indexFromManager(session.sessionManager);
     if (index) this.repository.refresh(sessionId, index);
+  }
+
+  /**
+   * 开一轮后台生成：立即返回，不 await；生成所有权在服务端，结果走事件流。
+   * HTTP 触发与目标续跑共用这一条路径，保证 `running` / 索引刷新 / 错误回传一致。
+   */
+  startRun(sessionId: string, session: AgentSession, text: string): void {
+    if (!this.beginRun(sessionId)) {
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请稍后重试或改用 steer", 409);
+    }
+    void session
+      .prompt(text)
+      .catch((error) => this.reportRunError(sessionId, error))
+      .finally(() => {
+        this.endRun(sessionId);
+        this.refreshIndex(sessionId);
+      });
+  }
+
+  /** 后台失败只能通过事件流回传，发起请求的连接此时可能早已断开 */
+  private reportRunError(sessionId: string, error: unknown): void {
+    const code = error instanceof AppError ? error.code : ERROR_CODES.internal;
+    const message = error instanceof Error ? error.message : String(error);
+    this.events.emitError(
+      sessionId,
+      code,
+      message,
+      error instanceof AppError ? error.params : undefined,
+    );
   }
 
   /**
@@ -261,11 +293,25 @@ export class SessionPool {
       if (mode === "build" && usesDefaultToolSet(capability)) await session.bindExtensions({});
 
       // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾。
-      // 子会话不参与回顾，避免把半截结论固化成项目记忆
+      // 子会话不参与回顾，避免把半截结论固化成项目记忆；目标续跑同为落定后动作。
       const memoryUnsubscribe = isSubagent
         ? () => {}
         : session.subscribe((event) => {
-            if (event.type === "agent_settled") this.memory.review(sessionId, session);
+            if (event.type !== "agent_settled") return;
+            this.memory.review(sessionId, session);
+            void this.goals
+              .onSettled(sessionId, session)
+              .then((outcome) => {
+                if (!outcome) return;
+                // 会话可能在校验期间被回收 / 重建：只有仍是池里这一个实例才起续跑
+                if (this.entries.get(sessionId)?.session !== session) return;
+                try {
+                  this.startRun(sessionId, session, outcome.continue);
+                } catch (error) {
+                  logger.warn({ sessionId, error }, "目标续跑启动失败");
+                }
+              })
+              .catch((error: unknown) => logger.warn({ sessionId, error }, "目标落定处理失败"));
           });
 
       const entry: PooledSession = { session, lastUsed: Date.now(), memoryUnsubscribe };
@@ -327,6 +373,7 @@ export class SessionPool {
     this.running.delete(sessionId);
     this.events.detach(sessionId);
     this.memory.discardReview(sessionId);
+    this.goals.forget(sessionId);
     try {
       entry.memoryUnsubscribe();
     } catch {

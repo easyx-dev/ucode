@@ -10,6 +10,8 @@ import {
   type FsListResponse,
   type FsMkdirRequest,
   type FsMkdirResponse,
+  type GoalResponse,
+  type GoalSetRequest,
   type HealthResponse,
   type InteractionListResponse,
   type InteractionRespondRequest,
@@ -145,6 +147,18 @@ export const api = {
   stats: {
     /** 全局使用统计；`days` 缺省为全部时间 */
     summary: (body: StatsSummaryRequest = {}) => post<StatsSummaryResponse>("stats/summary", body),
+  },
+  goals: {
+    /** 设定 / 替换当前会话目标；由服务端起第一轮 */
+    set: (body: GoalSetRequest) => post<GoalResponse>("goals/set", body),
+    status: (sessionId: string) =>
+      post<GoalResponse>("goals/status", { sessionId } satisfies SessionIdRequest),
+    pause: (sessionId: string) =>
+      post<GoalResponse>("goals/pause", { sessionId } satisfies SessionIdRequest),
+    resume: (sessionId: string) =>
+      post<GoalResponse>("goals/resume", { sessionId } satisfies SessionIdRequest),
+    clear: (sessionId: string) =>
+      post<GoalResponse>("goals/clear", { sessionId } satisfies SessionIdRequest),
   },
   interactions: {
     /** 补齐某会话尚未回答的交互请求（刷新 / 重连后） */

@@ -2,6 +2,7 @@
 import type { AppConfigPatchInput } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
 
+import { GoalService } from "./agent/goal";
 import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
 import { UsageService } from "./agent/usage";
@@ -29,6 +30,8 @@ export type Services = {
   permissions: SessionAllowStore;
   /** 使用统计：从会话记录聚合 token 用量，不落库 */
   usage: UsageService;
+  /** 目标模式：会话目标状态与落定后的校验续跑 */
+  goals: GoalService;
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
@@ -48,6 +51,7 @@ export const createServices = async (): Promise<Services> => {
   const permissions = new SessionAllowStore();
   const usage = new UsageService(sessions);
   const memory = new MemoryService(() => config.get().memory);
+  const goals = new GoalService(sessions, usage, events);
   const pool = new SessionPool(
     runtime,
     sessions,
@@ -58,6 +62,7 @@ export const createServices = async (): Promise<Services> => {
       interactions,
     },
     memory,
+    goals,
   );
 
   config.load();
@@ -93,6 +98,7 @@ export const createServices = async (): Promise<Services> => {
     interactions,
     permissions,
     usage,
+    goals,
     async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
       // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json

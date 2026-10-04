@@ -35,6 +35,13 @@
 
 ### 新增
 
+- 新增**目标模式**：`/goal <目标>` 给当前会话设目标，每轮落定后由服务端一次独立校验模型调用判断是否达成，
+  未达成自动续跑，直到达成、用户暂停 / 清除，或触发止损。目标是**会话属性**（叠加在 `build` 模式上，
+  不改变工具集与权限），仅编码模式可设；切走模式、当前轮被中断、生成出错都会暂停。新增
+  `goals/set|status|pause|resume|clear` 接口（`goalSetInputSchema`：`sessionId` / `objective` /
+  可选 `tokenBudget`）；`session` 表新增 `goal_state`（schema v4，单列 JSON 存状态）；`sessions/info`
+  响应追加 `goal`；新增 `goal_update` 事件。三层止损：连续 3 轮无工具调用、可选 token 预算、
+  默认 25 轮自动续跑上限（均转为暂停并保留目标）。前端在输入区上方新增目标栏，`/goal` 命令由客户端识别。
 - 新增**使用统计**：从 pi 会话记录里的 `usage`（assistant 消息 / `usage` 条目 / compaction）聚合 token 用量，
   **不落库**，按会话文件 mtime 内存缓存。新增 `stats/summary` 接口（`statsSummaryInputSchema`：可选 `days`），
   `sessions/info` 响应追加 `usage`；子会话与分叉会话一并计入并按来源标注。界面在对话区头部显示本会话用量，

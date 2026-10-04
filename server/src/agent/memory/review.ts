@@ -5,7 +5,7 @@
  * 解析失败或结构不符一律按「不保存」处理——宁可漏记，也不要写进半截内容。
  * 被中断或出错结束的轮次不回顾（见 `shouldReview`），交流正文按不可信资料对待。
  */
-import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import {
   MEMORY_REVIEW_MAX_CHARS,
@@ -14,15 +14,10 @@ import {
   MEMORY_REVIEW_TIMEOUT_MS,
 } from "../../constants";
 import type { PiModel } from "../../core/runtime";
+import { type ExchangeTurn, type SessionMessage, sliceExchange, textOf } from "../transcript";
 import { rememberFact } from "./store";
 
-type SessionMessage = AgentSession["messages"][number];
 type AssistantMessage = Awaited<ReturnType<ModelRuntime["completeSimple"]>>;
-
-export type ExchangeTurn = {
-  role: "user" | "assistant";
-  text: string;
-};
 
 export type ReviewDecision =
   | { remember: false }
@@ -38,23 +33,6 @@ const REVIEW_SYSTEM_PROMPT = [
   '有且只有一条值得保留时输出 {"remember": true, "title": "简短标题", "content": "独立于本轮对话也能读懂的事实"}。',
   "只输出 JSON，不要代码块、解释或多余文字。",
 ].join("\n");
-
-/** 从消息里取纯文本：用户消息可能是字符串，助手消息是内容块数组 */
-const textOf = (message: { content?: unknown }): string => {
-  const content = message.content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter(
-      (item): item is { type: "text"; text: string } =>
-        typeof item === "object" &&
-        item !== null &&
-        (item as { type?: unknown }).type === "text" &&
-        typeof (item as { text?: unknown }).text === "string",
-    )
-    .map((item) => item.text)
-    .join("\n");
-};
 
 /**
  * 是否值得回顾：被中断或出错结束的轮次交流是半截的，写进长期记忆会把没做完的结论固化成事实，
@@ -74,34 +52,7 @@ export const extractExchange = (
   messages: readonly SessionMessage[],
   maxUserTurns = MEMORY_REVIEW_MAX_USER_TURNS,
   maxChars = MEMORY_REVIEW_MAX_CHARS,
-): ExchangeTurn[] => {
-  const turns: ExchangeTurn[] = [];
-  let userTurns = 0;
-
-  for (let index = messages.length - 1; index >= 0 && userTurns < maxUserTurns; index -= 1) {
-    const message = messages[index];
-    if (!message) continue;
-    if (message.role !== "user" && message.role !== "assistant") continue;
-    const text = textOf(message).trim();
-    if (!text) continue;
-    turns.push({ role: message.role, text });
-    if (message.role === "user") userTurns += 1;
-  }
-  turns.reverse();
-
-  let total = turns.reduce((sum, turn) => sum + turn.text.length, 0);
-  while (turns.length > 1 && total > maxChars) {
-    total -= turns[0]?.text.length ?? 0;
-    turns.shift();
-  }
-  // 只剩最后一轮仍超限时按预算截断，避免单条超大回复绕过上限
-  const first = turns[0];
-  if (first && total > maxChars) {
-    const keep = Math.max(0, maxChars - (total - first.text.length));
-    turns[0] = { ...first, text: first.text.slice(0, keep) };
-  }
-  return turns;
-};
+): ExchangeTurn[] => sliceExchange(messages, maxUserTurns, maxChars);
 
 const buildReviewMessage = (turns: readonly ExchangeTurn[]): string => {
   const body = turns

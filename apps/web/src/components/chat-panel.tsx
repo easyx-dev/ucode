@@ -6,15 +6,19 @@ import { useTranslation } from "react-i18next";
 import { ChatHeader } from "@/components/chat-header";
 import { Composer } from "@/components/composer";
 import { DirectoryDialog } from "@/components/directory-dialog";
+import { GoalBar } from "@/components/goal-bar";
 import { MessageList } from "@/components/message-list";
 import { PlanDecisionForm } from "@/components/plan-decision-form";
 import { Button } from "@/components/ui/button";
 import type { ChatController } from "@/hooks/use-chat";
 import type { ComposerDraftsController } from "@/hooks/use-composer-drafts";
+import type { SessionSeed } from "@/hooks/use-send-message";
 import { composerKeyOf, emptyDraft } from "@/lib/composer-draft";
+import { type GoalCommand, parseGoalCommand } from "@/lib/goal-command";
 import { isWorkspaceSession } from "@/lib/session-groups";
 import type {
   ChatItem,
+  GoalView,
   ModelsResponse,
   SessionMode,
   SessionSummary,
@@ -49,6 +53,10 @@ type ChatPanelProps = {
   onEdit: (item: ChatItem, text: string) => Promise<boolean>;
   /** 本会话分叉自的源会话名；用于头部来源链接 */
   forkedFromName?: string | null;
+  /** 当前会话目标；用于输入区上方的目标栏 */
+  goal?: GoalView | null;
+  /** 处理 `/goal` 命令（设定 / 暂停 / 恢复 / 清除 / 查看） */
+  onGoalCommand: (command: GoalCommand, seed?: SessionSeed) => void;
   /** 本会话累计 token 用量；用于头部徽标 */
   usage?: UsageTotals | null;
   /** 打开全局使用统计 */
@@ -77,6 +85,8 @@ export function ChatPanel({
   onFork,
   onEdit,
   forkedFromName,
+  goal,
+  onGoalCommand,
   usage,
   onOpenUsage,
   onBackToParent,
@@ -103,11 +113,18 @@ export function ChatPanel({
       thinkingLevel: draft.thinkingLevel,
       mode: draft.mode,
     };
+    // 以 `/goal` 开头的是目标命令，不进普通消息流
+    const command = parseGoalCommand(text);
+    if (command) {
+      composer.clear(draftKey);
+      onGoalCommand(command, seed);
+      return;
+    }
     composer.clear(draftKey);
     void chat.send(text, seed).then(({ sessionId: target, admitted }) => {
       if (!admitted) composer.update(composerKeyOf(target), { text, ...seed });
     });
-  }, [chat, composer, draft, draftKey]);
+  }, [chat, composer, draft, draftKey, onGoalCommand]);
 
   // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」；
   // 空态显示草稿绑定的目录（「在目录中新建」选的）
@@ -162,6 +179,10 @@ export function ChatPanel({
         onFork={isChild ? undefined : onFork}
         onEdit={isChild || chat.streaming ? undefined : onEdit}
       />
+
+      {!isChild && goal ? (
+        <GoalBar goal={goal} onCommand={(command) => onGoalCommand(command)} />
+      ) : null}
 
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">

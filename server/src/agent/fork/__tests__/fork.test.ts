@@ -89,6 +89,7 @@ describe("resolveForkSource", () => {
     parentSessionId: null,
     agent: null,
     forkedFromId: null,
+    goalState: null,
     childCount: 0,
     sourcePath: "/tmp/src.jsonl",
     preview: "",

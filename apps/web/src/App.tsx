@@ -1,6 +1,7 @@
 /** 应用外壳：会话侧栏 + 对话区 + 设置对话框 */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import { ChatPanel } from "@/components/chat-panel";
 import { PermissionDialog } from "@/components/permission-dialog";
@@ -11,10 +12,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UsageDialog } from "@/components/usage-dialog";
 import { WelcomePanel } from "@/components/welcome-panel";
+import { useGoal } from "@/hooks/use-goal";
 import { useInteractions } from "@/hooks/use-interactions";
+import type { SessionSeed } from "@/hooks/use-send-message";
 import { useSessionUsage } from "@/hooks/use-session-usage";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { composerKeyOf, NEW_SESSION_KEY } from "@/lib/composer-draft";
+import type { GoalCommand } from "@/lib/goal-command";
 import { lastTurnPresentedPlan } from "@/lib/plan";
 import type { ChatItem, SessionMode, ThinkingLevel } from "@/lib/types";
 
@@ -24,6 +28,7 @@ export default function App() {
   const { sessions, models, configured, activeId, activeSession, chat, workspaceRoot } = workspace;
   const { composer, setActiveId } = workspace;
   const interactions = useInteractions(activeId);
+  const goal = useGoal(activeId);
   const [usageOpen, setUsageOpen] = useState(false);
   // 本会话累计用量：切换会话时取一次，生成落定后刷新
   const sessionUsage = useSessionUsage(activeSession?.id ?? null, chat.streaming);
@@ -76,6 +81,45 @@ export default function App() {
     void sessions.fork(activeId, item.id).then((session) => {
       if (session) setActiveId(session.id);
     });
+  };
+
+  /**
+   * `/goal` 命令：草稿态先建会话再设目标；其余命令作用于当前会话。
+   * 目标模式只在编码模式可用，服务端会再校验一次。
+   */
+  const runGoalCommand = (command: GoalCommand, seed: SessionSeed = {}): void => {
+    void (async () => {
+      if (command.kind === "set") {
+        if (activeId) {
+          await goal.set(activeId, { objective: command.objective });
+          return;
+        }
+        const created = await sessions.create(seed);
+        if (!created) return;
+        await goal.set(created.id, { objective: command.objective });
+        setActiveId(created.id);
+        return;
+      }
+      if (!activeId) {
+        toast.info(t("目标.暂无"));
+        return;
+      }
+      switch (command.kind) {
+        case "pause":
+          await goal.pause(activeId);
+          break;
+        case "resume":
+          await goal.resume(activeId);
+          break;
+        case "clear":
+          await goal.clear(activeId);
+          break;
+        case "status":
+          if (goal.goal) await goal.refresh(activeId);
+          else toast.info(t("目标.暂无"));
+          break;
+      }
+    })();
   };
 
   /** 编辑用户消息并重发；分支与刷新由服务端推进（transcript_reset 事件触发重取快照） */
@@ -135,6 +179,8 @@ export default function App() {
           onFork={forkFrom}
           onEdit={editMessage}
           forkedFromName={forkSourceName}
+          goal={goal.goal}
+          onGoalCommand={runGoalCommand}
           usage={sessionUsage}
           onOpenUsage={() => setUsageOpen(true)}
           onBackToParent={() => {

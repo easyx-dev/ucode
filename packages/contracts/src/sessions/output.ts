@@ -1,6 +1,7 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
 import type { SessionMode, ThinkingLevel } from "../constants";
+import type { GoalView } from "../goals/output";
 import type { UsageTotals } from "../stats/output";
 
 export type SessionSummary = {
@@ -42,6 +43,8 @@ export type SessionInfoResponse = {
   session: SessionSummary;
   /** 本会话累计 token 用量（见 stage-10）；未落盘 / 无用量时为零值 */
   usage: UsageTotals;
+  /** 当前会话目标（见 plans/stage-11-goal.md）；未设置或已清除时为空 */
+  goal: GoalView | null;
 };
 
 export type SessionArchiveResponse = SessionScoped & {

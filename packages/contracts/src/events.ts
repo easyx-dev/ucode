@@ -33,6 +33,8 @@ export const EVENT_NAMES = [
    */
   "subagent_start",
   "subagent_end",
+  /** 会话目标状态变化（设定 / 暂停 / 恢复 / 清除 / 续跑 / 完成），载荷为 `GoalView | null` */
+  "goal_update",
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
