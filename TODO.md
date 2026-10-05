@@ -20,13 +20,7 @@ curl -i -X OPTIONS http://192.168.1.149:2048/api/v1/messages/prompt \
 
 **风险**：agent 带 `read` / `write` / `edit` / `bash`，`APP_HOME` 指向真实仓库时，同网段任何人都能通过 HTTP 让它执行命令并读回结果；用户浏览任意网页时，该网页也能驱动本地服务（CORS 用 `*` 放行了预检）。
 
-**待办**：
-
-1. `/api/v1` 加 token 鉴权（`Authorization: Bearer <token>` 或 `X-Api-Token`）。token 首次启动随机生成，写入 `$APP_HOME/token`（0600）并打印到启动日志；`GET /api/v1/health` 放行。
-2. 默认只监听回环：`serve({ fetch: app.fetch, port: env.port, hostname: process.env.HOST ?? "127.0.0.1" })`，需要局域网访问时用 `HOST=0.0.0.0` 显式开启。
-3. `APP_CORS_ORIGIN` 默认改为 dev 下的 vite 源（`http://localhost:5173`），不再默认 `*`。生产是 server 同源托管 `apps/web/dist`，不依赖 CORS，收紧不会破坏部署。
-4. 前端 `apps/web/src/lib/api.ts` 统一带上 token（存 localStorage 或构建时注入），设置页加一个 token 输入框。
-5. `.env.example` / `README.md` 补 `HOST`、`API_TOKEN` 说明，并提示"不要把带 shell 权限的 agent 暴露到公网"。
+**待办**：实现方案已独立成文，落地按 [`plans/service-and-auth.md`](./plans/service-and-auth.md) 执行——该方案取代本节的实现清单（鉴权改为会话 Cookie + 一次性配对链接，`service.json` 承载 host / port / 凭证，而非 `$APP_HOME/token`）。
 
 **验收**：同网段 `curl http://<LAN-IP>:2048/api/v1/health` 连不上（默认回环）；带上正确 token 才能调用其他接口；无 token 返回 401；带 `Origin: https://evil.example` 的预检不再返回 `allow-origin: *`。
 
@@ -191,6 +185,15 @@ https://zcode.z.ai/cn/docs/edit-history
 
 ## 使用统计
 
+
+## 中继服务（切面：模型端点 + 通道）
+
+> **状态：暂缓（2026-10-05）。** 方案见 [`plans/relay.md`](./plans/relay.md)；只有收到明确指令才启动。
+
+中继是一个「切面」：对外提供登录后才可用的能力（先落地模型 API 端点），登录同时完成认证 + 绑定 + 建立通道，
+app 顺着通道调用 ucode 服务层。ucode 侧只加一个中继客户端（登录 / 保活通道 / 用 `serviceToken` 转发并加来源头 / 可选 provider）。
+
+前置：服务化（服务注册 + 鉴权 + 配对链接）先落地，见 [`plans/service-and-auth.md`](./plans/service-and-auth.md)。
 
 （其余项见 README「常见问题」；已修的 review 问题不在此列。）
 
