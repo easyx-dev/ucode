@@ -145,6 +145,17 @@ https://pi.dev/packages/@schovest/pi-goal
 也可以参考 claude code ，zocode，codex 的
 https://zcode.z.ai/cn/docs/goal
 
+## 插件机制
+
+方案见 [`plans/plugins.md`](./plans/plugins.md)。采用与 Claude Code / ZCode **同形**的插件格式
+（清单 `.ucode-plugin/plugin.json`，兼容识别 `.zcode-plugin` / `.claude-plugin`），一个插件可打包
+skills / commands / agents / hooks / bin / MCP。
+
+边界：只读 ucode 自己的插件根（`$APP_HOME/plugins` + 项目 `.ucode/plugins`），不读他方安装目录、
+不做格式转换；项目级插件需显式启用。
+
+状态：**暂不开发，待后续**。
+
 ## 项目级记忆（Memory）
 有些信息只值得告诉 Agent 一次：你习惯的 commit message 写法、项目用的包管理器、团队的评审约定。Memory 为 UCode Agent 提供项目级的长期记忆，让这类信息延续到后续会话，而不需要每次对话开头都重复交代。
 
