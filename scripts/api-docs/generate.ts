@@ -15,6 +15,10 @@ import { jsonSchemaToDocNode } from "./schema-params.ts";
 /** 域的中文标题 */
 const DOMAIN_LABELS: Record<string, string> = {
   health: "健康检查",
+  info: "服务发现",
+  status: "运行时状态",
+  auth: "鉴权",
+  service: "服务",
   models: "模型目录",
   config: "配置",
   sessions: "会话",
@@ -67,7 +71,7 @@ const renderEndpoint = (
     const node = jsonSchemaToDocNode(jsonSchema, docs);
     blocks.push(renderTables(renderNodeTables(node, refs), "request"), "");
   } else {
-    blocks.push("无参数（body 传 `{}`）", "");
+    blocks.push(endpoint.method === "GET" ? "无参数" : "无参数（body 传 `{}`）", "");
   }
 
   if (endpoint.binary) {
@@ -134,7 +138,7 @@ export const buildApiDoc = (): string => {
     "",
     "## 约定速览",
     "",
-    `- 前缀 \`${contracts.API_BASE_PATH}\`；除 \`GET /api/v1/health\`、\`GET /api/v1/attachments/<id>\` 与 \`POST /api/v1/attachments\`（原始字节请求体）外一律 \`POST\` + JSON body，无参数接口也要发 \`{}\``,
+    `- 前缀 \`${contracts.API_BASE_PATH}\`；除 \`GET /api/v1/health\`、\`GET /api/v1/info\`、\`GET /api/v1/status\`、\`GET /api/v1/auth/session\`、\`GET /api/v1/auth/sessions\`、\`GET /api/v1/service/info\`、\`GET /api/v1/attachments/<id>\` 与 \`POST /api/v1/attachments\`（原始字节请求体）外一律 \`POST\` + JSON body，无参数接口也要发 \`{}\``,
     '- 非流式响应共用封套：成功 `{ success: true, code: "ok", message: "", data }`；失败 `{ success, code, message, data, params? }`',
     "- 字段一律 camelCase；请求里指向资源的 id 用 `<资源>Id`，响应里资源自身用 `id`",
     "- 类型文本中的链接指向文末「公共类型」；`（…）` 内为该字段的取值约束",

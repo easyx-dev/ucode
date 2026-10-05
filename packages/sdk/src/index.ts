@@ -21,10 +21,10 @@ export {
 export { createEventStream, type EventConnect, type EventStream } from "./events";
 export { readSseStream } from "./sse";
 export { createStore, type Store } from "./store";
+export { type AuthState, type AuthStore, createAuthStore } from "./stores/auth";
 export { type CommandAssets, type CommandsStore, createCommandsStore } from "./stores/commands";
 export { type ConfigState, type ConfigStore, createConfigStore } from "./stores/config";
 export { createGoalStore, type GoalInput, type GoalState, type GoalStore } from "./stores/goal";
-export { createHealthStore, type HealthStore } from "./stores/health";
 export {
   createInteractionsStore,
   type InteractionsState,
@@ -38,6 +38,7 @@ export {
 } from "./stores/messages";
 export { createModelsStore, type ModelsState, type ModelsStore } from "./stores/models";
 export { createSessionsStore, type SessionsState, type SessionsStore } from "./stores/sessions";
+export { createStatusStore, type StatusStore } from "./stores/status";
 export { createUsageStore, type UsageState, type UsageStore } from "./stores/usage";
 export {
   createTransport,

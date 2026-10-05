@@ -62,6 +62,19 @@ export const ERROR_CODES = {
   /** 配置文件解析失败 */
   invalidConfig: "invalid_config",
 
+  /** 未认证：缺少或无效的凭证 */
+  unauthorized: "unauthorized",
+  /** 登录密码错误 */
+  invalidCredentials: "invalid_credentials",
+  /** 权限不足（角色 / 权限分级预留） */
+  forbidden: "forbidden",
+  /** 配对码不存在或已使用 */
+  pairingInvalid: "pairing_invalid",
+  /** 配对码已过期 */
+  pairingExpired: "pairing_expired",
+  /** 请求过于频繁，触发了限流 */
+  rateLimited: "rate_limited",
+
   /** 路径不存在，或存在但不是目录 */
   pathNotFound: "path_not_found",
   /** 要创建的目录已存在 */

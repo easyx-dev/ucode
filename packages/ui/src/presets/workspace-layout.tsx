@@ -23,11 +23,11 @@ import { useActiveSession } from "../hooks/use-active-session";
 import { useChat } from "../hooks/use-chat";
 import { useComposerDrafts } from "../hooks/use-composer-drafts";
 import { useGoal } from "../hooks/use-goal";
-import { useHealth } from "../hooks/use-health";
 import { useInteractions } from "../hooks/use-interactions";
 import { useModels } from "../hooks/use-models";
 import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
+import { useStatus } from "../hooks/use-status";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
 import { composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
@@ -64,7 +64,7 @@ export function WorkspaceLayout({
   const { t } = useTranslation();
   const sessions = useSessions();
   const models = useModels();
-  const workspaceRoot = useHealth()?.workspace ?? null;
+  const workspaceRoot = useStatus()?.workspace ?? null;
   const composer = useComposerDrafts();
   // 会话归档 / id 失效时把选中项清回空态
   const activeSession = useActiveSession(activeId, () => setActiveId(null));

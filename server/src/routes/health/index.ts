@@ -1,29 +1,16 @@
-/** /api/v1/health：存活与运行时状态（全站唯一的 GET 接口，无请求参数） */
-import { API_VERSION, type HealthResponse } from "@ucode/contracts";
+/** /api/v1/health：存活探针（最小载荷，未认证可访问，不泄露模型 / 配置） */
+import type { HealthMinimalResponse } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import type { Services } from "../../app";
-import { env } from "../../env";
 import { ok } from "../../lib/response";
+import { serviceVersion } from "../../lib/version";
 
-export const createHealthRoute = (services: Services) => {
+export const createHealthRoute = () => {
   const router = new Hono();
 
-  router.get("/", (c) => {
-    const status = services.runtime.getStatus();
-    return c.json(
-      ok({
-        apiVersion: API_VERSION,
-        configured: status.configured,
-        defaultModel: status.defaultModel,
-        thinkingLevel: status.thinkingLevel,
-        error: status.error,
-        workspace: env.workspaceRoot,
-        activeSessions: services.pool.activeCount(),
-        uptimeMs: Math.round(process.uptime() * 1000),
-      } satisfies HealthResponse),
-    );
-  });
+  router.get("/", (c) =>
+    c.json(ok({ up: true, version: serviceVersion } satisfies HealthMinimalResponse)),
+  );
 
   return router;
 };

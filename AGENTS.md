@@ -210,5 +210,6 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 
 ### 已知边界
 
-服务默认无 HTTP 鉴权且监听所有网卡，背后的 agent 带 `read`/`write`/`edit`/`bash` 权限。
-**不要把服务暴露到公网或不可信网络**，整改待办见 `TODO.md`。
+服务默认只监听回环地址，且 `/api/v1` 已加鉴权（会话 Cookie / `serviceToken` / 一次性配对，见
+[`docs/api.md`](./docs/api.md)「鉴权」）。背后的 agent 仍带 `read`/`write`/`edit`/`bash` 权限：
+**通过鉴权等于本机 owner**，不要把服务暴露到公网或不可信网络；`APP_HOST=0.0.0.0` 需显式开启。

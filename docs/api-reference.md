@@ -5,7 +5,7 @@
 
 ## 约定速览
 
-- 前缀 `/api/v1`；除 `GET /api/v1/health`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外一律 `POST` + JSON body，无参数接口也要发 `{}`
+- 前缀 `/api/v1`；除 `GET /api/v1/health`、`GET /api/v1/info`、`GET /api/v1/status`、`GET /api/v1/auth/session`、`GET /api/v1/auth/sessions`、`GET /api/v1/service/info`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外一律 `POST` + JSON body，无参数接口也要发 `{}`
 - 非流式响应共用封套：成功 `{ success: true, code: "ok", message: "", data }`；失败 `{ success, code, message, data, params? }`
 - 字段一律 camelCase；请求里指向资源的 id 用 `<资源>Id`，响应里资源自身用 `id`
 - 类型文本中的链接指向文末「公共类型」；`（…）` 内为该字段的取值约束
@@ -14,7 +14,18 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/health` | 存活探针 + 当前模型接入状态 |
+| GET | `/api/v1/health` | 存活探针（最小载荷，未认证可访问） |
+| GET | `/api/v1/info` | 服务发现与版本兼容（未认证可访问） |
+| GET | `/api/v1/status` | 认证后的运行时状态（原 health 富载荷） |
+| POST | `/api/v1/auth/login` | 密码登录，成功签发会话 Cookie |
+| POST | `/api/v1/auth/logout` | 注销当前会话并清除 Cookie |
+| GET | `/api/v1/auth/session` | 当前主体身份（whoami） |
+| GET | `/api/v1/auth/sessions` | 列出活动会话 |
+| POST | `/api/v1/auth/sessions/revoke` | 按会话 id 撤销指定会话 |
+| POST | `/api/v1/auth/password` | 修改超管密码并撤销全部会话 |
+| POST | `/api/v1/auth/pairing/create` | 签发一次性配对链接（5 分钟、单次使用） |
+| GET | `/api/v1/service/info` | 当前监听地址配置与是否需重启生效 |
+| POST | `/api/v1/service/host` | 修改监听地址（127.0.0.1 仅本机 / 0.0.0.0 局域网，需重启生效） |
 | POST | `/api/v1/models/list` | 供应商目录（内置 + 自定义）与各自的模型、接入状态 |
 | POST | `/api/v1/models/refresh` | 按当前配置重建运行时后返回最新目录 |
 | POST | `/api/v1/config/info` | 当前配置（apiKey 脱敏）与运行时状态 |
@@ -55,13 +66,48 @@
 
 ### GET /api/v1/health
 
-存活探针 + 当前模型接入状态
+存活探针（最小载荷，未认证可访问）
 
 **请求参数**
 
-无参数（body 传 `{}`）
+无参数
 
-**响应类型**：`HealthResponse`
+**响应类型**：`HealthMinimalResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `up` | boolean | 是 | — |
+| `version` | string | 是 | 服务端版本（根 package.json 的 version） |
+
+## 服务发现（`info`）
+
+### GET /api/v1/info
+
+服务发现与版本兼容（未认证可访问）
+
+**请求参数**
+
+无参数
+
+**响应类型**：`ServerInfoResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `version` | string | 是 | 服务端版本 |
+| `apiVersion` | string | 是 | 接口契约版本（与 API_BASE_PATH 同源） |
+| `compatRange` | string | 是 | 本服务可被哪些客户端版本使用，semver range 字符串（如 `^0.2.0`） |
+
+## 运行时状态（`status`）
+
+### GET /api/v1/status
+
+认证后的运行时状态（原 health 富载荷）
+
+**请求参数**
+
+无参数
+
+**响应类型**：`StatusResponse`
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -69,10 +115,156 @@
 | `defaultModel` | string \| null | 是 | 实际生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
-| `apiVersion` | string | 是 | 接口版本标识（与 API_BASE_PATH 同源） |
 | `workspace` | string | 是 | 助理根目录：未绑定工作目录的会话，工作区是它下面以会话 id 命名的那层 |
 | `activeSessions` | number | 是 | 内存中驻留的 AgentSession 数 |
 | `uptimeMs` | number | 是 | 进程已运行时长 |
+
+## 鉴权（`auth`）
+
+### POST /api/v1/auth/login
+
+密码登录，成功签发会话 Cookie
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `password` | string（长度≥1） | 是 | — | — |
+| `label` | string（长度≤60） | 否 | — | — |
+
+**响应类型**：`AuthLoginResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `session` | [AuthSessionView](#authsessionview) | 是 | — |
+
+### POST /api/v1/auth/logout
+
+注销当前会话并清除 Cookie
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`AuthLogoutResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `revoked` | boolean | 是 | — |
+
+### GET /api/v1/auth/session
+
+当前主体身份（whoami）
+
+**请求参数**
+
+无参数
+
+**响应类型**：`WhoamiResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "owner" | 是 | — |
+| `scopes` | string[] | 是 | 角色 / 权限分级暂缓，当前恒为 ["*"]（见 plans/service-and-auth.md §3.8） |
+| `session` | [AuthSessionView](#authsessionview) \| null | 是 | — |
+
+### GET /api/v1/auth/sessions
+
+列出活动会话
+
+**请求参数**
+
+无参数
+
+**响应类型**：`AuthSessionListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | number | 是 | — |
+| `sessions` | [AuthSessionView](#authsessionview)[] | 是 | — |
+
+### POST /api/v1/auth/sessions/revoke
+
+按会话 id 撤销指定会话
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `authSessionId` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`AuthSessionRevokeResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `revoked` | boolean | 是 | — |
+
+### POST /api/v1/auth/password
+
+修改超管密码并撤销全部会话
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `currentPassword` | string（长度≥1） | 是 | — | — |
+| `newPassword` | string（长度 8–128） | 是 | — | — |
+
+**响应类型**：`AuthPasswordResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `revokedSessions` | number | 是 | — |
+
+### POST /api/v1/auth/pairing/create
+
+签发一次性配对链接（5 分钟、单次使用）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`PairingCreateOutput`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `url` | string | 是 | 完整可访问地址，形如 http://<lan-ip>:<port>/auth/connect/<code> |
+| `code` | string | 是 | 一次性码 |
+| `expiresAt` | string | 是 | 过期时间（ISO 8601 UTC） |
+
+## 服务（`service`）
+
+### GET /api/v1/service/info
+
+当前监听地址配置与是否需重启生效
+
+**请求参数**
+
+无参数
+
+**响应类型**：`ServiceInfoResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `host` | string | 是 | 注册文件里配置的监听地址 |
+| `restartRequired` | boolean | 是 | 是否需要重启服务才能让配置生效（进程当前实际绑定地址与配置不同） |
+
+### POST /api/v1/service/host
+
+修改监听地址（127.0.0.1 仅本机 / 0.0.0.0 局域网，需重启生效）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `host` | "127.0.0.1" \| "0.0.0.0" | 是 | — | — |
+
+**响应类型**：`ServiceHostResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `host` | string | 是 | — |
+| `restartRequired` | boolean | 是 | — |
 
 ## 模型目录（`models`）
 
@@ -718,7 +910,7 @@
 
 **请求参数**
 
-无参数（body 传 `{}`）
+无参数
 
 **响应**
 
@@ -930,6 +1122,16 @@
 ## 公共类型
 
 以下类型被多个接口复用，字段说明同响应表。
+
+### AuthSessionView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `createdAt` | string | 是 | 签发时间（ISO 8601 UTC） |
+| `expiresAt` | string | 是 | 过期时间（ISO 8601 UTC） |
+| `lastSeenAt` | string | 是 | 最近一次使用时间（ISO 8601 UTC） |
+| `label` | string | 是 | 会话标签（设备名 / 备注） |
 
 ### CatalogProvider
 

@@ -7,16 +7,27 @@ import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
 import { UsageService } from "./agent/usage";
 import { ConfigStore, publicConfig } from "./config/store";
-import { ATTACHMENT_SWEEP_INTERVAL_MS, ATTACHMENT_TEMP_TTL_MS } from "./constants";
+import {
+  ATTACHMENT_SWEEP_INTERVAL_MS,
+  ATTACHMENT_TEMP_TTL_MS,
+  AUTH_SWEEP_INTERVAL_MS,
+} from "./constants";
 import { SessionEventBus } from "./core/event-bus";
 import { InteractionBroker } from "./core/interactions";
 import { SessionPool } from "./core/pool";
 import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
 import { AttachmentRepository } from "./db/attachment-repository";
+import { AuthSessionRepository } from "./db/auth-session-repository";
 import { SessionRepository } from "./db/session-repository";
+import { env } from "./env";
+import { CredentialStore } from "./lib/auth/credentials";
+import { PairingStore } from "./lib/auth/pairing";
+import { RateLimiter } from "./lib/auth/rate-limit";
+import { SessionService } from "./lib/auth/sessions";
 import { logger } from "./lib/logger";
 import { AppError } from "./lib/response";
+import type { ServiceRegistration } from "./lib/service-file";
 
 export type Services = {
   config: ConfigStore;
@@ -36,6 +47,15 @@ export type Services = {
   usage: UsageService;
   /** 目标模式：会话目标状态与落定后的校验续跑 */
   goals: GoalService;
+  /** 鉴权：凭证、登录会话、一次性配对码与登录限流 */
+  auth: {
+    credentials: CredentialStore;
+    sessions: SessionService;
+    pairing: PairingStore;
+    loginLimiter: RateLimiter;
+    /** 服务注册信息（host / port 等）；端口自选时 index 会在监听后回写同一个对象 */
+    registration: ServiceRegistration;
+  };
   /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
   /** 用当前配置重建运行时 */
@@ -44,12 +64,16 @@ export type Services = {
   close(): void;
 };
 
-export const createServices = async (): Promise<Services> => {
+export const createServices = async (registration: ServiceRegistration): Promise<Services> => {
   // 单进程单连接：两个仓储共用同一个句柄，关闭也由这里统一负责
   const db = openDatabase();
   const config = new ConfigStore();
   const sessions = new SessionRepository(db);
   const attachments = new AttachmentRepository(db);
+  const authSessions = new SessionService(new AuthSessionRepository(db));
+  const credentials = new CredentialStore(registration, env.servicePath);
+  const pairing = new PairingStore();
+  const loginLimiter = new RateLimiter();
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
@@ -99,6 +123,20 @@ export const createServices = async (): Promise<Services> => {
   const attachmentSweeper = setInterval(sweepAttachments, ATTACHMENT_SWEEP_INTERVAL_MS);
   attachmentSweeper.unref();
 
+  // 鉴权内存态清理：过期会话行、过期配对码与限流窗口；都只是回收，失败不阻断服务
+  const sweepAuth = (): void => {
+    try {
+      authSessions.prune();
+      pairing.prune();
+      loginLimiter.prune();
+    } catch (error) {
+      logger.warn(`清理鉴权内存态失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  sweepAuth();
+  const authSweeper = setInterval(sweepAuth, AUTH_SWEEP_INTERVAL_MS);
+  authSweeper.unref();
+
   const guardIdle = (): void => {
     if (pool.hasActiveRun()) {
       throw new AppError(ERROR_CODES.sessionBusy, "有会话正在生成，请先中断再更新配置", 409);
@@ -124,6 +162,13 @@ export const createServices = async (): Promise<Services> => {
     permissions,
     usage,
     goals,
+    auth: {
+      credentials,
+      sessions: authSessions,
+      pairing,
+      loginLimiter,
+      registration,
+    },
     async applyConfig(patch: AppConfigPatchInput) {
       guardIdle();
       // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json
@@ -146,6 +191,7 @@ export const createServices = async (): Promise<Services> => {
       if (closed) return;
       closed = true;
       clearInterval(attachmentSweeper);
+      clearInterval(authSweeper);
       db.close();
     },
   };

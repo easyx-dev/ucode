@@ -2,27 +2,9 @@
 
 ## P0 · 给 `/api/v1` 加鉴权，并默认只监听回环地址
 
-> **状态：暂缓（2026-09-30）。** 只有收到用户的明确指令才启动；不要在其它阶段 / 任务里顺手做，也不要反复询问。落地前不得把服务暴露到公网或不可信网络（见 `AGENTS.md`「已知边界」）。
-
-**现状（已在真实运行实例上验证）**：`server/src/index.ts` 的 `serve({ fetch: app.fetch, port: env.port })` 未指定 `hostname`，Node 绑定 `::`（所有网卡）；`app.use("*", cors({ origin: env.corsOrigin }))` 的默认值是 `*`；整个 `server/src` 没有任何请求级鉴权（只有 pi 自己的 `authPath`）。
-
-实测：
-
-```
-curl http://192.168.1.149:2048/api/v1/health            → 200            # 同网段任意机器
-curl -X POST http://192.168.1.149:2048/api/v1/models/list → 200（返回配置）
-curl -i -X OPTIONS http://192.168.1.149:2048/api/v1/messages/prompt \
-     -H 'Origin: https://evil.example' \
-     -H 'Access-Control-Request-Method: POST' \
-     -H 'Access-Control-Request-Headers: content-type'
-     → 204, access-control-allow-origin: *
-```
-
-**风险**：agent 带 `read` / `write` / `edit` / `bash`，`APP_HOME` 指向真实仓库时，同网段任何人都能通过 HTTP 让它执行命令并读回结果；用户浏览任意网页时，该网页也能驱动本地服务（CORS 用 `*` 放行了预检）。
-
-**待办**：实现方案已独立成文，落地按 [`plans/service-and-auth.md`](./plans/service-and-auth.md) 执行——该方案取代本节的实现清单（鉴权改为会话 Cookie + 一次性配对链接，`service.json` 承载 host / port / 凭证，而非 `$APP_HOME/token`）。
-
-**验收**：同网段 `curl http://<LAN-IP>:2048/api/v1/health` 连不上（默认回环）；带上正确 token 才能调用其他接口；无 token 返回 401；带 `Origin: https://evil.example` 的预检不再返回 `allow-origin: *`。
+> **已完成（2026-10-05）。** 落地见 [`plans/service-and-auth.md`](./plans/service-and-auth.md)：
+> `/api/v1` 全量鉴权（会话 Cookie / `serviceToken` / 一次性配对），默认只监听 `127.0.0.1`，
+> CORS 收紧为白名单 + credentials。接口约定见 [`docs/api.md`](./docs/api.md)「鉴权」。
 
 ---
 

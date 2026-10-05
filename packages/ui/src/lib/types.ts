@@ -23,7 +23,6 @@ export type {
   GoalSetRequest,
   GoalStatus,
   GoalView,
-  HealthResponse,
   InteractionRespondRequest,
   McpExposure,
   McpListResponse,

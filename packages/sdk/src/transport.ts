@@ -1,5 +1,5 @@
 /** HTTP 传输层：拼接 base、注入 token 与自定义头、拆解响应封套 */
-import { API_BASE_PATH, type ApiResponse } from "@ucode/contracts";
+import { API_BASE_PATH, type ApiResponse, ERROR_CODES } from "@ucode/contracts";
 
 import { ApiError, interpolate, type Translate } from "./error";
 
@@ -12,8 +12,10 @@ export type TransportOptions = {
   fetch?: FetchLike;
   /** 附加到每个请求的头 */
   headers?: Record<string, string>;
-  /** 鉴权令牌读取器；预留给后续的接口鉴权 */
+  /** 鉴权令牌读取器：供原生客户端注入 `serviceToken`（浏览器走会话 Cookie，不必设） */
   getToken?: () => string | Promise<string | null>;
+  /** 收到 401 时的回调：客户端据此切换为未登录态并跳登录页 */
+  onUnauthorized?: () => void;
   /** 错误兜底文案的翻译函数；未注入时用中文模板插值 */
   translate?: Translate;
 };
@@ -59,6 +61,8 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     try {
       payload = await response.json();
     } catch {
+      // 非 JSON 的 401（如反向代理）无法分辨原因，按未认证处理
+      if (response.status === 401) options.onUnauthorized?.();
       throw new ApiError(
         "invalid_response",
         message("服务返回了非 JSON 响应（HTTP {{status}}）", { status: String(response.status) }),
@@ -71,6 +75,11 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     const record = payload as ApiResponse<T> | null;
     if (record?.success) return record.data;
 
+    // 只有「未认证」才切全局登出：登录 / 改密码的 invalid_credentials 同为 401，但会话仍然有效
+    if (response.status === 401 && record?.code === ERROR_CODES.unauthorized) {
+      options.onUnauthorized?.();
+    }
+
     throw new ApiError(
       record?.code ?? "unknown_error",
       record?.message ??
@@ -79,15 +88,26 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     );
   };
 
-  /** 读取失败响应体里的原因，拿不到就退回状态码 */
-  const readStreamError = async (response: Response): Promise<string> => {
+  /** 读取失败响应体里的原因与业务码，拿不到就退回状态码 */
+  const readStreamError = async (
+    response: Response,
+  ): Promise<{ message: string; code: string }> => {
     try {
-      const body = (await response.json()) as { message?: string };
-      if (body.message) return body.message;
+      const body = (await response.json()) as { message?: string; code?: string };
+      return {
+        message:
+          body.message ??
+          message("事件流连接失败（HTTP {{status}}）", {
+            status: String(response.status),
+          }),
+        code: body.code ?? "events_failed",
+      };
     } catch {
-      // 非 JSON，退回状态码
+      return {
+        message: message("事件流连接失败（HTTP {{status}}）", { status: String(response.status) }),
+        code: "events_failed",
+      };
     }
-    return message("事件流连接失败（HTTP {{status}}）", { status: String(response.status) });
   };
 
   return {
@@ -96,6 +116,7 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
         method: "POST",
         headers: await requestHeaders("application/json"),
         body: JSON.stringify(body),
+        credentials: "include",
       });
       return unwrap<T>(response);
     },
@@ -105,6 +126,7 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
         method: "POST",
         headers: await requestHeaders(body.type || "application/octet-stream"),
         body,
+        credentials: "include",
       });
       return unwrap<T>(response);
     },
@@ -118,9 +140,14 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
         headers: await requestHeaders("application/json"),
         body: JSON.stringify(body ?? {}),
         signal,
+        credentials: "include",
       });
       if (!response.ok) {
-        throw new ApiError("events_failed", await readStreamError(response), {
+        const failure = await readStreamError(response);
+        if (response.status === 401 && failure.code === ERROR_CODES.unauthorized) {
+          options.onUnauthorized?.();
+        }
+        throw new ApiError("events_failed", failure.message, {
           httpStatus: response.status,
         });
       }
@@ -130,7 +157,10 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
       return response.body;
     },
     async get<T>(action: string): Promise<T> {
-      const response = await doFetch(`${base}/${action}`, { headers: await requestHeaders() });
+      const response = await doFetch(`${base}/${action}`, {
+        headers: await requestHeaders(),
+        credentials: "include",
+      });
       return unwrap<T>(response);
     },
     absoluteUrl: (action) => `${base}/${action}`,

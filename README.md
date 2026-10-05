@@ -25,7 +25,7 @@ pnpm dev
 pnpm build && pnpm start
 ```
 
-打开 `http://localhost:2048`（生产）或 `http://localhost:5173`（开发）。
+打开 `http://localhost:2048`（生产）或 `http://localhost:5173`（开发）。首次启动会生成登录密码并打印在启动日志里（也可查看 `$APP_HOME/app/service.json`），用密码登录后即可使用。
 
 首次启动会提示「尚未配置模型」，点侧栏底部 **设置** 或调用 `POST /api/v1/config/update` 填入端点即可。
 
@@ -35,12 +35,15 @@ pnpm build && pnpm start
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `APP_PORT` | `2048` | HTTP 端口 |
+| `APP_HOST` | `127.0.0.1` | 监听地址；仅回环，`0.0.0.0` 允许局域网（显式开启并告警） |
+| `APP_PORT` | `2048` | HTTP 端口；`0` 表示自选可用端口，启动后写回 `service.json` |
 | `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`agent/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
-| `APP_CORS_ORIGIN` | `*` | 开发模式跨域来源 |
+| `APP_CORS_ORIGIN` | 空 | 允许的跨域来源，逗号分隔；缺省不放行跨域（同源与原生客户端不需要 CORS） |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
 | `APP_PROMPT_SOURCE` | `custom` | 系统提示词源：`custom`（整段自研）/ `pi`（pi 默认 + 自研片段），改后重启生效 |
+
+> 未设 `APP_PORT` 时会复用 `$APP_HOME/app/service.json` 里上次的端口；`APP_HOST` / `APP_PORT` 也可在设置里改（需重启生效）。
 
 > `APP_HOME` 不设置时默认落在用户主目录（`~/.<品牌 slug>`，默认品牌即 `~/.ucode`）；
 > 显式指定请用绝对路径，相对路径会按仓库根解析。
@@ -50,7 +53,7 @@ pnpm build && pnpm start
 ```
 $APP_HOME/                 # 默认 ~/.ucode
 ├── agent/                 # agent 私有：auth.json / sessions/
-├── app/                   # 应用自有：config.json / app.db（SQLite）
+├── app/                   # 应用自有：config.json / service.json / app.db（SQLite）
 ├── skills/                # 全局技能：<id>/SKILL.md
 ├── prompts/               # 全局命令（提示词模板）：<name>.md
 ├── agents/                # 全局自定义角色：<slug>.md（primary / subagent）

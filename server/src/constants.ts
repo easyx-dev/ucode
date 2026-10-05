@@ -4,6 +4,9 @@ import { brand } from "@ucode/brand/values";
 
 export const DEFAULT_PORT = 2048;
 
+/** 默认监听地址：只绑回环，避免同网段任意机器直连 agent */
+export const DEFAULT_HOST = "127.0.0.1";
+
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
@@ -29,6 +32,9 @@ export const SUBSCRIBER_QUEUE_MAX = 256;
 export const EVENTS_HEARTBEAT_MS = 15_000;
 
 export const CONFIG_FILENAME = "config.json";
+
+/** 服务注册文件（位于 app 目录下）：host / port / 凭证，由服务独占写、客户端只读 */
+export const SERVICE_FILENAME = "service.json";
 
 /** pi 的 MCP 服务器配置（用户级），位于 agent 目录下，由本服务读写 */
 export const MCP_CONFIG_FILENAME = "mcp.json";
@@ -187,3 +193,18 @@ export type PromptSource = (typeof PROMPT_SOURCES)[number];
 
 /** 默认提示词源 */
 export const DEFAULT_PROMPT_SOURCE: PromptSource = "custom";
+
+/** 登录会话过期清理 / 限流窗口回收的扫描间隔 */
+export const AUTH_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+
+/** 登录会话有效期（30 天） */
+export const AUTH_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 登录限流：窗口内允许的失败 / 尝试次数上限 */
+export const LOGIN_RATE_LIMIT_MAX = 10;
+
+/** 登录限流窗口 */
+export const LOGIN_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+
+/** 一次性配对码有效期（5 分钟） */
+export const PAIRING_TTL_MS = 5 * 60 * 1000;

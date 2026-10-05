@@ -12,6 +12,7 @@ import { SettingsAppearance } from "./settings-appearance";
 import { SettingsDefaults } from "./settings-defaults";
 import { SettingsMcp } from "./settings-mcp";
 import { SettingsMemory } from "./settings-memory";
+import { SettingsRemoteAccess } from "./settings-remote-access";
 import { SettingsWebsearch } from "./settings-websearch";
 
 type SettingsBodyProps = {
@@ -92,6 +93,12 @@ export function SettingsBody({ draft, testingKey, onTest }: SettingsBodyProps) {
 
       <Section title={t("记忆")}>
         <SettingsMemory enabled={draft.memoryEnabled} onChange={draft.setMemoryEnabled} />
+      </Section>
+
+      <Separator />
+
+      <Section title={t("远程访问")}>
+        <SettingsRemoteAccess />
       </Section>
 
       <Separator />

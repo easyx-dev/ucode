@@ -16,9 +16,23 @@ export type UiProviderProps = {
 
 export function UiProvider({ client, children }: UiProviderProps) {
   useEffect(() => {
-    client.events.start();
+    // 未登录时不开事件流：/events 需要鉴权，匿名连接只会持续 401 重试
+    let started = false;
+    const sync = (): void => {
+      const authenticated = client.auth.getState().status === "authenticated";
+      if (authenticated && !started) {
+        client.events.start();
+        started = true;
+      } else if (!authenticated && started) {
+        client.events.stop();
+        started = false;
+      }
+    };
+    sync();
+    const unsubscribe = client.auth.subscribe(sync);
     return () => {
-      client.events.stop();
+      unsubscribe();
+      if (started) client.events.stop();
     };
   }, [client]);
 

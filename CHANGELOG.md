@@ -35,6 +35,25 @@
 
 ### 新增
 
+- 服务化与鉴权（取代 `TODO.md` 的 P0 条目，方案见 `plans/service-and-auth.md`）：
+  - **服务注册**：新增 `$APP_HOME/app/service.json`（`0600`，服务独占写），承载监听地址 / 端口 /
+    `serviceToken` / 登录密码；端口 `0` 自选并回写真实端口。新增 `APP_HOST`（默认 `127.0.0.1`），
+    未设 `APP_PORT` 时复用注册文件里的端口；`0.0.0.0` 需显式开启并告警。
+  - **鉴权**：`/api/v1` 全量加鉴权中间件，放行 `GET /health`、`GET /info`、`POST /auth/login`
+    与配对兑换；支持 `Bearer serviceToken`（本机原生客户端免交互）与登录会话 Cookie。
+    新增 `auth` 域接口（login / logout / whoami / 活动会话列表与撤销 / 改密码 / 签发一次性配对链接）
+    与 `GET /auth/connect/:code` 兑换入口；SQLite schema v7 新增 `auth_session`（只存 token 的 sha256，
+    可撤销、改密码撤销全部）；登录按来源 IP 限流。新增 `service` 域的监听地址读写。
+  - **契约与前端**：`health` 拆为 `health`（最小存活）/ `info`（发现与 `compatRange`）/ `status`
+    （认证后的运行时状态，原 `HealthResponse` 更名 `StatusResponse`）；新增 `auth` / `service` 契约与
+    错误码 `unauthorized` / `invalid_credentials` / `forbidden` / `pairing_invalid` / `pairing_expired` /
+    `rate_limited`；SDK 传输层带 Cookie 与 401 回调、新增 `auth` store；新增登录页与设置里的
+    「远程访问」面板（局域网开关 / 二维码配对链接 / 活动会话 / 改密码）；CORS 收紧为白名单 + credentials。
+
+### 变更
+
+- `TODO.md`：P0「给 `/api/v1` 加鉴权并默认只监听回环地址」已落地。
+
 - 新增会话级**权限档位**（`permissionMode`：`default` / `auto` / `full`）：只决定工具调用命中 `ask` 时
   弹审批还是自动放行，**不改变工具集、也不突破 `deny`**。`auto` 自动批准常规工具（越界目录仍审批），
   `full` 连越界目录一并放行、界面以 warning 色标记。契约 `SessionSummary` / `sessions/create` /

@@ -430,4 +430,45 @@ export default {
   查看全部命令: "Show all commands",
   "在输入框以 /goal 开头设定或查看目标": "Start the input with /goal to set or view the goal",
   "可用内置命令见输入框的 / 菜单": "See the / menu in the composer for built-in commands",
+
+  // Auth / login
+  登录: "Sign in",
+  密码: "Password",
+  输入服务密码: "Enter the service password",
+  "密码在服务首次启动时生成，可查看服务注册文件 service.json。":
+    "The password is generated on first start; find it in the service registration file service.json.",
+
+  // Remote access
+  远程访问: "Remote access",
+  "管理局域网访问、一次性配对链接与登录会话（含改密码）。":
+    "Manage LAN access, one-time pairing links and sign-in sessions (including password).",
+  管理: "Manage",
+  局域网访问: "LAN access",
+  仅本机: "This device only",
+  局域网: "LAN",
+  "让同一网络下的设备接入本服务。通过鉴权的设备等于本机 owner，可驱动 agent 读写文件、执行命令。":
+    "Let devices on the same network reach this service. An authenticated device is the local owner and can drive the agent to read/write files and run commands.",
+  "已允许局域网设备访问；如需关闭请切回「仅本机」并重启服务。":
+    "LAN devices can reach this service. To turn it off, switch back to “This device only” and restart the service.",
+  "当前仅本机可访问；开启后同一网络下的设备可访问，请只在可信网络使用。":
+    "Only this device can reach the service. Turning this on exposes it to the same network; use it on trusted networks only.",
+  "监听地址已更新，需要重启服务后生效。":
+    "The listen address changed. Restart the service for it to take effect.",
+  配对链接: "Pairing link",
+  "生成一条链接发给同一网络下的设备，打开即可接入；5 分钟内有效，且只能使用一次。":
+    "Generate a link for a device on the same network; opening it signs the device in. Valid for 5 minutes and usable once.",
+  生成配对链接: "Generate pairing link",
+  复制链接: "Copy link",
+  "剩余有效时间 {{time}}": "Expires in {{time}}",
+  链接已过期: "Link expired",
+  活动会话: "Active sessions",
+  暂无活动会话: "No active sessions",
+  本端: "This device",
+  "最近使用 {{time}}": "Last used {{time}}",
+  撤销: "Revoke",
+  修改密码: "Change password",
+  当前密码: "Current password",
+  新密码: "New password",
+  "新密码至少 8 位；修改后所有设备都需要重新登录。":
+    "At least 8 characters; all devices will need to sign in again after the change.",
 };

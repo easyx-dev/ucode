@@ -4,6 +4,13 @@ import type {
   AgentsListResponse,
   AppConfigPatchRequest,
   AttachmentUploadResponse,
+  AuthLoginRequest,
+  AuthLoginResponse,
+  AuthLogoutResponse,
+  AuthPasswordRequest,
+  AuthPasswordResponse,
+  AuthSessionListResponse,
+  AuthSessionRevokeResponse,
   CommandsListRequest,
   CommandsListResponse,
   ConfigSnapshot,
@@ -17,7 +24,6 @@ import type {
   FsSearchResponse,
   GoalResponse,
   GoalSetRequest,
-  HealthResponse,
   InteractionListResponse,
   InteractionRespondRequest,
   InteractionRespondResponse,
@@ -31,9 +37,14 @@ import type {
   MessageListRequest,
   MessageListResponse,
   ModelsResponse,
+  PairingCreateOutput,
   PromptAdmittedResponse,
   PromptRequest,
   ServerEvent,
+  ServerInfoResponse,
+  ServiceHostRequest,
+  ServiceHostResponse,
+  ServiceInfoResponse,
   SessionArchiveResponse,
   SessionCreateRequest,
   SessionForkRequest,
@@ -45,6 +56,8 @@ import type {
   SessionUpdateRequest,
   StatsSummaryRequest,
   StatsSummaryResponse,
+  StatusResponse,
+  WhoamiResponse,
 } from "@ucode/contracts";
 
 import { readSseStream } from "./sse";
@@ -63,8 +76,31 @@ export const createApis = (options: ApisOptions = {}) => {
     /** 附属资源直链（图片预览等）；baseUrl 为空时返回同源相对地址 */
     attachmentUrl: (id: string): string => transport.absoluteUrl(`attachments/${id}`),
 
-    async health(): Promise<HealthResponse> {
-      return transport.get<HealthResponse>("health");
+    /** 服务发现与版本兼容（未认证） */
+    async info(): Promise<ServerInfoResponse> {
+      return transport.get<ServerInfoResponse>("info");
+    },
+    /** 认证后的运行时状态（替代原 health 富载荷） */
+    async status(): Promise<StatusResponse> {
+      return transport.get<StatusResponse>("status");
+    },
+    auth: {
+      login: (body: AuthLoginRequest) => transport.post<AuthLoginResponse>("auth/login", body),
+      logout: () => transport.post<AuthLogoutResponse>("auth/logout", {}),
+      session: () => transport.get<WhoamiResponse>("auth/session"),
+      sessions: () => transport.get<AuthSessionListResponse>("auth/sessions"),
+      revokeSession: (sessionId: string) =>
+        transport.post<AuthSessionRevokeResponse>("auth/sessions/revoke", {
+          authSessionId: sessionId,
+        }),
+      changePassword: (body: AuthPasswordRequest) =>
+        transport.post<AuthPasswordResponse>("auth/password", body),
+      createPairing: () => transport.post<PairingCreateOutput>("auth/pairing/create", {}),
+    },
+    service: {
+      info: () => transport.get<ServiceInfoResponse>("service/info"),
+      setHost: (host: ServiceHostRequest["host"]) =>
+        transport.post<ServiceHostResponse>("service/host", { host }),
     },
     models: {
       list: () => transport.post<ModelsResponse>("models/list"),

@@ -9,7 +9,8 @@
 ## 传输约定
 
 - 前缀 `API_BASE_PATH`（`/api/v1`，由 `API_VERSION` 拼出）
-- 除 `GET /api/v1/health`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外，一律 `POST` + JSON body
+- 除 `GET /api/v1/health`、`GET /api/v1/info`、`GET /api/v1/status`、`GET /api/v1/auth/session`、`GET /api/v1/auth/sessions`、`GET /api/v1/service/info`、`GET /api/v1/attachments/<id>` 与 `POST /api/v1/attachments`（原始字节请求体）外，一律 `POST` + JSON body
+- **除放行清单外，全部接口需要鉴权**（见「鉴权」）：未认证返回 `401 unauthorized`，浏览器导航类请求 302 到 `/login`
 - **请求参数只放 body，不进路径**：路径只表达「域 + 动作」（`attachments` 的 `<id>` 例外，见「附件」）
 - `Content-Type: application/json`；无参数的接口也要发 `{}`（对应的 schema 是 `emptyInputSchema`）
 - 事件流 `/events` 是 SSE、附件路由收发原始字节，都不适用上面的 JSON 约定，见各自小节
@@ -40,9 +41,14 @@
 | 状态 | 何时用 | 对应 code |
 | --- | --- | --- |
 | 400 | 请求参数校验失败、业务参数非法 | `invalid_request`、`unknown_model` |
+| 401 | 未认证或凭证无效 | `unauthorized`、`invalid_credentials` |
+| 403 | 已认证但无权限 | `forbidden` |
 | 404 | 路由或资源不存在 | `not_found` |
 | 409 | 状态冲突（会话正在生成等） | `session_busy`、`model_not_configured` |
+| 429 | 触发限流（登录） | `rate_limited` |
 | 500 | 未预期异常 | `internal_error` |
+
+配对码相关错误用 400：`pairing_invalid`、`pairing_expired`。
 
 上游相关失败（`upstream_unreachable` / `upstream_error` / `unsupported_api`）按语义归入 400 或 500，
 但前端只应读 `code`。
@@ -68,6 +74,13 @@
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
 | `test` | 连通性测试 | 测试结果 |
 | `respond` | 回答挂起的交互请求 | 动作回执 |
+| `login` | 登录并签发会话 | 会话信息 |
+| `logout` | 注销当前会话 | 动作回执 |
+| `session` | 当前主体身份（whoami） | 主体信息 |
+| `sessions` | 活动会话列表 | 列表结构 |
+| `revoke` | 撤销指定会话 | 动作回执 |
+| `password` | 修改密码（并撤销全部会话） | 动作回执 |
+| `host` | 修改服务监听地址 | 服务配置 |
 
 ## 字段命名
 
@@ -191,8 +204,7 @@
 - `fs/mkdir`：单层建目录；已存在返回 `path_exists`，父目录不存在返回 `path_not_found`，
   其余失败（权限、只读等）返回 `mkdir_failed`。
 - 路径一律由服务端归一化（`~` 展开 + `realpath`），不存在的路径返回 `path_not_found`。
-- 与其它接口一致，`fs` 也没有鉴权：服务默认监听所有网卡且背后的 agent 有文件读写权限，
-  不要把本服务暴露到公网或不可信网络（见 `TODO.md` P0）。
+- `fs` 与其他接口一致，需通过鉴权（见「鉴权」）；agent 具备文件读写权限，不要把本服务暴露到不可信网络。
 
 **预留扩展**（本次未实现，形状已为其留白）：`fs/info` 用于单路径 stat / 读文件内容；
 `fs/search` 已实现（受限 walker，给输入区的 `@` 检索用），见 `docs/api-reference.md`。
@@ -236,9 +248,43 @@
   question 超时（`QUESTION_TIMEOUT_MS`）以可读错误结束本轮提问；本轮中断（stop）取消挂起的提问；
   会话归档时两类请求一并结算清理。`allow_session` 等价于按 `scope` 追加一条会话级 allow 规则，
   同样只存进程内存，服务重启回到规则默认。
+- **多客户端**：请求经事件流广播到所有已连接客户端，**任一客户端可作答、首个响应结算生效**（其余端收到
+  `interaction_resolved` 后收起对话框）。
+
+## 鉴权
+
+服务本质是一个 web 服务，鉴权复用标准 web 模型：**单一鉴权管线**把 Cookie / Bearer 统一解析为同一「主体（principal）」，通过鉴权后仍受内层权限引擎约束（鉴权是外层门）。完整方案见 [`plans/service-and-auth.md`](../plans/service-and-auth.md)。
+
+### 放行清单
+
+未认证可访问的只有：`GET /api/v1/health`、`GET /api/v1/info`、`POST /api/v1/auth/login`、`GET /auth/connect/:code`（配对兑换，在 API 前缀之外）、登录页静态资源与 `OPTIONS` 预检。其余接口一律需要鉴权，未认证返回 `401 unauthorized`；浏览器导航类请求（`Accept` 带 `text/html`）302 到 `/login`。
+
+### 三种接入路径
+
+| 路径 | 谁用 | 凭证 |
+| --- | --- | --- |
+| 本机原生客户端 | TUI / CLI / 桌面壳 | `serviceToken`，`Authorization: Bearer <token>`，免交互 |
+| 密码登录 | 浏览器（本机 / 局域网 / 远程） | `password` 换取会话 Cookie |
+| 一次性配对 | 局域网 / 远程 | `POST /api/v1/auth/pairing/create` 生成短 TTL 单次链接，`GET /auth/connect/:code` 兑换为 Cookie |
+
+解析顺序：`Authorization: Bearer` → 会话 Cookie；任一命中即通过。
+
+### 凭证与会话
+
+- `serviceToken` 与 `password` 明文存 `$APP_HOME/app/service.json`（权限 `0600`，服务独占写）；「读得到文件」即本机身份证明。密码首次启动自动生成，忘记可直接查看该文件。
+- 比较一律常量时间；登录接口按来源 IP 限流（`rate_limited`）。
+- 会话落 SQLite `auth_session`：库内只存 token 的 sha256，明文只回客户端 Cookie；默认 30 天，可列举、可逐个撤销，改密码撤销全部。
+- Cookie 名由品牌 slug 派生（`<slug>_session`），`HttpOnly` + `SameSite=Strict` + `Path=/`；有 TLS 时才加 `Secure`。
+
+### 边界
+
+- **不做 IP 信任**：loopback 不自动放行（DNS rebinding 下任意网页都能请求 `127.0.0.1`）。
+- CORS 由白名单开放并允许携带 Cookie（`credentials: true`），不再用 `origin: "*"`；`APP_CORS_ORIGIN` 逗号分隔，缺省不放行跨域来源。
+- 服务默认监听 `127.0.0.1`；`APP_HOST=0.0.0.0`（或设置里开启局域网访问）才允许同网段访问，且启动会告警。
+- **通过鉴权 = owner = 本机 `bash`**：远程接入的提示必须在界面上显式给出；角色 / 权限分级暂缓，principal 预留 `scopes`（当前恒为 `["*"]`）。
 
 ## 版本与破坏性变更
 
-- 版本体现在路径前缀 `API_VERSION`（当前 `v1`），`health` 的 `apiVersion` 同源
+- 版本体现在路径前缀 `API_VERSION`（当前 `v1`）；`GET /api/v1/info` 返回 `version`（服务端版本，取根 `package.json`）、`apiVersion`（同 `API_VERSION`）与 `compatRange`（可被哪些客户端版本使用，只比主次版本）
 - 破坏性变更（删字段、改字段语义、改响应形状）必须递增 `API_VERSION`；纯增量（加可选字段）不需要
 - 项目处于开发初期，`v1` 内允许破坏性调整，但必须同步更新本文件、`CHANGELOG` 与 web 侧引用

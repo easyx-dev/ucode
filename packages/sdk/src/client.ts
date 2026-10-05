@@ -6,29 +6,35 @@
  */
 import { type Apis, type ApisOptions, createApis } from "./apis";
 import { createEventStream, type EventStream } from "./events";
+import { createAuthStore } from "./stores/auth";
 import { createCommandsStore } from "./stores/commands";
 import { createConfigStore } from "./stores/config";
 import { createGoalStore } from "./stores/goal";
-import { createHealthStore } from "./stores/health";
 import { createInteractionsStore } from "./stores/interactions";
 import { createMcpStore } from "./stores/mcp";
 import { createMessagesStore } from "./stores/messages";
 import { createModelsStore } from "./stores/models";
 import { createSessionsStore } from "./stores/sessions";
+import { createStatusStore } from "./stores/status";
 import { createUsageStore } from "./stores/usage";
 
 export type ClientOptions = ApisOptions;
 
 export const createClient = (options: ClientOptions = {}) => {
-  const apis: Apis = createApis(options);
+  // 传输层 401 需要通知 auth store，但 transport 先于 store 创建：用一个可后置赋值的回调桥接
+  let onUnauthorized: (() => void) | null = null;
+  const apis: Apis = createApis({ ...options, onUnauthorized: () => onUnauthorized?.() });
   const events: EventStream = createEventStream(apis.events.stream);
+
+  const auth = createAuthStore({ apis });
+  onUnauthorized = () => auth.markAnonymous();
 
   const sessions = createSessionsStore({ apis, events });
   const messages = createMessagesStore({ apis, events });
   const interactions = createInteractionsStore({ apis, events });
   const goal = createGoalStore({ apis, events });
   const models = createModelsStore({ apis, events });
-  const health = createHealthStore({ apis, events });
+  const status = createStatusStore({ apis, events });
   const commands = createCommandsStore({ apis });
   const usage = createUsageStore({ apis, events });
   const config = createConfigStore({ apis, events });
@@ -37,12 +43,13 @@ export const createClient = (options: ClientOptions = {}) => {
   return {
     apis,
     events,
+    auth,
     sessions,
     messages,
     interactions,
     goal,
     models,
-    health,
+    status,
     commands,
     usage,
     config,

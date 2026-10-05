@@ -1,25 +1,25 @@
 /** 运行时状态：取 agent 工作目录等展示信息；配置变更事件到达时自动重取 */
-import type { HealthResponse } from "@ucode/contracts";
+import type { StatusResponse } from "@ucode/contracts";
 
 import type { Apis } from "../apis";
 import type { EventStream } from "../events";
 import { createStore, type Store } from "../store";
 
-export type HealthStore = {
-  getState: Store<HealthResponse | null>["getState"];
-  subscribe: Store<HealthResponse | null>["subscribe"];
+export type StatusStore = {
+  getState: Store<StatusResponse | null>["getState"];
+  subscribe: Store<StatusResponse | null>["subscribe"];
   load: () => Promise<void>;
 };
 
-export const createHealthStore = (deps: { apis: Apis; events: EventStream }): HealthStore => {
-  const store = createStore<HealthResponse | null>(null);
+export const createStatusStore = (deps: { apis: Apis; events: EventStream }): StatusStore => {
+  const store = createStore<StatusResponse | null>(null);
 
   // 取不到时保持 null，由使用方回落到通用文案，不打断主流程
   const load = async (): Promise<void> => {
     try {
-      store.setState(await deps.apis.health());
+      store.setState(await deps.apis.status());
     } catch {
-      // 忽略：health 不可达只影响展示
+      // 忽略：status 不可达只影响展示
     }
   };
 

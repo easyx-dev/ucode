@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -63,6 +63,21 @@ const migrations: Record<number, string> = {
   // 会话级权限档位：命中 ask 时弹审批还是自动放行（见 docs/modes-and-permissions.md）
   6: `
     ALTER TABLE session ADD COLUMN permission_mode TEXT;
+  `,
+  // 登录会话：浏览器 Cookie 对应的可撤销会话（见 plans/service-and-auth.md §3.4）。
+  // 库内只存 token 的 sha256，明文只回客户端 Cookie；id 是可展示 / 可撤销的 uuid。
+  7: `
+    CREATE TABLE auth_session (
+      id            TEXT PRIMARY KEY,
+      token_hash    TEXT NOT NULL,
+      created_at    TEXT NOT NULL,
+      expires_at    TEXT NOT NULL,
+      last_seen_at  TEXT NOT NULL,
+      revoked_at    TEXT,
+      label         TEXT NOT NULL DEFAULT ''
+    );
+    CREATE UNIQUE INDEX idx_auth_session_token_hash ON auth_session(token_hash);
+    CREATE INDEX idx_auth_session_expires_at ON auth_session(expires_at);
   `,
 };
 

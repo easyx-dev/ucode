@@ -12,6 +12,7 @@ import {
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
+  DEFAULT_HOST,
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   DEFAULT_PROMPT_SOURCE,
@@ -19,9 +20,11 @@ import {
   MCP_CONFIG_FILENAME,
   PROMPT_SOURCES,
   type PromptSource,
+  SERVICE_FILENAME,
   SESSIONS_DIRNAME,
   WORKSPACE_DIRNAME,
 } from "./constants";
+import { readServiceRegistration } from "./lib/service-file";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 
@@ -67,12 +70,32 @@ const appDir = resolve(homeDir, APP_DIRNAME);
 const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
 
+/**
+ * 服务注册文件里的 host / port 是「上次落地的监听形态」；
+ * 优先级为 显式 env > service.json > 默认，所以没设 APP_PORT 的普通重启会复用上次端口。
+ */
+const servicePath = resolve(appDir, SERVICE_FILENAME);
+const registration = readServiceRegistration(servicePath);
+const explicitPort = process.env.APP_PORT?.trim();
+
+const resolvePort = (): number => {
+  if (explicitPort) {
+    const parsed = Number(explicitPort);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return registration && registration.port > 0 ? registration.port : DEFAULT_PORT;
+};
+
 export const env = {
   repoRoot,
   isProduction,
   /** 工作与配置主目录 */
   homeDir,
-  port: resolveNum(process.env.APP_PORT, DEFAULT_PORT),
+  /** 监听地址：默认仅回环，`APP_HOST=0.0.0.0` 才允许局域网 */
+  host: process.env.APP_HOST?.trim() || registration?.host || DEFAULT_HOST,
+  port: resolvePort(),
+  /** 服务注册文件：host / port / serviceToken / password（0600，服务独占写） */
+  servicePath,
   /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
   workspaceRoot,
   /** agent 数据目录：auth.json / sessions 放这里 */
@@ -90,7 +113,7 @@ export const env = {
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
-  corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "*",
+  corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "",
   logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
   /** 系统提示词源：`APP_PROMPT_SOURCE=pi|custom`，改它需要重启（会话装配时读取） */
   promptSource: resolvePromptSource(process.env.APP_PROMPT_SOURCE),
