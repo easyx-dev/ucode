@@ -37,6 +37,7 @@ const callEvent = (toolName: string, input: Record<string, unknown>): ToolCallEv
 const baseGate = (rules: PermissionRule[]): PermissionGate => ({
   cwd: "/work",
   rules: () => rules,
+  approvalMode: "default",
   grant: () => {},
   request: async () => "deny",
 });
@@ -106,6 +107,41 @@ describe("createPermissionExtension", () => {
     assert.deepEqual(granted, [
       { tool: "read", pattern: "*.md", action: "allow", note: "文档文件" },
     ]);
+  });
+
+  it("auto 档自动放行工具级 ask，不再发起审批", async () => {
+    let requested = false;
+    const handler = mount({
+      ...baseGate([ASK_RULE]),
+      approvalMode: "auto",
+      request: async () => {
+        requested = true;
+        return "deny";
+      },
+    });
+    assert.equal(await handler(callEvent("read", { path: "notes.md" })), undefined);
+    assert.equal(requested, false);
+  });
+
+  it("full 档把越界审批也放行，但 deny 仍阻断", async () => {
+    let requested = false;
+    const handler = mount({
+      ...baseGate([]),
+      approvalMode: "full",
+      request: async () => {
+        requested = true;
+        return "deny";
+      },
+    });
+    assert.equal(await handler(callEvent("read", { path: "/etc/passwd" })), undefined);
+    assert.equal(requested, false);
+
+    const denied = mount({
+      ...baseGate([{ tool: "edit", pattern: "*", action: "deny", note: "只读模式" }]),
+      approvalMode: "full",
+    });
+    const result = await denied(callEvent("edit", { path: "src/a.ts" }));
+    assert.equal(result?.block, true);
   });
 });
 

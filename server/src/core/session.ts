@@ -3,7 +3,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { ERROR_CODES, type ThinkingLevel } from "@ucode/contracts";
+import { ERROR_CODES, type PermissionMode, type ThinkingLevel } from "@ucode/contracts";
 
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
@@ -22,6 +22,8 @@ export type SessionSeed = {
   thinkingLevel?: ThinkingLevel;
   /** primary agent slug；缺省即内置 `build` */
   mode?: string;
+  /** 会话级权限档位；缺省即内置 `default`（最放行档需显式选择） */
+  permissionMode?: PermissionMode;
 };
 
 export const createSession = (services: Services, seed: SessionSeed): string => {
@@ -32,6 +34,7 @@ export const createSession = (services: Services, seed: SessionSeed): string => 
     ...(seed.model ? { model: seed.model } : {}),
     ...(seed.thinkingLevel ? { thinkingLevel: seed.thinkingLevel } : {}),
     ...(seed.mode ? { mode: seed.mode } : {}),
+    ...(seed.permissionMode ? { permissionMode: seed.permissionMode } : {}),
   });
   return sessionId;
 };

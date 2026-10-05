@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -59,6 +59,10 @@ const migrations: Record<number, string> = {
       referenced_at TEXT
     );
     CREATE INDEX idx_attachment_created_at ON attachment(created_at);
+  `,
+  // 会话级权限档位：命中 ask 时弹审批还是自动放行（见 docs/modes-and-permissions.md）
+  6: `
+    ALTER TABLE session ADD COLUMN permission_mode TEXT;
   `,
 };
 

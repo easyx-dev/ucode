@@ -184,6 +184,8 @@ server/src/agent/
   表单出现时替掉 composer。计划只作为对话消息，不落盘。
   已知：模型可能在 `present_plan` 之后补一句结束语、偶尔重复调用，提示词已收紧但无法强制；
   在消息区过滤该工具卡片记入 `TODO.md` 待评估。
+- 后续新增**会话级权限档位**（`permissionMode`：`default` / `auto` / `full`）：在规则判定之后只放宽 `ask`、
+  不突破 `deny`，`auto` 保留越界目录审批。正文见 [`docs/modes-and-permissions.md`](../docs/modes-and-permissions.md)。
 
 ### 阶段 3 · 会话工作区 + ask 模式成品
 

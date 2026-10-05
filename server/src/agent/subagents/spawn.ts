@@ -6,10 +6,10 @@
  */
 import { randomUUID } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { ThinkingLevel } from "@ucode/contracts";
+import type { PermissionMode, ThinkingLevel } from "@ucode/contracts";
 
 import { SUBAGENT_DESCRIPTION_MAX_LENGTH, SUBAGENT_TIMEOUT_MS } from "../../constants";
-import type { SessionRecord } from "../../db/session-repository";
+import { overrideOf, type SessionRecord } from "../../db/session-repository";
 import { isRecord } from "../../utils/object";
 import { type AgentRegistry, subagentProfile } from "../agents";
 import { resolveContextPlan } from "./context";
@@ -26,6 +26,8 @@ export type SubagentSpawnDeps = {
       name: string;
       model?: string;
       thinkingLevel?: ThinkingLevel;
+      /** 继承父会话的权限档位；缺省不自动放宽 */
+      permissionMode?: PermissionMode;
     },
   ) => void;
   /** 装配失败时丢弃刚建的行（此时还没有文件，硬删） */
@@ -180,6 +182,8 @@ export const spawnSubagent = async (
 
   // 续跑复用已有子会话行与 JSONL；只有新建才落行
   if (!resumed) {
+    // 继承父会话的权限档位：父在 auto / full 时，委派出的子会话不退回默认
+    const parentPermissionMode = overrideOf(input.parent).permissionMode;
     deps.createChild(childId, {
       parentId: input.parent.id,
       cwd: input.cwd,
@@ -188,6 +192,7 @@ export const spawnSubagent = async (
       name,
       ...(request.model ? { model: request.model } : {}),
       ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+      ...(parentPermissionMode ? { permissionMode: parentPermissionMode } : {}),
     });
   }
 

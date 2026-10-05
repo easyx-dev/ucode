@@ -13,7 +13,7 @@ import {
   type SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { WebsearchConfig } from "@ucode/contracts";
+import { DEFAULT_PERMISSION_MODE, type WebsearchConfig } from "@ucode/contracts";
 
 import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
@@ -135,6 +135,8 @@ const createSessionLoader = async (
       ...skillDirectoryRules(assetPaths.skills.map((item) => item.path)),
       ...input.permission.listGrants(),
     ],
+    // 会话级权限档位：在规则判定之后放宽 ask（见 permissions/engine 的 applyApprovalMode）
+    approvalMode: overrideOf(input.record).permissionMode ?? DEFAULT_PERMISSION_MODE,
     parentRules: input.parentRules,
     grant: input.permission.grant,
     request: input.permission.request,

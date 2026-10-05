@@ -10,9 +10,15 @@
  * pi 对 `tool_call` 处理器抛错的处理是「按阻断兜底」，与这里的失败姿态一致。
  */
 import type { ExtensionFactory, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
-import type { PermissionDecision } from "@ucode/contracts";
+import type { PermissionDecision, PermissionMode } from "@ucode/contracts";
 
-import { decidePermission, type PermissionAsk, type PermissionRule, severityOf } from "./engine";
+import {
+  applyApprovalMode,
+  decidePermission,
+  type PermissionAsk,
+  type PermissionRule,
+  severityOf,
+} from "./engine";
 import { isMcpToolName, mcpPermission, mcpSubject } from "./mcp-rules";
 
 export type PermissionGate = {
@@ -20,6 +26,8 @@ export type PermissionGate = {
   cwd: string;
   /** 当前规则（模式规则 + 本会话已追加的授权）；每次调用现取，授权即时生效 */
   rules: () => readonly PermissionRule[];
+  /** 会话级权限档位：命中 `ask` 时是否自动放行；只放宽 `ask`，不突破 `deny` */
+  approvalMode: PermissionMode;
   /** 子会话的父会话规则；提供时与 `rules` 的判定取较严者，保证能力只可收窄 */
   parentRules?: () => readonly PermissionRule[];
   /** 记下本会话恒允：追加一条 allow 规则 */
@@ -63,7 +71,11 @@ export const createPermissionExtension =
               pi.getAllTools().find((tool) => tool.name === event.toolName)?.annotations,
             )
           : undefined;
-      const action = mcp?.action ?? verdict.action;
+      const action = applyApprovalMode(
+        mcp?.action ?? verdict.action,
+        verdict.tool,
+        gate.approvalMode,
+      );
       const subject = mcp ? mcpSubject(input, mcp.note) : verdict.subject;
 
       if (action === "allow") return undefined;

@@ -35,6 +35,12 @@
 
 ### 新增
 
+- 新增会话级**权限档位**（`permissionMode`：`default` / `auto` / `full`）：只决定工具调用命中 `ask` 时
+  弹审批还是自动放行，**不改变工具集、也不突破 `deny`**。`auto` 自动批准常规工具（越界目录仍审批），
+  `full` 连越界目录一并放行、界面以 warning 色标记。契约 `SessionSummary` / `sessions/create` /
+  `sessions/update` 增加该字段，SQLite schema v6 增加 `permission_mode` 列；输入区工具栏新增权限选择器
+  （空态禁用、不写草稿），会话分叉不继承、子智能体继承父档位，变更随 `session_updated` 事件下发。
+  模式与权限的完整语义见新增文档 `docs/modes-and-permissions.md`。
 - 新增 `@ucode/ui`（`packages/ui`）：web 与桌面端共享的 UI 包，含设计 token / 基础样式
   （`src/styles/theme.css`）、基础组件（`src/base`）、业务组件（`src/business`）、Provider
   （`src/provider`，收应用层创建好的 `client`）、SDK store 的 React 绑定 hooks 与纯逻辑；

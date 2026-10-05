@@ -251,6 +251,18 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&fo
 
 ---
 
+## 会话模式与权限
+
+会话模式（`build` / `plan` / `ask`，或自定义 primary agent）决定工具集与提示词倾向，只读模式直接禁写盘与执行；
+会话权限档位（`default` / `auto` / `full`）只决定命中 `ask` 时弹审批还是自动放行，
+**不改变工具集、也不突破 `deny`**（`.env` 阻断、只读模式的写 / 执行阻断在任何档位都生效）。
+档位是会话属性，入口在输入区底部工具栏。
+
+完整语义（权限引擎与默认规则、越界目录、技能目录与 MCP 兜底、审批与「本会话恒允」、安全边界、
+档位与新建 / 分叉 / 子会话的关系）见 [`docs/modes-and-permissions.md`](docs/modes-and-permissions.md)。
+
+---
+
 ## HTTP 接口
 
 统一响应体：`{ "success": true, "code": "ok", "message": "", "data": ... }`；

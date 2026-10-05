@@ -7,7 +7,13 @@
  * 命名、SQL 与删除规则见 `docs/database.md`。
  */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_SESSION_MODE, THINKING_LEVELS, type ThinkingLevel } from "@ucode/contracts";
+import {
+  DEFAULT_SESSION_MODE,
+  PERMISSION_MODES,
+  type PermissionMode,
+  THINKING_LEVELS,
+  type ThinkingLevel,
+} from "@ucode/contracts";
 import { z } from "zod";
 
 import { env } from "../env";
@@ -23,6 +29,8 @@ export type SessionOverride = {
   thinkingLevel?: ThinkingLevel;
   /** 会话模式（primary agent slug）；未设置时回落 `DEFAULT_SESSION_MODE` */
   mode?: string;
+  /** 会话级权限档位；未设置时回落 `DEFAULT_PERMISSION_MODE` */
+  permissionMode?: PermissionMode;
   /** 子会话的父会话 id 与角色 slug（只读派生，不参与 upsert） */
   parentSessionId?: string;
   agent?: string;
@@ -48,6 +56,8 @@ export type SessionRecord = {
   thinkingLevel: string | null;
   /** 会话模式（primary agent slug）；自定义 primary 可任意 slug，不再按枚举归一 */
   mode: string;
+  /** 会话级权限档位；为空表示未设置，序列化时回落默认 */
+  permissionMode: string | null;
   /** 子会话指向父会话；主会话为空（见 plans/stage-7c-subagents.md） */
   parentSessionId: string | null;
   /** 子会话的角色 slug（如 general / explore）；主会话为空 */
@@ -94,6 +104,7 @@ const SESSION_COLUMNS = [
   "model",
   "thinking_level",
   "mode",
+  "permission_mode",
   "parent_session_id",
   "agent",
   "forked_from_session_id",
@@ -117,6 +128,7 @@ const rowSchema = z.object({
   model: z.string().nullable(),
   thinking_level: z.string().nullable(),
   mode: z.string().nullable(),
+  permission_mode: z.string().nullable(),
   parent_session_id: z.string().nullable(),
   agent: z.string().nullable(),
   forked_from_session_id: z.string().nullable(),
@@ -138,6 +150,7 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   model: row.model,
   thinkingLevel: row.thinking_level,
   mode: row.mode ?? DEFAULT_SESSION_MODE,
+  permissionMode: row.permission_mode,
   parentSessionId: row.parent_session_id,
   agent: row.agent,
   forkedFromId: row.forked_from_session_id,
@@ -156,6 +169,12 @@ const toThinkingLevel = (value: string | null): ThinkingLevel | undefined =>
     ? (value as ThinkingLevel)
     : undefined;
 
+/** 同 `toThinkingLevel`：档位是枚举，非法值按未设置回落默认 */
+const toPermissionMode = (value: string | null): PermissionMode | undefined =>
+  value && (PERMISSION_MODES as readonly string[]).includes(value)
+    ? (value as PermissionMode)
+    : undefined;
+
 /** 搜索结果一律按字面量匹配，转义 LIKE 的 `%` / `_` / `\`（配合 `ESCAPE '\'`） */
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -163,12 +182,14 @@ const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) =>
 export const overrideOf = (record: SessionRecord | undefined): SessionOverride => {
   if (!record) return {};
   const thinkingLevel = toThinkingLevel(record.thinkingLevel);
+  const permissionMode = toPermissionMode(record.permissionMode);
   return {
     ...(record.name ? { name: record.name } : {}),
     ...(record.cwd ? { cwd: record.cwd } : {}),
     ...(record.model ? { model: record.model } : {}),
     ...(thinkingLevel ? { thinkingLevel } : {}),
     mode: record.mode,
+    ...(permissionMode ? { permissionMode } : {}),
     ...(record.parentSessionId ? { parentSessionId: record.parentSessionId } : {}),
     ...(record.agent ? { agent: record.agent } : {}),
     ...(record.forkedFromId ? { forkedFromId: record.forkedFromId } : {}),
@@ -184,8 +205,8 @@ export class SessionRepository {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, permission_mode, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -194,6 +215,7 @@ export class SessionRepository {
         override.model ?? null,
         override.thinkingLevel ?? null,
         override.mode ?? null,
+        override.permissionMode ?? null,
         now,
         now,
       );
@@ -210,13 +232,15 @@ export class SessionRepository {
       name: string;
       model?: string;
       thinkingLevel?: ThinkingLevel;
+      /** 继承父会话的权限档位；缺省为默认（不自动放宽） */
+      permissionMode?: PermissionMode;
     },
   ): void {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, agent, parent_session_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, permission_mode, agent, parent_session_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -225,6 +249,7 @@ export class SessionRepository {
         input.model ?? null,
         input.thinkingLevel ?? null,
         input.mode,
+        input.permissionMode ?? null,
         input.agent,
         input.parentId,
         now,
@@ -281,14 +306,15 @@ export class SessionRepository {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO session (id, name, cwd, model, thinking_level, mode, permission_mode, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = COALESCE(excluded.name, session.name),
            cwd = COALESCE(excluded.cwd, session.cwd),
            model = COALESCE(excluded.model, session.model),
            thinking_level = COALESCE(excluded.thinking_level, session.thinking_level),
-           mode = COALESCE(excluded.mode, session.mode)`,
+           mode = COALESCE(excluded.mode, session.mode),
+           permission_mode = COALESCE(excluded.permission_mode, session.permission_mode)`,
       )
       .run(
         id,
@@ -297,6 +323,7 @@ export class SessionRepository {
         override.model ?? null,
         override.thinkingLevel ?? null,
         override.mode ?? null,
+        override.permissionMode ?? null,
         now,
         now,
       );

@@ -11,14 +11,16 @@ import { type ComposerDraft, composerKeyOf, emptyDraft } from "../lib/composer-d
 import type { ComposerPayload } from "../lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
 import { isWorkspaceSession } from "../lib/session-groups";
-import type {
-  ChatItem,
-  GoalView,
-  ModelsResponse,
-  SessionCreateRequest,
-  SessionSummary,
-  ThinkingLevel,
-  UsageTotals,
+import {
+  type ChatItem,
+  DEFAULT_PERMISSION_MODE,
+  type GoalView,
+  type ModelsResponse,
+  type PermissionMode,
+  type SessionCreateRequest,
+  type SessionSummary,
+  type ThinkingLevel,
+  type UsageTotals,
 } from "../lib/types";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
@@ -45,6 +47,7 @@ type ChatPanelProps = {
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
   onSelectMode: (mode: string) => void;
+  onSelectPermissionMode: (mode: PermissionMode) => void;
   onOpenSettings: () => void;
   /** 打开某个子会话（子智能体工具卡上的入口） */
   onOpenSession: (sessionId: string) => void;
@@ -85,6 +88,7 @@ export function ChatPanel({
   onSelectModel,
   onSelectThinkingLevel,
   onSelectMode,
+  onSelectPermissionMode,
   onOpenSettings,
   onOpenSession,
   onOpenSidebar,
@@ -240,9 +244,11 @@ export function ChatPanel({
             session?.thinkingLevel ?? draft.thinkingLevel ?? models?.thinkingLevel ?? "off"
           }
           mode={session?.mode ?? draft.mode ?? "build"}
+          permissionMode={session?.permissionMode ?? DEFAULT_PERMISSION_MODE}
           onSelectModel={onSelectModel}
           onSelectThinkingLevel={onSelectThinkingLevel}
           onSelectMode={onSelectMode}
+          onSelectPermissionMode={onSelectPermissionMode}
           onBuiltin={onBuiltin}
         />
       )}

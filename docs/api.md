@@ -221,6 +221,8 @@
 按 `kind` 判别两类：
 
 - `permission`：工具调用命中 `ask` 规则，用户答 `allow_once` / `allow_session` / `deny`。
+  会话权限档位（`permissionMode`）决定命中 `ask` 时是否真的产生请求：`auto` 自动放行常规工具、
+  `full` 连越界目录一并放行，`deny` 在任何档位都保持阻断（语义见 [模式与权限](./modes-and-permissions.md)）。
 - `question`：模型经 `question` 工具向用户提问，用户从选项中选择或自填；答复为 `answers: string[][]`，
   与问题同序，每项是该问题选中的标签或自填文本，空数组表示用户跳过。
 

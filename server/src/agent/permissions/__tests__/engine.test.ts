@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import { agentRules, PRIMARY_PROFILES } from "../../agents";
 import { DEFAULT_PERMISSION_RULES, skillDirectoryRules } from "../defaults";
 import {
+  applyApprovalMode,
   decidePermission,
   evaluateRules,
   externalScope,
@@ -112,6 +113,28 @@ describe("decidePermission", () => {
       decidePermission(rules, "read", { path: `${skillDir}/foo/SKILL.md` }, CWD).action,
       "allow",
     );
+  });
+});
+
+describe("applyApprovalMode", () => {
+  it("default 不改写任何判定", () => {
+    assert.equal(applyApprovalMode("ask", "edit", "default"), "ask");
+    assert.equal(applyApprovalMode("ask", "external_directory", "default"), "ask");
+    assert.equal(applyApprovalMode("allow", "edit", "default"), "allow");
+    assert.equal(applyApprovalMode("deny", "edit", "default"), "deny");
+  });
+
+  it("auto 放行常规工具的 ask，保留越界审批", () => {
+    assert.equal(applyApprovalMode("ask", "edit", "auto"), "allow");
+    assert.equal(applyApprovalMode("ask", "mcp__srv__write", "auto"), "allow");
+    assert.equal(applyApprovalMode("ask", "external_directory", "auto"), "ask");
+  });
+
+  it("full 放行所有 ask，但不突破 deny / allow", () => {
+    assert.equal(applyApprovalMode("ask", "external_directory", "full"), "allow");
+    assert.equal(applyApprovalMode("ask", "edit", "full"), "allow");
+    assert.equal(applyApprovalMode("deny", "edit", "full"), "deny");
+    assert.equal(applyApprovalMode("allow", "edit", "full"), "allow");
   });
 });
 

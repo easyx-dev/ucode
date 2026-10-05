@@ -35,7 +35,13 @@ import type { GoalCommand } from "../lib/goal-command";
 import { lastTurnPresentedPlan } from "../lib/plan";
 import { sessionTitle } from "../lib/session";
 import { isWorkspaceSession } from "../lib/session-groups";
-import type { ChatItem, SessionCreateRequest, SessionSummary, ThinkingLevel } from "../lib/types";
+import type {
+  ChatItem,
+  PermissionMode,
+  SessionCreateRequest,
+  SessionSummary,
+  ThinkingLevel,
+} from "../lib/types";
 
 export type WorkspaceLayoutProps = {
   /** 当前选中的会话；null 表示草稿态（新建） */
@@ -108,6 +114,10 @@ export function WorkspaceLayout({
   const selectMode = (mode: string): void => {
     if (activeId) void sessions.setMode(activeId, mode);
     else composer.update(draftKey, { mode });
+  };
+  /** 权限档位只作用于已有会话：空态不落草稿、选择器禁用，新建会话恒为默认档 */
+  const selectPermissionMode = (mode: PermissionMode): void => {
+    if (activeId) void sessions.setPermissionMode(activeId, mode);
   };
 
   /**
@@ -313,6 +323,7 @@ export function WorkspaceLayout({
           onSelectModel={selectModel}
           onSelectThinkingLevel={selectThinkingLevel}
           onSelectMode={selectMode}
+          onSelectPermissionMode={selectPermissionMode}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSession={setActiveId}
           onOpenSidebar={() => setSidebarOpen(true)}

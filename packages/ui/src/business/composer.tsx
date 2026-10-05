@@ -10,7 +10,7 @@ import { useCommands } from "../hooks/use-commands";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-document";
 import type { ComposerPayload } from "../lib/composer-payload";
-import type { AttachmentView, CatalogProvider, ThinkingLevel } from "../lib/types";
+import type { AttachmentView, CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
 import { useClient } from "../provider";
 import { AttachmentStrip } from "./composer/attachment-strip";
 import { ComposerEditor } from "./composer/editor";
@@ -18,6 +18,7 @@ import type { SuggestionItem } from "./composer/suggestion";
 import { filesOf, useComposerAttachments } from "./composer/use-composer-attachments";
 import { ModePicker } from "./mode-picker";
 import { ModelPicker } from "./model-picker";
+import { PermissionPicker } from "./permission-picker";
 import { ThinkingPicker } from "./thinking-picker";
 
 type ComposerProps = {
@@ -43,9 +44,11 @@ type ComposerProps = {
   model: string;
   thinkingLevel: ThinkingLevel;
   mode: string;
+  permissionMode: PermissionMode;
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
   onSelectMode: (mode: string) => void;
+  onSelectPermissionMode: (mode: PermissionMode) => void;
   /** 内置动作（不落正文，由上层执行） */
   onBuiltin: (id: BuiltinCommandId) => void;
 };
@@ -79,9 +82,11 @@ export function Composer({
   model,
   thinkingLevel,
   mode,
+  permissionMode,
   onSelectModel,
   onSelectThinkingLevel,
   onSelectMode,
+  onSelectPermissionMode,
   onBuiltin,
 }: ComposerProps) {
   const { t } = useTranslation();
@@ -109,8 +114,10 @@ export function Composer({
   );
   const versionRef = useRef(0);
   const [version, setVersion] = useState(0);
-  /** `/models`、`/thinking`、`/mode` 从命令唤起的选择器（复用工具栏里的同一个弹出层） */
-  const [openPicker, setOpenPicker] = useState<"model" | "thinking" | "mode" | null>(null);
+  /** `/models`、`/thinking`、`/mode`、`/permission` 从命令唤起的选择器（复用工具栏里的同一个弹出层） */
+  const [openPicker, setOpenPicker] = useState<"model" | "thinking" | "mode" | "permission" | null>(
+    null,
+  );
   /**
    * 编辑器最后一次拿到的文档（JSON 快照）。Tiptap 不受控，只有重挂载才会换内容；
    * 用它区分「外部草稿变化」（清空 / 回填）与「自己刚写出去的那份」，避免每次按键都重挂载。
@@ -146,7 +153,7 @@ export function Composer({
   }, [initialDoc, resetEditor]);
 
   /**
-   * 内置命令分发：切换模型 / 思考档位 / 模式这三个直接打开工具栏里的选择器（就地完成），
+   * 内置命令分发：切换模型 / 思考档位 / 模式 / 权限档位这四个直接打开工具栏里的选择器（就地完成），
    * 其余交给上层（会话级动作在 App）。无可用模型时 `/models` 只提示，不空开弹出层。
    */
   const handleBuiltin = useCallback(
@@ -165,6 +172,10 @@ export function Composer({
       }
       if (id === "mode") {
         setOpenPicker("mode");
+        return;
+      }
+      if (id === "permission") {
+        setOpenPicker("permission");
         return;
       }
       onBuiltin(id);
@@ -355,6 +366,14 @@ export function Composer({
               open={openPicker === "mode"}
               onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
               onSelect={onSelectMode}
+            />
+
+            <PermissionPicker
+              value={permissionMode}
+              disabled={sessionId === null}
+              open={openPicker === "permission"}
+              onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
+              onSelect={onSelectPermissionMode}
             />
 
             <div className="ml-auto flex items-center gap-1">

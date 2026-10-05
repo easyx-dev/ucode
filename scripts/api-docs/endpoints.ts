@@ -118,7 +118,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: "sessionUpdateInputSchema",
     requestType: "SessionUpdateInput",
     output: "SessionSummary",
-    summary: "重命名 / 换模型 / 换推理等级 / 换模式",
+    summary: "重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位",
   },
   {
     domain: "sessions",

@@ -94,6 +94,18 @@ export const PERMISSION_DECISIONS = ["allow_once", "allow_session", "deny"] as c
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 
 /**
+ * 会话级权限档位：决定命中 `ask` 的调用是弹审批还是自动放行。
+ * `default` 全部按规则 / `auto` 自动批准常规工具（越界目录仍审批）/
+ * `full` 所有 `ask` 放行（越界目录也放行）。三者都**只放宽 `ask`**，`deny` 永不突破。
+ */
+export const PERMISSION_MODES = ["default", "auto", "full"] as const;
+
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+
+/** 新建会话的默认权限档位；最放行档必须由用户显式选择 */
+export const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
+
+/**
  * 联网搜索服务商：websearch 工具的可选实现，顺序即设置页的展示顺序。
  * 每家在 server 侧对应一个 `SearchProvider`（端点、鉴权与响应映射都不同）。
  */

@@ -23,7 +23,7 @@
 | POST | `/api/v1/sessions/list` | 会话列表，可按名称搜索、按父子过滤 |
 | POST | `/api/v1/sessions/create` | 新建会话（首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | 会话详情 + 用量 + 当前目标 |
-| POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 |
+| POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 |
 | POST | `/api/v1/sessions/archive` | 归档会话（软删：从列表隐藏，文件保留） |
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
@@ -262,6 +262,7 @@
 | `model` | string（长度≥1） | 否 | — | — |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
+| `permissionMode` | "default" \| "auto" \| "full" | 否 | — | — |
 
 **响应类型**：`SessionSummary`
 
@@ -276,6 +277,7 @@
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
+| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -303,7 +305,7 @@
 
 ### POST /api/v1/sessions/update
 
-重命名 / 换模型 / 换推理等级 / 换模式
+重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位
 
 **请求参数**
 
@@ -314,6 +316,7 @@
 | `model` | string（长度≥1） | 否 | — | — |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
+| `permissionMode` | "default" \| "auto" \| "full" | 否 | — | — |
 
 **响应类型**：`SessionSummary`
 
@@ -328,6 +331,7 @@
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
+| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -377,6 +381,7 @@
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
+| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
@@ -973,6 +978,7 @@
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
+| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |

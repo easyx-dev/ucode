@@ -36,6 +36,17 @@ describe("SessionRepository", () => {
     assert.equal(record?.cwd, "/tmp");
   });
 
+  it("权限档位可写入并读回；非法值按未设置回落", () => {
+    repo.create("s2p", { permissionMode: "full" });
+    assert.equal(overrideOf(repo.find("s2p")).permissionMode, "full");
+    repo.set("s2p", { permissionMode: "auto" });
+    assert.equal(overrideOf(repo.find("s2p")).permissionMode, "auto");
+
+    // 绕过写入层塞非法值，读取时按「未设置」处理
+    db.prepare("UPDATE session SET permission_mode = ? WHERE id = ?").run("yolo", "s2p");
+    assert.equal(overrideOf(repo.find("s2p")).permissionMode, undefined);
+  });
+
   it("set 只覆盖显式给出的字段", () => {
     repo.create("s3", { mode: "plan" });
     repo.set("s3", { name: "改个名" });

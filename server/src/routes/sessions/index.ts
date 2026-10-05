@@ -162,7 +162,7 @@ const appendTranscriptPatch = (
 const updateSession = (services: Services, patch: SessionUpdateInput): SessionSummary => {
   if (patch.model) assertModel(services, patch.model);
   if (
-    (patch.model || patch.thinkingLevel || patch.mode) &&
+    (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) &&
     services.pool.isActive(patch.sessionId)
   ) {
     throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断", 409);
@@ -193,10 +193,13 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     ...(patch.model ? { model: patch.model } : {}),
     ...(patch.thinkingLevel ? { thinkingLevel: patch.thinkingLevel } : {}),
     ...(patch.mode ? { mode: patch.mode } : {}),
+    ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
   });
 
-  // 换模型 / 换 thinking / 换模式需要重建会话实例才会生效，历史留在盘上
-  if (patch.model || patch.thinkingLevel || patch.mode) services.pool.dispose(patch.sessionId);
+  // 换模型 / 换 thinking / 换模式 / 换权限档位需要重建会话实例才会生效，历史留在盘上
+  if (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
+    services.pool.dispose(patch.sessionId);
+  }
 
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）
   const summary = describeSession(services, patch.sessionId).session;

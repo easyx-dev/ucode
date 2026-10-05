@@ -162,6 +162,7 @@ export default {
   切换当前会话的模型: "Switch the current session's model",
   切换思考档位: "Switch the thinking level",
   切换助手模式: "Switch the assistant mode",
+  切换权限档位: "Switch the permission level",
   请先接入模型供应商: "Connect a model provider first",
 
   // Assistant modes
@@ -175,6 +176,18 @@ export default {
   "只读分析与回答，不改文件、不执行命令。":
     "Read-only analysis and answers; no file writes or commands.",
   切换模式失败: "Failed to switch mode",
+
+  // Permission levels
+  权限档位: "Permission level",
+  默认: "Default",
+  自动批准: "Auto-approve",
+  完全访问: "Full access",
+  "按模式规则执行，需要授权时弹窗确认。":
+    "Follow the mode rules; prompt for approval when required.",
+  "自动批准常规工具，访问工作目录之外仍会询问。":
+    "Auto-approve routine tools; still ask before touching paths outside the working directory.",
+  "自动批准所有操作（含工作目录之外），仅保留规则里的阻断。":
+    "Auto-approve everything, including paths outside the working directory; only rule-based blocks remain.",
 
   // Interaction request (permission / question)
   交互请求: "Interaction request",

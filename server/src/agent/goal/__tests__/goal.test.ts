@@ -153,6 +153,7 @@ describe("GoalService 落定处理", () => {
       model: null,
       thinkingLevel: null,
       mode: "build",
+      permissionMode: null,
       parentSessionId: null,
       agent: null,
       forkedFromId: null,

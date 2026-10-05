@@ -15,6 +15,7 @@ export type BuiltinCommandId =
   | "models"
   | "thinking"
   | "mode"
+  | "permission"
   | "settings"
   | "goal"
   | "help";
@@ -39,6 +40,7 @@ export const BUILTIN_COMMANDS: readonly BuiltinCommand[] = [
   { id: "models", name: "models", descriptionKey: "切换当前会话的模型", needsSession: false }, // i18n-ignore
   { id: "thinking", name: "thinking", descriptionKey: "切换思考档位", needsSession: false }, // i18n-ignore
   { id: "mode", name: "mode", descriptionKey: "切换助手模式", needsSession: false }, // i18n-ignore
+  { id: "permission", name: "permission", descriptionKey: "切换权限档位", needsSession: true }, // i18n-ignore
   { id: "settings", name: "settings", descriptionKey: "打开设置", needsSession: false }, // i18n-ignore
   { id: "goal", name: "goal", descriptionKey: "查看或设定会话目标", needsSession: true }, // i18n-ignore
   { id: "help", name: "help", descriptionKey: "查看全部命令", needsSession: false }, // i18n-ignore

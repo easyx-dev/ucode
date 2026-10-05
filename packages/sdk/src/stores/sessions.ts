@@ -4,7 +4,12 @@
  * 初始取一次 `sessions/list`，之后由 `session_created` / `session_updated` / `session_archived`
  * 事件驱动，不再轮询；子会话按父级懒加载，事件到达时只更新已加载的父级。
  */
-import type { SessionCreateRequest, SessionSummary, ThinkingLevel } from "@ucode/contracts";
+import type {
+  PermissionMode,
+  SessionCreateRequest,
+  SessionSummary,
+  ThinkingLevel,
+} from "@ucode/contracts";
 
 import type { Apis } from "../apis";
 import { type ApiError, asApiError } from "../error";
@@ -20,6 +25,7 @@ type SessionPatch = {
   model?: string;
   thinkingLevel?: ThinkingLevel;
   mode?: string;
+  permissionMode?: PermissionMode;
 };
 
 export type SessionsState = {
@@ -44,6 +50,7 @@ export type SessionsStore = {
   setModel: (sessionId: string, model: string) => Promise<void>;
   setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
+  setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   archive: (sessionId: string) => Promise<void>;
   /** 加载（或刷新）某个父会话的子会话；重复调用即重取 */
   loadChildren: (parentId: string) => Promise<void>;
@@ -272,6 +279,7 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     setModel: (sessionId, model) => applyUpdate(sessionId, { model }),
     setThinkingLevel: (sessionId, thinkingLevel) => applyUpdate(sessionId, { thinkingLevel }),
     setMode: (sessionId, mode) => applyUpdate(sessionId, { mode }),
+    setPermissionMode: (sessionId, permissionMode) => applyUpdate(sessionId, { permissionMode }),
     async archive(sessionId) {
       try {
         await deps.apis.sessions.archive(sessionId);

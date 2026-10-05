@@ -1,5 +1,10 @@
 /** 会话列表与动作的 React 绑定：状态来自 SDK sessions store，动作转发到 store */
-import type { SessionCreateRequest, SessionSummary, ThinkingLevel } from "@ucode/contracts";
+import type {
+  PermissionMode,
+  SessionCreateRequest,
+  SessionSummary,
+  ThinkingLevel,
+} from "@ucode/contracts";
 
 import { useErrorText } from "../lib/error";
 import { useClient } from "../provider";
@@ -21,6 +26,7 @@ export type SessionsController = {
   setModel: (sessionId: string, model: string) => Promise<void>;
   setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
+  setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   archive: (sessionId: string) => Promise<void>;
 };
 
@@ -43,6 +49,7 @@ export function useSessions(): SessionsController {
     setModel: client.sessions.setModel,
     setThinkingLevel: client.sessions.setThinkingLevel,
     setMode: client.sessions.setMode,
+    setPermissionMode: client.sessions.setPermissionMode,
     archive: client.sessions.archive,
   };
 }

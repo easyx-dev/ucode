@@ -49,6 +49,7 @@ const recordWith = (patch: Partial<SessionRecord>): SessionRecord => ({
   model: null,
   thinkingLevel: null,
   mode: "build",
+  permissionMode: null,
   parentSessionId: null,
   agent: null,
   forkedFromId: null,

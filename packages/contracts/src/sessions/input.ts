@@ -1,7 +1,7 @@
 /** 会话接口的请求 zod 模型；`*Request` 为客户端载荷（z.input），`*Input` 为服务端解析后（z.infer） */
 import { z } from "zod";
 
-import { THINKING_LEVELS } from "../constants";
+import { PERMISSION_MODES, THINKING_LEVELS } from "../constants";
 
 /**
  * 会话 id 格式，与 pi 的 `assertValidSessionId` 一致。
@@ -47,6 +47,7 @@ export const sessionCreateInputSchema = z.object({
   model: z.string().min(1).optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
   mode: sessionModeSchema.optional(),
+  permissionMode: z.enum(PERMISSION_MODES).optional(),
 });
 
 export const sessionUpdateInputSchema = z.object({
@@ -55,6 +56,7 @@ export const sessionUpdateInputSchema = z.object({
   model: z.string().min(1).optional(),
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
   mode: sessionModeSchema.optional(),
+  permissionMode: z.enum(PERMISSION_MODES).optional(),
 });
 
 export type SessionIdRequest = z.input<typeof sessionIdInputSchema>;

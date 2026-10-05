@@ -7,7 +7,7 @@
  */
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 
-import type { PermissionAction } from "@ucode/contracts";
+import type { PermissionAction, PermissionMode } from "@ucode/contracts";
 
 import { toPosixPath } from "../../utils/path";
 
@@ -156,4 +156,19 @@ export const decidePermission = (
     scope: externalScope(target.absolutePath),
     rule: external.rule ?? verdict.rule,
   };
+};
+
+/**
+ * 按会话权限档位改写判定结果：只放宽 `ask`，`deny` 永不突破。
+ * `auto` 保留越界目录（`external_directory`）的审批，`full` 连越界一并放行。
+ * 传入的 `tool` 应是判定给出的工具名（越界检查恒为 `external_directory`）。
+ */
+export const applyApprovalMode = (
+  action: PermissionAction,
+  tool: string,
+  mode: PermissionMode,
+): PermissionAction => {
+  if (action !== "ask" || mode === "default") return action;
+  if (mode === "auto" && tool === "external_directory") return action;
+  return "allow";
 };

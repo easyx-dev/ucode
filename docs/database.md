@@ -49,7 +49,8 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 `session` 有意保持单表，列分两组语义，**新增列必须先归组**：
 
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
-  `thinking_level` / `mode`（未设置回落 `build`）/ `deleted_at`（软删标记，非空即已归档）/
+  `thinking_level` / `mode`（未设置回落 `build`）/ `permission_mode`（会话级权限档位，未设置回落
+  `default`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
   `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/
   `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）
@@ -69,7 +70,7 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 会话正文的事实源是 pi 的 JSONL；`source_path` 指向它，也是「还没落盘」的判据（为 null 时
 文件尚未写出）。**不再从文件回读任何元数据**（外部导入能力已放弃），所以删库重建后
-`name` / `cwd` / `model` / `thinking_level` / `mode` 会丢失——这是有意的取舍。
+`name` / `cwd` / `model` / `thinking_level` / `mode` / `permission_mode` 会丢失——这是有意的取舍。
 
 ### `attachment` 表
 
@@ -149,6 +150,6 @@ server/src/db/
 ## 容错
 
 - 库里只存会话状态与列表缓存，损坏或丢失时删掉 `app.db` 重建即可；代价是会话的
-  `name` / `cwd` / `model` / `thinking_level` / `mode` 与归档标记一并丢失（见「列分组」）
+  `name` / `cwd` / `model` / `thinking_level` / `mode` / `permission_mode` 与归档标记一并丢失（见「列分组」）
 - 读取路径的解析失败一律回落而不是抛出，避免脏行打挂接口
 - 对账（`reconcile()`）只做减法：删掉文件已消失的行，不再从文件还原元数据

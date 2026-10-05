@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import {
   API_BASE_PATH,
+  DEFAULT_PERMISSION_MODE,
   DEFAULT_SESSION_MODE,
   type MessageBlock,
   type MessageDTO,
@@ -214,6 +215,7 @@ export const sessionInfoToDTO = (
   model: override.model ?? defaultModel,
   thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
   mode: override.mode ?? DEFAULT_SESSION_MODE,
+  permissionMode: override.permissionMode ?? DEFAULT_PERMISSION_MODE,
   parentSessionId: override.parentSessionId ?? null,
   agent: override.agent ?? null,
   forkedFromId: override.forkedFromId ?? null,
@@ -248,6 +250,7 @@ export const draftSessionSummary = (
     model: override.model ?? defaultModel,
     thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
     mode: override.mode ?? DEFAULT_SESSION_MODE,
+    permissionMode: override.permissionMode ?? DEFAULT_PERMISSION_MODE,
     parentSessionId: override.parentSessionId ?? null,
     agent: override.agent ?? null,
     forkedFromId: override.forkedFromId ?? null,
