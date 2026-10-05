@@ -1,12 +1,13 @@
 /**
- * 构建期把品牌值注入 `index.html`。
+ * 构建期把品牌值注入 `index.html` 的 Vite 插件。
  *
- * 只处理构建期才能定型、且不适合放到运行时的两项：浏览器标题与首屏主题存储键。
- * 这里用包的 node 入口（`@ucode/brand/values`）——它不含图片 import，Node 能直接加载；
- * 图片资源由 `components/brand-logo.tsx` / `brand-head.tsx` 在应用侧引用。
+ * 只处理构建期才能定型、且不适合放到运行时的两项：浏览器标题与首屏主题 / 语言存储键。
+ * 用包的 node 入口（`./brand.ts`）——它不含图片 import，Node 能直接加载；
+ * 图片资源由各端在应用侧引用。
  */
-import { brand, localeStorageKey, themeStorageKey } from "@ucode/brand/values";
 import type { Plugin } from "vite";
+
+import { brand, localeStorageKey, themeStorageKey } from "./brand.ts";
 
 export const brandHtml = (): Plugin => ({
   name: "brand-html",

@@ -283,7 +283,10 @@
 - **已完成**：阶段 1（服务注册 / 回环默认 / `serviceToken`）、阶段 2（鉴权中间件、会话 Cookie、登录页、
   health / info / status 拆分、CORS 白名单）、阶段 3（一次性配对 + 「远程访问」面板）、
   阶段 4 的 `/api/v1/info` 与多客户端交互归属文档。
+- **已落地（桌面端，2026-10-06）**：`apps/desktop`（Electron）按 §3.3a 免登录——主进程读
+  `service.json`，对发往服务 `/api/v1` 的请求注入 `serviceToken`（fetch / SSE / 附件图片都带上），
+  凭证不进渲染层。本轮仅开发运行，见 README「桌面端」。
 - **待客户端包就绪**：阶段 4 的服务发现与 `ensure`、`resolveEndpoint()`、按 `compatRange` 做兼容决策，
-  以及桌面 webview 注入 `serviceToken` 的验收。
+  以及桌面端的安装包（阶段 5，内置服务运行时）。
 - **另立项**：阶段 5 打包（仓库外）；阶段 6 中继（[`relay.md`](./relay.md)）。
 - **已定不做**：服务与 Web UI 解耦——Web UI 随服务同源托管。

@@ -1,9 +1,8 @@
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
+import { brandHtml } from "@ucode/brand/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-
-import { brandHtml } from "./plugins/brand-html.ts";
 
 export default defineConfig({
   plugins: [

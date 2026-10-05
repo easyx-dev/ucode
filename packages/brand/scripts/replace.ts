@@ -28,7 +28,8 @@ const SCAN_FILE = /\.(?:ts|tsx|html|css|json|md|svg)$/;
 const DEFAULT_TARGETS = [
   "apps/web/src",
   "apps/web/index.html",
-  "apps/web/plugins",
+  "apps/desktop/src",
+  "apps/desktop/index.html",
   "server/src",
   "docs",
   "README.md",

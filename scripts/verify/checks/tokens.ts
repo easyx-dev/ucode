@@ -22,7 +22,7 @@ const PALETTE_UTILITY = new RegExp(
 
 export const run = (root: string): string[] => {
   const problems: string[] = [];
-  const files = ["apps/web/src", "packages/ui/src"].flatMap((dir) =>
+  const files = ["apps/web/src", "apps/desktop/src/renderer", "packages/ui/src"].flatMap((dir) =>
     listFiles(root, dir, (path) => /\.tsx?$/.test(path)),
   );
 

@@ -110,10 +110,11 @@
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify` |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand / i18n） |
-| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web`） |
+| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web` / `apps/desktop`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
+| `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
 
 单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
 （如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
@@ -168,6 +169,10 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
   （`src/lib/*`）。子路径导出：`@ucode/ui/base/*`、`@ucode/ui/business/*`、`@ucode/ui/hooks/*`、
   `@ucode/ui/lib/*`、`@ucode/ui/provider`、`@ucode/ui/presets/workspace`、`@ucode/ui/theme.css`。
   组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
+- `apps/web/`（Vite + React）与 `apps/desktop/`（Electron）都是薄外壳：界面与逻辑在 `@ucode/ui` /
+  `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/lib/app-i18n`）、client 装配与导航状态。
+  桌面端主进程从 `$APP_HOME/app/service.json` 取端点与 `serviceToken`，对发往服务 `/api/v1` 的请求
+  注入 `Authorization: Bearer`——凭证只留在主进程，渲染层拿不到；渲染层只接收 `baseUrl`。
 - `packages/i18n/`（`@ucode/i18n`）是跨端 i18n 运行时与共享文案的单一事实源：house i18next 配置
   （`createI18n`）、协议级通用文案（`common`）、错误码文案（`domain`）、产品界面文案
   （`ui`，web / Electron / TUI 共用），以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射。

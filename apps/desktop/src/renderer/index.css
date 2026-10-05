@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@ucode/ui/theme.css";
+
+/* 共享 UI 包的 className 也要纳入扫描 */
+@source "../../../../packages/ui/src";

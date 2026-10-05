@@ -4,6 +4,8 @@
 
 - **server/**：Hono + TypeScript，端口 `2048`，全部接口前缀 `/api/v1`（`health` 之外都是 `POST`）
 - **apps/web/**：Vite + React 19 + Tailwind v4 + shadcn/ui，开发时跑 `5173`，生产由 server 同源托管
+- **apps/desktop/**：Electron 桌面端，自带 Vite + React 渲染层，复用 `@ucode/ui` 与 `@ucode/sdk`；主进程读
+  `$APP_HOME/app/service.json` 免登录连接本机服务（凭证只留在主进程）
 - **packages/contracts/**：`@ucode/contracts`，接口的请求校验与响应类型，server 与 web 共用同一份定义
 - **packages/brand/**：`@ucode/brand`，品牌名与 logo / favicon 的单一来源，B 端定制只改这里
 - 会话正文沿用 pi 的 JSONL；`$APP_HOME/app/app.db`（SQLite）保存应用自己的会话元数据与索引
@@ -23,11 +25,27 @@ pnpm dev
 
 # 生产：构建 web 后只用 2048 一个端口
 pnpm build && pnpm start
+
+# 桌面端：先起 server，再单独起 Electron（渲染层 5174）
+pnpm dev:desktop
 ```
 
 打开 `http://localhost:2048`（生产）或 `http://localhost:5173`（开发）。首次启动会生成登录密码并打印在启动日志里（也可查看 `$APP_HOME/app/service.json`），用密码登录后即可使用。
 
 首次启动会提示「尚未配置模型」，点侧栏底部 **设置** 或调用 `POST /api/v1/config/update` 填入端点即可。
+
+### 桌面端（Electron）
+
+`apps/desktop` 是独立客户端，本轮只做**开发运行**、只连**已运行**的本机服务：
+
+- 界面：自带 Vite + React 渲染层，复用 `@ucode/ui` 的组件与 `@ucode/sdk`；会话 / 设置状态只在本窗口内（不走 URL）。
+- 免登录：主进程读 `$APP_HOME/app/service.json` 拿 `serviceToken`，对发往服务 `/api/v1` 的请求注入
+  `Authorization: Bearer`（fetch / SSE / 附件图片都带上），**凭证不进渲染层**；渲染层只拿 `baseUrl`。
+- 跨域：渲染层跑在 `http://localhost:5174`，需在 `.env` 放行 `APP_CORS_ORIGIN=http://localhost:5174`
+  （带凭证的跨域不能用 `*`）。未找到服务或凭证失效时，界面给出可读提示。
+- 启动：先 `pnpm dev`（或 `pnpm start`）起服务，再 `pnpm dev:desktop`。
+
+> 尚未做：安装包（内置服务运行时）、服务发现与自动拉起、按 `compatRange` 的版本兼容决策；留待打包阶段。
 
 ### 环境变量（`.env`）
 
@@ -83,7 +101,7 @@ $APP_HOME/                 # 默认 ~/.ucode
 - `src/assets.ts`：`logoLight` / `logoDark` / `favicon` 三个图片引用，从 `assets/` 下的文件 import；
   换 logo 就替换文件，换格式就改这里的 import 扩展名（svg / png / jpg / webp … 都行）；
   只想要一套通用的 logo 时，把 `logoLight` / `logoDark` 指向同一个文件即可
-- 标题与主题存储键由 `apps/web/plugins/brand-html.ts` 在构建时注入 `index.html`，避免首屏闪烁
+- 标题与主题存储键由 `@ucode/brand/vite` 的 `brandHtml` 插件在构建时注入 `index.html`，避免首屏闪烁
 - 默认数据目录名由 `slug` 派生（`~/.<slug>`，默认即 `~/.ucode`）
 
 改完跑 `pnpm check`：其中的 brand 校验会检查品牌值合法、资源齐备，并拦下源码里残留的硬编码品牌名。历史遗留或不在品牌包覆盖范围内的文件，可用应急脚本批量矫正：
@@ -431,9 +449,16 @@ apps/web/src/
   App.tsx                  # 应用外壳：URL 导航（会话 / 设置） + WorkspaceLayout
   main.tsx                 # 入口：主题、i18n 接线与 client 的 Provider
   components/brand-head.tsx # 文档级品牌元素（favicon）
-  lib/i18n.ts              # i18next 接线与语言持久化（文案在 @ucode/i18n）
+  lib/i18n.ts              # 应用 i18n 单例（接线在 @ucode/ui/lib/app-i18n）
   lib/sdk.ts               # 创建 client 实例
   index.css                # tailwind 入口：import @ucode/ui/theme.css + @source 包源码
+apps/desktop/
+  src/main/index.ts        # Electron 主进程：窗口、服务凭证注入（webRequest）、连接 IPC
+  src/main/connection.ts   # 读 $APP_HOME/app/service.json → { baseUrl, token }
+  src/preload/index.ts     # 把 baseUrl 暴露给渲染层（凭证不经预载）
+  src/renderer/            # 渲染层外壳：入口、i18n 接线、client 装配、窗口内导航
+  vite.config.ts           # 渲染层（端口 5174）
+  scripts/build-main.mjs   # esbuild 打 main（ESM）/ preload（CJS）
 ```
 
 ### 实现要点

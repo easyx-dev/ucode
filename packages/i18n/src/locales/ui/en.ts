@@ -471,4 +471,13 @@ export default {
   新密码: "New password",
   "新密码至少 8 位；修改后所有设备都需要重新登录。":
     "At least 8 characters; all devices will need to sign in again after the change.",
+
+  // Desktop shell（桌面端启动时的连接态）
+  未连接到本机服务: "Not connected to the local service",
+  "未找到服务注册文件 {{path}}，请先启动服务。":
+    "Service registration file not found: {{path}}. Start the service first.",
+  "无法连接本机服务，请确认服务已启动。":
+    "Cannot reach the local service. Make sure it is running.",
+  "服务凭证无效，请重启服务后重试。":
+    "The service credential is invalid. Restart the service and try again.",
 };

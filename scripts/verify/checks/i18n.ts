@@ -221,10 +221,11 @@ const hardcodedProblems = (root: string, file: string): string[] => {
  * 只扫客户端与文案包：服务端已不做本地化，它的中文是「固定兜底文案 + 日志」，按设计允许。
  */
 const sourceProblems = (root: string): string[] =>
-  ["apps/web/src", "packages/ui/src", "packages/i18n/src"].flatMap((dir) =>
-    listFiles(root, dir, (path) => /\.tsx?$/.test(path))
-      .filter((file) => !isCatalogData(file))
-      .flatMap((file) => hardcodedProblems(root, file)),
+  ["apps/web/src", "apps/desktop/src/renderer", "packages/ui/src", "packages/i18n/src"].flatMap(
+    (dir) =>
+      listFiles(root, dir, (path) => /\.tsx?$/.test(path))
+        .filter((file) => !isCatalogData(file))
+        .flatMap((file) => hardcodedProblems(root, file)),
   );
 
 export const run = (root: string): string[] => [

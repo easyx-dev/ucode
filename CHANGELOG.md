@@ -35,6 +35,12 @@
 
 ### 新增
 
+- 新增 **桌面端 `apps/desktop`**（Electron）：自带 Vite + React 渲染层，复用 `@ucode/ui` 与 `@ucode/sdk`，
+  外壳沿用 web 的约定（品牌注入、i18n、主题、防闪脚本），只把「URL 导航 + 登录闸门」换成窗口内内存导航
+  与连接态。主进程从 `$APP_HOME/app/service.json` 读端点与 `serviceToken`，对发往该服务 `/api/v1` 的请求
+  注入 `Authorization: Bearer`（fetch / SSE / 附件 `<img>` 都经此带凭证，凭证不进渲染层）；未运行或
+  凭证失效时渲染层给出可读提示。本轮只做开发运行（不打包、不自动拉起服务）：`pnpm dev:desktop`
+  （需先起服务，并在 `.env` 放行 `APP_CORS_ORIGIN=http://localhost:5174`）。main / preload 用 esbuild 打包。
 - 服务化与鉴权（取代 `TODO.md` 的 P0 条目，方案见 `plans/service-and-auth.md`）：
   - **服务注册**：新增 `$APP_HOME/app/service.json`（`0600`，服务独占写），承载监听地址 / 端口 /
     `serviceToken` / 登录密码；端口 `0` 自选并回写真实端口。新增 `APP_HOST`（默认 `127.0.0.1`），
@@ -51,6 +57,12 @@
     「远程访问」面板（局域网开关 / 二维码配对链接 / 活动会话 / 改密码）；CORS 收紧为白名单 + credentials。
 
 ### 变更
+
+- `brand-html` Vite 插件由 `apps/web/plugins` 移到 `@ucode/brand/vite`，web 与桌面端共用；
+  i18n 接线由 `apps/web/src/lib/i18n.ts` 抽到 `@ucode/ui/lib/app-i18n`（`createAppI18n`）。
+- `scripts/verify` 的 i18n（硬编码中文）与 tokens（裸色值）扫描范围纳入 `apps/desktop/src/renderer`，
+  brand 校验纳入 `apps/desktop`；根 `pnpm check` 覆盖桌面端 typecheck / test。
+- `.env.example` 的 `APP_CORS_ORIGIN` 由 `*` 改为示例值并说明桌面端来源（带凭证的跨域不能用 `*`）。
 
 - `TODO.md`：P0「给 `/api/v1` 加鉴权并默认只监听回环地址」已落地。
 
