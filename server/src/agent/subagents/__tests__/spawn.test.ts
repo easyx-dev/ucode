@@ -69,6 +69,7 @@ const depsOf = (over: Partial<SubagentSpawnDeps> = {}): SubagentSpawnDeps => ({
   findChild: () => undefined,
   ensure: async () => assert.fail("未提供 ensure"),
   refresh: () => {},
+  emitSessionCreated: () => {},
   settleInteractions: () => {},
   dispose: () => {},
   emit: () => {},

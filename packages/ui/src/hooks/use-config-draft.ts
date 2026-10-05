@@ -1,18 +1,24 @@
-/** 模型设置的草稿状态：读取当前配置与 pi 供应商目录，组合 provider 级与模型级编辑 */
+/**
+ * 模型设置的草稿状态：数据来自 config / models store，抽屉打开时加载并在数据到达后填充草稿。
+ *
+ * 草稿一旦填充即由用户接管，后续 store 更新不再覆盖，避免打断未保存的编辑。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
-import { api, describeError } from "../lib/api";
-import type { DraftProvider, DraftWebsearch } from "../lib/config-draft";
+
 import {
   createDraftProvider,
+  type DraftProvider,
+  type DraftWebsearch,
   fromCatalogProvider,
   modelOptions,
   toDraftProvider,
   toDraftWebsearch,
 } from "../lib/config-draft";
-import { type CatalogProvider, DEFAULT_SEARCH_PROVIDER, type ThinkingLevel } from "../lib/types";
+import type { CatalogProvider, ThinkingLevel } from "../lib/types";
+import { DEFAULT_SEARCH_PROVIDER } from "../lib/types";
+import { useClient } from "../provider";
 import { useConfigModels } from "./use-config-models";
+import { useStore } from "./use-store";
 
 /** 联网搜索草稿的初值：与契约的默认值保持一致 */
 const emptyWebsearch = (): DraftWebsearch => ({
@@ -26,60 +32,56 @@ const emptyWebsearch = (): DraftWebsearch => ({
 export type ConfigDraft = ReturnType<typeof useConfigDraft>;
 
 export function useConfigDraft(open: boolean) {
-  const { t } = useTranslation();
+  const client = useClient();
+  const configState = useStore(client.config);
+  const modelsState = useStore(client.models);
+
   const [providers, setProviders] = useState<DraftProvider[]>([]);
   const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("off");
   const [websearch, setWebsearch] = useState<DraftWebsearch>(emptyWebsearch);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
-  const [loading, setLoading] = useState(false);
+  /** 本次打开是否已用服务端配置填充过草稿 */
+  const seeded = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 配置给出「已保存了什么」，目录给出「pi 还支持什么」，两者一起才够渲染
-      const [{ config }, models] = await Promise.all([api.config.info(), api.models.list()]);
-      const directory = models.providers;
-      setCatalog(directory);
-      setProviders(
-        config.providers.map((provider) =>
-          toDraftProvider(
-            provider,
-            directory.find((item) => item.id === provider.id),
-          ),
-        ),
-      );
-      setDefaultModel(config.defaultModel ?? "");
-      setThinkingLevel(config.thinkingLevel);
-      setWebsearch(toDraftWebsearch(config.websearch));
-      setMemoryEnabled(config.memory.enabled);
-    } catch (error) {
-      toast.error(t("失败提示.模板", { label: t("配置加载失败"), reason: describeError(error) }));
-    } finally {
-      setLoading(false);
+  // 打开时拉取「已保存了什么」与「pi 还支持什么」；关闭后重置填充标记
+  useEffect(() => {
+    if (!open) {
+      seeded.current = false;
+      return;
     }
-  }, [t]);
-
-  /**
-   * 语言切换只该换文案：`load` 的依赖含 `t`，若让 effect 直接依赖它，切语言会重跑 `load`，
-   * 用服务端配置覆盖对话框里未保存的草稿。改成只在 `open` 变化时触发，`load` 走 ref。
-   */
-  const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load;
-  }, [load]);
+    void client.config.load();
+    void client.models.reload();
+  }, [client, open]);
 
   useEffect(() => {
-    if (open) void loadRef.current();
-  }, [open]);
+    const snapshot = configState.data;
+    // 目录未就绪（既无数据也无错误）时先不 seed：内置供应商要靠目录判定 source，
+    // 否则会被当成自定义、保存时误报缺 baseUrl
+    const modelsSettled = modelsState.data !== null || modelsState.error !== null;
+    if (!open || seeded.current || !snapshot || !modelsSettled) return;
+    seeded.current = true;
+    const directory = modelsState.data?.providers ?? [];
+    const { config } = snapshot;
+    setCatalog(directory);
+    setProviders(
+      config.providers.map((provider) =>
+        toDraftProvider(
+          provider,
+          directory.find((item) => item.id === provider.id),
+        ),
+      ),
+    );
+    setDefaultModel(config.defaultModel ?? "");
+    setThinkingLevel(config.thinkingLevel);
+    setWebsearch(toDraftWebsearch(config.websearch));
+    setMemoryEnabled(config.memory.enabled);
+  }, [configState.data, modelsState.data, modelsState.error, open]);
 
-  const patchProvider = useCallback(
-    (key: string, patch: Partial<DraftProvider>) => {
-      setProviders((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
-    },
-    [setProviders],
-  );
+  const patchProvider = useCallback((key: string, patch: Partial<DraftProvider>) => {
+    setProviders((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+  }, []);
 
   const addProvider = useCallback(() => {
     setProviders((prev) => [...prev, createDraftProvider()]);
@@ -122,7 +124,7 @@ export function useConfigDraft(open: boolean) {
     thinkingLevel,
     websearch,
     memoryEnabled,
-    loading,
+    loading: configState.loading,
     options,
     setDefaultModel,
     setThinkingLevel,

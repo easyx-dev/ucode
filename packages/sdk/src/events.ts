@@ -1,7 +1,14 @@
-/** 全局事件流：持有单条 SSE 连接并按指数退避重连，向订阅者广播帧与连接状态 */
+/**
+ * 全局事件流：持有单条 SSE 连接并按指数退避重连，向订阅者广播帧与连接状态。
+ *
+ * 事件与回调一律 `on<X>` 命名（见 AGENTS.md「语言规范」）；`server.connected` 作为连接信号
+ * 只触发 `onConnected`，不进入 `onEvent`。错误帧同时进入 `onEvent` 与 `onError`。
+ */
 import type { ServerEvent } from "@ucode/contracts";
 
-export type EventSubscribe = (
+import { type ApiError, toApiError } from "./error";
+
+export type EventConnect = (
   onEvent: (frame: ServerEvent) => void,
   signal: AbortSignal,
 ) => Promise<void>;
@@ -11,10 +18,14 @@ export type EventStream = {
   start: () => void;
   /** 断开连接并停止重连 */
   stop: () => void;
-  /** 订阅事件帧，返回退订函数 */
-  subscribe: (listener: (frame: ServerEvent) => void) => () => void;
-  /** 订阅连接状态，返回退订函数 */
-  onStatus: (listener: (connected: boolean) => void) => () => void;
+  /** 订阅所有帧（不含 `server.connected`），返回退订函数 */
+  onEvent: (listener: (frame: ServerEvent) => void) => () => void;
+  /** 订阅错误帧，返回退订函数 */
+  onError: (listener: (error: ApiError) => void) => () => void;
+  /** 订阅连接建立，返回退订函数 */
+  onConnected: (listener: () => void) => () => void;
+  /** 订阅连接断开，返回退订函数 */
+  onDisconnected: (listener: () => void) => () => void;
 };
 
 const sleep = (ms: number): Promise<void> =>
@@ -22,18 +33,26 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-export const createEventStream = (subscribe: EventSubscribe): EventStream => {
-  const listeners = new Set<(frame: ServerEvent) => void>();
-  const statusListeners = new Set<(connected: boolean) => void>();
+export const createEventStream = (connect: EventConnect): EventStream => {
+  const eventListeners = new Set<(frame: ServerEvent) => void>();
+  const errorListeners = new Set<(error: ApiError) => void>();
+  const connectedListeners = new Set<() => void>();
+  const disconnectedListeners = new Set<() => void>();
 
   let controller: AbortController | null = null;
   let connected = false;
   let attempt = 0;
 
-  const notifyStatus = (next: boolean): void => {
-    if (connected === next) return;
-    connected = next;
-    for (const listener of statusListeners) listener(next);
+  const notifyConnected = (): void => {
+    if (connected) return;
+    connected = true;
+    for (const listener of connectedListeners) listener();
+  };
+
+  const notifyDisconnected = (): void => {
+    if (!connected) return;
+    connected = false;
+    for (const listener of disconnectedListeners) listener();
   };
 
   const run = async (): Promise<void> => {
@@ -41,19 +60,23 @@ export const createEventStream = (subscribe: EventSubscribe): EventStream => {
       const current = controller;
       if (!current || current.signal.aborted) return;
       try {
-        await subscribe((frame) => {
+        await connect((frame) => {
           if (frame.type === "server.connected") {
             attempt = 0;
-            notifyStatus(true);
+            notifyConnected();
             return;
           }
-          for (const listener of listeners) listener(frame);
+          for (const listener of eventListeners) listener(frame);
+          if (frame.type === "error") {
+            const error = toApiError(frame);
+            for (const listener of errorListeners) listener(error);
+          }
         }, current.signal);
       } catch {
         // 连接失败或被中断，统一走下面的退避重连
       }
 
-      notifyStatus(false);
+      notifyDisconnected();
       if (current.signal.aborted) return;
 
       attempt += 1;
@@ -73,18 +96,30 @@ export const createEventStream = (subscribe: EventSubscribe): EventStream => {
       controller?.abort();
       controller = null;
       attempt = 0;
-      notifyStatus(false);
+      notifyDisconnected();
     },
-    subscribe(listener) {
-      listeners.add(listener);
+    onEvent(listener) {
+      eventListeners.add(listener);
       return () => {
-        listeners.delete(listener);
+        eventListeners.delete(listener);
       };
     },
-    onStatus(listener) {
-      statusListeners.add(listener);
+    onError(listener) {
+      errorListeners.add(listener);
       return () => {
-        statusListeners.delete(listener);
+        errorListeners.delete(listener);
+      };
+    },
+    onConnected(listener) {
+      connectedListeners.add(listener);
+      return () => {
+        connectedListeners.delete(listener);
+      };
+    },
+    onDisconnected(listener) {
+      disconnectedListeners.add(listener);
+      return () => {
+        disconnectedListeners.delete(listener);
       };
     },
   };

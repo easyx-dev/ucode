@@ -1,7 +1,7 @@
 /** HTTP 传输层：拼接 base、注入 token 与自定义头、拆解响应封套 */
 import { API_BASE_PATH, type ApiResponse } from "@ucode/contracts";
 
-import { interpolate, SdkError, type Translate } from "./error";
+import { ApiError, interpolate, type Translate } from "./error";
 
 export type FetchLike = typeof fetch;
 
@@ -53,13 +53,13 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     };
   };
 
-  /** 拆封套：success 为真返回 data，否则抛 SdkError；失败详情挂在 details 上 */
+  /** 拆封套：success 为真返回 data，否则抛 ApiError；失败详情挂在 details 上 */
   const unwrap = async <T>(response: Response): Promise<T> => {
     let payload: unknown;
     try {
       payload = await response.json();
     } catch {
-      throw new SdkError(
+      throw new ApiError(
         "invalid_response",
         message("服务返回了非 JSON 响应（HTTP {{status}}）", { status: String(response.status) }),
         {
@@ -71,7 +71,7 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     const record = payload as ApiResponse<T> | null;
     if (record?.success) return record.data;
 
-    throw new SdkError(
+    throw new ApiError(
       record?.code ?? "unknown_error",
       record?.message ??
         message("请求失败（HTTP {{status}}）", { status: String(response.status) }),
@@ -120,12 +120,12 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
         signal,
       });
       if (!response.ok) {
-        throw new SdkError("events_failed", await readStreamError(response), {
+        throw new ApiError("events_failed", await readStreamError(response), {
           httpStatus: response.status,
         });
       }
       if (!response.body) {
-        throw new SdkError("events_failed", message("服务未返回流"));
+        throw new ApiError("events_failed", message("服务未返回流"));
       }
       return response.body;
     },

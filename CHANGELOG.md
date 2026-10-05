@@ -36,15 +36,18 @@
 ### 新增
 
 - 新增 `@ucode/ui`（`packages/ui`）：web 与桌面端共享的 UI 包，含设计 token / 基础样式
-  （`src/styles/theme.css`）、基础组件、业务组件、数据 hooks 与纯逻辑。web 的组件、hooks 与纯逻辑
-  整体迁入，经 `src/runtime.ts` 的 `configureUi` 注入 SDK / 翻译 / 语言切换；`apps/web` 瘦身为外壳
-  （入口、i18n 接线、SDK 装配），`index.css` 改为 `@import "@ucode/ui/theme.css"` + `@source` 扫描包内
-  className；`scripts/verify` 的 tokens / i18n / brand 扫描范围纳入 `packages/ui/src`；shadcn 配置移至
-  `packages/ui/components.json`。
+  （`src/styles/theme.css`）、基础组件（`src/base`）、业务组件（`src/business`）、Provider
+  （`src/provider`，收应用层创建好的 `client`）、SDK store 的 React 绑定 hooks 与纯逻辑；
+  web 的组件、hooks 与纯逻辑整体迁入。组件组合式：应用层拼装基础 / 业务组件，或直接用
+  `src/presets/workspace-layout.tsx` 的预置组合；当前会话等导航状态由应用层以受控 props 传入。
+  `apps/web` 瘦身为外壳（入口、i18n 接线、client 装配、URL 导航），`index.css` 改为
+  `@import "@ucode/ui/theme.css"` + `@source` 扫描包内 className；`scripts/verify` 的 tokens / i18n /
+  brand 扫描范围纳入 `packages/ui/src`；shadcn 配置移至 `packages/ui/components.json`。
 - 新增 `@ucode/sdk`（`packages/sdk`）：把 server `/api/v1` 封装成无 React / DOM 依赖的跨端客户端，
-  含传输层（封套拆解、baseUrl 与 token/头注入）、SSE 解析与指数退避重连的事件流，以及会话消息流等
-  状态 store（快照接续、事件归并、乐观发送）；`createClient` 为无状态接口层，`createSdk` 额外装配事件流
-  与 store，供 web / Electron / TUI 共用。web 经 `configureUi` 注入实例。
+  分两层——`createApis` 是无状态接口层（含传输层封套拆解、baseUrl 与 token/头注入、SSE 解析与
+  指数退避重连的事件流），`createClient` 在其上装配各域同步 store（会话列表、消息流、交互、目标、
+  模型、health、命令、用量、配置、MCP），store 订阅事件流做增量归并、暴露 `getState` / `subscribe`
+  与动作，供 web / 桌面 / TUI 共用；无模块级单例，多窗口多实例互不干扰。
 - 新增 `POST /api/v1/attachments`（**请求体为原始字节**，`?name=` 带文件名）与附件元数据表
   （SQLite `attachment`，schema v5）：`id` 是内容 sha256，字节落 `$APP_HOME/app/attachments/<id>`，
   `GET /attachments/<id>` 的 `Content-Type` 取元数据。`referenced_at` 区分临时 / 永久：
@@ -307,6 +310,12 @@
 
 ### 变更
 
+- 会话列表 / 模型 / MCP 改为事件驱动：`EVENT_NAMES` 新增 `session_created` / `session_updated`
+  （载荷 `{ session, usage? }`）/ `session_archived`，控制帧新增 `config_changed` / `mcp_changed`，
+  移除 `session_info_changed`（并入 `session_updated`）。客户端据此删除会话列表、模型目录、MCP 的
+  轮询刷新；`SessionSummary` 的 `usage` 由 `session_updated` 携带。
+- 客户端错误类型 `SdkError` 更名为 `ApiError`；事件订阅面更名为 `events.onEvent` / `onError` /
+  `onConnected` / `onDisconnected`。
 - i18n 约定进一步收敛为「key 即中文文案」：长文案也用 key 本身（不再用 `.说明` 之类的摘要 key），
   `packages/i18n/src/locales/*/zh-CN.ts` 只剩纯占位模板 `失败提示.模板`；`scripts/verify` 的 i18n
   校验改为「zh ⊆ en + zh 只允许摘要 key（`分组.用途` 形态）+ 禁止 key === value 冗余 + 摘要 key
@@ -437,6 +446,8 @@
 
 ### 移除
 
+- 移除 `@ucode/ui` 的运行时注入单例（`src/runtime.ts` 的 `configureUi`）与 `lib` 的 api / sdk /
+  event-stream 代理：改由 `UiProvider` 经 React context 下发应用层创建好的 `client`。
 - 移除 `POST /sessions/delete`（由 `POST /sessions/archive` 取代）。
 - 移除 `messages/prompt` 的 `cwd` 字段（会话级设置只在 `sessions/create`）。
 - 移除 `SessionSummary.messageCount` 与 `SessionInfoResponse` 的 `persisted` / `entries` 字段。

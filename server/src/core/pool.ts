@@ -4,7 +4,7 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { ERROR_CODES, type WebsearchConfig } from "@ucode/contracts";
+import { ERROR_CODES, type SessionSummary, type WebsearchConfig } from "@ucode/contracts";
 
 import {
   type AgentProfile,
@@ -24,6 +24,7 @@ import type { MemoryService } from "../agent/memory";
 import type { PermissionRule, SessionAllowStore } from "../agent/permissions";
 import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
 import { type SubagentHooks, spawnSubagent } from "../agent/subagents";
+import type { UsageService } from "../agent/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../agent/workspace";
 import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
@@ -34,6 +35,7 @@ import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
 import type { PiRuntime } from "./runtime";
 import { indexFromManager } from "./session-index";
+import { describeSessionSummary } from "./session-summary";
 
 type PooledSession = {
   session: AgentSession;
@@ -69,6 +71,8 @@ export class SessionPool {
     private readonly memory: MemoryService,
     /** 目标模式：落定后校验并按需续跑 */
     private readonly goals: GoalService,
+    /** 使用统计：落定后随 `session_updated` 一起下发累计用量 */
+    private readonly usage: UsageService,
   ) {}
 
   startSweeper(intervalMs = 60_000): void {
@@ -97,12 +101,49 @@ export class SessionPool {
     return next;
   }
 
-  /** 生成落定后回写索引（名称 / 条目数 / 预览 / 时间） */
+  /** 生成落定后回写索引（名称 / 条目数 / 预览 / 时间），并把摘要与用量下发给所有客户端 */
   refreshIndex(sessionId: string): void {
     const session = this.entries.get(sessionId)?.session;
     if (!session) return;
     const index = indexFromManager(session.sessionManager);
     if (index) this.repository.refresh(sessionId, index);
+    this.emitUpdated(sessionId, true);
+  }
+
+  /** 读当前摘要（供事件下发）；会话不在仓储时返回 null */
+  private summaryOf(sessionId: string): SessionSummary | null {
+    return describeSessionSummary(
+      {
+        repository: this.repository,
+        isActive: (id) => this.isActive(id),
+        defaults: () => {
+          const status = this.runtime.getStatus();
+          return { model: status.defaultModel, thinkingLevel: status.thinkingLevel };
+        },
+      },
+      sessionId,
+    );
+  }
+
+  /** 下发摘要变更；`withUsage` 用于落定后（累计用量此时才写入口径） */
+  private emitUpdated(sessionId: string, withUsage = false): void {
+    const session = this.summaryOf(sessionId);
+    if (!session) return;
+    if (!withUsage) {
+      this.events.emitSessionUpdated(sessionId, session);
+      return;
+    }
+    const record = this.repository.find(sessionId);
+    const usage = record
+      ? this.usage.usageOf(record, { live: this.entries.get(sessionId)?.session })
+      : undefined;
+    this.events.emitSessionUpdated(sessionId, session, usage);
+  }
+
+  /** 子会话创建成功后下发，供列表与导航插入新行 */
+  private emitCreated(sessionId: string): void {
+    const session = this.summaryOf(sessionId);
+    if (session) this.events.emitSessionCreated(sessionId, session);
   }
 
   /**
@@ -224,6 +265,7 @@ export class SessionPool {
                 this.dispose(id);
               },
               emit: (type, data) => this.events.emitFrame(record.id, type, data),
+              emitSessionCreated: (id) => this.emitCreated(id),
             },
           );
         } finally {
@@ -373,6 +415,8 @@ export class SessionPool {
   beginRun(sessionId: string): boolean {
     if (this.running.has(sessionId)) return false;
     this.running.add(sessionId);
+    // 所有客户端据此把该会话标成运行态，而不是等下一次列表刷新
+    this.emitUpdated(sessionId);
     return true;
   }
 

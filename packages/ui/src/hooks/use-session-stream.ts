@@ -1,17 +1,18 @@
-/** 会话消息流：订阅 SDK 的会话流 store（快照 / 接续 / 归并都在 SDK 内） */
+/** 会话消息流：订阅 client 的 messages store（快照 / 接续 / 归并都在 SDK 内） */
 import type { SessionStreamState } from "@ucode/sdk";
 import { useEffect, useMemo } from "react";
-import { sdk } from "../lib/sdk";
+
+import { useClient } from "../provider";
 import { useStore } from "./use-store";
 
 export function useSessionStream(sessionId: string | null): SessionStreamState {
-  const store = useMemo(() => sdk.sessionStream.get(sessionId), [sessionId]);
+  const client = useClient();
+  const store = useMemo(() => client.messages.get(sessionId), [client, sessionId]);
   const state = useStore(store);
 
   useEffect(() => {
-    sdk.events.start();
-    sdk.sessionStream.activate(sessionId);
-  }, [sessionId]);
+    client.messages.activate(sessionId);
+  }, [client, sessionId]);
 
   return state;
 }

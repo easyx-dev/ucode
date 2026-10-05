@@ -164,10 +164,19 @@
 `POST /api/v1/events` 返回 `text/event-stream`，**不套封套**：
 
 - SSE 事件名固定 `message`，真正的类型在 `data` 的 JSON 里
-- 会话事件帧：`{ type, sessionId, seq, data }`
+- **会话事件帧**：`{ type, sessionId, seq, data }`
   - `type` 取自 `EVENT_NAMES`；`seq` 是**会话内**单调序号
   - 客户端用 `messages/list` 返回的快照 `seq` 切分：丢弃 `seq <= 快照 seq` 的帧，接续其余帧
-- 控制帧：`{ type: "server.connected" }`、`{ type: "error", sessionId?, code, message }`
+  - 除消息流（`message_*` / `tool_*` / `queue_update` / `compaction_*`）外，会话列表的增改删也走这里：
+    - `session_created`：载荷 `SessionSummary`，新建 / 分叉 / 子智能体创建
+    - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals }`，改名 / 换模型 /
+      落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
+    - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
+  - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
+- **控制帧**（无 `sessionId` / `seq`）：`server.connected`、
+  `{ type: "error", sessionId?, code, message, params? }`、
+  `{ type: "config_changed", config: ConfigSnapshot }`（配置重建，客户端据此重取 models / health）、
+  `{ type: "mcp_changed", mcp: McpListResponse }`
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲
 

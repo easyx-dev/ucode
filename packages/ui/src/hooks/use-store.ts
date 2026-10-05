@@ -2,6 +2,9 @@
 import type { Store } from "@ucode/sdk";
 import { useSyncExternalStore } from "react";
 
-export function useStore<T>(store: Store<T>): T {
+/** 只读订阅面：SDK 各域 store 暴露 getState/subscribe，动作方法另有其名 */
+export type Observable<T> = Pick<Store<T>, "getState" | "subscribe">;
+
+export function useStore<T>(store: Observable<T>): T {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }

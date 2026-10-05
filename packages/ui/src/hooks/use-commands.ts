@@ -1,8 +1,9 @@
-/** 命令与技能清单：按会话 / cwd 拉取并缓存，供 `/` 菜单使用 */
-import { useEffect, useState } from "react";
+/** 命令与技能清单的 React 绑定：按会话 / cwd 缓存，用时加载 */
+import type { PromptCommandView, SkillCommandView } from "@ucode/contracts";
+import { useEffect, useMemo } from "react";
 
-import { api } from "../lib/api";
-import type { PromptCommandView, SkillCommandView } from "../lib/types";
+import { useClient } from "../provider";
+import { useStore } from "./use-store";
 
 export type CommandAssets = {
   prompts: PromptCommandView[];
@@ -12,23 +13,14 @@ export type CommandAssets = {
 const EMPTY: CommandAssets = { prompts: [], skills: [] };
 
 export function useCommands(sessionId: string | null, cwd?: string): CommandAssets {
-  const [assets, setAssets] = useState<CommandAssets>(EMPTY);
+  const client = useClient();
+  const state = useStore(client.commands);
+  const input = useMemo(() => (sessionId ? { sessionId } : cwd ? { cwd } : {}), [sessionId, cwd]);
 
   useEffect(() => {
-    let cancelled = false;
-    const body = sessionId ? { sessionId } : cwd ? { cwd } : {};
-    api.commands
-      .list(body)
-      .then((result) => {
-        if (!cancelled) setAssets({ prompts: result.prompts, skills: result.skills });
-      })
-      .catch(() => {
-        if (!cancelled) setAssets(EMPTY);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, cwd]);
+    void client.commands.load(input);
+  }, [client, input]);
 
-  return assets;
+  const key = sessionId ?? cwd ?? "";
+  return state.byKey[key] ?? EMPTY;
 }

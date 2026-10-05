@@ -8,7 +8,13 @@
  *   构成「快照 + 接续」的一致性边界：投影与序号在同一同步块读取。
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { EventName, ServerEvent } from "@ucode/contracts";
+import type {
+  EventName,
+  ServerControlEvent,
+  ServerEvent,
+  SessionSummary,
+  UsageTotals,
+} from "@ucode/contracts";
 
 import { toSseEvents } from "./events";
 
@@ -60,12 +66,36 @@ export class SessionEventBus {
     message: string,
     params?: Record<string, string>,
   ): void {
-    this.publish({ type: "error", sessionId, code, message, ...(params ? { params } : {}) });
+    this.emitControl({
+      type: "error",
+      sessionId,
+      code,
+      message,
+      ...(params ? { params } : {}),
+    });
+  }
+
+  /** 服务端自身产生的控制帧（无 sessionId、无 seq）：config_changed / mcp_changed 等 */
+  emitControl(frame: ServerControlEvent): void {
+    this.publish(frame);
   }
 
   /** 服务端自身产生的会话事件（如交互请求）；客户端按 type 过滤 */
   emitFrame(sessionId: string, type: EventName, data: unknown): void {
     this.publish({ type, sessionId, seq: this.nextSeq(sessionId), data });
+  }
+
+  /** 会话摘要增 / 改 / 删的统一下发点；`usage` 仅在实际变化时带上 */
+  emitSessionCreated(sessionId: string, session: SessionSummary): void {
+    this.emitFrame(sessionId, "session_created", session);
+  }
+
+  emitSessionUpdated(sessionId: string, session: SessionSummary, usage?: UsageTotals): void {
+    this.emitFrame(sessionId, "session_updated", usage ? { session, usage } : { session });
+  }
+
+  emitSessionArchived(sessionId: string): void {
+    this.emitFrame(sessionId, "session_archived", { sessionId });
   }
 
   /** 快照序号：与 messages/list 的投影同一次同步读取，客户端按它切分实时帧 */

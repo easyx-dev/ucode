@@ -138,10 +138,11 @@ const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
       return [{ event: "compaction_start", data: { reason: event.reason } }];
     case "compaction_end":
       return [{ event: "compaction_end", data: {} }];
-    case "session_info_changed":
-      return [{ event: "session_info_changed", data: { name: event.name ?? null } }];
     case "agent_settled":
       return [{ event: "agent_settled", data: {} }];
+    // pi 的会话信息变更（如标题变化）不再单独下发：服务端在写入摘要后统一发 `session_updated`
+    case "session_info_changed":
+      return null;
     default:
       return null;
   }

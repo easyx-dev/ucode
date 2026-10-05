@@ -290,8 +290,13 @@ SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 | `message_end` | `MessageDTO` | 权威消息（前端用它替换流式内容） |
 | `queue_update` | `{ steering, followUp }` | 生成中排队情况 |
 | `compaction_start` / `compaction_end` | `{ reason? }` | 上下文压缩 |
-| `session_info_changed` | `{ sessionId }` | 会话名 / 模型等元数据变化 |
+| `session_created` | `SessionSummary` | 新建 / 分叉 / 子智能体创建 |
+| `session_updated` | `{ session: SessionSummary, usage? }` | 改名 / 换模型 / 落定后摘要刷新 / 运行态变化 |
+| `session_archived` | `{ sessionId }` | 归档（级联子会话逐个下发） |
 | `agent_settled` | `{}` | 本次运行结束 |
+
+控制帧（无 `sessionId` / `seq`）：`server.connected`、`{ type: "error", sessionId?, code, message, params? }`、
+`{ type: "config_changed", config }`（配置重建）、`{ type: "mcp_changed", mcp }`。
 
 `MessageDTO`：
 
@@ -351,17 +356,18 @@ packages/i18n/             # 跨端 i18n 运行时与共享文案（只依赖 i1
   src/locales/domain/      # 错误码文案（中英）
   src/locales/ui/          # 产品界面文案（web / Electron / TUI 共用，中英）
 packages/sdk/              # @ucode/sdk：server /api/v1 的跨端客户端（无 React / DOM）
-  src/client.ts            # createClient：按域组装的接口方法
+  src/apis.ts              # createApis：按域组装的接口方法（无状态）
   src/transport.ts         # 封套拆解、baseUrl / token 注入与自定义头
-  src/events.ts            # 事件流：指数退避重连与订阅
-  src/stream/              # 会话流等状态 store（快照接续、事件归并）
-  src/app.ts               # createSdk：client + events + stores
+  src/events.ts            # 事件流：指数退避重连与 onEvent / onError 订阅
+  src/stores/              # 各域同步 store（会话列表、消息流、交互、目标、配置…）
+  src/client.ts            # createClient：apis + events + 各域 store
 packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
-  src/components/ui/       # 基础组件（shadcn 生成后归我们维护）
-  src/components/          # 业务组件（侧栏、消息区、Composer、设置…）
-  src/hooks/               # 数据与状态 hooks
+  src/base/                # 基础组件（shadcn 生成后归我们维护）
+  src/business/            # 业务组件（侧栏、消息区、Composer、设置…）
+  src/hooks/               # SDK store 的 React 绑定与派生
   src/lib/                 # 纯逻辑（类型出口、消息归并、草稿、格式化…）
-  src/runtime.ts           # configureUi：注入 SDK / 翻译 / 语言切换
+  src/provider/            # UiProvider：注入应用层创建好的 client
+  src/presets/workspace-layout.tsx  # 预置组合（侧栏 + 对话 + 输入 + 对话框）
   src/styles/theme.css     # 设计 token、base 层与 markdown 样式
   components.json          # shadcn CLI 配置
 server/src/
@@ -407,11 +413,11 @@ server/src/
     eval.ts                # 提示词评测：真实模型跑固定用例，按提示词源对比
     lib/local-gateway.ts   # smoke / eval 共用的本地端点装配
 apps/web/src/
-  App.tsx                  # 应用外壳：组合 @ucode/ui 的组件与 hooks
-  main.tsx                 # 入口：主题、i18n 接线与 SDK 运行时注入
+  App.tsx                  # 应用外壳：URL 导航（会话 / 设置） + WorkspaceLayout
+  main.tsx                 # 入口：主题、i18n 接线与 client 的 Provider
   components/brand-head.tsx # 文档级品牌元素（favicon）
-  lib/i18n.ts              # i18next 接线与语言切换（文案在 @ucode/i18n）
-  lib/sdk.ts               # 创建 SDK 实例并注入 @ucode/ui 运行时
+  lib/i18n.ts              # i18next 接线与语言持久化（文案在 @ucode/i18n）
+  lib/sdk.ts               # 创建 client 实例
   index.css                # tailwind 入口：import @ucode/ui/theme.css + @source 包源码
 ```
 

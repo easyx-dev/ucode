@@ -1,12 +1,12 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
-import type { AppConfigPatchInput } from "@ucode/contracts";
+import type { AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
 import { expireTempAttachments } from "./agent/attachment";
 import { GoalService } from "./agent/goal";
 import { MemoryService } from "./agent/memory";
 import { SessionAllowStore } from "./agent/permissions";
 import { UsageService } from "./agent/usage";
-import { ConfigStore } from "./config/store";
+import { ConfigStore, publicConfig } from "./config/store";
 import { ATTACHMENT_SWEEP_INTERVAL_MS, ATTACHMENT_TEMP_TTL_MS } from "./constants";
 import { SessionEventBus } from "./core/event-bus";
 import { InteractionBroker } from "./core/interactions";
@@ -68,6 +68,7 @@ export const createServices = async (): Promise<Services> => {
     },
     memory,
     goals,
+    usage,
   );
 
   config.load();
@@ -107,6 +108,11 @@ export const createServices = async (): Promise<Services> => {
   // 退出时可能先后收到多个信号，close 只能生效一次（DatabaseSync 重复 close 会抛）
   let closed = false;
 
+  const snapshot = (): ConfigSnapshot => ({
+    config: publicConfig(config.get()),
+    status: runtime.getStatus(),
+  });
+
   return {
     config,
     sessions,
@@ -126,6 +132,7 @@ export const createServices = async (): Promise<Services> => {
       config.set(next);
       pool.disposeAll();
       await runtime.apply(next);
+      events.emitControl({ type: "config_changed", config: snapshot() });
     },
     async reload() {
       guardIdle();
@@ -133,6 +140,7 @@ export const createServices = async (): Promise<Services> => {
       runtime.assertUsable(next);
       pool.disposeAll();
       await runtime.apply(next);
+      events.emitControl({ type: "config_changed", config: snapshot() });
     },
     close() {
       if (closed) return;

@@ -11,10 +11,11 @@ import {
 import { Hono } from "hono";
 
 import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../agent/mcp";
+import type { Services } from "../../app";
 import { ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 
-export const createMcpRoute = () => {
+export const createMcpRoute = (services: Services) => {
   const router = new Hono();
 
   router.post("/list", jsonBody(mcpListInputSchema), (c) => {
@@ -24,11 +25,13 @@ export const createMcpRoute = () => {
 
   router.post("/upsert", jsonBody(mcpUpsertInputSchema), (c) => {
     const response: McpWriteResponse = writeMcpServer(c.req.valid("json") as McpUpsertInput);
+    services.events.emitControl({ type: "mcp_changed", mcp: readMcpConfig() });
     return c.json(ok(response));
   });
 
   router.post("/delete", jsonBody(mcpDeleteInputSchema), (c) => {
     const response: McpDeleteResponse = deleteMcpServer(c.req.valid("json").name);
+    services.events.emitControl({ type: "mcp_changed", mcp: readMcpConfig() });
     return c.json(ok(response));
   });
 

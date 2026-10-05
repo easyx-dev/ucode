@@ -28,6 +28,7 @@ import type { Services } from "../../app";
 import { draftSessionSummary, sessionInfoToDTO } from "../../core/serialize";
 import { assertModel, createSession } from "../../core/session";
 import { indexFromManager, infoFromRecord } from "../../core/session-index";
+import { describeSessionSummary, type SessionSummarySources } from "../../core/session-summary";
 import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
 import { AppError, ok } from "../../lib/response";
@@ -57,49 +58,31 @@ const runtimeDefaults = (
  * 客户端才能把 URL 里已消失的会话清掉而不是渲染成空会话。
  */
 const describeSession = (services: Services, sessionId: string): SessionInfoResponse => {
-  const { model, thinkingLevel } = runtimeDefaults(services);
   const record = services.sessions.find(sessionId);
   if (!record) {
     throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
       path: sessionId,
     });
   }
-  const override = overrideOf(record);
-  const running = services.pool.isActive(sessionId);
+  const session = describeSessionSummary(summarySources(services), sessionId);
+  if (!session) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
   // 池内会话直接读内存条目，避免每次 info 都重解析整份会话文件
   const usage = services.usage.usageOf(record, { live: services.pool.get(sessionId) });
   const goal = services.goals.view(record, services.pool.get(sessionId));
 
-  if (!record.sourcePath) {
-    return {
-      session: draftSessionSummary(
-        sessionId,
-        override,
-        model,
-        thinkingLevel,
-        workspaceDirOf(sessionId),
-        running,
-        record.childCount,
-        { createdAt: record.createdAt, updatedAt: record.updatedAt },
-      ),
-      usage,
-      goal,
-    };
-  }
-
-  return {
-    session: sessionInfoToDTO(
-      infoFromRecord(record),
-      override,
-      model,
-      thinkingLevel,
-      running,
-      record.childCount,
-    ),
-    usage,
-    goal,
-  };
+  return { session, usage, goal };
 };
+
+/** 事件下发与详情共用同一套摘要口径 */
+const summarySources = (services: Services): SessionSummarySources => ({
+  repository: services.sessions,
+  isActive: (sessionId) => services.pool.isActive(sessionId),
+  defaults: () => runtimeDefaults(services),
+});
 
 const listSessions = (services: Services, query: SessionListInput): SessionListResponse => {
   const { model, thinkingLevel } = runtimeDefaults(services);
@@ -150,16 +133,14 @@ const createSessionRoute = (services: Services, input: SessionCreateInput): Sess
 
   const sessionId = createSession(services, input);
 
-  const { model, thinkingLevel } = runtimeDefaults(services);
-  return draftSessionSummary(
-    sessionId,
-    services.sessions.get(sessionId),
-    model,
-    thinkingLevel,
-    workspaceDirOf(sessionId),
-    false,
-    0,
-  );
+  const summary = describeSessionSummary(summarySources(services), sessionId);
+  if (!summary) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
+  services.events.emitSessionCreated(sessionId, summary);
+  return summary;
 };
 
 /** 名称 / 模型变更同时追加到会话文件，供 pi 重放 */
@@ -218,7 +199,9 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   if (patch.model || patch.thinkingLevel || patch.mode) services.pool.dispose(patch.sessionId);
 
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）
-  return describeSession(services, patch.sessionId).session;
+  const summary = describeSession(services, patch.sessionId).session;
+  services.events.emitSessionUpdated(patch.sessionId, summary);
+  return summary;
 };
 
 /** 归档（软删）：只写 `deleted_at`，行、JSONL 与工作区目录都保留；子会话随父级联归档 */
@@ -231,12 +214,14 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
 
   for (const id of targets) {
     services.pool.dispose(id);
-    services.events.remove(id);
     // 会话归档后，挂起的审批与「本会话恒允」都失去意义；目标状态一并清掉
     services.interactions.forget(id);
     services.permissions.clear(id);
     services.sessions.setGoal(id, null);
     services.sessions.archive(id);
+    // 先广播归档再清序号：客户端只按 type 处理，seq 不参与列表口径
+    services.events.emitSessionArchived(id);
+    services.events.remove(id);
   }
 
   return { archived: true, sessionId };
@@ -282,7 +267,9 @@ const forkSession = (services: Services, input: SessionForkInput): SessionSummar
   const index = indexFromManager(forked.manager);
   if (index) services.sessions.refresh(forked.id, index);
 
-  return describeSession(services, forked.id).session;
+  const summary = describeSession(services, forked.id).session;
+  services.events.emitSessionCreated(forked.id, summary);
+  return summary;
 };
 
 export const createSessionsRoute = (services: Services) => {

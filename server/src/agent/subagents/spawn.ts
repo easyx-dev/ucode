@@ -35,6 +35,8 @@ export type SubagentSpawnDeps = {
   findChild: (sessionId: string) => SessionRecord | undefined;
   /** 子会话落定后回写索引（source_path / preview），供列表与导航使用 */
   refresh: (sessionId: string) => void;
+  /** 新建子会话成功装配后下发 `session_created`，供其它客户端把子会话插入列表 */
+  emitSessionCreated: (sessionId: string) => void;
   /** 结算该子会话发起的挂起交互（归属父会话，但只清来源是它的） */
   settleInteractions: (sessionId: string) => void;
   dispose: (sessionId: string) => void;
@@ -198,6 +200,9 @@ export const spawnSubagent = async (
     if (!resumed) deps.discardChild(childId);
     throw error;
   }
+
+  // 只有新建才广播 session_created：续跑复用已有行，客户端早已见过
+  if (!resumed) deps.emitSessionCreated(childId);
 
   // 只发关联帧：前端据此把该子会话自身的进度帧归入父会话里这次工具调用，不重发子会话事件
   deps.emit("subagent_start", {

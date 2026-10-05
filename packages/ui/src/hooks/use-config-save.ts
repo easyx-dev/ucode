@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { api, describeError } from "../lib/api";
+
 import { type DraftProvider, toUpdatePayload, validateDrafts } from "../lib/config-draft";
+import { useClient } from "../provider";
 import type { ConfigDraft } from "./use-config-draft";
 
 export type ConfigSave = {
@@ -17,6 +18,7 @@ export type ConfigSave = {
 
 export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSave {
   const { t } = useTranslation();
+  const client = useClient();
   const [saving, setSaving] = useState(false);
   const [testingKey, setTestingKey] = useState<string | null>(null);
 
@@ -29,7 +31,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
 
     setSaving(true);
     try {
-      await api.config.update(
+      const saved = await client.config.update(
         toUpdatePayload(
           draft.providers,
           draft.defaultModel || null,
@@ -38,12 +40,12 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
           draft.memoryEnabled,
         ),
       );
-      toast.success(t("配置已保存"));
-      onSaved();
-      return true;
-    } catch (error) {
-      toast.error(t("失败提示.模板", { label: t("保存失败"), reason: describeError(error) }));
-      return false;
+      // 失败原因由 ErrorToaster 统一提示，这里只报成功
+      if (saved) {
+        toast.success(t("配置已保存"));
+        onSaved();
+      }
+      return saved;
     } finally {
       setSaving(false);
     }
@@ -60,21 +62,21 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
 
     setTestingKey(provider.key);
     try {
-      const result = await api.config.test({
+      const result = await client.config.test({
         baseUrl,
         providerId: provider.id.trim() || undefined,
         ...(provider.apiKey.trim() ? { apiKey: provider.apiKey.trim() } : {}),
         api: provider.api,
         model,
       });
-      toast.success(
-        t("连接成功 · {{latency}}ms · {{model}}", {
-          latency: result.latencyMs,
-          model: result.modelEcho ?? "-",
-        }),
-      );
-    } catch (error) {
-      toast.error(t("失败提示.模板", { label: t("连接失败"), reason: describeError(error) }));
+      if (result) {
+        toast.success(
+          t("连接成功 · {{latency}}ms · {{model}}", {
+            latency: result.latencyMs,
+            model: result.modelEcho ?? "-",
+          }),
+        );
+      }
     } finally {
       setTestingKey(null);
     }

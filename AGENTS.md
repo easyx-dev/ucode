@@ -28,7 +28,7 @@
 - 注释形式与标点：文件级与块注释用 `/** */`，行内用 `//`；JSDoc 块内句子用中文句号结尾，单行 `//` 不加句末句号。
 - 类型声明统一用 `type`，不引入 `interface`：`interface` 的声明合并本项目用不到，与 `type` 功能重叠；统一后不必在两者间反复选择。联合 / 映射等本来就只能用 `type`。
 - TS 类型从宽：`type` 的字段注释逐字段写即可，与字段名同义、略显冗余都可以接受，不必纠结「算不算复述」；要保证的是内容为业务口径而非错误含义。
-- 文件级注释：概述文件或模块职责，位于文件第一行（import 之前，`/** */` 且不复述文件名）；`components/ui/`、入口与配置文件豁免；职责与路径同名的文件可不加。
+- 文件级注释：概述文件或模块职责，位于文件第一行（import 之前，`/** */` 且不复述文件名）；`packages/ui/src/base/`、入口与配置文件豁免；职责与路径同名的文件可不加。
 - 声明写法：React 组件与 hooks 用 `export function`；其余纯函数（web `lib/`、server 全部）一律 `export const xxx = (...) =>`；模块级常量用 `SCREAMING_SNAKE_CASE`。
 - 命名动词保持一套：
   - 布尔值与判断函数用 `is*` / `has*` / `can*`，不用 `show*` 表达判断；
@@ -153,14 +153,20 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
   与 `assets/`（资源引用在 `src/assets.ts`，换格式改 import 扩展名即可）；默认数据目录名 `appHomeDirname`
   也由它派生（`~/.<slug>`），server 用包的 node 入口 `@ucode/brand/values` 取值。
   源码里禁止硬编码品牌名，`pnpm check` 的 brand 校验会拦下。
-- `packages/sdk/`（`@ucode/sdk`）是 server `/api/v1` 的跨端客户端单一事实源：传输层（封套拆解、baseUrl /
-  token 注入）、SSE 解析与事件流、会话流等状态 store，**不依赖 React / DOM**，web / Electron / TUI 共用。
-  web 通过 `configureUi`（`@ucode/ui/runtime`）注入 `createSdk` 实例；`createClient` 是无状态接口层，
-  可单独使用。
+- `packages/sdk/`（`@ucode/sdk`）是 server `/api/v1` 的跨端客户端单一事实源，**不依赖 React / DOM**，
+  web / 桌面 / TUI 共用，分两层：
+  - `createApis(options)` 是无状态接口层：一方法一接口，外加传输层（封套拆解、baseUrl / token 注入）、
+    SSE 解析与重连事件流（`events.onEvent` / `onError` / `onConnected` / `onDisconnected`）。可单独使用。
+  - `createClient(options)` 在其上装配各域同步 store（`sessions` / `messages` / `interactions` / `goal` /
+    `models` / `health` / `commands` / `usage` / `config` / `mcp`），store 订阅事件流做增量归并，
+    暴露 `getState` / `subscribe` + 动作，React 侧用 `useSyncExternalStore` 订阅。
+  无模块级单例，多窗口多实例互不干扰。
 - `packages/ui/`（`@ucode/ui`）是 web 与桌面端共享的 UI 单一事实源：设计 token / 基础样式
-  （`src/styles/theme.css`）、基础组件与业务组件、数据 hooks 与纯逻辑，经 `configureUi` 注入运行时
-  （SDK 实例 + 翻译函数 + 语言切换）。子路径导出：`@ucode/ui/components/*`、`@ucode/ui/hooks/*`、
-  `@ucode/ui/lib/*`、`@ucode/ui/runtime`、`@ucode/ui/theme.css`。
+  （`src/styles/theme.css`）、基础组件（`src/base/*`）、业务组件（`src/business/*`）、Provider
+  （`src/provider`，收应用层创建好的 `client`）、SDK store 的 React 绑定 hooks（`src/hooks/*`）与纯逻辑
+  （`src/lib/*`）。子路径导出：`@ucode/ui/base/*`、`@ucode/ui/business/*`、`@ucode/ui/hooks/*`、
+  `@ucode/ui/lib/*`、`@ucode/ui/provider`、`@ucode/ui/presets/workspace`、`@ucode/ui/theme.css`。
+  组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
 - `packages/i18n/`（`@ucode/i18n`）是跨端 i18n 运行时与共享文案的单一事实源：house i18next 配置
   （`createI18n`）、协议级通用文案（`common`）、错误码文案（`domain`）、产品界面文案
   （`ui`，web / Electron / TUI 共用），以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射。
@@ -184,7 +190,7 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 非默认设置的原因记在这里，不要在配置文件里加注释：
 
 - **没有排除任何路径**（`files.includes: ["**"]`）。曾经排除过三类文件，都已消除：
-  `components/ui` 现在归我们维护（见「组件来源」），CSS 靠下面的 `tailwindDirectives` 解决，
+  `packages/ui/src/base` 现在归我们维护（见「组件来源」），CSS 靠下面的 `tailwindDirectives` 解决，
   `index.html` 的内联脚本改成顶层 `try` / `catch {}` 后不再触发 lint。
 - `css.parser.tailwindDirectives: true`：Biome 的 CSS parser 默认**关闭** Tailwind 语法，
   关闭时 `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。打开后 CSS 正常纳入检查。
@@ -194,7 +200,7 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 
 ### 组件来源
 
-`packages/ui/src/components/ui/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
+`packages/ui/src/base/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
 同样适用本文件的命名、行数、颜色 token 与格式化规则。
 
 - 唯一豁免：不要求写文件级注释（都是对 Radix 的薄封装）

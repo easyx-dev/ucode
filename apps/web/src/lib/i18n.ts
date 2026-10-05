@@ -1,7 +1,8 @@
 /**
- * web 侧的 i18n 接线：初始化实例、语言切换与首屏同步。
+ * web 侧的 i18n 接线：初始化实例，并在语言变化时持久化偏好、同步 `<html lang>` 与 dayjs。
  *
  * 文案目录与 house 约定都在 `@ucode/i18n`；这里只管语言持久化与 DOM 副作用。
+ * 界面切换语言的入口是 `@ucode/ui` 的 `useLocale`（调用 i18n.changeLanguage），本文件监听其变化。
  */
 import { localeStorageKey } from "@ucode/brand";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@ucode/contracts";
@@ -27,16 +28,15 @@ const i18n = createI18n({
 
 setDayjsLocale(isLocale(i18n.language) ? i18n.language : DEFAULT_LOCALE);
 
-/** 切换界面语言：更新 i18next、落盘偏好，并同步 `<html lang>` 与 dayjs */
-export const applyLocale = (locale: Locale): void => {
-  if (i18n.language !== locale) void i18n.changeLanguage(locale);
+i18n.on("languageChanged", (lng) => {
+  if (!isLocale(lng)) return;
   try {
-    localStorage.setItem(localeStorageKey, locale);
+    localStorage.setItem(localeStorageKey, lng);
   } catch {
     // 存不下也不影响本次会话
   }
-  document.documentElement.lang = locale;
-  setDayjsLocale(locale);
-};
+  document.documentElement.lang = lng;
+  setDayjsLocale(lng);
+});
 
 export default i18n;

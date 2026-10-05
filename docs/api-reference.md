@@ -859,7 +859,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "session_info_changed" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" | 是 | — |
+| `type` | "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
 | `sessionId` | string | 是 | — |
 | `seq` | number | 是 | — |
 | `data` | unknown | 是 | — |
@@ -882,6 +882,20 @@
 | `message` | string | 是 | 中文兜底文案；客户端按 `code` 查 errorMessageKeys 渲染 |
 | `params` | Record<string, string> | 否 | 渲染文案所需的插值值 |
 
+**取值之一（type = "config_changed"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "config_changed" | 是 | — |
+| `config` | [ConfigSnapshot](#configsnapshot) | 是 | — |
+
+**取值之一（type = "mcp_changed"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "mcp_changed" | 是 | — |
+| `mcp` | [McpListResponse](#mcplistresponse) | 是 | — |
+
 **事件名（`type`）**
 
 - `message_start`
@@ -895,7 +909,6 @@
 - `queue_update`
 - `compaction_start`
 - `compaction_end`
-- `session_info_changed`
 - `agent_settled`
 - `transcript_reset`
 - `interaction_request`
@@ -903,6 +916,9 @@
 - `subagent_start`
 - `subagent_end`
 - `goal_update`
+- `session_created`
+- `session_updated`
+- `session_archived`
 
 各事件 `data` 的载荷说明见 [README「全局事件流」](../README.md#全局事件流)。
 
@@ -1114,6 +1130,21 @@
 | `kind` | "primary" \| "subagent" \| "forked" | 是 | — |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档，统计里仍计入，但界面不应再打开该会话 |
 | `totals` | [UsageTotals](#usagetotals) | 是 | — |
+
+### ConfigSnapshot
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `config` | [ConfigView](#configview) | 是 | — |
+| `status` | [RuntimeStatus](#runtimestatus) | 是 | — |
+
+### McpListResponse
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `servers` | [McpServerView](#mcpserverview)[] | 是 | — |
+| `configPath` | string | 是 | 配置文件绝对路径，供设置页展示与排查 |
+| `errors` | string[] | 是 | 读盘或解析失败的原因（坏 JSON、字段不合法）；空数组表示正常 |
 
 ### CatalogModel
 

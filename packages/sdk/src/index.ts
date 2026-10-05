@@ -1,35 +1,44 @@
 /**
  * `@ucode/sdk`：server `/api/v1` 的跨端客户端封装。
  *
- * 纯逻辑、无 React / DOM 依赖：web、Electron、TUI 共用。`createClient` 是无状态接口层，
- * `createSdk` 额外装配事件流与会话流等状态 store；React 侧用 `useSyncExternalStore` 订阅。
+ * 纯逻辑、无 React / DOM 依赖：web、桌面、TUI 共用。分两层——
+ * `createApis` 是无状态接口层（一方法一接口），`createClient` 在其上装配事件流与各域同步状态，
+ * React 侧用 `useSyncExternalStore` 订阅 store。
  */
-export { createSdk, type Sdk, type SdkOptions } from "./app";
+export { type Apis, type ApisOptions, createApis } from "./apis";
+export { type Client, type ClientOptions, createClient } from "./client";
 export {
-  appendUserItem,
-  asRecord,
-  reduceEvent,
-  removeUserItem,
-  settle,
-} from "./chat-reducer";
-export { type ClientOptions, createClient, type UcodeClient } from "./client";
-export {
+  ApiError,
+  type ApiErrorOptions,
+  asApiError,
   describeApiError,
   describeError,
   interpolate,
-  isSdkError,
-  SdkError,
-  type SdkErrorOptions,
+  isApiError,
   type Translate,
+  toApiError,
 } from "./error";
-export { createEventStream, type EventStream, type EventSubscribe } from "./events";
+export { createEventStream, type EventConnect, type EventStream } from "./events";
 export { readSseStream } from "./sse";
 export { createStore, type Store } from "./store";
+export { type CommandAssets, type CommandsStore, createCommandsStore } from "./stores/commands";
+export { type ConfigState, type ConfigStore, createConfigStore } from "./stores/config";
+export { createGoalStore, type GoalInput, type GoalState, type GoalStore } from "./stores/goal";
+export { createHealthStore, type HealthStore } from "./stores/health";
 export {
-  createSessionStreams,
+  createInteractionsStore,
+  type InteractionsState,
+  type InteractionsStore,
+} from "./stores/interactions";
+export { createMcpStore, type McpState, type McpStore } from "./stores/mcp";
+export {
+  createMessagesStore,
+  type MessagesStore,
   type SessionStreamState,
-  type SessionStreams,
-} from "./stream/session";
+} from "./stores/messages";
+export { createModelsStore, type ModelsState, type ModelsStore } from "./stores/models";
+export { createSessionsStore, type SessionsState, type SessionsStore } from "./stores/sessions";
+export { createUsageStore, type UsageState, type UsageStore } from "./stores/usage";
 export {
   createTransport,
   type FetchLike,
