@@ -23,11 +23,11 @@ export function SessionSection({
 }: SessionSectionProps) {
   return (
     <Collapsible open={!collapsed} onOpenChange={(open) => onCollapsedChange(!open)}>
-      <div className="flex items-center gap-0.5">
+      <div className="group flex items-center gap-0.5">
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1.5 text-left outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <span className="truncate text-sm text-muted-foreground">{title}</span>
             <ChevronRight
@@ -38,7 +38,10 @@ export function SessionSection({
             />
           </button>
         </CollapsibleTrigger>
-        {actions}
+        {/* 操作入口悬停 / 聚焦分类行时才露出，触屏上没有悬停态故常驻 */}
+        <span className="pointer-events-none flex shrink-0 items-center opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100">
+          {actions}
+        </span>
       </div>
 
       <CollapsibleContent>
