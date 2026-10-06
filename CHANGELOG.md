@@ -66,6 +66,9 @@
 
 ### 变更
 
+- 命名调整：运行时数据目录 `$APP_HOME/agent` 更名为 `$APP_HOME/harness`（`AGENT_DIRNAME` → `HARNESS_DIRNAME`、
+  `env.agentDir` → `env.harnessDir`），server 源码模块 `server/src/agent/` 更名为 `server/src/harness/`。
+  开发初期不做迁移，删除或改名本地 `~/.ucode/agent` 后由服务重建。
 - plan 模式的 `present_plan` 收尾改为有条件：需要用户拍板方向时先用 `question` 提问，
   方案具体到可落地步骤时才在回复末尾调用 `present_plan`。
 - `brand-html` Vite 插件由 `apps/web/plugins` 移到 `@ucode/brand/vite`，web 与桌面端共用；

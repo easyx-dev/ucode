@@ -2,7 +2,7 @@
  * 内置角色注册表：primary（build / plan / ask）与 subagent（general / explore）。
  *
  * primary 与子角色的能力在这里以同一形状声明；与父会话取交集的逻辑见 `capability.ts`。
- * 模式约束文案不放这里（按语言存放在 `agent/prompt/locales`），这里只管能力。
+ * 模式约束文案不放这里（按语言存放在 `harness/prompt/locales`），这里只管能力。
  */
 import type { SessionMode } from "@ucode/contracts";
 

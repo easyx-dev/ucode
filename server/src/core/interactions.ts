@@ -18,9 +18,8 @@ import type {
   QuestionInteraction,
   QuestionItem,
 } from "@ucode/contracts";
-
-import type { PermissionAsk } from "../harness/permissions";
 import { PERMISSION_APPROVAL_TIMEOUT_MS, QUESTION_TIMEOUT_MS } from "../constants";
+import type { PermissionAsk } from "../harness/permissions";
 import type { SessionEventBus } from "./event-bus";
 
 /** question 的结算结果：用户答复 / 等待超时 / 本轮中断或会话关闭 */

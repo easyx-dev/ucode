@@ -1,7 +1,7 @@
 /**
  * 系统提示词的中文目录：正文以 opencode 的提示词分节与规则为蓝本移植改写。
  *
- * 改写点见 `agent/prompt/index.ts` 顶部：去掉 CLI / 终端语境与 opencode 专有入口，
+ * 改写点见 `harness/prompt/index.ts` 顶部：去掉 CLI / 终端语境与 opencode 专有入口，
  * 工具名对齐本仓库，「禁止写注释」换成遵循项目 AGENTS.md。
  */
 import type { PromptCatalog } from "../types";

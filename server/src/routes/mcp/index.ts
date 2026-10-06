@@ -1,4 +1,4 @@
-/** /api/v1/mcp：用户级 MCP 服务器配置的增删改，落 `$APP_HOME/agent/mcp.json` */
+/** /api/v1/mcp：用户级 MCP 服务器配置的增删改，落 `$APP_HOME/harness/mcp.json` */
 import {
   type McpDeleteResponse,
   type McpListResponse,
@@ -9,9 +9,8 @@ import {
   mcpUpsertInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../harness/mcp";
 import type { Services } from "../../app";
+import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../harness/mcp";
 import { ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 

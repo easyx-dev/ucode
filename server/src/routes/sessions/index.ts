@@ -20,10 +20,6 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import { hasPrimaryMode, loadAgentRegistry } from "../../harness/agents";
-import { createForkedSessionFile, resolveForkSource } from "../../harness/fork";
-import { resolveSessionCwd } from "../../harness/session-config";
-import { workspaceDirOf } from "../../harness/workspace";
 import type { Services } from "../../app";
 import { draftSessionSummary, sessionInfoToDTO } from "../../core/serialize";
 import { assertModel, createSession } from "../../core/session";
@@ -31,6 +27,10 @@ import { indexFromManager, infoFromRecord } from "../../core/session-index";
 import { describeSessionSummary, type SessionSummarySources } from "../../core/session-summary";
 import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
+import { hasPrimaryMode, loadAgentRegistry } from "../../harness/agents";
+import { createForkedSessionFile, resolveForkSource } from "../../harness/fork";
+import { resolveSessionCwd } from "../../harness/session-config";
+import { workspaceDirOf } from "../../harness/workspace";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 import { resolveTargetPath } from "../../utils/path";

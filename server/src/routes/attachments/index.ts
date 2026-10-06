@@ -15,10 +15,9 @@ import {
   IMAGE_MIME_TYPES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
+import type { Services } from "../../app";
 import { isAttachmentId, putAttachment, resolveAttachment } from "../../harness/attachment";
 import { storeImage } from "../../harness/image";
-import type { Services } from "../../app";
 import { AppError, ok } from "../../lib/response";
 
 const isImageMime = (value: string): boolean =>

@@ -10,8 +10,8 @@ export const DEFAULT_HOST = "127.0.0.1";
 /** AgentSession 空闲多久后被回收 */
 export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
-/** agent 数据目录名（位于 APP_HOME 下）：auth.json / sessions */
-export const AGENT_DIRNAME = "agent";
+/** 运行时数据目录名（位于 APP_HOME 下）：auth.json / sessions */
+export const HARNESS_DIRNAME = "harness";
 
 /** 应用自有数据目录名（位于 APP_HOME 下）：config.json / SQLite */
 export const APP_DIRNAME = "app";
@@ -81,7 +81,7 @@ export const SUBAGENT_TIMEOUT_MS = 10 * 60 * 1000;
 /** 子智能体会话名的长度上限（取任务简称） */
 export const SUBAGENT_DESCRIPTION_MAX_LENGTH = 60;
 
-/** 自定义子角色目录名（位于 agent 目录下）：`agents/*.md` */
+/** 自定义角色目录名：全局 `$APP_HOME/agents/*.md`、项目配置目录 `agents/*.md` */
 export const AGENTS_DIRNAME = "agents";
 
 /** 全局技能目录名（位于 APP_HOME 下）：`skills/<id>/SKILL.md` */

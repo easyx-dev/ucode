@@ -126,7 +126,7 @@ const sessionOf = async (
     record: undefined,
     cwd,
     // 用测试自己的 pi 目录，别去读用户真实的数据目录
-    agentDir: join(root, "pi"),
+    harnessDir: join(root, "pi"),
     mode,
     sessionManager: SessionManager.inMemory(),
     runtime,
@@ -355,10 +355,10 @@ describe("buildSessionOptions 子智能体装配", () => {
   });
 
   it("注册表里的隐藏角色仍进 agent 入参枚举，只是不进描述", async () => {
-    const agentDir = mkdtempSync(join(tmpdir(), "session-config-agents-"));
-    mkdirSync(join(agentDir, "agents"));
+    const harnessDir = mkdtempSync(join(tmpdir(), "session-config-agents-"));
+    mkdirSync(join(harnessDir, "agents"));
     writeFileSync(
-      join(agentDir, "agents", "secret.md"),
+      join(harnessDir, "agents", "secret.md"),
       ["---", 'description: "隐藏角色"', "advertise: false", "---", "正文"].join("\n"),
     );
 
@@ -367,7 +367,7 @@ describe("buildSessionOptions 子智能体装配", () => {
       "custom",
       undefined,
       undefined,
-      loadAgentRegistry({ cwd: agentDir, appHome: agentDir }),
+      loadAgentRegistry({ cwd: harnessDir, appHome: harnessDir }),
     );
     const tool = session.getAllTools().find((item) => item.name === "subagent");
     assert.ok(tool, "主会话应注册 subagent");

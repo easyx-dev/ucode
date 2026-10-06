@@ -63,7 +63,7 @@ export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
 
 /**
  * 按 slug 取子角色；未知 slug 直接报错，避免静默退回默认角色。
- * 传入注册表时从中解析（含自定义角色），缺省只在内置集合里查，供不依赖 `agentDir` 的调用方使用。
+ * 传入注册表时从中解析（含自定义角色），缺省只在内置集合里查，供不依赖 `harnessDir` 的调用方使用。
  */
 export const subagentProfile = (slug?: string, registry?: AgentRegistry): AgentProfile => {
   const target = slug ?? DEFAULT_SUBAGENT_SLUG;

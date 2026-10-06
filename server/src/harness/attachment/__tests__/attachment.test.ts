@@ -1,4 +1,4 @@
-/** agent/attachment：内容寻址附件库（文件 + SQLite 元数据） */
+/** harness/attachment：内容寻址附件库（文件 + SQLite 元数据） */
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

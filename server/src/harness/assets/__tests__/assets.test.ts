@@ -1,4 +1,4 @@
-/** agent/assets：目录优先级与命令 / 技能装载 */
+/** harness/assets：目录优先级与命令 / 技能装载 */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -97,7 +97,7 @@ describe("loadCommandAssets", () => {
       cwd: root,
       appHome,
       userHome,
-      agentDir: makeTemp(),
+      harnessDir: makeTemp(),
     });
 
     assert.deepEqual(
@@ -125,7 +125,7 @@ describe("loadCommandAssets", () => {
       cwd: root,
       appHome,
       userHome,
-      agentDir: makeTemp(),
+      harnessDir: makeTemp(),
     });
 
     assert.equal(assets.skills.length, 1);
@@ -136,7 +136,12 @@ describe("loadCommandAssets", () => {
 
   it("没有资源目录时返回空集合", async () => {
     const { root, appHome, userHome } = layout();
-    const assets = await loadCommandAssets({ cwd: root, appHome, userHome, agentDir: makeTemp() });
+    const assets = await loadCommandAssets({
+      cwd: root,
+      appHome,
+      userHome,
+      harnessDir: makeTemp(),
+    });
     assert.deepEqual(assets, { prompts: [], skills: [] });
   });
 });

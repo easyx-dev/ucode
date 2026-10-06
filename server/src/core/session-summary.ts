@@ -4,9 +4,8 @@
  * 路由写点与 `session_created/updated` 事件下发都从这里取，避免「列表口径」与「事件口径」分叉。
  */
 import type { SessionSummary, ThinkingLevel } from "@ucode/contracts";
-
-import { workspaceDirOf } from "../harness/workspace";
 import { overrideOf, type SessionRepository } from "../db/session-repository";
+import { workspaceDirOf } from "../harness/workspace";
 import { draftSessionSummary, sessionInfoToDTO } from "./serialize";
 import { infoFromRecord } from "./session-index";
 

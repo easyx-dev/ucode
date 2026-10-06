@@ -6,7 +6,6 @@ import { isAbsolute, resolve } from "node:path";
 import { appHomeDirname } from "@ucode/brand/values";
 
 import {
-  AGENT_DIRNAME,
   APP_DIRNAME,
   ATTACHMENTS_DIRNAME,
   AUTH_FILENAME,
@@ -16,6 +15,7 @@ import {
   DEFAULT_POOL_IDLE_MS,
   DEFAULT_PORT,
   DEFAULT_PROMPT_SOURCE,
+  HARNESS_DIRNAME,
   LOG_LEVELS,
   MCP_CONFIG_FILENAME,
   PROMPT_SOURCES,
@@ -61,11 +61,11 @@ const resolvePromptSource = (value: string | undefined): PromptSource => {
 /**
  * 应用主目录，同时是 agent 的工作目录。
  * 默认落在用户主目录下（`~/` + `appHomeDirname`），可用 `APP_HOME` 指向别处。
- * 下面按「谁的资产」分成两层：agent 的私有数据（auth / sessions）与
+ * 下面按「谁的资产」分成两层：运行时私有数据（auth / sessions）与
  * 应用自有数据（config.json / SQLite），互不混放。
  */
 const homeDir = resolveDir(process.env.APP_HOME, resolve(homedir(), appHomeDirname));
-const agentDir = resolve(homeDir, AGENT_DIRNAME);
+const harnessDir = resolve(homeDir, HARNESS_DIRNAME);
 const appDir = resolve(homeDir, APP_DIRNAME);
 const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
@@ -98,18 +98,18 @@ export const env = {
   servicePath,
   /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
   workspaceRoot,
-  /** agent 数据目录：auth.json / sessions 放这里 */
-  agentDir,
+  /** 运行时数据目录：auth.json / sessions 放这里 */
+  harnessDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
   appDir,
   /** 附件库：按内容 sha256 存的原始字节，图片与文档共用 */
   attachmentsDir: resolve(appDir, ATTACHMENTS_DIRNAME),
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
-  sessionsRoot: resolve(agentDir, SESSIONS_DIRNAME),
-  authPath: resolve(agentDir, AUTH_FILENAME),
+  sessionsRoot: resolve(harnessDir, SESSIONS_DIRNAME),
+  authPath: resolve(harnessDir, AUTH_FILENAME),
   configPath: resolve(appDir, CONFIG_FILENAME),
   /** pi 的 MCP 服务器配置（用户级）；设置页增删改写回这里 */
-  mcpConfigPath: resolve(agentDir, MCP_CONFIG_FILENAME),
+  mcpConfigPath: resolve(harnessDir, MCP_CONFIG_FILENAME),
   dbPath: resolve(appDir, DB_FILENAME),
   webDistDir: resolve(repoRoot, "apps/web/dist"),
   poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
@@ -122,7 +122,7 @@ export const env = {
 for (const dir of new Set([
   env.homeDir,
   env.workspaceRoot,
-  env.agentDir,
+  env.harnessDir,
   env.appDir,
   env.sessionsRoot,
 ])) {

@@ -8,10 +8,9 @@ import {
   sessionIdInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import { buildGoalKickoff, buildGoalResume } from "../../harness/goal/prompt";
 import type { Services } from "../../app";
 import { admitGoalRun } from "../../core/run";
+import { buildGoalKickoff, buildGoalResume } from "../../harness/goal/prompt";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 

@@ -8,7 +8,8 @@ import {
   SESSION_MODES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
+import type { Services } from "../../app";
+import { env } from "../../env";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -18,8 +19,6 @@ import {
   SUBAGENT_SLUGS,
 } from "../../harness/agents";
 import { resolveSessionCwd } from "../../harness/session-config";
-import type { Services } from "../../app";
-import { env } from "../../env";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 

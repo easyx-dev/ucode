@@ -55,7 +55,7 @@ pnpm dev:desktop
 | --- | --- | --- |
 | `APP_HOST` | `127.0.0.1` | 监听地址；仅回环，`0.0.0.0` 允许局域网（显式开启并告警） |
 | `APP_PORT` | `2048` | HTTP 端口；`0` 表示自选可用端口，启动后写回 `service.json` |
-| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`agent/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
+| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`harness/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
 | `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
 | `APP_CORS_ORIGIN` | 空 | 允许的跨域来源，逗号分隔；缺省不放行跨域（同源与原生客户端不需要 CORS） |
 | `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
@@ -70,7 +70,7 @@ pnpm dev:desktop
 
 ```
 $APP_HOME/                 # 默认 ~/.ucode
-├── agent/                 # agent 私有：auth.json / sessions/
+├── harness/               # 运行时私有：auth.json / sessions/
 ├── app/                   # 应用自有：config.json / service.json / app.db（SQLite）
 ├── skills/                # 全局技能：<id>/SKILL.md
 ├── prompts/               # 全局命令（提示词模板）：<name>.md
@@ -82,7 +82,7 @@ $APP_HOME/                 # 默认 ~/.ucode
 （均沿 cwd 祖先链收集，止于项目根）；技能另有兼容目录 `.agents/skills`。
 同名优先级：项目 `.ucode` > 项目 `.agents/skills` > 全局 `$APP_HOME` > 用户 `~/.agents/skills`。
 
-配置 = `$APP_HOME/app/config.json`、agent 目录 = `$APP_HOME/agent`（`auth.json` / `sessions/`）、
+配置 = `$APP_HOME/app/config.json`、harness 目录 = `$APP_HOME/harness`（`auth.json` / `sessions/`）、
 会话元数据与索引 = `$APP_HOME/app/app.db`。
 会话的工作目录：绑定目录的用那个目录，未绑定的用 `$APP_HOME/workspace/<sessionId>`。
 
@@ -404,7 +404,7 @@ packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
   src/styles/theme.css     # 设计 token、base 层与 markdown 样式
   components.json          # shadcn CLI 配置
 server/src/
-  env.ts                   # APP_HOME 派生 pi/ 与 app/ 下的全部路径
+  env.ts                   # APP_HOME 派生 harness/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
   constants.ts             # 默认值与固定目录名
   utils/                   # 纯函数工具（time / object）
@@ -426,7 +426,7 @@ server/src/
     session-index.ts       # pi 会话对象 -> 入库索引 / SessionInfo
     serialize.ts           # pi 会话条目 -> MessageDTO
     events.ts              # AgentSessionEvent -> SSE 事件
-  agent/                   # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
+  harness/                 # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
     session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
     assets/                # 命令与技能目录解析 + 装载（pi ResourceLoader 只认我们的目录）
     prompt/                # 系统提示词：组装 + 多语言目录 + 模型族变体（pi / custom 两套源可切换）
@@ -463,14 +463,14 @@ apps/desktop/
 
 ### 实现要点
 
-- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/agent/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
+- **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/harness/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
 - **索引同步**：启动时 `reconcile()` 以 JSONL 为准对齐索引（补齐外部新增、清理已删文件），每轮生成落定后再回写一次；列表 / 详情直接读 SQLite，不再扫描 JSONL 目录。
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
 - **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
-- **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `agent/models.json`；`config.json` 是模型配置的唯一事实源。
+- **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `harness/models.json`；`config.json` 是模型配置的唯一事实源。
 - **工具集在装配层收口**：内置工具走 `tools` 白名单（pi 的该字段是白名单，自研工具漏进去就会被过滤掉），
   `webfetch` / `websearch` 走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。
-  **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/agent/extensions`、项目 `.pi/extensions`）或 pi 包
+  **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/harness/extensions`、项目 `.pi/extensions`）或 pi 包
   注册的工具不在白名单里，不会生效。
 - **外部内容不入信任链**：`webfetch` 只抓公网地址（回环 / 私网 / 链路本地一律拒绝，重定向逐跳校验），
   并用 `<fetched>` / `<search_results>` 边界包裹返回内容，正文里的同名标签先中和（否则页面能「闭合」边界），

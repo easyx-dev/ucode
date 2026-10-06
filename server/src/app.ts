@@ -1,11 +1,6 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
 import type { AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
-import { expireTempAttachments } from "./harness/attachment";
-import { GoalService } from "./harness/goal";
-import { MemoryService } from "./harness/memory";
-import { SessionAllowStore } from "./harness/permissions";
-import { UsageService } from "./harness/usage";
 import { ConfigStore, publicConfig } from "./config/store";
 import {
   ATTACHMENT_SWEEP_INTERVAL_MS,
@@ -21,6 +16,11 @@ import { AttachmentRepository } from "./db/attachment-repository";
 import { AuthSessionRepository } from "./db/auth-session-repository";
 import { SessionRepository } from "./db/session-repository";
 import { env } from "./env";
+import { expireTempAttachments } from "./harness/attachment";
+import { GoalService } from "./harness/goal";
+import { MemoryService } from "./harness/memory";
+import { SessionAllowStore } from "./harness/permissions";
+import { UsageService } from "./harness/usage";
 import { CredentialStore } from "./lib/auth/credentials";
 import { PairingStore } from "./lib/auth/pairing";
 import { RateLimiter } from "./lib/auth/rate-limit";

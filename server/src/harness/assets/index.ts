@@ -2,7 +2,7 @@
  * 命令与技能装载：按 `commandAssetPaths` 的有序目录交给 pi 的 `DefaultResourceLoader`，
  * 读回后映射为不含绝对路径的视图（供 `/` 菜单与技能广告使用）。
  *
- * 会话装配（`agent/session-config.ts`）用同一份路径给 resourceLoader，保证「界面列出的」与
+ * 会话装配（`harness/session-config.ts`）用同一份路径给 resourceLoader，保证「界面列出的」与
  * 「pi 实际能展开 / 广告的」是同一集合。
  */
 import { sep } from "node:path";
@@ -56,7 +56,7 @@ const toSkillView = (skill: Skill, paths: CommandAssetPath[]): SkillCommandView 
  * 同名时靠路径顺序决定（pi 侧 first-wins）。
  */
 export const loadCommandAssets = async (
-  input: CommandAssetPathInput & { agentDir: string },
+  input: CommandAssetPathInput & { harnessDir: string },
 ): Promise<CommandsListResponse> => {
   const paths = commandAssetPaths(input);
   if (paths.skills.length === 0 && paths.prompts.length === 0) {
@@ -65,7 +65,7 @@ export const loadCommandAssets = async (
 
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
-    agentDir: input.agentDir,
+    agentDir: input.harnessDir,
     settingsManager: SettingsManager.inMemory(),
     noExtensions: true,
     noThemes: true,

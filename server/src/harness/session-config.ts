@@ -77,7 +77,7 @@ export type SessionAssemblyInput = {
   parentRules?: () => readonly PermissionRule[];
   /** 仅主会话提供：注册 `subagent` 工具；子会话不提供，天然禁递归 */
   subagents?: SubagentHooks;
-  /** 子角色注册表（含自定义角色）；缺省按 `agentDir` 加载，供 `subagent` 工具列角色 */
+  /** 子角色注册表（含自定义角色）；缺省按 `harnessDir` 加载，供 `subagent` 工具列角色 */
   agentRegistry?: AgentRegistry;
   /** 实时读取联网搜索设置：设置页保存后新建的会话即按新 key 生效 */
   websearch: () => WebsearchConfig;
@@ -89,8 +89,8 @@ export type SessionAssemblyInput = {
   memory?: MemoryService;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
-  /** agent 数据目录；缺省取 `env.agentDir`（评测 / 测试需要隔离时显式传入） */
-  agentDir?: string;
+  /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
+  harnessDir?: string;
 };
 
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
@@ -113,7 +113,7 @@ const promptLoaderOptions = (
 
 /**
  * 组装 resourceLoader：内联扩展负责 `tool_call` 权限拦截与内置 `codemode`，
- * 系统提示词按 `promptSource` 装配（见 `agent/prompt`），项目记忆开启时把记忆索引并入上下文文件。
+ * 系统提示词按 `promptSource` 装配（见 `harness/prompt`），项目记忆开启时把记忆索引并入上下文文件。
  */
 const createSessionLoader = async (
   input: SessionAssemblyInput,
@@ -124,7 +124,7 @@ const createSessionLoader = async (
   variant: PromptVariant,
 ): Promise<DefaultResourceLoader> => {
   // 命令与技能只认我们的目录（全局 $APP_HOME + 项目祖先的项目配置目录 + .agents 兼容），
-  // 不读 pi 默认的 agentDir/skills 与 cwd/.pi/*；顺序即同名优先级（pi first-wins）
+  // 不读 pi 默认的技能目录与 cwd/.pi/*；顺序即同名优先级（pi first-wins）
   const assetPaths = commandAssetPaths({ cwd: input.cwd, appHome: env.homeDir });
   const gate = {
     cwd: input.cwd,
@@ -143,14 +143,14 @@ const createSessionLoader = async (
   };
   const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
   // MCP / tool_search 只在「默认工具集」的会话里挂：白名单会话（plan / ask / explore，以及自定义只读角色）
-  // 本就够不着扩展工具，连了也是白连；MCP 还会激活 codemode，绕过只读白名单（见 agent/mcp）
+  // 本就够不着扩展工具，连了也是白连；MCP 还会激活 codemode，绕过只读白名单（见 harness/mcp）
   const withExtensions = usesDefaultToolSet(capability);
-  const mcp = withExtensions ? mcpExtension(input.agentDir ?? env.agentDir) : undefined;
+  const mcp = withExtensions ? mcpExtension(input.harnessDir ?? env.harnessDir) : undefined;
   // tool_search 只注册、默认不激活：默认集会话出现 deferred MCP 服务器时由 MCP 扩展自动激活
   const discoveryExtension = withExtensions ? [createToolSearchExtension()] : [];
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
-    agentDir: input.agentDir ?? env.agentDir,
+    agentDir: input.harnessDir ?? env.harnessDir,
     settingsManager,
     noSkills: true,
     noPromptTemplates: true,
@@ -232,7 +232,7 @@ export const buildSessionOptions = async (
 
   return {
     cwd: input.cwd,
-    agentDir: input.agentDir ?? env.agentDir,
+    agentDir: input.harnessDir ?? env.harnessDir,
     modelRuntime: input.runtime.requireRuntime(),
     ...(model ? { model } : {}),
     thinkingLevel,

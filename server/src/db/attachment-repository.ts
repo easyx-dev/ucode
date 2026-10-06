@@ -2,7 +2,7 @@
  * 附件元数据仓储：内容是文件系统里的原始字节，这里只存元数据索引。
  *
  * `id` 是**内容寻址**的 sha256（不是 `randomUUID`）——同一份内容同一个 id，
- * 因此 `insert` 冲突即已存在、直接跳过。字节文件由 `agent/attachment` 负责读写。
+ * 因此 `insert` 冲突即已存在、直接跳过。字节文件由 `harness/attachment` 负责读写。
  * `referenced_at` 为空表示只被草稿引用过、可过期；被消息引用后置为时间且不再回退。
  * 命名与 SQL 规则见 `docs/database.md`。
  */

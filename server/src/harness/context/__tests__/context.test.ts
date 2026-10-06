@@ -1,4 +1,4 @@
-/** agent/context：`@` 引用展开 */
+/** harness/context：`@` 引用展开 */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

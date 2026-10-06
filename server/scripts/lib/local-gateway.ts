@@ -10,8 +10,8 @@ import { resolve } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 export type LocalGatewayOptions = {
-  /** agent 数据目录：models.json / auth.json 落这里 */
-  agentDir: string;
+  /** 运行时数据目录：models.json / auth.json 落这里 */
+  harnessDir: string;
   baseUrl: string;
   apiKey: string;
   modelId: string;
@@ -25,14 +25,14 @@ export type LocalGateway = {
 };
 
 export const createLocalGateway = async ({
-  agentDir,
+  harnessDir,
   baseUrl,
   apiKey,
   modelId,
   providerId = "local",
 }: LocalGatewayOptions): Promise<LocalGateway> => {
-  mkdirSync(agentDir, { recursive: true });
-  const modelsPath = resolve(agentDir, "models.json");
+  mkdirSync(harnessDir, { recursive: true });
+  const modelsPath = resolve(harnessDir, "models.json");
   writeFileSync(
     modelsPath,
     `${JSON.stringify(
@@ -65,7 +65,7 @@ export const createLocalGateway = async ({
   );
 
   const modelRuntime = await ModelRuntime.create({
-    authPath: resolve(agentDir, "auth.json"),
+    authPath: resolve(harnessDir, "auth.json"),
     modelsPath,
     refreshOnCreate: false,
   });

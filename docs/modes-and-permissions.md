@@ -17,7 +17,7 @@
 ## 会话模式
 
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
-内置三个，声明在 `server/src/agent/agents/profiles.ts`，工具名清单在 `server/src/agent/tools/names.ts`。
+内置三个，声明在 `server/src/harness/agents/profiles.ts`，工具名清单在 `server/src/harness/tools/names.ts`。
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 用途 |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@
 
 ## 权限引擎
 
-实现：`server/src/agent/permissions/`。规则是声明式的，挂在 pi 的 `tool_call` 拦截上
+实现：`server/src/harness/permissions/`。规则是声明式的，挂在 pi 的 `tool_call` 拦截上
 （`extension.ts` + `DefaultResourceLoader({ extensionFactories })`，装配在 `session-config.ts`）。
 
 ### 规则与判定

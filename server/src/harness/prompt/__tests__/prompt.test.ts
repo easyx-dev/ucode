@@ -2,7 +2,7 @@
  * 系统提示词单测：语言目录拼装、模式差异、模型变体口子。
  *
  * 这里只测拼装结果；「经 pi 装配后生效、pi 源保留默认提示词、custom 源无残留」在
- * `agent/__tests__/session-config.test.ts` 里走真实 SDK 验证。
+ * `harness/__tests__/session-config.test.ts` 里走真实 SDK 验证。
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";

@@ -24,11 +24,10 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { SessionMode } from "@ucode/contracts";
-
-import { buildSessionOptions } from "../src/harness/session-config";
 import { PROMPT_SOURCES, type PromptSource } from "../src/constants";
 import type { PiRuntime } from "../src/core/runtime";
 import { env } from "../src/env";
+import { buildSessionOptions } from "../src/harness/session-config";
 import { createLocalGateway } from "./lib/local-gateway";
 
 const args = process.argv.slice(2);
@@ -128,7 +127,7 @@ const apiKey = readArg("api-key", "devtest");
 const providerId = "local";
 const modelIds = readList("model").length > 0 ? readList("model") : ["deepseek-v4-flash"];
 const attempts = Math.max(1, Number(readArg("attempts", "1")) || 1);
-const agentDir = resolve(env.repoRoot, ".tmp/eval/agent");
+const harnessDir = resolve(env.repoRoot, ".tmp/eval/harness");
 const workspaceDir = resolve(env.repoRoot, ".tmp/eval/workspace");
 const REPO_CWD = env.repoRoot;
 
@@ -175,8 +174,8 @@ const openSession = async (
   const options = await buildSessionOptions({
     record: undefined,
     cwd: cwdOf(item),
-    // 会话也落在评测自己的 agent 目录，避免受用户真实数据目录的 skills / 设置影响
-    agentDir,
+    // 会话也落在评测自己的运行时目录，避免受用户真实数据目录的 skills / 设置影响
+    harnessDir,
     mode: item.mode,
     sessionManager: SessionManager.inMemory(),
     runtime,
@@ -274,7 +273,7 @@ if (cases.some((item) => item.optional)) {
 let failed = 0;
 for (const modelId of modelIds) {
   const { modelRuntime, model } = await createLocalGateway({
-    agentDir,
+    harnessDir,
     baseUrl,
     apiKey,
     modelId,

@@ -5,7 +5,9 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { ERROR_CODES, type SessionSummary, type WebsearchConfig } from "@ucode/contracts";
-
+import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
+import type { SessionRecord, SessionRepository } from "../db/session-repository";
+import { env } from "../env";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -26,9 +28,6 @@ import { buildSessionOptions, resolveSessionCwd } from "../harness/session-confi
 import { type SubagentHooks, spawnSubagent } from "../harness/subagents";
 import type { UsageService } from "../harness/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
-import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
-import type { SessionRecord, SessionRepository } from "../db/session-repository";
-import { env } from "../env";
 import { logger } from "../lib/logger";
 import { AppError } from "../lib/response";
 import type { SessionEventBus } from "./event-bus";

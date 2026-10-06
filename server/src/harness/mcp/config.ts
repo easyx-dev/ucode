@@ -1,5 +1,5 @@
 /**
- * MCP 服务器配置的读写：唯一来源是 `$APP_HOME/agent/mcp.json`（用户级，不做项目级）。
+ * MCP 服务器配置的读写：唯一来源是 `$APP_HOME/harness/mcp.json`（用户级，不做项目级）。
  *
  * 文件沿用 pi 与其他 MCP 客户端共用的 `mcpServers` 形状；本服务只改 `mcpServers` 这一项，
  * 顶层其它键（如 `autoEnableCodemode`）原样保留，避免覆盖用户手写的配置。
@@ -27,8 +27,9 @@ import { MCP_CONFIG_FILENAME } from "../../constants";
 import { env } from "../../env";
 import { logger } from "../../lib/logger";
 
-/** agent 目录下的 MCP 配置文件路径；装配层按会话的 agentDir 取，避免读到别的目录 */
-export const mcpConfigPathOf = (agentDir: string): string => resolve(agentDir, MCP_CONFIG_FILENAME);
+/** 运行时数据目录下的 MCP 配置文件路径；装配层按会话的 harnessDir 取，避免读到别的目录 */
+export const mcpConfigPathOf = (harnessDir: string): string =>
+  resolve(harnessDir, MCP_CONFIG_FILENAME);
 
 /** mcp.json 的原始结构：只认 `mcpServers` 与 `autoEnableCodemode`，其余键原样保留 */
 type RawMcpFile = Record<string, unknown> & {

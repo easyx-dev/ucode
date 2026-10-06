@@ -56,7 +56,7 @@
 - `server/src/core/pool.ts:130`（`序号也不能随 detach 重置…`）
 - `server/src/core/run.ts:67`（`而那一步现在只认已有记录…`）
 - `server/src/core/run.ts:75`（`否则并发请求会一直排队…`）
-- `server/src/agent/tools/ssrf.ts:50`（`代价是 NAT64…`）
+- `server/src/harness/tools/ssrf.ts:50`（`代价是 NAT64…`）
 - `server/src/index.ts:44`（`生产模式：同源托管 web 构建产物…`）
 - `server/src/index.ts:46`（`所以先起服务、后 pnpm build 也能生效…`）
 - `server/src/routes/messages/index.ts:30`（`只读文件会让刷新后的对话区空着…`）

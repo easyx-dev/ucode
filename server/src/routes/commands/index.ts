@@ -6,11 +6,10 @@ import {
   ERROR_CODES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import { loadCommandAssets } from "../../harness/assets";
-import { resolveSessionCwd } from "../../harness/session-config";
 import type { Services } from "../../app";
 import { env } from "../../env";
+import { loadCommandAssets } from "../../harness/assets";
+import { resolveSessionCwd } from "../../harness/session-config";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 
@@ -36,7 +35,7 @@ export const createCommandsRoute = (services: Services) => {
     const assets: CommandsListResponse = await loadCommandAssets({
       cwd: resolveCwd(services, input),
       appHome: env.homeDir,
-      agentDir: env.agentDir,
+      harnessDir: env.harnessDir,
     });
     return c.json(ok(assets));
   });

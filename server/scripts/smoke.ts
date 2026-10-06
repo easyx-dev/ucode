@@ -40,10 +40,10 @@ const CODEMODE_MARKER = "smoke-codemode-ok";
 
 const root = resolve(import.meta.dirname, "..");
 const workDir = resolve(root, "../.tmp/smoke");
-const agentDir = resolve(workDir, "agent");
+const harnessDir = resolve(workDir, "harness");
 
 const { modelRuntime, model } = await createLocalGateway({
-  agentDir,
+  harnessDir,
   baseUrl,
   apiKey,
   modelId,
@@ -55,11 +55,11 @@ if (!model) {
 }
 
 // codemode 走内联扩展 + defaultTools，与真实会话同一套装配方式；
-// 工具名取自 agent 的常量，避免与 pi 注册名脱节后这里静默少一个工具
+// 工具名取自 harness 的常量，避免与 pi 注册名脱节后这里静默少一个工具
 const settingsManager = SettingsManager.inMemory();
 const resourceLoader = new DefaultResourceLoader({
   cwd: workDir,
-  agentDir,
+  agentDir: harnessDir,
   settingsManager,
   extensionFactories: [createCodemodeExtension({ mode: "on" })],
 });
@@ -71,7 +71,7 @@ settingsManager.applyOverrides({
 
 const { session } = await createAgentSession({
   cwd: workDir,
-  agentDir,
+  agentDir: harnessDir,
   modelRuntime,
   model,
   thinkingLevel,

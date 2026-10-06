@@ -1,7 +1,7 @@
 /**
  * 子智能体运行时：由父会话的工具调用触发，前台跑一个独立子会话并只回传最终文本。
  *
- * 能力（工具集 / 权限 / 模型）由 `agent/agents` 与父会话取交集后交给装配层；
+ * 能力（工具集 / 权限 / 模型）由 `harness/agents` 与父会话取交集后交给装配层；
  * 这里只关心生命周期：建行 → 取会话实例 → prompt → 取文本 → 回收。
  */
 import type { ThinkingLevel } from "@ucode/contracts";

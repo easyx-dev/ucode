@@ -1,7 +1,7 @@
 /**
  * ModelRuntime 的生命周期：按配置重建、解析模型引用、导出供应商目录。
  *
- * provider 目录与凭证都注入内存，不落 `agent/models.json`：pi 的 `registerProvider`
+ * provider 目录与凭证都注入内存，不落 `harness/models.json`：pi 的 `registerProvider`
  * 与 `setRuntimeApiKey` 足以覆盖原先从 models.json 读取的全部内容。
  */
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
