@@ -32,6 +32,7 @@ import { logger } from "../lib/logger";
 import { AppError } from "../lib/response";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
+import { planRecycle } from "./recycle";
 import type { PiRuntime } from "./runtime";
 import { indexFromManager } from "./session-index";
 import { describeSessionSummary } from "./session-summary";
@@ -41,6 +42,8 @@ type PooledSession = {
   lastUsed: number;
   /** 会话落定事件的订阅解绑；随池回收一并释放 */
   memoryUnsubscribe: () => void;
+  /** 配置已变更：这一轮跑完（或下次访问）就按新配置重建 */
+  stale: boolean;
 };
 
 /**
@@ -53,6 +56,10 @@ export class SessionPool {
   private readonly locks = new Map<string, Promise<unknown>>();
   /** 由本进程通过 HTTP 发起的、尚未结束的 run */
   private readonly running = new Set<string>();
+  /** 正在处理落定后动作（目标续跑等）的会话：此时不做配置回收 */
+  private readonly settling = new Set<string>();
+  /** 配置代次：每换一次运行时自增，用来识别「装配跨过了配置变更」的实例 */
+  private generation = 0;
   private sweeper: NodeJS.Timeout | null = null;
 
   constructor(
@@ -90,13 +97,16 @@ export class SessionPool {
   withLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const previous = this.locks.get(sessionId) ?? Promise.resolve();
     const next = previous.then(fn, fn);
-    this.locks.set(
-      sessionId,
-      next.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const tail = next.then(
+      () => undefined,
+      () => undefined,
     );
+    this.locks.set(sessionId, tail);
+    // 链排空后释放条目；仍指向自己才删，否则会把后来者接上的链一起丢掉，
+    // 让后续请求绕过还在排队的任务
+    void tail.then(() => {
+      if (this.locks.get(sessionId) === tail) this.locks.delete(sessionId);
+    });
     return next;
   }
 
@@ -163,14 +173,18 @@ export class SessionPool {
     images: readonly PromptImage[] = [],
   ): void {
     if (!this.beginRun(sessionId)) {
-      throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请稍后重试或改用 steer", 409);
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
     }
     void session
       .prompt(text, images.length > 0 ? { images: [...images] } : undefined)
       .catch((error) => this.reportRunError(sessionId, error))
       .finally(() => {
-        this.endRun(sessionId);
-        this.refreshIndex(sessionId);
+        // 先刷新索引再释放占位：释放可能触发「配置变更后的回收」，那时实例已不在池里
+        try {
+          this.refreshIndex(sessionId);
+        } finally {
+          this.endRun(sessionId);
+        }
       });
   }
 
@@ -186,8 +200,12 @@ export class SessionPool {
       .compact(instructions)
       .catch((error) => this.reportRunError(sessionId, error))
       .finally(() => {
-        this.endRun(sessionId);
-        this.refreshIndex(sessionId);
+        // 先刷新索引再释放占位：释放可能触发「配置变更后的回收」，那时实例已不在池里
+        try {
+          this.refreshIndex(sessionId);
+        } finally {
+          this.endRun(sessionId);
+        }
       });
   }
 
@@ -283,11 +301,17 @@ export class SessionPool {
 
   async ensure(sessionId: string): Promise<AgentSession> {
     const existing = this.entries.get(sessionId);
-    if (existing) {
-      existing.lastUsed = Date.now();
-      return existing.session;
+    // 配置变更标脏的实例不活跃即可回收，落到下面按新配置重装
+    if (existing?.stale) this.recycleIfStale(sessionId);
+    const pooled = this.entries.get(sessionId);
+    if (pooled) {
+      pooled.lastUsed = Date.now();
+      return pooled.session;
     }
 
+    // 装配要跨 await（loader 重建、MCP 连接），期间配置可能被换掉；
+    // 那时回收计划扫不到这个还没入池的实例，只能靠代次比对补标脏
+    const generation = this.generation;
     const record = this.repository.find(sessionId);
     // 只为已存在的会话建实例：没有记录就没有可用的 cwd（见 run.ts 的同款前置检查）
     if (!record) {
@@ -370,6 +394,9 @@ export class SessionPool {
         : session.subscribe((event) => {
             if (event.type !== "agent_settled") return;
             this.memory.review(sessionId, session);
+            // 落定后的两件事会争回收时机：目标要续跑就用旧装配把这一轮跑完，
+            // 所以配置回收排在它们之后（settling 期间不回收）
+            this.settling.add(sessionId);
             void this.goals
               .onSettled(sessionId, session)
               .then((outcome) => {
@@ -382,10 +409,20 @@ export class SessionPool {
                   logger.warn({ sessionId, error }, "目标续跑启动失败");
                 }
               })
-              .catch((error: unknown) => logger.warn({ sessionId, error }, "目标落定处理失败"));
+              .catch((error: unknown) => logger.warn({ sessionId, error }, "目标落定处理失败"))
+              .finally(() => {
+                this.settling.delete(sessionId);
+                this.recycleIfStale(sessionId);
+              });
           });
 
-      const entry: PooledSession = { session, lastUsed: Date.now(), memoryUnsubscribe };
+      const entry: PooledSession = {
+        session,
+        lastUsed: Date.now(),
+        memoryUnsubscribe,
+        // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
+        stale: generation !== this.generation,
+      };
       this.entries.set(sessionId, entry);
       // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
       // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧。
@@ -428,6 +465,8 @@ export class SessionPool {
 
   endRun(sessionId: string): void {
     this.running.delete(sessionId);
+    // 占位释放后会话才算真的空闲：配置变更留下的脏实例在这里兜底回收
+    this.recycleIfStale(sessionId);
   }
 
   async abort(sessionId: string): Promise<boolean> {
@@ -442,11 +481,16 @@ export class SessionPool {
     const entry = this.entries.get(sessionId);
     if (!entry) return false;
     this.entries.delete(sessionId);
-    this.locks.delete(sessionId);
     this.running.delete(sessionId);
+    this.settling.delete(sessionId);
     this.events.detach(sessionId);
     this.memory.discardReview(sessionId);
     this.goals.forget(sessionId);
+    // 挂起审批 / 提问按失败结算，避免回答打到已释放的实例：子会话的请求挂在父会话下
+    // 并带 source 标注，主会话的请求就挂在自己名下
+    const parentSessionId = this.repository.find(sessionId)?.parentSessionId ?? null;
+    if (parentSessionId) this.permissions.interactions.forgetSource(parentSessionId, sessionId);
+    else this.permissions.interactions.forget(sessionId);
     try {
       entry.memoryUnsubscribe();
     } catch {
@@ -466,12 +510,28 @@ export class SessionPool {
     }
   }
 
-  hasActiveRun(): boolean {
-    if (this.running.size > 0) return true;
-    for (const entry of this.entries.values()) {
-      if (entry.session.isStreaming) return true;
+  /**
+   * 配置变更后的会话回收：空闲实例立即丢弃（下次访问按新配置重装），
+   * 正在生成 / 压缩的实例只标脏 —— 不打断这一轮，等它落定后回收。
+   */
+  recycleForConfigChange(): void {
+    this.generation += 1;
+    const plan = planRecycle(
+      [...this.entries.keys()].map((id) => ({ id, active: this.isActive(id) })),
+    );
+    for (const sessionId of plan.markStale) {
+      const entry = this.entries.get(sessionId);
+      if (entry) entry.stale = true;
     }
-    return false;
+    for (const sessionId of plan.dispose) this.dispose(sessionId);
+  }
+
+  /** 标脏的实例已空闲就回收；还在跑或正处理落定动作时留给下一处兜底 */
+  private recycleIfStale(sessionId: string): boolean {
+    const entry = this.entries.get(sessionId);
+    if (!entry?.stale) return false;
+    if (this.isActive(sessionId) || this.settling.has(sessionId)) return false;
+    return this.dispose(sessionId);
   }
 
   activeCount(): number {
@@ -481,6 +541,8 @@ export class SessionPool {
   private sweep(): void {
     const now = Date.now();
     for (const [sessionId, entry] of this.entries) {
+      // 配置变更留下的脏实例：一旦不活跃就回收，不必等空闲超时
+      if (entry.stale && this.recycleIfStale(sessionId)) continue;
       if (entry.session.isStreaming) continue;
       if (this.running.has(sessionId)) continue;
       if (now - entry.lastUsed < env.poolIdleMs) continue;

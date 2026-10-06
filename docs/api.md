@@ -193,7 +193,7 @@
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、
   `{ type: "error", sessionId?, code, message, params? }`、
-  `{ type: "config_changed", config: ConfigSnapshot }`（配置重建，客户端据此重取 models / health）、
+  `{ type: "config_changed", config: ConfigSnapshot }`（配置已变更，客户端据此重取 models / health）、
   `{ type: "mcp_changed", mcp: McpListResponse }`
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲

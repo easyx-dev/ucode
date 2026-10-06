@@ -186,7 +186,7 @@ export function ChatHeader({
               <RefreshCw className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t("丢弃内存会话并按当前配置重建运行时")}</TooltipContent>
+          <TooltipContent>{t("按当前配置重建运行时，正在生成的会话本轮结束后切换")}</TooltipContent>
         </Tooltip>
       </div>
     </header>

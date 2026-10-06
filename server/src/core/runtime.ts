@@ -23,6 +23,15 @@ export type PiModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 /** pi 的 Provider 类型 */
 type PiProvider = NonNullable<ReturnType<ModelRuntime["getProvider"]>>;
 
+/** 一次构建的产物：还没切换进实例，构建失败不影响当前运行时 */
+export type BuiltRuntime = {
+  runtime: ModelRuntime;
+  /** pi 内置 provider id 集合，在注册自定义 provider 之前采集 */
+  builtinIds: Set<string>;
+  /** 这次构建用的 provider 配置 */
+  providers: AppConfig["providers"];
+};
+
 /** 配置里第一个 provider 的首个模型；内置条目可能没有 `models`，此时返回 null */
 export const firstModelRef = (config: AppConfig): string | null => {
   const provider = config.providers[0];
@@ -54,18 +63,18 @@ export class PiRuntime {
     error: "尚未加载配置",
   };
 
-  async apply(config: AppConfig): Promise<RuntimeStatus> {
-    this.providers = config.providers;
-    this.runtime = null;
-    this.status = { ...this.status, configured: false, defaultModel: null, error: null };
-
+  /**
+   * 按配置构建一个全新的 ModelRuntime。只读自身已有状态，失败时不改动当前运行时，
+   * 让调用方能「先构建、后切换」，不会留下「配置已换、运行时为空」的半截状态。
+   */
+  async build(config: AppConfig): Promise<BuiltRuntime> {
     // modelsPath: null 让 pi 跳过读取模型目录文件，provider 全部由下面的注入决定
     const runtime = await ModelRuntime.create({
       authPath: env.authPath,
       modelsPath: null,
       refreshOnCreate: false,
     });
-    this.builtinIds = new Set(runtime.getProviders().map((provider) => provider.id));
+    const builtinIds = new Set(runtime.getProviders().map((provider) => provider.id));
 
     for (const provider of config.providers) {
       // 只有覆盖了 baseUrl / models 才需要注册；纯内置条目（id + apiKey）交给 pi 的内置目录
@@ -79,7 +88,14 @@ export class PiRuntime {
     // 刷新鉴权快照，让目录的 available 对「运行时注入的 key」与「环境变量」两种来源都准确
     await runtime.refresh({ allowNetwork: false });
 
-    this.runtime = runtime;
+    return { runtime, builtinIds, providers: config.providers };
+  }
+
+  /** 切换到一份构建好的运行时并重算状态；同步完成，调用方可在同一帧里落盘配置 */
+  swap(built: BuiltRuntime, config: AppConfig): RuntimeStatus {
+    this.runtime = built.runtime;
+    this.builtinIds = built.builtinIds;
+    this.providers = built.providers;
 
     const wantedRef = config.defaultModel ?? firstModelRef(config) ?? this.firstAvailableRef();
     const model = this.resolveModelRef(wantedRef);
@@ -103,6 +119,11 @@ export class PiRuntime {
       error: null,
     };
     return this.status;
+  }
+
+  /** 构建并切换；启动路径与需要重建的调用方用它一步到位 */
+  async apply(config: AppConfig): Promise<RuntimeStatus> {
+    return this.swap(await this.build(config), config);
   }
 
   /**

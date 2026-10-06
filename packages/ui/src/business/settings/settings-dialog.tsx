@@ -37,7 +37,7 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
           <DialogTitle>{t("设置")}</DialogTitle>
           <DialogDescription>
             {t(
-              "外观、模型与联网搜索配置。保存后会重建模型运行时；apiKey 留空表示沿用已保存的 key。",
+              "外观、模型与联网搜索配置。保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。",
             )}
           </DialogDescription>
         </DialogHeader>

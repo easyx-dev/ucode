@@ -85,6 +85,11 @@
   生成的时刻，回复的真实耗时需用它减去 `createdAt` 才能得到；server 从会话条目的 `entry.timestamp` 取
   （实时帧取服务端当前时刻）。对话区据此把模型 / 时间 / 耗时按「一轮回复」聚合展示一次，
   连续工具调用合并为一条摘要卡片。
+- 配置保存不再要求会话空闲：`config/update`（与 `models/refresh`）先构建新的 `ModelRuntime`，成功后才切换、
+  落盘并回收内存会话（空闲的立即回收，正在生成的本轮跑完再回收），构建或落盘失败时磁盘、运行时与会话都保持原状；
+  只有联网搜索变化时连运行时都不重建。回收会一并把该实例上挂起的审批 / 提问按取消结算。
+  `config_changed` 因此不再意味着「内存会话全部重置」，
+  `session_busy` 只出现在必须空闲的写操作上（文案改为「会话正在生成，请先中断或等本轮结束」）。
 - 配置改为**环境变量声明、代码不带默认值**（缺失 / 非法即启动报错）：`server/src/constants.ts` 移除
   `DEFAULT_PORT` / `DEFAULT_HOST` / `DEFAULT_POOL_IDLE_MS` / `DEFAULT_PROMPT_SOURCE`，
   `env.ts` 改为从环境变量读取并校验。按 `NODE_ENV` 选择环境文件：生产 **`.env.prod`**

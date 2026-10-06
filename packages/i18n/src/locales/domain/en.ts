@@ -9,7 +9,8 @@ export default {
   请求参数无效: "Invalid request parameters",
   "接口不存在：{{path}}": "No such API endpoint: {{path}}",
   服务内部错误: "Internal server error",
-  "会话正忙，请稍后重试或改用 steer": "The session is busy. Retry later or use steer.",
+  "会话正在生成，请先中断或等本轮结束":
+    "The session is generating. Interrupt it or wait for this turn to finish.",
   "模型不可用：{{ref}}": "Model unavailable: {{ref}}",
   "尚未配置模型，请先在设置里添加 provider":
     "No model configured. Add a provider in settings first.",

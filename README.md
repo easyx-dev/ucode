@@ -509,7 +509,9 @@ apps/desktop/
 - **会话持久化**：消息正文交给 pi 的 `SessionManager`，落在 `$APP_HOME/harness/sessions/*.jsonl`；应用自己的会话元数据与列表索引（覆盖值、名称、预览、计数、时间、文件路径）放 `$APP_HOME/app/app.db`。
 - **索引同步**：启动时 `reconcile()` 以 JSONL 为准对齐索引（补齐外部新增、清理已删文件），每轮生成落定后再回写一次；列表 / 详情直接读 SQLite，不再扫描 JSONL 目录。
 - **AgentSession 池**：同一会话串行执行（流式期间到达的消息会排队），空闲 `APP_POOL_IDLE_MS` 后 `dispose()`，下次访问从 JSONL 恢复。
-- **配置热重载**：`config/update` 会先校验并落盘，再重建 `ModelRuntime`、丢弃内存会话（校验失败不会动内存会话）；有会话正在生成时返回 `409 session_busy`。
+- **配置热重载**：`config/update` 先合并并落盘，再按需重建 `ModelRuntime`（只有联网搜索变化时不重建）；
+  内存会话随之重装——空闲的立即回收、正在生成的本轮跑完再回收，都不会打断当前这一轮。
+  重建失败（如 provider 落不了地）时磁盘、运行时与会话都保持原状。
 - **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `harness/models.json`；`config.json` 是模型配置的唯一事实源。
 - **工具集在装配层收口**：内置工具走 `tools` 白名单（pi 的该字段是白名单，自研工具漏进去就会被过滤掉），
   `webfetch` / `websearch` 走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。

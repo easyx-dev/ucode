@@ -32,12 +32,12 @@ export default {
   未配置模型: "No model configured",
   去设置: "Open settings",
   重建运行时: "Rebuild runtime",
-  丢弃内存会话并按当前配置重建运行时:
-    "Discard in-memory sessions and rebuild the runtime from the current config",
+  "按当前配置重建运行时，正在生成的会话本轮结束后切换":
+    "Rebuild the runtime from the current config; busy sessions switch after their current turn",
 
   // Settings dialog
-  "外观、模型与联网搜索配置。保存后会重建模型运行时；apiKey 留空表示沿用已保存的 key。":
-    "Appearance, model and web search configuration. Saving rebuilds the model runtime; leave apiKey blank to keep the saved key.",
+  "外观、模型与联网搜索配置。保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。":
+    "Appearance, model and web search configuration. The new config takes effect from the next turn; leave apiKey blank to keep the saved key.",
   保存并生效: "Save and apply",
   外观: "Appearance",
   模型: "Models",

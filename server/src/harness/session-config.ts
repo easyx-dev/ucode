@@ -207,6 +207,10 @@ export const buildSessionOptions = async (
   const model = input.runtime.resolveModelRef(modelRef) ?? input.runtime.resolveModelRef(null);
   const thinkingLevel =
     override.thinkingLevel ?? capability.thinkingLevel ?? input.runtime.getStatus().thinkingLevel;
+  // 装配要等 loader 重建，而保存配置会在这期间换掉运行时：先把运行时取一次给本次装配用，
+  // 免得出现「模型解析自旧运行时、交给新运行时建会话」的错配。
+  // 这几行之间不得插入 await —— 同代快照靠「同一个同步块内不留让出点」保证
+  const modelRuntime = input.runtime.requireRuntime();
 
   // loader 与会话共用同一个 SettingsManager：分两个实例会让资源发现与运行期设置不一致
   const settingsManager = SettingsManager.inMemory();
@@ -233,7 +237,7 @@ export const buildSessionOptions = async (
   return {
     cwd: input.cwd,
     agentDir: input.harnessDir ?? env.harnessDir,
-    modelRuntime: input.runtime.requireRuntime(),
+    modelRuntime,
     ...(model ? { model } : {}),
     thinkingLevel,
     sessionManager: input.sessionManager,

@@ -12,7 +12,7 @@ export const errorMessageKeys = {
   invalid_request: "请求参数无效",
   not_found: "接口不存在：{{path}}",
   internal_error: "服务内部错误",
-  session_busy: "会话正忙，请稍后重试或改用 steer",
+  session_busy: "会话正在生成，请先中断或等本轮结束",
   unknown_model: "模型不可用：{{ref}}",
   model_not_configured: "尚未配置模型，请先在设置里添加 provider",
   unsupported_api: "连通性测试不支持该 api 类型：{{api}}",

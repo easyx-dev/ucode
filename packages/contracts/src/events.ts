@@ -66,7 +66,7 @@ export type ServerControlEvent =
       /** 渲染文案所需的插值值 */
       params?: Record<string, string>;
     }
-  /** 配置已重建（模型运行时与内存会话都会重置）：客户端据此重取 models / health */
+  /** 配置已变更：模型运行时按需重建，内存会话在空闲后按新配置重装。客户端据此重取 models / health */
   | { type: "config_changed"; config: ConfigSnapshot }
   /** MCP 服务器配置变更：客户端据此刷新列表 */
   | { type: "mcp_changed"; mcp: McpListResponse };

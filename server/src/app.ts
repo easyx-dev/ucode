@@ -1,6 +1,6 @@
-/** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
-import type { AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
-import { ERROR_CODES } from "@ucode/contracts";
+/** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置应用（热重载）的编排 */
+import type { AppConfig, AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
+import { classifyConfigChange } from "./config/classify";
 import { ConfigStore, publicConfig } from "./config/store";
 import {
   ATTACHMENT_SWEEP_INTERVAL_MS,
@@ -26,7 +26,6 @@ import { PairingStore } from "./lib/auth/pairing";
 import { RateLimiter } from "./lib/auth/rate-limit";
 import { SessionService } from "./lib/auth/sessions";
 import { logger } from "./lib/logger";
-import { AppError } from "./lib/response";
 import type { ServiceRegistration } from "./lib/service-file";
 
 export type Services = {
@@ -56,9 +55,9 @@ export type Services = {
     /** 服务注册信息（host / port 等）；端口自选时 index 会在监听后回写同一个对象 */
     registration: ServiceRegistration;
   };
-  /** 更新配置：落盘 + 重建 ModelRuntime + 丢弃内存中的 AgentSession */
+  /** 更新配置：落盘 + 按需重建 ModelRuntime，并把内存会话回收成「下次访问按新配置重装」 */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
-  /** 用当前配置重建运行时 */
+  /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
   /** 关闭共享的 SQLite 连接 */
   close(): void;
@@ -137,12 +136,6 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const authSweeper = setInterval(sweepAuth, AUTH_SWEEP_INTERVAL_MS);
   authSweeper.unref();
 
-  const guardIdle = (): void => {
-    if (pool.hasActiveRun()) {
-      throw new AppError(ERROR_CODES.sessionBusy, "有会话正在生成，请先中断再更新配置", 409);
-    }
-  };
-
   // 退出时可能先后收到多个信号，close 只能生效一次（DatabaseSync 重复 close 会抛）
   let closed = false;
 
@@ -150,6 +143,34 @@ export const createServices = async (registration: ServiceRegistration): Promise
     config: publicConfig(config.get()),
     status: runtime.getStatus(),
   });
+
+  const announceConfig = (): void => {
+    events.emitControl({ type: "config_changed", config: snapshot() });
+  };
+
+  // 两次保存 / 重载交错会让运行时切换与会话回收互相踩，串行执行
+  let applyChain: Promise<unknown> = Promise.resolve();
+  const withApply = <T>(fn: () => Promise<T>): Promise<T> => {
+    const run = applyChain.then(fn, fn);
+    applyChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+
+  /**
+   * 重建运行时并回收内存会话。构建（唯一可能失败的 await）与落盘都排在切换之前：
+   * 失败时磁盘、运行时与内存会话都保持原状，不会留下「新配置 + 空运行时」的半截状态。
+   */
+  const swapRuntime = async (next: AppConfig, persist: boolean): Promise<void> => {
+    runtime.assertUsable(next);
+    const built = await runtime.build(next);
+    if (persist) config.set(next);
+    runtime.swap(built, next);
+    pool.recycleForConfigChange();
+    announceConfig();
+  };
 
   return {
     config,
@@ -169,23 +190,21 @@ export const createServices = async (registration: ServiceRegistration): Promise
       loginLimiter,
       registration,
     },
-    async applyConfig(patch: AppConfigPatchInput) {
-      guardIdle();
-      // 先合并并校验，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json
-      const next = config.merge(patch);
-      runtime.assertUsable(next);
-      config.set(next);
-      pool.disposeAll();
-      await runtime.apply(next);
-      events.emitControl({ type: "config_changed", config: snapshot() });
+    applyConfig(patch: AppConfigPatchInput) {
+      return withApply(async () => {
+        // 先合并，再落盘：非法 patch 既不该丢内存会话，也不该写进 config.json
+        const next = config.merge(patch);
+        // 只有联网搜索是运行期读取：工具下次调用就用新设置，不必重建运行时与会话
+        if (classifyConfigChange(next, config.get()) === "lazy") {
+          config.set(next);
+          announceConfig();
+          return;
+        }
+        await swapRuntime(next, true);
+      });
     },
-    async reload() {
-      guardIdle();
-      const next = config.get();
-      runtime.assertUsable(next);
-      pool.disposeAll();
-      await runtime.apply(next);
-      events.emitControl({ type: "config_changed", config: snapshot() });
+    reload() {
+      return withApply(() => swapRuntime(config.get(), false));
     },
     close() {
       if (closed) return;
