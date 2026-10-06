@@ -64,6 +64,12 @@ export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 /** question 工具等待用户答复的时限；超时以可读错误结束本轮提问 */
 export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** agent 侧 shell 命令的总时长上限（秒）；模型可用 `timeout` 参数放宽 */
+export const SHELL_COMMAND_TIMEOUT_SECONDS = 30 * 60;
+
+/** agent 侧 shell 命令连续无输出的时长上限；到达即判定为等待交互输入并中止 */
+export const SHELL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** 单个父会话同时运行的子智能体数量上限；超限立即报错，不排队 */
 export const SUBAGENT_MAX_CONCURRENCY = 4;
 

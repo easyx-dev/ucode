@@ -47,6 +47,7 @@ import {
   promptSectionOf,
   resolvePromptVariant,
 } from "./prompt";
+import { createShellExtension } from "./shell";
 import type { SubagentHooks } from "./subagents";
 import { buildCustomTools } from "./tools/index";
 import { SUBAGENT_TOOL_NAME } from "./tools/names";
@@ -158,6 +159,8 @@ const createSessionLoader = async (
     additionalPromptTemplatePaths: assetPaths.prompts.map((item) => item.path),
     extensionFactories: [
       createPermissionExtension(gate),
+      // shell 兜底：同名覆盖内置 bash，保证命令不会停下来等交互输入（见 harness/shell）
+      createShellExtension(),
       createCodemodeExtension({ mode: "on" }),
       ...discoveryExtension,
       ...(mcp ? [mcp] : []),

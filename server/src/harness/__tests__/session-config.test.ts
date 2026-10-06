@@ -20,6 +20,7 @@ import { brand } from "@ucode/brand/values";
 import type { ProviderConfig, SessionMode } from "@ucode/contracts";
 
 import type { PromptSource } from "../../constants";
+import { SHELL_COMMAND_TIMEOUT_SECONDS, SHELL_IDLE_TIMEOUT_MS } from "../../constants";
 import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
@@ -211,6 +212,24 @@ describe("buildSessionOptions 工具装配", () => {
     assert.ok(
       !tools.includes("tool_search"),
       `无 deferred 服务器时不应激活，实际：${tools.join(", ")}`,
+    );
+  });
+
+  // 兜底靠「同名注册即替换」生效，一旦装配漏挂或 pi 改了优先级就会静默退回内置实现
+  it("TS-05 bash 由 shell 扩展覆盖内置实现", async () => {
+    const session = await sessionOf("build");
+    const bash = session.getAllTools().find((tool) => tool.name === "bash");
+    session.dispose();
+
+    assert.ok(bash, "build 应注册 bash 工具");
+    // 内联工厂扩展的 sourceInfo 固定为 { path: "<inline>", source: "inline" }，正向断言比排除法更紧
+    assert.equal(bash.sourceInfo.source, "inline", "bash 仍是内置实现，兜底未生效");
+    // 默认上限由兜底注入，pi 的 timeout 参数说明里没这句，模型只能从工具描述得知
+    const description = bash.description ?? "";
+    assert.ok(
+      description.includes(`${SHELL_COMMAND_TIMEOUT_SECONDS} 秒`) &&
+        description.includes(`${SHELL_IDLE_TIMEOUT_MS / 60_000} 分钟`),
+      `工具描述未说明默认上限：${description}`,
     );
   });
 });
