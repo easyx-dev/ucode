@@ -46,7 +46,8 @@ packages/ui/src/
 | 纯逻辑 | `packages/ui/src/lib/` | 无 React 依赖的纯函数（格式化、草稿、命令解析） | 依赖组件 |
 
 - **数据自服务**：业务组件经 `hooks/use-*` 读 SDK store（会话、消息、目标、交互…），不再由应用层透传控制器
-- **导航受控**：当前会话、设置页开关等平台相关状态由应用层持有，以 props 传入（`sessionId` / `onSelectSession` / `open` / `onOpenChange`），UI 不定义导航抽象、不写 URL
+- **导航受控**：当前会话、设置分区等平台相关状态由应用层持有，以 props 传入（`sessionId` / `onSelectSession` /
+  `settingsSection` / `onSettingsSectionChange`），UI 不定义导航抽象、不写 URL
 - **组合优先**：应用层拼装 `base/*` 与 `business/*`；`presets/workspace` 只是一套默认组合，任何应用都可拆开自拼
 - 事件回调用 `on<动词>` 命名；纯函数下沉到 `lib/`，可单独测试
 

@@ -35,16 +35,28 @@ export default {
   "按当前配置重建运行时，正在生成的会话本轮结束后切换":
     "Rebuild the runtime from the current config; busy sessions switch after their current turn",
 
-  // Settings dialog
+  // Settings panel
   "外观、模型与联网搜索配置。保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。":
     "Appearance, model and web search configuration. The new config takes effect from the next turn; leave apiKey blank to keep the saved key.",
-  保存并生效: "Save and apply",
+  返回工作区: "Back to workspace",
+  基础设置: "Basics",
+  "Agent 能力": "Agent capabilities",
+  服务: "Service",
   外观: "Appearance",
-  模型: "Models",
+  模型设置: "Models",
   默认值: "Defaults",
-  "还没有接入供应商，从下面的目录里选一个，或添加自定义供应商。":
-    "No provider configured yet. Pick one from the catalog below, or add a custom provider.",
+  "MCP 服务器": "MCP servers",
+  保存并生效: "Save and apply",
+  添加供应商: "Add provider",
+  "还没有接入供应商，点右上角「添加供应商」。":
+    "No provider yet. Use “Add provider” at the top right.",
   添加自定义供应商: "Add custom provider",
+  "保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。":
+    "The new config takes effect from the next turn; leave apiKey blank to keep the saved key.",
+  "内置目录里的供应商只需再填一把 key；pi 不认识的端点用自定义供应商。":
+    "Providers from the built-in catalog only need an API key; use a custom provider for endpoints pi does not know.",
+  待配置: "Needs setup",
+  已就绪: "Ready",
 
   // Web search
   联网搜索: "Web search",
@@ -74,13 +86,10 @@ export default {
   "界面语言，切换后立即生效并记住选择。":
     "Interface language. Changes take effect immediately and are remembered.",
 
-  // Provider catalog
-  接入内置供应商: "Add a built-in provider",
-  "{{n}} 个可选": "{{n}} available",
+  // Provider add dialog
   "搜索供应商，如 deepseek": "Search providers, e.g. deepseek",
   "没有匹配的供应商。": "No matching provider.",
   已加入: "Added",
-  "{{n}} 个模型": "{{n}} models",
 
   // Reasoning levels
   关闭: "Off",
@@ -490,9 +499,6 @@ export default {
 
   // Remote access
   远程访问: "Remote access",
-  "管理局域网访问、一次性配对链接与登录会话（含改密码）。":
-    "Manage LAN access, one-time pairing links and sign-in sessions (including password).",
-  管理: "Manage",
   局域网访问: "LAN access",
   仅本机: "This device only",
   局域网: "LAN",

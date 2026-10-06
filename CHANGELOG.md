@@ -81,6 +81,9 @@
 
 ### 变更
 
+- web 端设置深链改为按分区寻址：`?settings=1` → `?settings=<分区>`（`appearance` / `models` / `defaults` /
+  `memory` / `websearch` / `mcp` / `remote`），非法值视为未打开；设置界面由对话框改为全屏面板（左侧分类导航 +
+  右侧内容页），模型页改为「供应商列表 + 详情」两栏。桌面端是窗口内导航状态，不涉及 URL。
 - `MessageDTO` 新增 `completedAt`（assistant 回复写入会话记录的时刻）：pi 的 `message.timestamp` 是开始
   生成的时刻，回复的真实耗时需用它减去 `createdAt` 才能得到；server 从会话条目的 `entry.timestamp` 取
   （实时帧取服务端当前时刻）。对话区据此把模型 / 时间 / 耗时按「一轮回复」聚合展示一次，

@@ -159,7 +159,7 @@ node packages/brand/scripts/replace.ts --from 旧品牌 --to 新品牌 --write
 
 ### 接入 pi 内置供应商（推荐）
 
-pi 自带一份供应商目录（`pi-ai` 的 `providers/all`）。设置页的「接入内置供应商」会列出其中
+pi 自带一份供应商目录（`pi-ai` 的 `providers/all`）。设置页的「添加供应商」会列出其中
 **可用一把 API key 直接接入**的那些（32 个：deepseek / minimax / zai / kimi-coding / xiaomi / qwen-token-plan /
 openai / anthropic / xai / openrouter / google / groq / mistral / together …），选中后只需填 apiKey。
 
@@ -258,7 +258,7 @@ curl -X POST http://localhost:19688/api/v1/config/test \
 
 agent 有自研的 `webfetch`（抓链接转 markdown）与 `websearch`（联网搜索，只给标题 / 链接 / 摘要）两个工具。
 `websearch` 需要一家搜索服务商，配置与模型同放 `$APP_HOME/app/config.json`，
-也可以在设置对话框的「联网搜索」区块里改。
+也可以在设置的「联网搜索」页里改。
 
 | provider | 门槛 | 鉴权 / 地址 |
 | --- | --- | --- |

@@ -5,13 +5,6 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../base/dialog";
 import { Input } from "../../base/input";
 import { Label } from "../../base/label";
 import { useAuth } from "../../hooks/use-auth";
@@ -231,100 +224,73 @@ function PasswordForm() {
   );
 }
 
-function RemoteAccessDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
+/** 局域网访问开关：改的是服务监听地址，重启后才真正生效 */
+function LanAccess({ access }: { access: RemoteAccess }) {
   const { t } = useTranslation();
-  const access = useRemoteAccess(open);
-  const auth = useAuth();
   const lanEnabled = access.info?.host === "0.0.0.0";
-  const errorText = useErrorText(access.error);
-
   const options = [
     { value: "off", label: t("仅本机") },
     { value: "on", label: t("局域网") },
   ] as const satisfies ReadonlyArray<SegmentedOption<"on" | "off">>;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("远程访问")}</DialogTitle>
-          <DialogDescription>
-            {t(
-              "让同一网络下的设备接入本服务。通过鉴权的设备等于本机 owner，可驱动 agent 读写文件、执行命令。",
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto py-1">
-          <SettingsGroup>
-            <SettingsRow
-              title={t("局域网访问")}
-              description={
-                lanEnabled
-                  ? t("已允许局域网设备访问；如需关闭请切回「仅本机」并重启服务。")
-                  : t("当前仅本机可访问；开启后同一网络下的设备可访问，请只在可信网络使用。")
-              }
-              control={
-                <SegmentedControl
-                  label={t("局域网访问")}
-                  value={lanEnabled ? "on" : "off"}
-                  options={options}
-                  onChange={(value) =>
-                    void access.setHost(value === "on" ? "0.0.0.0" : "127.0.0.1")
-                  }
-                />
-              }
+    <>
+      <SettingsGroup>
+        <SettingsRow
+          title={t("局域网访问")}
+          description={
+            lanEnabled
+              ? t("已允许局域网设备访问；如需关闭请切回「仅本机」并重启服务。")
+              : t("当前仅本机可访问；开启后同一网络下的设备可访问，请只在可信网络使用。")
+          }
+          control={
+            <SegmentedControl
+              label={t("局域网访问")}
+              value={lanEnabled ? "on" : "off"}
+              options={options}
+              onChange={(value) => void access.setHost(value === "on" ? "0.0.0.0" : "127.0.0.1")}
             />
-          </SettingsGroup>
+          }
+        />
+      </SettingsGroup>
 
-          {access.info?.restartRequired ? (
-            <p className="text-xs text-destructive">{t("监听地址已更新，需要重启服务后生效。")}</p>
-          ) : null}
-
-          {errorText ? <p className="text-xs text-destructive">{errorText}</p> : null}
-
-          <PairingPanel
-            pairing={access.pairing}
-            busy={access.busy}
-            onCreate={() => void access.createPairing()}
-          />
-          <SessionList
-            sessions={access.sessions}
-            currentId={auth.session?.id ?? null}
-            busy={access.busy}
-            onRevoke={(id) => void access.revoke(id)}
-          />
-          <PasswordForm />
-        </div>
-      </DialogContent>
-    </Dialog>
+      {access.info?.restartRequired ? (
+        <p className="text-xs text-destructive">{t("监听地址已更新，需要重启服务后生效。")}</p>
+      ) : null}
+    </>
   );
 }
 
 export function SettingsRemoteAccess() {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  // 本页一挂载即拉取访问状态，离开设置页就停止
+  const access = useRemoteAccess(true);
+  const auth = useAuth();
+  const errorText = useErrorText(access.error);
 
   return (
-    <>
-      <SettingsGroup>
-        <SettingsRow
-          title={t("远程访问")}
-          description={t("管理局域网访问、一次性配对链接与登录会话（含改密码）。")}
-          control={
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-              {t("管理")}
-            </Button>
-          }
-        />
-      </SettingsGroup>
-      <RemoteAccessDialog open={open} onOpenChange={setOpen} />
-    </>
+    <div className="max-w-3xl space-y-5">
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {t(
+          "让同一网络下的设备接入本服务。通过鉴权的设备等于本机 owner，可驱动 agent 读写文件、执行命令。",
+        )}
+      </p>
+
+      <LanAccess access={access} />
+      {errorText ? <p className="text-xs text-destructive">{errorText}</p> : null}
+
+      <PairingPanel
+        pairing={access.pairing}
+        busy={access.busy}
+        onCreate={() => void access.createPairing()}
+      />
+      <SessionList
+        sessions={access.sessions}
+        currentId={auth.session?.id ?? null}
+        busy={access.busy}
+        onRevoke={(id) => void access.revoke(id)}
+      />
+      <PasswordForm />
+    </div>
   );
 }

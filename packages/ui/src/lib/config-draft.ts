@@ -173,6 +173,20 @@ export const toDraftProvider = (
   models: (provider.models ?? []).map(toDraftModel),
 });
 
+/**
+ * 草稿是否已可保存生效，用于列表里的状态点：
+ * 内置供应商只缺 key；自定义供应商要有端点，且每个模型都得填 id（key 可留空，本地端点常不需要）。
+ */
+export const isDraftProviderReady = (provider: DraftProvider): boolean => {
+  if (provider.source === "builtin")
+    return Boolean(provider.apiKey.trim() || provider.apiKeyMasked);
+  return (
+    Boolean(provider.baseUrl.trim()) &&
+    provider.models.length > 0 &&
+    provider.models.every((model) => model.id.trim().length > 0)
+  );
+};
+
 /** 保存前校验：自定义 provider 要有端点与模型，且每个模型都要有 id */
 export const validateDrafts = (drafts: DraftProvider[], t: TFunction): string | null => {
   for (const provider of drafts) {

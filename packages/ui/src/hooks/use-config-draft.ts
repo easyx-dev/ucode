@@ -83,19 +83,24 @@ export function useConfigDraft(open: boolean) {
     setProviders((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }, []);
 
-  const addProvider = useCallback(() => {
-    setProviders((prev) => [...prev, createDraftProvider()]);
+  /** 新加一条自定义供应商，返回它的草稿 key 以便选中 */
+  const addProvider = useCallback((): string => {
+    const provider = createDraftProvider();
+    setProviders((prev) => [...prev, provider]);
+    return provider.key;
   }, []);
 
-  /** 从 pi 目录接入一个内置供应商：只差一个 apiKey */
+  /** 从 pi 目录接入一个内置供应商（只差一个 apiKey），返回草稿 key；目录里找不到时返回 null */
   const addFromCatalog = useCallback(
-    (providerId: string) => {
+    (providerId: string): string | null => {
       const entry = catalog.find((item) => item.id === providerId);
-      if (!entry) return;
+      if (!entry) return null;
+      const provider = fromCatalogProvider(entry);
       setProviders((prev) => [
         ...prev.filter((item) => item.id !== providerId || item.source !== "builtin"),
-        fromCatalogProvider(entry),
+        provider,
       ]);
+      return provider.key;
     },
     [catalog],
   );

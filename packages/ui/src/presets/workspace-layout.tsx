@@ -19,7 +19,7 @@ import { PermissionDialog } from "../business/permission-dialog";
 import { QuestionDialog } from "../business/question-dialog";
 import { RenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
-import { SettingsDialog } from "../business/settings/settings-dialog";
+import { SettingsPanel } from "../business/settings/settings-panel";
 import { UsageDialog } from "../business/usage-dialog";
 import { WelcomePanel } from "../business/welcome-panel";
 import { useActiveSession } from "../hooks/use-active-session";
@@ -38,6 +38,7 @@ import type { GoalCommand } from "../lib/goal-command";
 import { lastTurnPresentedPlan } from "../lib/plan";
 import { sessionTitle } from "../lib/session";
 import { isWorkspaceSession } from "../lib/session-groups";
+import { DEFAULT_SETTINGS_SECTION, type SettingsSectionId } from "../lib/settings-section";
 import type {
   ChatItem,
   PermissionMode,
@@ -50,8 +51,9 @@ export type WorkspaceLayoutProps = {
   /** 当前选中的会话；null 表示草稿态（新建） */
   sessionId: string | null;
   onSelectSession: (sessionId: string | null) => void;
-  settingsOpen: boolean;
-  onSettingsOpenChange: (open: boolean) => void;
+  /** 设置界面当前的分区；null 表示未打开 */
+  settingsSection: SettingsSectionId | null;
+  onSettingsSectionChange: (section: SettingsSectionId | null) => void;
   usageOpen: boolean;
   onUsageOpenChange: (open: boolean) => void;
 };
@@ -71,8 +73,8 @@ const readSidebarCollapsed = (): boolean => {
 export function WorkspaceLayout({
   sessionId: activeId,
   onSelectSession: setActiveId,
-  settingsOpen,
-  onSettingsOpenChange: setSettingsOpen,
+  settingsSection,
+  onSettingsSectionChange: setSettingsSection,
   usageOpen,
   onUsageOpenChange: setUsageOpen,
 }: WorkspaceLayoutProps) {
@@ -95,6 +97,9 @@ export function WorkspaceLayout({
   const chat = useChat(activeId, { onSessionCreated: setActiveId });
   const sessionUsage = useSessionUsage(activeId);
   const interaction = interactions.pending[0] ?? null;
+
+  /** 各入口统一落到模型设置页：未配置模型时用户要找的就是它 */
+  const openSettings = (): void => setSettingsSection(DEFAULT_SETTINGS_SECTION);
 
   // 拉宽到桌面断点时自动收起抽屉，避免被已隐藏的菜单按钮困在遮罩里
   useEffect(() => {
@@ -275,7 +280,7 @@ export function WorkspaceLayout({
         forkCurrent();
         break;
       case "settings":
-        setSettingsOpen(true);
+        openSettings();
         break;
       case "stop":
         void chat.stop();
@@ -359,7 +364,7 @@ export function WorkspaceLayout({
     onOpenWorkspace: () => setPicking(true),
     onOpenAutomation: () => toast.info(t("自动化功能即将推出")),
     onOpenMarketplace: () => toast.info(t("插件市场即将推出")),
-    onOpenSettings: () => setSettingsOpen(true),
+    onOpenSettings: openSettings,
     childrenByParent: sessions.childrenByParent,
     childrenLoading: sessions.childrenLoading,
     onLoadChildren: sessions.loadChildren,
@@ -398,7 +403,7 @@ export function WorkspaceLayout({
               }}
               onOpenSettings={() => {
                 setSidebarOpen(false);
-                setSettingsOpen(true);
+                openSettings();
               }}
             />
           </SheetContent>
@@ -415,7 +420,7 @@ export function WorkspaceLayout({
               configured={configured}
               defaultModel={models.data?.defaultModel ?? null}
               workspaceRoot={workspaceRoot}
-              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSettings={openSettings}
             />
           }
           onReloadModels={() => void models.refresh()}
@@ -423,7 +428,7 @@ export function WorkspaceLayout({
           onSelectThinkingLevel={selectThinkingLevel}
           onSelectMode={selectMode}
           onSelectPermissionMode={selectPermissionMode}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={openSettings}
           onOpenSession={setActiveId}
           onToggleSidebar={() => {
             // 桌面端切换收起，移动端唤出抽屉
@@ -480,13 +485,16 @@ export function WorkspaceLayout({
           onSubmit={(id, name) => void sessions.rename(id, name)}
         />
 
-        <SettingsDialog
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          onSaved={() => {
-            void models.reload();
-          }}
-        />
+        {settingsSection ? (
+          <SettingsPanel
+            section={settingsSection}
+            onSectionChange={setSettingsSection}
+            onClose={() => setSettingsSection(null)}
+            onSaved={() => {
+              void models.reload();
+            }}
+          />
+        ) : null}
 
         <CommandPalette
           open={paletteOpen}
@@ -498,7 +506,7 @@ export function WorkspaceLayout({
           onNewTask={startNewSession}
           onNewAssistant={startAssistantSession}
           onOpenWorkspace={() => setPicking(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={openSettings}
           onToggleSidebar={toggleSidebar}
           onOpenFile={(path) => toast.info(t("文件查看器即将推出"), { description: path })}
         />

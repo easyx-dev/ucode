@@ -4,13 +4,14 @@
  * 界面本体全部来自 `@ucode/ui`；本文件只负责导航状态的存放与默认选中。
  */
 import { useSessions } from "@ucode/ui/hooks/use-sessions";
+import type { SettingsSectionId } from "@ucode/ui/lib/settings-section";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useEffect, useRef, useState } from "react";
 
 export function DesktopApp() {
   const { sessions, loading } = useSessions();
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId | null>(null);
   const [usageOpen, setUsageOpen] = useState(false);
   /** 默认选中只发生一次 */
   const picked = useRef(false);
@@ -28,8 +29,8 @@ export function DesktopApp() {
     <WorkspaceLayout
       sessionId={sessionId}
       onSelectSession={setSessionId}
-      settingsOpen={settingsOpen}
-      onSettingsOpenChange={setSettingsOpen}
+      settingsSection={settingsSection}
+      onSettingsSectionChange={setSettingsSection}
       usageOpen={usageOpen}
       onUsageOpenChange={setUsageOpen}
     />

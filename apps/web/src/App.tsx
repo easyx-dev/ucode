@@ -8,6 +8,7 @@ import { errorMessageKey } from "@ucode/i18n";
 import { LoginPage } from "@ucode/ui/business/login-page";
 import { useAuth } from "@ucode/ui/hooks/use-auth";
 import { useSessions } from "@ucode/ui/hooks/use-sessions";
+import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/lib/settings-section";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useClient } from "@ucode/ui/provider";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,11 +18,17 @@ const SESSION_KEY = "session";
 const SETTINGS_KEY = "settings";
 const LOGIN_PATH = "/login";
 
-type Nav = { sessionId: string | null; settingsOpen: boolean };
+/** 导航状态：会话 id 与设置分区，分别写进 `?session=` 与 `?settings=` */
+type Nav = { sessionId: string | null; settingsSection: SettingsSectionId | null };
 
 const readQuery = (): Nav => {
   const params = new URLSearchParams(window.location.search);
-  return { sessionId: params.get(SESSION_KEY), settingsOpen: params.get(SETTINGS_KEY) === "1" };
+  const section = params.get(SETTINGS_KEY);
+  return {
+    sessionId: params.get(SESSION_KEY),
+    // 旧的 `?settings=1` 与拼错的分区都当没打开
+    settingsSection: isSettingsSectionId(section) ? section : null,
+  };
 };
 
 /** 写回 URL；用户主动切换用 push 保留历史，程序化纠偏用 replace 不污染历史 */
@@ -29,7 +36,7 @@ const writeQuery = (next: Nav, mode: "push" | "replace"): void => {
   const url = new URL(window.location.href);
   if (next.sessionId) url.searchParams.set(SESSION_KEY, next.sessionId);
   else url.searchParams.delete(SESSION_KEY);
-  if (next.settingsOpen) url.searchParams.set(SETTINGS_KEY, "1");
+  if (next.settingsSection) url.searchParams.set(SETTINGS_KEY, next.settingsSection);
   else url.searchParams.delete(SETTINGS_KEY);
   const target = `${url.pathname}${url.search}${url.hash}`;
   if (mode === "push") window.history.pushState(null, "", target);
@@ -88,7 +95,7 @@ export default function App() {
 function AuthenticatedApp() {
   const initial = readQuery();
   const [sessionId, setSessionId] = useState(initial.sessionId);
-  const [settingsOpen, setSettingsOpen] = useState(initial.settingsOpen);
+  const [settingsSection, setSettingsSection] = useState(initial.settingsSection);
   const [usageOpen, setUsageOpen] = useState(false);
   const { sessions, loading } = useSessions();
   /** 默认选中只发生一次 */
@@ -97,17 +104,19 @@ function AuthenticatedApp() {
   const selectSession = useCallback(
     (id: string | null) => {
       setSessionId(id);
-      writeQuery({ sessionId: id, settingsOpen }, "push");
+      writeQuery({ sessionId: id, settingsSection }, "push");
     },
-    [settingsOpen],
+    [settingsSection],
   );
 
   const changeSettings = useCallback(
-    (open: boolean) => {
-      setSettingsOpen(open);
-      writeQuery({ sessionId, settingsOpen: open }, "push");
+    (section: SettingsSectionId | null) => {
+      setSettingsSection(section);
+      // 开关设置入栈（后退可撑销），设置内切页只改查询串，避免后退要连按多次
+      const switching = settingsSection !== null && section !== null;
+      writeQuery({ sessionId, settingsSection: section }, switching ? "replace" : "push");
     },
-    [sessionId],
+    [sessionId, settingsSection],
   );
 
   // URL 未指定会话时，列表就绪后默认选中最近一个——只做一次
@@ -118,15 +127,15 @@ function AuthenticatedApp() {
     const first = sessions[0];
     if (!first) return;
     setSessionId(first.id);
-    writeQuery({ sessionId: first.id, settingsOpen }, "replace");
-  }, [loading, sessionId, sessions, settingsOpen]);
+    writeQuery({ sessionId: first.id, settingsSection }, "replace");
+  }, [loading, sessionId, sessions, settingsSection]);
 
   // 浏览器前进 / 后退：URL 是导航状态的事实源
   useEffect(() => {
     const onPopState = (): void => {
       const next = readQuery();
       setSessionId(next.sessionId);
-      setSettingsOpen(next.settingsOpen);
+      setSettingsSection(next.settingsSection);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -136,8 +145,8 @@ function AuthenticatedApp() {
     <WorkspaceLayout
       sessionId={sessionId}
       onSelectSession={selectSession}
-      settingsOpen={settingsOpen}
-      onSettingsOpenChange={changeSettings}
+      settingsSection={settingsSection}
+      onSettingsSectionChange={changeSettings}
       usageOpen={usageOpen}
       onUsageOpenChange={setUsageOpen}
     />
