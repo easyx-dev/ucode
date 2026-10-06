@@ -151,6 +151,12 @@ export class PiRuntime {
     return this.runtime.getModel(providerId, modelId) ?? null;
   }
 
+  /** 模型上下文窗口；模型解析不到或没声明窗口时返回 null */
+  contextWindowOf(ref: string | null): number | null {
+    const contextWindow = this.resolveModelRef(ref)?.contextWindow ?? 0;
+    return contextWindow > 0 ? contextWindow : null;
+  }
+
   /** 配置未指定默认模型时的回落：第一个已配置鉴权的可用模型 */
   private firstAvailableRef(): string | null {
     const model = this.runtime?.getAvailableSnapshot()[0];

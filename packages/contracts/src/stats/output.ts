@@ -13,6 +13,19 @@ export type UsageTotals = {
   totalTokens: number;
 };
 
+/**
+ * 会话当前上下文占用：最近一次回答所在上下文的大小（该次请求的提示 + 回复），与模型窗口配对。
+ *
+ * 与 `UsageTotals` 的累计口径不同——累计用量只增不减，占用会随压缩回落。
+ * 还没回答过、或刚压缩完还没出新回答时给不出这个值（见 `SessionInfoResponse.contextUsage`）。
+ */
+export type ContextUsage = {
+  /** 上下文里的 token 数 */
+  tokens: number;
+  /** 该会话当前生效模型的上下文窗口 */
+  contextWindow: number;
+};
+
 /** 按模型归并的用量；模型键为 `provider/model` */
 export type ModelUsage = {
   provider: string;

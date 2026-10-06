@@ -71,10 +71,12 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
     });
   }
   // 池内会话直接读内存条目，避免每次 info 都重解析整份会话文件
-  const usage = services.usage.usageOf(record, { live: services.pool.get(sessionId) });
-  const goal = services.goals.view(record, services.pool.get(sessionId));
+  const live = services.pool.get(sessionId);
+  const usage = services.usage.usageOf(record, { live });
+  const contextUsage = services.usage.contextUsageOf(record, { live });
+  const goal = services.goals.view(record, live);
 
-  return { session, usage, goal };
+  return { session, usage, contextUsage, goal };
 };
 
 /** 事件下发与详情共用同一套摘要口径 */
@@ -210,9 +212,10 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   }
 
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）
-  const summary = describeSession(services, patch.sessionId).session;
-  services.events.emitSessionUpdated(patch.sessionId, summary);
-  return summary;
+  const info = describeSession(services, patch.sessionId);
+  // 带上占用与窗口：改模型 / 模式会换掉生效窗口，不重发的话客户端会继续按旧窗口算百分比
+  services.events.emitSessionUpdated(patch.sessionId, info.session, info.usage, info.contextUsage);
+  return info.session;
 };
 
 /** `/read`：标记会话已读（写上次打开时间），用于侧栏未读点消失 */

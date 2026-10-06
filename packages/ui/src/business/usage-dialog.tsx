@@ -11,8 +11,8 @@ import {
   DialogTitle,
 } from "../base/dialog";
 import { useUsage } from "../hooks/use-usage";
-import type { ModelUsage, SessionUsageEntry, UsageTotals } from "../lib/types";
-import { formatTokens, usageKindLabel } from "../lib/usage";
+import type { ContextUsage, ModelUsage, SessionUsageEntry, UsageTotals } from "../lib/types";
+import { contextPercent, formatTokens, usageKindLabel } from "../lib/usage";
 import { SegmentedControl, type SegmentedOption } from "./segmented-control";
 
 type RangeValue = "all" | "30" | "7";
@@ -26,6 +26,25 @@ function TotalRow({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-border px-3 py-2">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-sm font-medium tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+/** 当前会话的上下文占用：占比为主，附上占用与窗口的绝对量 */
+function ContextBlock({ context }: { context: ContextUsage }) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-lg border border-border px-3 py-2">
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-semibold tabular-nums">{`${contextPercent(context)}%`}</span>
+        <span className="text-xs text-muted-foreground">{t("当前会话上下文占用")}</span>
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground tabular-nums">
+        {t("{{used}} / {{window}} token", {
+          used: formatTokens(context.tokens),
+          window: formatTokens(context.contextWindow),
+        })}
+      </div>
     </div>
   );
 }
@@ -123,9 +142,11 @@ type UsageDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** 从统计里打开某个会话 */
   onOpenSession: (sessionId: string) => void;
+  /** 当前会话的上下文占用；没有会话或取不到时为空 */
+  context?: ContextUsage | null;
 };
 
-export function UsageDialog({ open, onOpenChange, onOpenSession }: UsageDialogProps) {
+export function UsageDialog({ open, onOpenChange, onOpenSession, context }: UsageDialogProps) {
   const { t } = useTranslation();
   const [range, setRange] = useState<RangeValue>("all");
   const { data, loading, error } = useUsage(open, daysOf(range));
@@ -173,6 +194,7 @@ export function UsageDialog({ open, onOpenChange, onOpenSession }: UsageDialogPr
               </p>
             ) : (
               <div className="space-y-4 py-1">
+                {context ? <ContextBlock context={context} /> : null}
                 <TotalsBlock totals={data.total} toolCalls={data.toolCalls} />
                 <ModelList items={data.byModel} />
                 <SessionList items={data.bySession} onOpen={openSession} />

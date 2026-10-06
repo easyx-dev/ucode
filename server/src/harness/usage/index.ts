@@ -1,5 +1,5 @@
 /**
- * 使用统计：从 pi 会话记录里聚合每次 LLM 调用的 token 用量。
+ * 使用统计：从 pi 会话记录里聚合每次 LLM 调用的 token 用量，并给出当前的上下文占用。
  *
  * 用量已经在会话 JSONL 里（assistant 消息的 `usage`、独立 `usage` 条目、compaction / branch_summary 的 `usage`），
  * 这里只做读取与聚合，不落库；按会话文件 mtime 缓存解析结果，避免重复扫描。
@@ -9,10 +9,14 @@ import { existsSync, statSync } from "node:fs";
 
 import {
   type AgentSession,
+  calculateContextTokens,
+  getLastAssistantUsage,
+  getLatestCompactionEntry,
   type SessionEntry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type {
+  ContextUsage,
   ModelUsage,
   SessionUsageEntry,
   SessionUsageKind,
@@ -83,6 +87,23 @@ type UsagePoint = {
   model: string | null;
   totals: UsageTotals;
   toolCalls: number;
+};
+
+/**
+ * 当前分支的上下文占用 token 数：最近一次可信回答所面对的上下文大小。
+ *
+ * 可信口径复用 pi 的 `getLastAssistantUsage()`（中断 / 出错 / 零值的回答都不算基准）；压缩会重写上下文，
+ * 压缩点之前那条回答的用量反映的是压缩前的规模，因此只有压缩之后新出的回答才能当基准——压缩后还没回答时
+ * 只能算未知，与 pi 的 `getContextUsage()` 一致。
+ * 与它的差别：这里不估算基准回答之后追加的消息（pi 的 `estimateProjectedContextTokens` 会加上这部分），
+ * 落定时最后一条就是那条回答、两者相等，基准回答之后还有消息时（排队输入、中断轮）pi 会略高。
+ */
+const contextTokensOfBranch = (manager: SessionManager): number | null => {
+  const branch = manager.getBranch();
+  const compaction = getLatestCompactionEntry(branch);
+  const afterCompaction = compaction ? branch.slice(branch.indexOf(compaction) + 1) : branch;
+  const usage = getLastAssistantUsage(afterCompaction);
+  return usage ? calculateContextTokens(usage) : null;
 };
 
 /** 把会话条目解析成用量点；不含用量的条目被跳过 */
@@ -176,17 +197,27 @@ const kindOf = (record: SessionRecord): SessionUsageKind => {
   return "primary";
 };
 
-/** 解析单个会话文件的用量点缓存条目 */
-type CachedPoints = { path: string; mtimeMs: number; points: UsagePoint[] };
+/** 解析单个会话文件的结果缓存条目 */
+type CachedSessionUsage = {
+  path: string;
+  mtimeMs: number;
+  points: UsagePoint[];
+  /** 上下文占用 token 数；拿不到有效基准时为 null（见 `contextTokensOfBranch`） */
+  contextTokens: number | null;
+};
 
 /**
  * 会话用量读取与全局汇总。
- * 只依赖仓储（列会话）与文件系统；会话文件未变化时复用缓存，文件读取失败时保留上一次结果。
+ * 只依赖仓储（列会话）、模型窗口解析器与文件系统；会话文件未变化时复用缓存，文件读取失败时保留上一次结果。
  */
 export class UsageService {
-  private readonly cache = new Map<string, CachedPoints>();
+  private readonly cache = new Map<string, CachedSessionUsage>();
 
-  constructor(private readonly sessions: SessionRepository) {}
+  constructor(
+    private readonly sessions: SessionRepository,
+    /** 解析 `provider/model` 的上下文窗口；解析不到为 null（运行时相关，由装配层注入） */
+    private readonly contextWindowOf: (modelRef: string | null) => number | null,
+  ) {}
 
   /**
    * 单会话累计用量。
@@ -202,6 +233,26 @@ export class UsageService {
       ? collectPoints(options.live.sessionManager.getEntries())
       : this.pointsOf(record);
     return aggregate(points, options.sinceMs).totals;
+  }
+
+  /**
+   * 单会话当前上下文占用；拿不到有效基准、或模型窗口不可知时返回 null。
+   *
+   * 池内会话直接问 pi（内存里已有投影，不必重解析文件）；离线会话按文件 mtime 缓存读基准。
+   */
+  contextUsageOf(
+    record: SessionRecord,
+    options: { live?: AgentSession | undefined } = {},
+  ): ContextUsage | null {
+    if (options.live) {
+      const usage = options.live.getContextUsage();
+      if (!usage || usage.tokens === null) return null;
+      return { tokens: usage.tokens, contextWindow: usage.contextWindow };
+    }
+    const tokens = this.cachedOf(record)?.contextTokens ?? null;
+    const contextWindow = this.contextWindowOf(record.model);
+    if (tokens === null || contextWindow === null) return null;
+    return { tokens, contextWindow };
   }
 
   /** 全局汇总：总量、工具调用次数、按模型与按会话；`days` 缺省为全部时间 */
@@ -245,30 +296,40 @@ export class UsageService {
     };
   }
 
-  /** 读取会话文件的用量点，按 mtime 缓存；文件未落盘或读失败时返回空 / 上次结果 */
-  private pointsOf(record: SessionRecord): UsagePoint[] {
+  /** 读取会话文件的用量点，按 mtime 缓存；文件未落盘或读失败时保留上一次结果 */
+  private cachedOf(record: SessionRecord): CachedSessionUsage | null {
     const path = record.sourcePath;
-    if (!path) return [];
+    if (!path) return null;
 
     let mtimeMs: number;
     try {
-      if (!existsSync(path)) return [];
+      if (!existsSync(path)) return null;
       mtimeMs = statSync(path).mtimeMs;
     } catch {
-      return [];
+      return null;
     }
 
     const cached = this.cache.get(record.id);
-    if (cached && cached.path === path && cached.mtimeMs === mtimeMs) return cached.points;
+    if (cached && cached.path === path && cached.mtimeMs === mtimeMs) return cached;
 
     try {
-      const points = collectPoints(SessionManager.open(path).getEntries());
-      this.cache.set(record.id, { path, mtimeMs, points });
-      return points;
+      const manager = SessionManager.open(path);
+      const entry: CachedSessionUsage = {
+        path,
+        mtimeMs,
+        points: collectPoints(manager.getEntries()),
+        contextTokens: contextTokensOfBranch(manager),
+      };
+      this.cache.set(record.id, entry);
+      return entry;
     } catch (error) {
       // 会话正在写、末行截断等都可能读失败：展示路径不能被打断，沿用上一次结果
       logger.warn({ sessionId: record.id, error }, "读取会话用量失败");
-      return cached?.points ?? [];
+      return cached ?? null;
     }
+  }
+
+  private pointsOf(record: SessionRecord): UsagePoint[] {
+    return this.cachedOf(record)?.points ?? [];
   }
 }

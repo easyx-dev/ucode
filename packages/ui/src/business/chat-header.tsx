@@ -16,8 +16,8 @@ import { Badge } from "../base/badge";
 import { Button } from "../base/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../base/tooltip";
 import { sessionTitle } from "../lib/session";
-import type { ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
-import { formatTokens } from "../lib/usage";
+import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
+import { contextPercent, formatTokens } from "../lib/usage";
 
 type ChatHeaderProps = {
   session: SessionSummary | null;
@@ -34,6 +34,8 @@ type ChatHeaderProps = {
   forkedFromName?: string | null;
   /** 本会话累计 token 用量；无会话或还没有用量时为 null */
   usage?: UsageTotals | null;
+  /** 本会话当前上下文占用；无会话或取不到时为 null，此时回落显示累计用量 */
+  context?: ContextUsage | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
   /** 展开 / 收起侧栏（桌面端常驻，移动端唤出抽屉） */
@@ -54,6 +56,7 @@ export function ChatHeader({
   onOpenForkSource,
   forkedFromName,
   usage,
+  context,
   onOpenUsage,
   onToggleSidebar,
   sidebarCollapsed,
@@ -130,7 +133,7 @@ export function ChatHeader({
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        {usage && usage.totalTokens > 0 && onOpenUsage ? (
+        {onOpenUsage && (context || (usage && usage.totalTokens > 0)) ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -141,7 +144,7 @@ export function ChatHeader({
                 onClick={onOpenUsage}
               >
                 <Gauge className="size-3.5" />
-                {formatTokens(usage.totalTokens)}
+                {context ? `${contextPercent(context)}%` : formatTokens(usage?.totalTokens ?? 0)}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t("使用统计")}</TooltipContent>

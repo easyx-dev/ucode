@@ -13,6 +13,7 @@ export type {
   ConfigTestResponse,
   ConfigView,
   ContextRef,
+  ContextUsage,
   EventName,
   FsEntry,
   FsListRequest,

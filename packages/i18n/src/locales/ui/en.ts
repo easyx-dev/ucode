@@ -423,6 +423,8 @@ export default {
 
   // Usage statistics
   使用统计: "Usage",
+  当前会话上下文占用: "Current session context usage",
+  "{{used}} / {{window}} token": "{{used}} / {{window}} tokens",
   "从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。":
     "Token usage aggregated from local session records; model cost is not included, and subagent / forked sessions are counted.",
   输入: "Input",

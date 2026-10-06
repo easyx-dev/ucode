@@ -225,8 +225,11 @@ describe("UsageService", () => {
     ...over,
   });
 
-  const serviceWith = (records: SessionRecord[]): UsageService =>
-    new UsageService({ list: () => records } as unknown as SessionRepository);
+  const serviceWith = (
+    records: SessionRecord[],
+    contextWindow: number | null = 128000,
+  ): UsageService =>
+    new UsageService({ list: () => records } as unknown as SessionRepository, () => contextWindow);
 
   it("从会话文件聚合单会话用量", () => {
     const service = serviceWith([record()]);
@@ -255,5 +258,103 @@ describe("UsageService", () => {
       summary.bySession.find((entry) => entry.sessionId === "a1")?.deletedAt,
       "2026-02-01T00:00:00.000Z",
     );
+  });
+
+  /** 会话在上下文基准测试里的用量：只用 input 计 token，便于按总量断言 */
+  const usageShape = (totalTokens: number): UsageShape => ({
+    input: totalTokens,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+  });
+
+  /** 在独立目录里造一份只在本次用例里用的会话文件，避免污染共享 fixture 的 mtime 缓存 */
+  const withSessionFile = (
+    sessionId: string,
+    build: (manager: SessionManager) => void,
+  ): { target: SessionRecord; cleanup: () => void } => {
+    const sessionDir = mkdtempSync(join(tmpdir(), "session-context-"));
+    const manager = SessionManager.create("/tmp/usage-project", sessionDir, { id: sessionId });
+    build(manager);
+    const path = manager.getSessionFile();
+    assert.ok(path, "会话应已落盘");
+    return {
+      target: record({ id: sessionId, sourcePath: path }),
+      cleanup: () => rmSync(sessionDir, { recursive: true, force: true }),
+    };
+  };
+
+  const appendAssistant = (
+    manager: SessionManager,
+    over: { timeMs: number; usage: UsageShape; stopReason?: string },
+  ): void => {
+    manager.appendMessage({
+      role: "assistant",
+      provider: "p",
+      model: "m",
+      usage: over.usage,
+      content: [{ type: "text", text: "hi" }],
+      api: "x",
+      stopReason: over.stopReason ?? "stop",
+      timestamp: over.timeMs,
+    } as unknown as Parameters<typeof manager.appendMessage>[0]);
+  };
+
+  it("上下文占用取最近一次回答的用量，窗口由注入的解析器给出", () => {
+    const service = serviceWith([record()]);
+    // fixture 里唯一的一次回答：input 10 + output 2
+    assert.deepEqual(service.contextUsageOf(record()), { tokens: 12, contextWindow: 128000 });
+  });
+
+  it("模型窗口不可知时给不出占用", () => {
+    const service = serviceWith([record()], null);
+    assert.equal(service.contextUsageOf(record()), null);
+  });
+
+  it("压缩后还没出新回答时占用未知，出新一轮回答后按新回答计算", () => {
+    const compacted = withSessionFile("ctx-compacted", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(9000) });
+      manager.appendCompaction("summary", null, 9000);
+    });
+    try {
+      const service = serviceWith([compacted.target]);
+      assert.equal(service.contextUsageOf(compacted.target), null);
+    } finally {
+      compacted.cleanup();
+    }
+
+    const answered = withSessionFile("ctx-answered", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(9000) });
+      manager.appendCompaction("summary", null, 9000);
+      appendAssistant(manager, { timeMs: 2000, usage: usageShape(200) });
+    });
+    try {
+      const service = serviceWith([answered.target]);
+      assert.equal(service.contextUsageOf(answered.target)?.tokens, 200);
+    } finally {
+      answered.cleanup();
+    }
+  });
+
+  it("中断与出错的回答不算有效基准", () => {
+    const aborted = withSessionFile("ctx-aborted", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(300) });
+      appendAssistant(manager, {
+        timeMs: 2000,
+        usage: usageShape(500),
+        stopReason: "aborted",
+      });
+    });
+    try {
+      const service = serviceWith([aborted.target]);
+      assert.equal(service.contextUsageOf(aborted.target)?.tokens, 300);
+    } finally {
+      aborted.cleanup();
+    }
+  });
+
+  it("会话未落盘时给不出占用", () => {
+    const service = serviceWith([record({ sourcePath: null })]);
+    assert.equal(service.contextUsageOf(record({ sourcePath: null })), null);
   });
 });

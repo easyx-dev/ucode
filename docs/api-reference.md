@@ -497,6 +497,7 @@
 | --- | --- | --- | --- |
 | `session` | [SessionSummary](#sessionsummary) | 是 | — |
 | `usage` | [UsageTotals](#usagetotals) | 是 | 本会话累计 token 用量（见 stage-10）；未落盘 / 无用量时为零值 |
+| `contextUsage` | [ContextUsage](#contextusage) \| null | 是 | 本会话当前上下文占用；判断依据不足时为空——未落盘、模型窗口不可知、压缩后还没出新一轮回答。 |
 | `goal` | [GoalView](#goalview) \| null | 是 | 当前会话目标（见 plans/stage-11-goal.md）；未设置或已清除时为空 |
 
 ### POST /api/v1/sessions/update
@@ -1258,6 +1259,13 @@
 | `cacheReadTokens` | number | 是 | — |
 | `cacheWriteTokens` | number | 是 | — |
 | `totalTokens` | number | 是 | — |
+
+### ContextUsage
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `tokens` | number | 是 | 上下文里的 token 数 |
+| `contextWindow` | number | 是 | 该会话当前生效模型的上下文窗口 |
 
 ### GoalView
 

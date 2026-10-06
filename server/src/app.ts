@@ -78,7 +78,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
   const permissions = new SessionAllowStore();
-  const usage = new UsageService(sessions);
+  const usage = new UsageService(sessions, (ref) => runtime.contextWindowOf(ref));
   const memory = new MemoryService(() => config.get().memory);
   const goals = new GoalService(sessions, usage, events);
   const pool = new SessionPool(

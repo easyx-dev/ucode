@@ -2,7 +2,7 @@
 import type { ListResult, SessionScoped } from "../common";
 import type { PermissionMode, ThinkingLevel } from "../constants";
 import type { GoalView } from "../goals/output";
-import type { UsageTotals } from "../stats/output";
+import type { ContextUsage, UsageTotals } from "../stats/output";
 
 export type SessionSummary = {
   id: string;
@@ -49,6 +49,10 @@ export type SessionInfoResponse = {
   session: SessionSummary;
   /** 本会话累计 token 用量（见 stage-10）；未落盘 / 无用量时为零值 */
   usage: UsageTotals;
+  /**
+   * 本会话当前上下文占用；判断依据不足时为空——未落盘、模型窗口不可知、压缩后还没出新一轮回答。
+   */
+  contextUsage: ContextUsage | null;
   /** 当前会话目标（见 plans/stage-11-goal.md）；未设置或已清除时为空 */
   goal: GoalView | null;
 };

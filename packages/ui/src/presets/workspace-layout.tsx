@@ -437,7 +437,8 @@ export function WorkspaceLayout({
           forkedFromName={forkSourceName}
           goal={goal.goal}
           onGoalCommand={runGoalCommand}
-          usage={sessionUsage}
+          usage={sessionUsage.usage}
+          context={sessionUsage.context}
           onOpenUsage={() => setUsageOpen(true)}
           onBackToParent={() => {
             const parentId = activeSession?.parentSessionId;
@@ -464,7 +465,12 @@ export function WorkspaceLayout({
           }
         />
 
-        <UsageDialog open={usageOpen} onOpenChange={setUsageOpen} onOpenSession={setActiveId} />
+        <UsageDialog
+          open={usageOpen}
+          onOpenChange={setUsageOpen}
+          onOpenSession={setActiveId}
+          context={sessionUsage.context}
+        />
 
         <RenameSessionDialog
           target={renaming}

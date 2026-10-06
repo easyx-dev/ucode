@@ -184,8 +184,9 @@
   - 客户端用 `messages/list` 返回的快照 `seq` 切分：丢弃 `seq <= 快照 seq` 的帧，接续其余帧
   - 除消息流（`message_*` / `tool_*` / `queue_update` / `compaction_*`）外，会话列表的增改删也走这里：
     - `session_created`：载荷 `SessionSummary`，新建 / 分叉 / 子智能体创建
-    - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals }`，改名 / 换模型 /
-      置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
+    - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals, contextUsage?: ContextUsage | null }`，改名 / 换模型 /
+      置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
+      模式），`contextUsage` 与它同帧
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
   - `transcript_reset`：载荷 `{ fromEntryId }`，编辑重发或追加界面标记后活动分支 / 历史已改变，
     客户端应重取快照；它不参与 `seq` 切分（收到即整表重取）

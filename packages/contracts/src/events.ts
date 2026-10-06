@@ -12,8 +12,9 @@ import type { McpListResponse } from "./mcp/output";
  * - `subagent_start` / `subagent_end`：子智能体与父会话 toolCall 的关联
  * - `goal_update`：`GoalView | null`
  * - `session_created`：`SessionSummary`，新建 / 分叉 / 子智能体创建
- * - `session_updated`：`{ session: SessionSummary; usage?: UsageTotals }`，
- *   改名 / 换模型 / 落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
+ * - `session_updated`：`{ session: SessionSummary; usage?: UsageTotals; contextUsage?: ContextUsage | null }`，
+ *   改名 / 换模型 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
+ *   模式），`contextUsage` 与它同帧
  * - `session_archived`：`{ sessionId }`，归档（级联子会话逐个下发）
  */
 export const EVENT_NAMES = [

@@ -362,7 +362,7 @@ SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 | `queue_update` | `{ steering, followUp }` | 生成中排队情况 |
 | `compaction_start` / `compaction_end` | `{ reason? }` | 上下文压缩 |
 | `session_created` | `SessionSummary` | 新建 / 分叉 / 子智能体创建 |
-| `session_updated` | `{ session: SessionSummary, usage? }` | 改名 / 换模型 / 落定后摘要刷新 / 运行态变化 |
+| `session_updated` | `{ session: SessionSummary, usage?, contextUsage? }` | 改名 / 换模型 / 落定后摘要刷新 / 运行态变化 |
 | `session_archived` | `{ sessionId }` | 归档（级联子会话逐个下发） |
 | `agent_settled` | `{}` | 本次运行结束 |
 

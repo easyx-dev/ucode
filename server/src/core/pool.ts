@@ -124,7 +124,7 @@ export class SessionPool {
     );
   }
 
-  /** 下发摘要变更；`withUsage` 用于落定后（累计用量此时才写入口径） */
+  /** 下发摘要变更；`withUsage` 用于落定后（累计用量与上下文占用此时才写入口径） */
   private emitUpdated(sessionId: string, withUsage = false): void {
     const session = this.summaryOf(sessionId);
     if (!session) return;
@@ -133,10 +133,17 @@ export class SessionPool {
       return;
     }
     const record = this.repository.find(sessionId);
-    const usage = record
-      ? this.usage.usageOf(record, { live: this.entries.get(sessionId)?.session })
-      : undefined;
-    this.events.emitSessionUpdated(sessionId, session, usage);
+    if (!record) {
+      this.events.emitSessionUpdated(sessionId, session);
+      return;
+    }
+    const live = this.entries.get(sessionId)?.session;
+    this.events.emitSessionUpdated(
+      sessionId,
+      session,
+      this.usage.usageOf(record, { live }),
+      this.usage.contextUsageOf(record, { live }),
+    );
   }
 
   /** 子会话创建成功后下发，供列表与导航插入新行 */

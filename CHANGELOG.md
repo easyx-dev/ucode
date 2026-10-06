@@ -35,6 +35,10 @@
 
 ### 新增
 
+- 会话上下文占用：`SessionInfoResponse` 与 `session_updated` 事件增加 `contextUsage`（当前上下文的 token 数与
+  模型窗口；压缩后未出新回答、模型窗口不可知、会话未落盘时为空）。池内会话直接读 pi 的内存投影，
+  离线会话按会话文件 mtime 缓存解析；web 头部用量徽标改显示占用百分比（取不到时回落累计 token），
+  点开的使用统计顶部补上本会话明细。
 - 生产构建与启动：新增 `server/src/cli.ts`（命令行入口）与 `scripts/build-cli.mjs`（esbuild 把
   server + CLI 打成单文件 `dist/ucode.js`）；`pnpm build` 同时构建 web（`apps/web/dist`）与 server 产物，
   `pnpm start` 改为 `NODE_ENV=production node dist/ucode.js`（不再经 tsx 直接跑源码）。CLI 提供

@@ -9,6 +9,7 @@
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type {
+  ContextUsage,
   EventName,
   ServerControlEvent,
   ServerEvent,
@@ -85,13 +86,22 @@ export class SessionEventBus {
     this.publish({ type, sessionId, seq: this.nextSeq(sessionId), data });
   }
 
-  /** 会话摘要增 / 改 / 删的统一下发点；`usage` 仅在实际变化时带上 */
+  /** 会话摘要增 / 改 / 删的统一下发点；`usage` 在需要客户端重算占用时带上，`contextUsage` 与它同帧 */
   emitSessionCreated(sessionId: string, session: SessionSummary): void {
     this.emitFrame(sessionId, "session_created", session);
   }
 
-  emitSessionUpdated(sessionId: string, session: SessionSummary, usage?: UsageTotals): void {
-    this.emitFrame(sessionId, "session_updated", usage ? { session, usage } : { session });
+  emitSessionUpdated(
+    sessionId: string,
+    session: SessionSummary,
+    usage?: UsageTotals,
+    contextUsage?: ContextUsage | null,
+  ): void {
+    this.emitFrame(
+      sessionId,
+      "session_updated",
+      usage ? { session, usage, contextUsage: contextUsage ?? null } : { session },
+    );
   }
 
   emitSessionArchived(sessionId: string): void {

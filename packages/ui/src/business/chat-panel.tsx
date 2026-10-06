@@ -13,6 +13,7 @@ import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
 import { isWorkspaceSession } from "../lib/session-groups";
 import {
   type ChatItem,
+  type ContextUsage,
   DEFAULT_PERMISSION_MODE,
   type GoalView,
   type ModelsResponse,
@@ -71,6 +72,8 @@ type ChatPanelProps = {
   onBuiltin: (id: BuiltinCommandId) => void;
   /** 本会话累计 token 用量；用于头部徽标 */
   usage?: UsageTotals | null;
+  /** 本会话当前上下文占用；取不到时头部回落显示累计用量 */
+  context?: ContextUsage | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
   /** 从子会话视图返回父会话 */
@@ -106,6 +109,7 @@ export function ChatPanel({
   onGoalCommand,
   onBuiltin,
   usage,
+  context,
   onOpenUsage,
   onBackToParent,
   planReady,
@@ -192,6 +196,7 @@ export function ChatPanel({
         onOpenForkSource={onOpenSession}
         forkedFromName={forkedFromName}
         usage={usage}
+        context={context}
         onOpenUsage={onOpenUsage}
       />
 
