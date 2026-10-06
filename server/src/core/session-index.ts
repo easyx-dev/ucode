@@ -6,7 +6,7 @@
  */
 import { existsSync } from "node:fs";
 import type { SessionEntry, SessionInfo, SessionManager } from "@earendil-works/pi-coding-agent";
-import { workspaceDirOf } from "../agent/workspace";
+import { workspaceDirOf } from "../harness/workspace";
 import type { SessionIndex, SessionRecord } from "../db/session-repository";
 import { isRecord } from "../utils/object";
 

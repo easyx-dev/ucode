@@ -10,7 +10,7 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../agent/mcp";
+import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../harness/mcp";
 import type { Services } from "../../app";
 import { ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";

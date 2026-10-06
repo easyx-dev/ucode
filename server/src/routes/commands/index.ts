@@ -7,8 +7,8 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { loadCommandAssets } from "../../agent/assets";
-import { resolveSessionCwd } from "../../agent/session-config";
+import { loadCommandAssets } from "../../harness/assets";
+import { resolveSessionCwd } from "../../harness/session-config";
 import type { Services } from "../../app";
 import { env } from "../../env";
 import { AppError, ok } from "../../lib/response";

@@ -9,7 +9,7 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { buildGoalKickoff, buildGoalResume } from "../../agent/goal/prompt";
+import { buildGoalKickoff, buildGoalResume } from "../../harness/goal/prompt";
 import type { Services } from "../../app";
 import { admitGoalRun } from "../../core/run";
 import { AppError, ok } from "../../lib/response";

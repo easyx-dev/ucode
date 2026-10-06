@@ -16,8 +16,8 @@ import {
   PRIMARY_PROFILES,
   SUBAGENT_PROFILES,
   SUBAGENT_SLUGS,
-} from "../../agent/agents";
-import { resolveSessionCwd } from "../../agent/session-config";
+} from "../../harness/agents";
+import { resolveSessionCwd } from "../../harness/session-config";
 import type { Services } from "../../app";
 import { env } from "../../env";
 import { AppError, ok } from "../../lib/response";

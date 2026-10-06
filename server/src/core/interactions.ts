@@ -19,7 +19,7 @@ import type {
   QuestionItem,
 } from "@ucode/contracts";
 
-import type { PermissionAsk } from "../agent/permissions";
+import type { PermissionAsk } from "../harness/permissions";
 import { PERMISSION_APPROVAL_TIMEOUT_MS, QUESTION_TIMEOUT_MS } from "../constants";
 import type { SessionEventBus } from "./event-bus";
 

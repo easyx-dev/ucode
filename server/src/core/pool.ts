@@ -17,15 +17,15 @@ import {
   resolveSubagentCapability,
   subagentProfile,
   usesDefaultToolSet,
-} from "../agent/agents";
-import type { GoalService } from "../agent/goal";
-import type { PromptImage } from "../agent/image";
-import type { MemoryService } from "../agent/memory";
-import type { PermissionRule, SessionAllowStore } from "../agent/permissions";
-import { buildSessionOptions, resolveSessionCwd } from "../agent/session-config";
-import { type SubagentHooks, spawnSubagent } from "../agent/subagents";
-import type { UsageService } from "../agent/usage";
-import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../agent/workspace";
+} from "../harness/agents";
+import type { GoalService } from "../harness/goal";
+import type { PromptImage } from "../harness/image";
+import type { MemoryService } from "../harness/memory";
+import type { PermissionRule, SessionAllowStore } from "../harness/permissions";
+import { buildSessionOptions, resolveSessionCwd } from "../harness/session-config";
+import { type SubagentHooks, spawnSubagent } from "../harness/subagents";
+import type { UsageService } from "../harness/usage";
+import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
 import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { env } from "../env";

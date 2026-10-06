@@ -16,8 +16,8 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { isAttachmentId, putAttachment, resolveAttachment } from "../../agent/attachment";
-import { storeImage } from "../../agent/image";
+import { isAttachmentId, putAttachment, resolveAttachment } from "../../harness/attachment";
+import { storeImage } from "../../harness/image";
 import type { Services } from "../../app";
 import { AppError, ok } from "../../lib/response";
 

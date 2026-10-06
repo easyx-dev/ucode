@@ -1,11 +1,11 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置热重载的编排 */
 import type { AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
 import { ERROR_CODES } from "@ucode/contracts";
-import { expireTempAttachments } from "./agent/attachment";
-import { GoalService } from "./agent/goal";
-import { MemoryService } from "./agent/memory";
-import { SessionAllowStore } from "./agent/permissions";
-import { UsageService } from "./agent/usage";
+import { expireTempAttachments } from "./harness/attachment";
+import { GoalService } from "./harness/goal";
+import { MemoryService } from "./harness/memory";
+import { SessionAllowStore } from "./harness/permissions";
+import { UsageService } from "./harness/usage";
 import { ConfigStore, publicConfig } from "./config/store";
 import {
   ATTACHMENT_SWEEP_INTERVAL_MS,

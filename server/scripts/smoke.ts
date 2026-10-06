@@ -20,7 +20,7 @@ import {
 
 import type { ThinkingLevel } from "@ucode/contracts";
 
-import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../src/agent/tools/index";
+import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../src/harness/tools/index";
 import { createLocalGateway } from "./lib/local-gateway";
 
 const args = process.argv.slice(2);

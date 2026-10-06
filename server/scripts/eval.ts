@@ -25,7 +25,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { SessionMode } from "@ucode/contracts";
 
-import { buildSessionOptions } from "../src/agent/session-config";
+import { buildSessionOptions } from "../src/harness/session-config";
 import { PROMPT_SOURCES, type PromptSource } from "../src/constants";
 import type { PiRuntime } from "../src/core/runtime";
 import { env } from "../src/env";
@@ -81,7 +81,7 @@ const CASES: EvalCase[] = [
   {
     name: "list-files",
     mode: "build",
-    prompt: "列出 server/src/agent/prompt/locales 下的所有文件路径。",
+    prompt: "列出 server/src/harness/prompt/locales 下的所有文件路径。",
     toolsAny: ["find", "ls", "grep"],
     textAny: ["zh-CN"],
   },

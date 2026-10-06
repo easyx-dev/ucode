@@ -20,10 +20,10 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import { hasPrimaryMode, loadAgentRegistry } from "../../agent/agents";
-import { createForkedSessionFile, resolveForkSource } from "../../agent/fork";
-import { resolveSessionCwd } from "../../agent/session-config";
-import { workspaceDirOf } from "../../agent/workspace";
+import { hasPrimaryMode, loadAgentRegistry } from "../../harness/agents";
+import { createForkedSessionFile, resolveForkSource } from "../../harness/fork";
+import { resolveSessionCwd } from "../../harness/session-config";
+import { workspaceDirOf } from "../../harness/workspace";
 import type { Services } from "../../app";
 import { draftSessionSummary, sessionInfoToDTO } from "../../core/serialize";
 import { assertModel, createSession } from "../../core/session";

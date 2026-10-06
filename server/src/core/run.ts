@@ -6,11 +6,11 @@ import {
   type MessageEditInput,
   type PromptInput,
 } from "@ucode/contracts";
-import { resolveAttachment } from "../agent/attachment";
-import { expandContexts } from "../agent/context";
-import { resolveEditableUserEntry } from "../agent/edit";
-import { type PromptImage, toPromptImage } from "../agent/image";
-import { resolveSessionCwd } from "../agent/session-config";
+import { resolveAttachment } from "../harness/attachment";
+import { expandContexts } from "../harness/context";
+import { resolveEditableUserEntry } from "../harness/edit";
+import { type PromptImage, toPromptImage } from "../harness/image";
+import { resolveSessionCwd } from "../harness/session-config";
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
 import { sleep } from "../utils/time";

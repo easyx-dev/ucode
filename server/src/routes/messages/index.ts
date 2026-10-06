@@ -15,7 +15,7 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { resolveSessionCwd } from "../../agent/session-config";
+import { resolveSessionCwd } from "../../harness/session-config";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
 import { admitCompact, admitEdit, admitPrompt } from "../../core/run";

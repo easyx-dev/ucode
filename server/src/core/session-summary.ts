@@ -5,7 +5,7 @@
  */
 import type { SessionSummary, ThinkingLevel } from "@ucode/contracts";
 
-import { workspaceDirOf } from "../agent/workspace";
+import { workspaceDirOf } from "../harness/workspace";
 import { overrideOf, type SessionRepository } from "../db/session-repository";
 import { draftSessionSummary, sessionInfoToDTO } from "./serialize";
 import { infoFromRecord } from "./session-index";
