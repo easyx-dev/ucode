@@ -31,6 +31,7 @@
 | POST | `/api/v1/config/info` | 当前配置（apiKey 脱敏）与运行时状态 |
 | POST | `/api/v1/config/update` | 局部更新配置并热重载 |
 | POST | `/api/v1/config/test` | 按给定端点做一次连通性测试 |
+| POST | `/api/v1/config/fetch-models` | 按 provider 端点拉模型列表并推断各项能力 |
 | POST | `/api/v1/sessions/list` | 会话列表，可按名称搜索、按父子过滤 |
 | POST | `/api/v1/sessions/create` | 新建会话（首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | 会话详情 + 用量 + 当前目标 |
@@ -422,6 +423,28 @@
 | `modelEcho` | string \| null | 是 | 上游回显的模型 id，未回显时为 null |
 | `url` | string | 是 | 实际请求的 chat/completions 地址 |
 
+### POST /api/v1/config/fetch-models
+
+按 provider 端点拉模型列表并推断各项能力
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `providerId` | string（长度≥1） | 否 | — | 对应已保存的 provider；用于回落 apiKey，并作为能力推断的比对来源 |
+| `baseUrl` | string（长度≥1） | 是 | — | 上游端点根地址，末尾斜杠会被去掉后拼 `/models` |
+| `apiKey` | string | 否 | — | 留空时回落到 providerId 已保存的 key |
+| `api` | "openai-completions" \| "openai-responses" \| "anthropic-messages" \| "google-generative-ai" \| "mistral-conversations" \| "azure-openai-responses" \| "openai-codex-responses" \| "bedrock-converse-stream" \| "google-vertex" \| "pi-messages" | 否 | `openai-completions` | — |
+
+**响应类型**：`ProviderModelsResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `url` | string | 是 | 实际请求的 `/models` 地址 |
+| `latencyMs` | number | 是 | 上游响应耗时 |
+| `models` | [ProviderModelSuggestion](#providermodelsuggestion)[] | 是 | — |
+| `truncated` | boolean | 是 | 上游返回条数超过上限，只回了前面一段 |
+
 ## 会话（`sessions`）
 
 ### POST /api/v1/sessions/list
@@ -477,6 +500,7 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -535,6 +559,7 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -585,6 +610,7 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -620,6 +646,7 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -789,7 +816,7 @@
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `requestId` | string | 是 | — |
-| `resolved` | boolean | 是 | 是否命中一条待回答请求并已生效；重复回答或已超时则为 false |
+| `resolved` | boolean | 是 | 是否命中一条待回答请求并已生效；重复回答或请求已失效（本轮中断 / 会话归档）则为 false |
 
 ## 文件系统（`fs`）
 
@@ -1105,6 +1132,11 @@
 | `toolCalls` | number | 是 | assistant 消息里的工具调用总数 |
 | `byModel` | [ModelUsage](#modelusage)[] | 是 | — |
 | `bySession` | [SessionUsageEntry](#sessionusageentry)[] | 是 | — |
+| `daily` | [UsageDayBucket](#usagedaybucket)[] | 是 | 区间内的逐日用量；与 `total` 同口径，求和等于 `total.totalTokens` |
+| `weekly` | [UsageWeekBucket](#usageweekbucket)[] | 是 | 区间内的逐周用量，由逐日结果按周一归并 |
+| `streak` | [UsageStreak](#usagestreak) | 是 | 活跃度与连续天数（全量历史） |
+| `peak` | [UsagePeakDay](#usagepeakday) \| null | 是 | 区间内的峰值日；区间内没有用量时为 null |
+| `longestSessionMs` | number | 是 | 区间内「单会话最长聊天时长」（毫秒）：会话内相邻调用间隔不超过 30 分钟算同一段， 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。 |
 
 ## 事件流
 
@@ -1227,6 +1259,19 @@
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
 
+### ProviderModelSuggestion
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `name` | string | 是 | 上游给出的展示名，没给则回落为 id |
+| `reasoning` | boolean | 是 | 是否支持思考（推断） |
+| `vision` | boolean | 是 | 是否接受图片输入（推断） |
+| `contextWindow` | number | 是 | 上下文窗口（推断） |
+| `maxTokens` | number | 是 | 单次输出上限（推断） |
+| `capabilitySource` | "default" \| "configured" \| "upstream" \| "catalog" \| "heuristic" | 是 | 上述能力的取值来源 |
+| `configured` | boolean | 是 | 是否已存在于该 provider 的配置里（按 id 比对） |
+
 ### SessionSummary
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1246,6 +1291,7 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -1411,6 +1457,37 @@
 | `kind` | "primary" \| "subagent" \| "forked" | 是 | — |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档，统计里仍计入，但界面不应再打开该会话 |
 | `totals` | [UsageTotals](#usagetotals) | 是 | — |
+
+### UsageDayBucket
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `totals` | [UsageTotals](#usagetotals) | 是 | — |
+| `messages` | number | 是 | 该桶内的调用次数（有 usage 的条目数），界面上记为「轮消息」；工具次数不计入 |
+| `date` | string | 是 | — |
+
+### UsageWeekBucket
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `totals` | [UsageTotals](#usagetotals) | 是 | — |
+| `messages` | number | 是 | 该桶内的调用次数（有 usage 的条目数），界面上记为「轮消息」；工具次数不计入 |
+| `weekStart` | string | 是 | — |
+
+### UsageStreak
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `current` | number | 是 | 当前连续天数：最新活跃日为今天或昨天时从该日往回数，否则为 0 |
+| `longest` | number | 是 | 历史最长连续天数 |
+| `activeDays` | number | 是 | 有活动（至少一个用量点）的天数 |
+
+### UsagePeakDay
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `date` | string | 是 | — |
+| `totalTokens` | number | 是 | — |
 
 ### ConfigSnapshot
 

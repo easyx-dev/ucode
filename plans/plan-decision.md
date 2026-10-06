@@ -6,7 +6,7 @@
 > 参考：pi `SessionManager`（1.0.2，`dist/core/session-manager.d.ts` 的 `appendCustomEntry` / `CustomEntry` /
 > `buildContextEntries`）；opencode v2（计划模式写文件、持久决策落项目级规则，均不宜照搬，见第十节）。
 >
-> 状态：**未开始**（待实现）。评审确认的取舍：**忽略 = 会话文件里追加一条可见的界面标记条目**，
+> 状态：**已完成**。评审确认的取舍：**忽略 = 会话文件里追加一条可见的界面标记条目**，
 > 不新增 DB 列、不新增事件、不引入旁路状态。
 
 ## 一、背景与目标

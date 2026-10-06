@@ -5,7 +5,8 @@
 > 参考实现：opencode web 的 `packages/app/src/components/prompt-input/`（编辑器、附件、draft store）与
 > `packages/opencode/src/image/image.ts`（图片归一化）。
 >
-> 状态：**未开始**；落地后在此补「复盘」。
+> 状态：**已完成**：编辑器、命令 / 技能菜单、图片与附件（走服务端临时附件换 id）都已落地，
+> 逐项变化见 `CHANGELOG.md`。
 
 ## 一、目标与范围
 

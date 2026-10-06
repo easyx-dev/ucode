@@ -4,7 +4,7 @@
 > 内置命令、自定义 primary agent、技能权限等 P0 决策。
 > 底层复用 pi SDK 的 Skills / Prompt Templates / `DefaultResourceLoader`，不重写；
 > 前端输入区按 Tiptap 方案实施。
-> 状态：**未开始**；落地后在此补「复盘」。
+> 状态：**已完成**：内置命令、自定义提示词命令与技能、附件上传都已落地，逐项变化见 `CHANGELOG.md`。
 
 ## 一、目标与范围
 

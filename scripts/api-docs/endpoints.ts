@@ -184,6 +184,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     output: "ConfigTestResponse",
     summary: "按给定端点做一次连通性测试",
   },
+  {
+    domain: "config",
+    action: "fetch-models",
+    method: "POST",
+    input: "providerModelsInputSchema",
+    requestType: "ProviderModelsInput",
+    output: "ProviderModelsResponse",
+    summary: "按 provider 端点拉模型列表并推断各项能力",
+  },
 
   {
     domain: "sessions",

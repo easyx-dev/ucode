@@ -4,7 +4,8 @@
 > 参考：[opencode `task`](https://opencode.ai/docs/agents/) 与 [pi-subagents](https://pi.dev/packages/pi-subagents)。
 > 本文只覆盖子智能体；goal 模式、7d（统计 / 编辑历史）、会话分叉不在此文（分叉只在「口子」一节交叉引用）。
 >
-> 状态：**设计已定稿**，按 7c-1a ~ 7c-1d 分阶段执行；7c-1a 已完成（`a4271e6`）。
+> 状态：**已完成**（7c-1a ~ 7c-1d-b；7c-1d-c 暂缓，不放开嵌套），进度以母文档
+> [`agent-tools-and-modes.md`](./agent-tools-and-modes.md) 的进度表为准。
 
 ## 一、核心原理（已确认）
 
