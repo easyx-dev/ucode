@@ -1,6 +1,6 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
-import type { PermissionMode, ThinkingLevel } from "../constants";
+import type { PermissionMode, SessionStatus, ThinkingLevel } from "../constants";
 import type { GoalView } from "../goals/output";
 import type { ContextUsage, UsageTotals } from "../stats/output";
 
@@ -33,6 +33,12 @@ export type SessionSummary = {
   childCount: number;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
+  /**
+   * 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。
+   * 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、
+   * 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。
+   */
+  status: SessionStatus;
   /** 置顶时间；非空表示置顶，排序时置顶项排在组内最前 */
   pinnedAt: string | null;
   /** 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 */

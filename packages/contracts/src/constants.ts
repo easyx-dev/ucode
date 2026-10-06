@@ -120,6 +120,24 @@ export type PermissionMode = (typeof PERMISSION_MODES)[number];
 export const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
 
 /**
+ * 会话的对外状态（`SessionSummary.status`）：侧栏与通知据此展示中间态。
+ *
+ * `idle` 已完成 / `running` 生成中 / `waiting_*` 等待用户输入（按挂起请求的类别细分）/
+ * `error` 本轮出错。与 `running` 的分工：`running` 是「有活跃生成」的粗粒度布尔，
+ * 等待授权或回答时仍为真（这一轮并未释放），`status` 才是需要用户动作的那几个态。
+ */
+export const SESSION_STATUSES = [
+  "idle",
+  "running",
+  "waiting_permission",
+  "waiting_question",
+  "waiting_plan",
+  "error",
+] as const;
+
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+/**
  * 联网搜索服务商：websearch 工具的可选实现，顺序即设置页的展示顺序。
  * 每家在 server 侧对应一个 `SearchProvider`（端点、鉴权与响应映射都不同）。
  */

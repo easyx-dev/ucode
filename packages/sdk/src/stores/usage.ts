@@ -41,6 +41,9 @@ export const createUsageStore = (deps: { apis: Apis; events: EventStream }): Usa
     contextBySession: {},
   });
 
+  /** 汇总请求的自增序号：快速切时间范围时，只有最后一次请求的结果能落地 */
+  let statsRequest = 0;
+
   deps.events.onEvent((frame) => {
     if (frame.type !== "session_updated") return;
     const { usage, contextUsage } = frame.data as {
@@ -60,14 +63,22 @@ export const createUsageStore = (deps: { apis: Apis; events: EventStream }): Usa
     getState: store.getState,
     subscribe: store.subscribe,
     async loadStats(days) {
+      statsRequest += 1;
+      const request = statsRequest;
       store.setState((prev) => ({ ...prev, statsLoading: true }));
       try {
         const stats = await deps.apis.stats.summary(days ? { days } : {});
+        // 晚到的旧响应直接丢弃：否则顶部显示「近 7 天」而数据是上一次的
+        if (request !== statsRequest) return;
         store.setState((prev) => ({ ...prev, stats, error: null }));
       } catch (error) {
+        if (request !== statsRequest) return;
         store.setState((prev) => ({ ...prev, error: asApiError(error) }));
       } finally {
-        store.setState((prev) => ({ ...prev, statsLoading: false }));
+        // 加载态只由最后一次请求收尾，避免先返回的那次把 spinner 提前摘掉
+        if (request === statsRequest) {
+          store.setState((prev) => ({ ...prev, statsLoading: false }));
+        }
       }
     },
     getSession: (sessionId) => (sessionId ? (store.getState().bySession[sessionId] ?? null) : null),

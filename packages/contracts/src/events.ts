@@ -13,8 +13,8 @@ import type { McpListResponse } from "./mcp/output";
  * - `goal_update`：`GoalView | null`
  * - `session_created`：`SessionSummary`，新建 / 分叉 / 子智能体创建
  * - `session_updated`：`{ session: SessionSummary; usage?: UsageTotals; contextUsage?: ContextUsage | null }`，
- *   改名 / 换模型 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
- *   模式），`contextUsage` 与它同帧
+ *   改名 / 换模型 / 落定后摘要刷新 / 运行态与状态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
+ *   模式），`contextUsage` 与它同帧。状态变化（`status`）由服务端给出，`running` 与它可能同时为真
  * - `session_archived`：`{ sessionId }`，归档（级联子会话逐个下发）
  */
 export const EVENT_NAMES = [

@@ -3,6 +3,7 @@
  *
  * 初始取一次 `sessions/list`，之后由 `session_created` / `session_updated` / `session_archived`
  * 事件驱动，不再轮询；子会话按父级懒加载，事件到达时只更新已加载的父级。
+ * `transcript_reset`（忽略计划、编辑重发）不随摘要帧下发，那里按需重取单条会话。
  */
 import type {
   PermissionMode,
@@ -140,13 +141,29 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     return data.sessions;
   };
 
+  /**
+   * 重取单条会话的摘要。
+   *
+   * 有些写点服务端不补 `session_updated`（忽略计划、编辑重发都会换活动分支，只发 `transcript_reset`），
+   * 而它们会改变状态（如「等待计划确认」）——只能按需重取一次。
+   */
+  const refreshSummary = async (sessionId: string): Promise<void> => {
+    try {
+      const data = await deps.apis.sessions.info(sessionId);
+      if (data.session.parentSessionId) upsertChild(data.session);
+      else upsertRoot(data.session);
+    } catch {
+      // 会话已消失（归档 / 删除）：交给 session_archived 或下一次列表刷新收敛
+    }
+  };
+
   const refresh = async (): Promise<void> => {
     setState((prev) => ({ ...prev, loading: true }));
     try {
       const data = await deps.apis.sessions.list({ limit: LIST_LIMIT });
       setState((prev) => ({ ...prev, list: sortSessions(data.sessions), error: null }));
 
-      // 已展开的父会话随根列表一起刷新：一轮委派结束后新子会话据此出现。
+      // 已展开的父会话随根列表一起刷新：一轮委派结束后新子会话据此出现
       // 单个父级拉取失败不影响根列表，沿用上一次的子会话缓存
       const parents = [...loadedParents];
       const refreshed = await Promise.all(
@@ -245,13 +262,17 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
         removeSession((frame.data as { sessionId: string }).sessionId);
         return;
       }
+      case "transcript_reset": {
+        void refreshSummary(frame.sessionId);
+        return;
+      }
       default:
         return;
     }
   });
 
-  // 重连补快照：断流期间的 session_created/updated/archived 会丢失，重连后重取列表补齐。
-  // 首连与创建时的 refresh 重合，跳过。
+  // 重连补快照：断流期间的 session_created/updated/archived 会丢失，重连后重取列表补齐
+  // 首连与创建时的 refresh 重合，跳过
   let connectedOnce = false;
   deps.events.onConnected(() => {
     if (!connectedOnce) {

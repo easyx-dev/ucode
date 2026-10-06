@@ -41,6 +41,8 @@ import type {
   PairingCreateOutput,
   PromptAdmittedResponse,
   PromptRequest,
+  ProviderModelsRequest,
+  ProviderModelsResponse,
   ServerEvent,
   ServerInfoResponse,
   ServiceHostRequest,
@@ -112,6 +114,8 @@ export const createApis = (options: ApisOptions = {}) => {
       update: (patch: AppConfigPatchRequest) =>
         transport.post<ConfigSnapshot>("config/update", patch),
       test: (input: ConfigTestRequest) => transport.post<ConfigTestResponse>("config/test", input),
+      fetchModels: (input: ProviderModelsRequest) =>
+        transport.post<ProviderModelsResponse>("config/fetch-models", input),
     },
     sessions: {
       list: (body: SessionListRequest) =>

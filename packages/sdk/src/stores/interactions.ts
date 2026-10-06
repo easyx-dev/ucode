@@ -108,7 +108,7 @@ export const createInteractionsStore = (deps: {
           break;
         }
       }
-      // 先本地移除，避免重复点击；失败或超时由 resolved 事件兜底
+      // 先本地移除，避免重复点击；失败或请求失效由 resolved 事件兜底
       store.setState((prev) => {
         const pending = withoutRequest(prev.pending, input.requestId);
         return pending === prev.pending ? prev : { ...prev, pending };

@@ -55,6 +55,6 @@ export type InteractionListResponse = {
 
 export type InteractionRespondResponse = {
   requestId: string;
-  /** 是否命中一条待回答请求并已生效；重复回答或已超时则为 false */
+  /** 是否命中一条待回答请求并已生效；重复回答或请求已失效（本轮中断 / 会话归档）则为 false */
   resolved: boolean;
 };

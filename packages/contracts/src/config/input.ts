@@ -172,6 +172,20 @@ export const configTestSchema = z.object({
   model: z.string().min(1),
 });
 
+/**
+ * 按 provider 端点拉取可用模型列表：面向「还没保存的 provider 表单」，
+ * 所以 baseUrl / apiKey 都由请求带来，缺 key 时回落到同 id 已保存的 provider。
+ */
+export const providerModelsInputSchema = z.object({
+  /** 对应已保存的 provider；用于回落 apiKey，并作为能力推断的比对来源 */
+  providerId: z.string().min(1).optional(),
+  /** 上游端点根地址，末尾斜杠会被去掉后拼 `/models` */
+  baseUrl: z.string().min(1),
+  /** 留空时回落到 providerId 已保存的 key */
+  apiKey: z.string().optional(),
+  api: z.enum(API_TYPES).default("openai-completions"),
+});
+
 export type AppConfig = z.infer<typeof appConfigSchema>;
 export type AppConfigPatchInput = z.infer<typeof appConfigPatchSchema>;
 /** 客户端发送的配置更新载荷（模型字段的默认值可省） */
@@ -183,3 +197,6 @@ export type MemoryConfig = z.infer<typeof memorySchema>;
 export type ConfigTestInput = z.infer<typeof configTestSchema>;
 /** 客户端发送的连通性测试载荷（api 默认 openai-completions，可省） */
 export type ConfigTestRequest = z.input<typeof configTestSchema>;
+export type ProviderModelsInput = z.infer<typeof providerModelsInputSchema>;
+/** 客户端发送的模型列表拉取载荷（api / apiKey 可省） */
+export type ProviderModelsRequest = z.input<typeof providerModelsInputSchema>;
