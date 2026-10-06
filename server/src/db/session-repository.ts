@@ -36,6 +36,10 @@ export type SessionOverride = {
   agent?: string;
   /** 会话分叉自哪个会话（只读派生，不参与 upsert） */
   forkedFromId?: string;
+  /** 置顶时间；非空即置顶（只读派生，不参与 upsert） */
+  pinnedAt?: string;
+  /** 上次打开（标记已读）时间（只读派生，不参与 upsert） */
+  lastReadAt?: string;
   /** 归档时间；非空表示已归档（软删） */
   deletedAt?: string;
 };
@@ -73,6 +77,10 @@ export type SessionRecord = {
   preview: string;
   createdAt: string;
   updatedAt: string;
+  /** 置顶时间；非空即置顶 */
+  pinnedAt: string | null;
+  /** 上次打开（标记已读）时间；用于未读判定 */
+  lastReadAt: string | null;
   /** 归档时间；非空表示已归档（软删） */
   deletedAt: string | null;
 };
@@ -113,6 +121,8 @@ const SESSION_COLUMNS = [
   "preview",
   "created_at",
   "updated_at",
+  "pinned_at",
+  "last_read_at",
   "deleted_at",
 ].join(", ");
 
@@ -120,6 +130,9 @@ const CHILD_COUNT_EXPR =
   "(SELECT COUNT(*) FROM session child WHERE child.parent_session_id = session.id AND child.deleted_at IS NULL) AS child_count";
 
 const SESSION_SELECT = `SELECT ${SESSION_COLUMNS}, ${CHILD_COUNT_EXPR} FROM session`;
+
+/** 列表排序：置顶优先（按置顶时间倒序），其余按最近更新倒序 */
+const SESSION_ORDER = "ORDER BY (pinned_at IS NULL), pinned_at DESC, updated_at DESC";
 
 const rowSchema = z.object({
   id: z.string(),
@@ -137,6 +150,8 @@ const rowSchema = z.object({
   preview: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
+  pinned_at: z.string().nullable(),
+  last_read_at: z.string().nullable(),
   deleted_at: z.string().nullable(),
   child_count: z.number(),
 });
@@ -160,6 +175,8 @@ const toRecord = (row: SessionRow): SessionRecord => ({
   preview: row.preview,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  pinnedAt: row.pinned_at,
+  lastReadAt: row.last_read_at,
   deletedAt: row.deleted_at,
 });
 
@@ -193,6 +210,8 @@ export const overrideOf = (record: SessionRecord | undefined): SessionOverride =
     ...(record.parentSessionId ? { parentSessionId: record.parentSessionId } : {}),
     ...(record.agent ? { agent: record.agent } : {}),
     ...(record.forkedFromId ? { forkedFromId: record.forkedFromId } : {}),
+    ...(record.pinnedAt ? { pinnedAt: record.pinnedAt } : {}),
+    ...(record.lastReadAt ? { lastReadAt: record.lastReadAt } : {}),
     ...(record.deletedAt ? { deletedAt: record.deletedAt } : {}),
   };
 };
@@ -343,6 +362,19 @@ export class SessionRepository {
   }
 
   /**
+   * 置顶 / 取消置顶；`at` 为 null 表示取消。
+   * 不复用 `set`：那里用 COALESCE 合并覆盖值，且置顶不该改 `updated_at`（否则会顶到列表最前）。
+   */
+  setPinned(id: string, at: string | null): void {
+    this.db.prepare("UPDATE session SET pinned_at = ? WHERE id = ?").run(at, id);
+  }
+
+  /** 标记已读：写上次打开时间；不改 `updated_at`，以免未读状态自相矛盾 */
+  setLastRead(id: string, at: string): void {
+    this.db.prepare("UPDATE session SET last_read_at = ? WHERE id = ?").run(at, id);
+  }
+
+  /**
    * 丢弃一条从未落盘的会话行（如子智能体装配失败时刚建的行）。
    * 只删 `source_path IS NULL` 的行：文件一旦写出就该走归档 / 对账，不能硬删。
    */
@@ -359,7 +391,7 @@ export class SessionRepository {
 
   list(): SessionRecord[] {
     return this.db
-      .prepare(`${SESSION_SELECT} ORDER BY updated_at DESC`)
+      .prepare(`${SESSION_SELECT} ${SESSION_ORDER}`)
       .all()
       .map((row) => toRecord(rowSchema.parse(row)));
   }
@@ -430,7 +462,7 @@ export class SessionRepository {
       .prepare(`SELECT COUNT(*) AS total FROM session WHERE ${where}`)
       .get(...params) as { total?: number } | undefined;
     const rows = this.db
-      .prepare(`${SESSION_SELECT} WHERE ${where} ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`${SESSION_SELECT} WHERE ${where} ${SESSION_ORDER} LIMIT ?`)
       .all(...params, query.limit);
 
     return {

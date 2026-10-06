@@ -53,9 +53,10 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
   `default`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
   `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/
-  `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）
+  `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）/
+  `pinned_at`（置顶时间，非空即置顶）
 - **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写）：`source_path` /
-  `preview` / `created_at` / `updated_at`
+  `preview` / `created_at` / `updated_at` / `last_read_at`（上次打开时间，用于未读判定）
 
 `parent_session_id` / `agent` 让子智能体会话成为真实会话行：列表默认只出主会话
 （`parent_session_id IS NULL`），传 `parentSessionId` 才取某个会话的子会话（见

@@ -1,10 +1,12 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
 import {
   ChevronLeft,
+  CirclePlus,
   FolderOpen,
   Gauge,
   GitFork,
   Loader2,
+  PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
   Settings2,
@@ -34,8 +36,12 @@ type ChatHeaderProps = {
   usage?: UsageTotals | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
-  /** 移动端打开会话侧栏抽屉 */
-  onOpenSidebar?: () => void;
+  /** 展开 / 收起侧栏（桌面端常驻，移动端唤出抽屉） */
+  onToggleSidebar?: () => void;
+  /** 侧栏当前是否收起；决定切换按钮的图标 */
+  sidebarCollapsed?: boolean;
+  /** 新建任务（顶栏的 + 入口） */
+  onNewTask?: () => void;
 };
 
 export function ChatHeader({
@@ -49,21 +55,38 @@ export function ChatHeader({
   forkedFromName,
   usage,
   onOpenUsage,
-  onOpenSidebar,
+  onToggleSidebar,
+  sidebarCollapsed,
+  onNewTask,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
   return (
     <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-      {onOpenSidebar ? (
+      {onToggleSidebar ? (
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 shrink-0 md:hidden"
-          title={t("会话列表")}
-          onClick={onOpenSidebar}
+          className="size-7 shrink-0"
+          title={t("切换侧边栏")}
+          onClick={onToggleSidebar}
         >
-          <PanelLeftOpen className="size-4" />
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="size-4" />
+          ) : (
+            <PanelLeftClose className="size-4" />
+          )}
+        </Button>
+      ) : null}
+      {onNewTask ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0"
+          title={t("新建任务")}
+          onClick={onNewTask}
+        >
+          <CirclePlus className="size-4" />
         </Button>
       ) : null}
       {session?.parentSessionId && onBackToParent ? (

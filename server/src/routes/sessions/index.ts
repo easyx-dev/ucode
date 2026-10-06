@@ -183,9 +183,12 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     }
   }
   if (record.sourcePath) {
-    const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);
-    const index = indexFromManager(manager);
-    if (index) services.sessions.refresh(patch.sessionId, index);
+    // 只有名称 / 模型 / 档位需要追加到会话文件；置顶等元数据不落文件
+    if (patch.name || patch.model || patch.thinkingLevel) {
+      const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);
+      const index = indexFromManager(manager);
+      if (index) services.sessions.refresh(patch.sessionId, index);
+    }
   }
 
   services.sessions.set(patch.sessionId, {
@@ -196,6 +199,11 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
   });
 
+  // 置顶是应用侧元数据：只写 pinned_at，不改 updated_at、不重建会话
+  if (patch.pinned !== undefined) {
+    services.sessions.setPinned(patch.sessionId, patch.pinned ? new Date().toISOString() : null);
+  }
+
   // 换模型 / 换 thinking / 换模式 / 换权限档位需要重建会话实例才会生效，历史留在盘上
   if (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
     services.pool.dispose(patch.sessionId);
@@ -204,6 +212,20 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）
   const summary = describeSession(services, patch.sessionId).session;
   services.events.emitSessionUpdated(patch.sessionId, summary);
+  return summary;
+};
+
+/** `/read`：标记会话已读（写上次打开时间），用于侧栏未读点消失 */
+const readSession = (services: Services, sessionId: string): SessionSummary => {
+  const record = services.sessions.find(sessionId);
+  if (!record) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
+  services.sessions.setLastRead(sessionId, new Date().toISOString());
+  const summary = describeSession(services, sessionId).session;
+  services.events.emitSessionUpdated(sessionId, summary);
   return summary;
 };
 
@@ -292,6 +314,9 @@ export const createSessionsRoute = (services: Services) => {
   );
   router.post("/archive", jsonBody(sessionIdInputSchema), (c) =>
     c.json(ok(archiveSession(services, c.req.valid("json").sessionId))),
+  );
+  router.post("/read", jsonBody(sessionIdInputSchema), (c) =>
+    c.json(ok(readSession(services, c.req.valid("json").sessionId))),
   );
   router.post("/fork", jsonBody(sessionForkInputSchema), (c) =>
     c.json(ok(forkSession(services, c.req.valid("json")))),

@@ -27,6 +27,10 @@ export type SessionsController = {
   setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
+  /** 置顶 / 取消置顶 */
+  pin: (sessionId: string, pinned: boolean) => Promise<void>;
+  /** 标记已读 */
+  markRead: (sessionId: string) => Promise<void>;
   archive: (sessionId: string) => Promise<void>;
 };
 
@@ -50,6 +54,8 @@ export function useSessions(): SessionsController {
     setThinkingLevel: client.sessions.setThinkingLevel,
     setMode: client.sessions.setMode,
     setPermissionMode: client.sessions.setPermissionMode,
+    pin: client.sessions.pin,
+    markRead: client.sessions.markRead,
     archive: client.sessions.archive,
   };
 }

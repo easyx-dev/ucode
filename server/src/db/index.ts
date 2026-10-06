@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -78,6 +78,11 @@ const migrations: Record<number, string> = {
     );
     CREATE UNIQUE INDEX idx_auth_session_token_hash ON auth_session(token_hash);
     CREATE INDEX idx_auth_session_expires_at ON auth_session(expires_at);
+  `,
+  // 侧栏置顶与已读：`pinned_at` 非空即置顶，`last_read_at` 用于未读判定（见 plans/ui 侧栏重构）
+  8: `
+    ALTER TABLE session ADD COLUMN pinned_at TEXT;
+    ALTER TABLE session ADD COLUMN last_read_at TEXT;
   `,
 };
 

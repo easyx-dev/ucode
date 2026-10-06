@@ -13,10 +13,10 @@ export default {
   会话: "Sessions",
   "加载中…": "Loading…",
   暂无会话: "No sessions",
+  暂无项目: "No projects",
   新建: "New",
   新建会话: "New session",
   新会话: "New session",
-  搜索会话: "Search sessions",
   会话列表: "Session list",
   设置: "Settings",
   取消: "Cancel",
@@ -282,9 +282,9 @@ export default {
   归档失败: "Archive failed",
 
   // Sidebar sections
-  项目区: "Projects",
+  项目: "Projects",
+  助理: "Assistant",
   助理区: "Assistant",
-  在目录中新建: "New in directory",
   选择目录: "Choose directory",
   返回上级: "Go up",
   新建文件夹: "New folder",
@@ -294,6 +294,29 @@ export default {
   没有匹配的目录: "No matching directory",
   输入绝对路径: "Enter an absolute path",
   创建文件夹失败: "Failed to create folder",
+
+  // Sidebar menu and session rows
+  新建任务: "New task",
+  小助理: "Assistant",
+  搜索: "Search",
+  自动化: "Automation",
+  插件市场: "Marketplace",
+  打开工作区: "Open workspace",
+  切换侧边栏: "Toggle sidebar",
+  置顶: "Pin",
+  取消置顶: "Unpin",
+  未读: "Unread",
+  自动化功能即将推出: "Automation is coming soon",
+  插件市场即将推出: "Marketplace is coming soon",
+  文件查看器即将推出: "File viewer is coming soon",
+
+  // Command palette
+  全部: "All",
+  操作: "Actions",
+  任务: "Tasks",
+  "搜索操作、任务或文件": "Search actions, tasks or files",
+  无匹配结果: "No results",
+  "搜索中…": "Searching…",
 
   // Session directory
   目录: "Directory",

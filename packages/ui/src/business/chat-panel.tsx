@@ -51,8 +51,12 @@ type ChatPanelProps = {
   onOpenSettings: () => void;
   /** 打开某个子会话（子智能体工具卡上的入口） */
   onOpenSession: (sessionId: string) => void;
-  /** 移动端打开会话侧栏抽屉 */
-  onOpenSidebar?: () => void;
+  /** 展开 / 收起侧栏（移动端唤出抽屉） */
+  onToggleSidebar?: () => void;
+  /** 侧栏是否收起 */
+  sidebarCollapsed?: boolean;
+  /** 新建任务（顶栏入口） */
+  onNewTask?: () => void;
   /** 从某条消息分叉出新会话 */
   onFork: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话、非生成中可用） */
@@ -91,7 +95,9 @@ export function ChatPanel({
   onSelectPermissionMode,
   onOpenSettings,
   onOpenSession,
-  onOpenSidebar,
+  onToggleSidebar,
+  sidebarCollapsed,
+  onNewTask,
   onFork,
   onEdit,
   forkedFromName,
@@ -175,7 +181,9 @@ export function ChatPanel({
         models={models}
         onReloadModels={onReloadModels}
         onOpenSettings={onOpenSettings}
-        onOpenSidebar={onOpenSidebar}
+        onToggleSidebar={onToggleSidebar}
+        sidebarCollapsed={sidebarCollapsed}
+        onNewTask={onNewTask}
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
         onBackToParent={onBackToParent}

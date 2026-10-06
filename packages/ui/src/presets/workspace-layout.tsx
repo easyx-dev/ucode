@@ -4,13 +4,16 @@
  * 只接收受控的导航状态；产品行为（内置命令、计划批准、目标命令、会话动作）都在这里，
  * 应用层只需提供导航 props。需要更细的组合时自行用 `@ucode/ui/business/*` 拼装。
  */
-import { useEffect, useMemo, useState } from "react";
+import { brand } from "@ucode/brand";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Sheet, SheetContent } from "../base/sheet";
 import { Toaster } from "../base/sonner";
 import { TooltipProvider } from "../base/tooltip";
 import { ChatPanel } from "../business/chat-panel";
+import { CommandPalette } from "../business/command-palette";
+import { DirectoryPickerDialog } from "../business/directory-picker-dialog";
 import { ErrorToaster } from "../business/error-toaster";
 import { PermissionDialog } from "../business/permission-dialog";
 import { QuestionDialog } from "../business/question-dialog";
@@ -53,6 +56,18 @@ export type WorkspaceLayoutProps = {
   onUsageOpenChange: (open: boolean) => void;
 };
 
+/** 侧栏收起状态的持久化键 */
+const SIDEBAR_COLLAPSED_KEY = `${brand.slug}-sidebar-collapsed`;
+
+/** 读出上次的侧栏收起状态；读不到时默认展开 */
+const readSidebarCollapsed = (): boolean => {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 export function WorkspaceLayout({
   sessionId: activeId,
   onSelectSession: setActiveId,
@@ -71,6 +86,9 @@ export function WorkspaceLayout({
   const interactions = useInteractions(activeId);
   const goal = useGoal(activeId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
 
   const configured = models.data?.configured ?? false;
@@ -87,6 +105,26 @@ export function WorkspaceLayout({
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
+
+  /** 收起 / 展开侧栏并落盘；移动端抽屉由 sidebarOpen 单独管 */
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // 写不进去（隐私模式）不影响使用
+      }
+      return next;
+    });
+  }, []);
+
+  // 打开会话即标记已读：内容新于上次已读、且不在生成中时才提交，避免自我循环
+  useEffect(() => {
+    if (!activeSession || activeSession.running) return;
+    if (activeSession.lastReadAt && activeSession.updatedAt <= activeSession.lastReadAt) return;
+    void sessions.markRead(activeSession.id);
+  }, [activeSession, sessions.markRead]);
 
   // plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区
   const planReady =
@@ -137,6 +175,21 @@ export function WorkspaceLayout({
   const startInDirectory = (path: string): void => {
     setActiveId(null);
     composer.update(NEW_SESSION_KEY, { cwd: path });
+  };
+
+  /** 「小助理」：回到草稿态并清掉目录，会话落到助理工作区（不绑定项目） */
+  const startAssistantSession = (): void => {
+    setActiveId(null);
+    composer.update(NEW_SESSION_KEY, { cwd: undefined });
+  };
+
+  // 快捷键监听持有最新的 startNewSession：它随当前会话每次重建，用 ref 避免反复绑定监听
+  const startNewSessionRef = useRef(startNewSession);
+  startNewSessionRef.current = startNewSession;
+
+  /** 置顶 / 取消置顶：乐观更新由 SDK store 处理，失败在错误条里提示 */
+  const togglePin = (session: SessionSummary): void => {
+    void sessions.pin(session.id, !session.pinnedAt);
   };
 
   const forkFrom = (item: ChatItem): void => {
@@ -237,6 +290,35 @@ export function WorkspaceLayout({
     }
   };
 
+  // 全局快捷键：⌘K 搜索、⌘B 切换侧栏、⌘O 打开工作区、⌘N 新建任务（浏览器可能保留 ⌘N）
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      switch (event.key.toLowerCase()) {
+        case "k":
+          event.preventDefault();
+          setPaletteOpen((prev) => !prev);
+          break;
+        case "b":
+          event.preventDefault();
+          toggleSidebar();
+          break;
+        case "o":
+          event.preventDefault();
+          setPicking(true);
+          break;
+        case "n":
+          event.preventDefault();
+          startNewSessionRef.current();
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleSidebar]);
+
   // 分叉来源会话名：从当前列表取，取不到（已归档 / 未加载）则退化为 id
   const forkSourceId = activeSession?.forkedFromId ?? null;
   const forkSourceName = forkSourceId
@@ -260,12 +342,18 @@ export function WorkspaceLayout({
     configured,
     onSelect: setActiveId,
     onCreate: startNewSession,
+    onCreateAssistant: startAssistantSession,
     onCreateInDirectory: startInDirectory,
     onRenameRequest: requestRename,
-    onDelete: (id: string) => {
+    onArchive: (id: string) => {
       void sessions.archive(id);
       composer.clear(composerKeyOf(id));
     },
+    onTogglePin: togglePin,
+    onOpenSearch: () => setPaletteOpen(true),
+    onOpenWorkspace: () => setPicking(true),
+    onOpenAutomation: () => toast.info(t("自动化功能即将推出")),
+    onOpenMarketplace: () => toast.info(t("插件市场即将推出")),
     onOpenSettings: () => setSettingsOpen(true),
     childrenByParent: sessions.childrenByParent,
     childrenLoading: sessions.childrenLoading,
@@ -276,10 +364,12 @@ export function WorkspaceLayout({
   return (
     <TooltipProvider>
       <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-        {/* 桌面端固定侧栏；移动端收进抽屉 */}
-        <div className="hidden h-full w-72 shrink-0 md:flex">
-          <SessionSidebar {...sidebarProps} />
-        </div>
+        {/* 桌面端固定侧栏；收起时不占宽度，移动端收进抽屉 */}
+        {sidebarCollapsed ? null : (
+          <div className="hidden h-full w-72 shrink-0 md:flex">
+            <SessionSidebar {...sidebarProps} />
+          </div>
+        )}
 
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent title={t("会话列表")} className="md:hidden">
@@ -291,6 +381,10 @@ export function WorkspaceLayout({
               }}
               onCreate={() => {
                 startNewSession();
+                setSidebarOpen(false);
+              }}
+              onCreateAssistant={() => {
+                startAssistantSession();
                 setSidebarOpen(false);
               }}
               onCreateInDirectory={(path) => {
@@ -326,7 +420,13 @@ export function WorkspaceLayout({
           onSelectPermissionMode={selectPermissionMode}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSession={setActiveId}
-          onOpenSidebar={() => setSidebarOpen(true)}
+          onToggleSidebar={() => {
+            // 桌面端切换收起，移动端唤出抽屉
+            if (window.matchMedia("(min-width: 768px)").matches) toggleSidebar();
+            else setSidebarOpen(true);
+          }}
+          sidebarCollapsed={sidebarCollapsed}
+          onNewTask={startNewSession}
           onFork={forkFrom}
           onEdit={editMessage}
           forkedFromName={forkSourceName}
@@ -375,6 +475,31 @@ export function WorkspaceLayout({
             void models.reload();
           }}
         />
+
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          sessions={sessionsView}
+          fileRoot={activeSession?.cwd ?? workspaceRoot}
+          onSelectSession={setActiveId}
+          onRunBuiltin={runBuiltin}
+          onNewTask={startNewSession}
+          onNewAssistant={startAssistantSession}
+          onOpenWorkspace={() => setPicking(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleSidebar={toggleSidebar}
+          onOpenFile={(path) => toast.info(t("文件查看器即将推出"), { description: path })}
+        />
+
+        <DirectoryPickerDialog
+          open={picking}
+          onOpenChange={setPicking}
+          onSelect={(path) => {
+            startInDirectory(path);
+            setPicking(false);
+          }}
+        />
+
         <Toaster position="top-center" />
         <ErrorToaster />
       </div>

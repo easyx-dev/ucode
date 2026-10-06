@@ -221,6 +221,8 @@ export const sessionInfoToDTO = (
   forkedFromId: override.forkedFromId ?? null,
   childCount,
   running,
+  pinnedAt: override.pinnedAt ?? null,
+  lastReadAt: override.lastReadAt ?? null,
   deletedAt: override.deletedAt ?? null,
 });
 
@@ -256,6 +258,8 @@ export const draftSessionSummary = (
     forkedFromId: override.forkedFromId ?? null,
     childCount,
     running,
+    pinnedAt: override.pinnedAt ?? null,
+    lastReadAt: override.lastReadAt ?? null,
     deletedAt: override.deletedAt ?? null,
   };
 };

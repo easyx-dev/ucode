@@ -34,8 +34,9 @@
 | POST | `/api/v1/sessions/list` | 会话列表，可按名称搜索、按父子过滤 |
 | POST | `/api/v1/sessions/create` | 新建会话（首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | 会话详情 + 用量 + 当前目标 |
-| POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 |
+| POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 / 置顶 |
 | POST | `/api/v1/sessions/archive` | 归档会话（软删：从列表隐藏，文件保留） |
+| POST | `/api/v1/sessions/read` | 标记会话已读（写上次打开时间） |
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
@@ -475,6 +476,8 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
+| `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
 
 ### POST /api/v1/sessions/info
@@ -497,7 +500,7 @@
 
 ### POST /api/v1/sessions/update
 
-重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位
+重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 / 置顶
 
 **请求参数**
 
@@ -509,6 +512,7 @@
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
 | `permissionMode` | "default" \| "auto" \| "full" | 否 | — | — |
+| `pinned` | boolean | 否 | — | 置顶开关；与名称等覆盖值不同，不改会话文件、也不受生成中限制 |
 
 **响应类型**：`SessionSummary`
 
@@ -529,6 +533,8 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
+| `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
 
 ### POST /api/v1/sessions/archive
@@ -547,6 +553,39 @@
 | --- | --- | --- | --- |
 | `sessionId` | string | 是 | — |
 | `archived` | boolean | 是 | — |
+
+### POST /api/v1/sessions/read
+
+标记会话已读（写上次打开时间）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+
+**响应类型**：`SessionSummary`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `name` | string \| null | 是 | — |
+| `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
+| `createdAt` | string | 是 | — |
+| `updatedAt` | string | 是 | — |
+| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `model` | string \| null | 是 | 生效的 "provider/model" |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
+| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
+| `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
+| `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
+| `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
+| `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
+| `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
 
 ### POST /api/v1/sessions/fork
 
@@ -579,6 +618,8 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
+| `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
 
 ## 消息（`messages`）
@@ -1186,6 +1227,8 @@
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
+| `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
 
 ### UsageTotals

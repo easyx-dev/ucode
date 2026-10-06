@@ -1,15 +1,12 @@
-/** 会话列表的一行：标题、相对时间与重命名 / 归档入口；主会话行可下钻子会话 */
+/**
+ * 会话列表的一行：未读点 / 置顶标记、标题与相对时间；
+ * 悬停时右侧露出置顶与归档入口，双击标题可重命名。主会话行可下钻子会话。
+ */
 import type { SessionSummary } from "@ucode/contracts";
 import { cn } from "cn";
-import { Bot, ChevronRight, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Archive, Bot, ChevronRight, Loader2, Pin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../base/dropdown-menu";
 import { sessionTitle } from "../lib/session";
 import { relativeTimeLabel } from "../lib/time";
 
@@ -18,11 +15,15 @@ type SessionListItemProps = {
   /** 当前选中会话 id；子会话行据此高亮 */
   activeId: string | null;
   onSelect: (sessionId: string) => void;
-  /** 子会话行：缩进一级，只点选，没有展开与操作菜单 */
+  /** 子会话行：缩进一级，只点选，没有展开与操作 */
   child?: boolean;
-  /** 主会话行的重命名 / 归档入口 */
+  /** 距上次打开之后有新更新 */
+  unread?: boolean;
+  /** 置顶开关入口（主会话行） */
+  onTogglePin?: () => void;
+  /** 双击标题重命名入口 */
   onRename?: () => void;
-  onDelete?: () => void;
+  onArchive?: () => void;
   /** 主会话行有子会话时显示展开箭头（搜索期间不展示） */
   expandable?: boolean;
   expanded?: boolean;
@@ -37,8 +38,10 @@ export function SessionListItem({
   activeId,
   onSelect,
   child,
+  unread,
+  onTogglePin,
   onRename,
-  onDelete,
+  onArchive,
   expandable,
   expanded,
   onToggleExpand,
@@ -47,13 +50,15 @@ export function SessionListItem({
 }: SessionListItemProps) {
   const { t } = useTranslation();
   const active = session.id === activeId;
-  const hasActions = Boolean(onRename && onDelete);
+  const pinned = Boolean(session.pinnedAt);
+  const title = sessionTitle(session, t("新会话"));
+  const hasActions = Boolean(onTogglePin && onArchive);
 
   return (
     <div>
       <div
         className={cn(
-          "group relative flex h-9 items-center rounded-lg pr-1 pl-2 transition-colors",
+          "group relative flex h-10 items-center rounded-lg pr-1 pl-2 transition-colors",
           active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
           child && "ml-5",
         )}
@@ -72,50 +77,62 @@ export function SessionListItem({
               )}
             />
           </button>
-        ) : child ? (
-          <Bot className="mr-1 size-3 shrink-0 text-muted-foreground" />
         ) : null}
 
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          title={title}
+          className="flex min-w-0 flex-1 items-center text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => onSelect(session.id)}
+          onDoubleClick={onRename}
         >
-          {session.running ? (
-            <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" />
-          ) : null}
-          <span className={cn("truncate", child ? "text-xs" : "text-sm")}>
-            {sessionTitle(session, t("新会话"))}
+          {/* 固定槽位：有没有指示器都占同样宽度，标题才能与父级文字稳定对齐；置顶针与未读点可并存 */}
+          <span className="flex w-6 shrink-0 items-center justify-center gap-1">
+            {session.running ? (
+              <Loader2 className="size-3 animate-spin text-muted-foreground" />
+            ) : child ? (
+              <Bot className="size-3 text-muted-foreground" />
+            ) : (
+              <>
+                {pinned ? <Pin className="size-3 text-muted-foreground" /> : null}
+                {unread ? (
+                  <span
+                    className="size-1.5 rounded-full bg-info"
+                    role="status"
+                    aria-label={t("未读")}
+                  />
+                ) : null}
+              </>
+            )}
           </span>
+          <span className={cn("truncate", child ? "text-xs" : "text-sm")}>{title}</span>
         </button>
 
-        <span className="shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+        <span className="shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 [@media(pointer:coarse)]:hidden">
           {relativeTimeLabel(session.updatedAt)}
         </span>
 
         {hasActions ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="pointer-events-none absolute right-0.5 size-6 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
-                title={t("更多操作")}
-              >
-                <MoreHorizontal className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onRename}>
-                <Pencil className="size-3.5" />
-                {t("重命名")}
-              </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                <Trash2 className="size-3.5" />
-                {t("归档")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="pointer-events-none absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              title={pinned ? t("取消置顶") : t("置顶")}
+              onClick={onTogglePin}
+            >
+              <Pin className={cn("size-3.5", pinned && "fill-current")} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              title={t("归档")}
+              onClick={onArchive}
+            >
+              <Archive className="size-3.5" />
+            </Button>
+          </div>
         ) : null}
       </div>
 

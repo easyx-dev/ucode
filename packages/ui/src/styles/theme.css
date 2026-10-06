@@ -161,6 +161,11 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 起按钮默认 cursor: default；可点击控件统一回正手型（禁用态除外） */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 /* markdown 渲染（assistant 输出） */
 .md-content {

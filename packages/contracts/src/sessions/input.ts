@@ -57,6 +57,8 @@ export const sessionUpdateInputSchema = z.object({
   thinkingLevel: z.enum(THINKING_LEVELS).optional(),
   mode: sessionModeSchema.optional(),
   permissionMode: z.enum(PERMISSION_MODES).optional(),
+  /** 置顶开关；与名称等覆盖值不同，不改会话文件、也不受生成中限制 */
+  pinned: z.boolean().optional(),
 });
 
 export type SessionIdRequest = z.input<typeof sessionIdInputSchema>;

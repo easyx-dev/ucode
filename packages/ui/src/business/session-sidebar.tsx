@@ -1,14 +1,14 @@
-/** 会话侧栏：装配头部、按区分的列表与设置入口 */
+/** 会话侧栏：品牌头、顶部功能菜单、项目 / 助理分类列表与底部设置入口 */
+import { brand } from "@ucode/brand";
 import { Settings2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
-import { useSessionFilter } from "../hooks/use-session-filter";
 import { confirmArchiveSession } from "../lib/session";
 import type { SessionSummary } from "../lib/types";
-import { DirectoryPickerDialog } from "./directory-picker-dialog";
+import { BrandLogo } from "./brand-logo";
 import { SessionList } from "./session-list";
-import { SessionSidebarHeader } from "./session-sidebar-header";
+import { SessionSidebarMenu } from "./session-sidebar-menu";
 
 type SessionSidebarProps = {
   sessions: SessionSummary[];
@@ -18,13 +18,21 @@ type SessionSidebarProps = {
   loading: boolean;
   configured: boolean;
   onSelect: (sessionId: string) => void;
-  /** 新建助理会话（落在自己的工作区） */
+  /** 新建任务（继承当前项目目录） */
   onCreate: () => void;
+  /** 新建助理会话（落在助理工作区） */
+  onCreateAssistant: () => void;
   /** 在指定目录里新建会话 */
   onCreateInDirectory: (path: string) => void;
   /** 请求重命名某个会话（对话框由 App 承载，便于 `/rename` 命令复用） */
   onRenameRequest: (session: SessionSummary) => void;
-  onDelete: (sessionId: string) => void;
+  onArchive: (sessionId: string) => void;
+  /** 置顶 / 取消置顶 */
+  onTogglePin: (session: SessionSummary) => void;
+  onOpenSearch: () => void;
+  onOpenWorkspace: () => void;
+  onOpenAutomation: () => void;
+  onOpenMarketplace: () => void;
   onOpenSettings: () => void;
   /** 已加载的子会话，按父会话 id 索引 */
   childrenByParent: Record<string, SessionSummary[]>;
@@ -43,9 +51,15 @@ export function SessionSidebar({
   configured,
   onSelect,
   onCreate,
+  onCreateAssistant,
   onCreateInDirectory,
   onRenameRequest,
-  onDelete,
+  onArchive,
+  onTogglePin,
+  onOpenSearch,
+  onOpenWorkspace,
+  onOpenAutomation,
+  onOpenMarketplace,
   onOpenSettings,
   childrenByParent,
   childrenLoading,
@@ -53,11 +67,8 @@ export function SessionSidebar({
   activeParentId,
 }: SessionSidebarProps) {
   const { t } = useTranslation();
-  const [query, setQuery] = useState("");
-  const [picking, setPicking] = useState(false);
   /** 展开子会话的父会话 id；展开即拉取（重复展开会重取，保证楼层刷新后不过期） */
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const filtered = useSessionFilter(sessions, query);
 
   const toggleChildren = useCallback(
     (sessionId: string) => {
@@ -83,48 +94,48 @@ export function SessionSidebar({
   }, [activeParentId, onLoadChildren]);
 
   return (
-    <aside className="flex h-full w-full flex-col">
-      <SessionSidebarHeader
-        query={query}
+    <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+        <BrandLogo className="size-5" />
+        <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
+      </div>
+
+      <SessionSidebarMenu
         canCreate={configured}
-        onQueryChange={setQuery}
         onCreate={onCreate}
-        onPickDirectory={() => setPicking(true)}
+        onCreateAssistant={onCreateAssistant}
+        onOpenSearch={onOpenSearch}
+        onOpenAutomation={onOpenAutomation}
+        onOpenMarketplace={onOpenMarketplace}
       />
 
       <SessionList
-        sessions={filtered}
+        sessions={sessions}
         workspaceRoot={workspaceRoot}
         activeId={activeId}
         loading={loading}
         onSelect={onSelect}
         onCreate={onCreateInDirectory}
+        onCreateAssistant={onCreateAssistant}
         onRename={onRenameRequest}
-        onDelete={(session) => {
-          if (confirmArchiveSession(session, t)) onDelete(session.id);
+        onArchive={(session) => {
+          if (confirmArchiveSession(session, t)) onArchive(session.id);
         }}
+        onTogglePin={onTogglePin}
+        onOpenWorkspace={onOpenWorkspace}
         childrenByParent={childrenByParent}
         childrenLoading={childrenLoading}
         expanded={expanded}
         onToggleChildren={toggleChildren}
-        searching={query.trim().length > 0}
+        searching={false}
       />
 
-      <div className="border-t p-2">
+      <div className="border-t border-sidebar-border p-2">
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onOpenSettings}>
           <Settings2 className="size-4" />
           {t("设置")}
         </Button>
       </div>
-
-      <DirectoryPickerDialog
-        open={picking}
-        onOpenChange={setPicking}
-        onSelect={(path) => {
-          onCreateInDirectory(path);
-          setPicking(false);
-        }}
-      />
     </aside>
   );
 }

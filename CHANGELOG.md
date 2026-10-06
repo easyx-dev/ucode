@@ -35,6 +35,10 @@
 
 ### 新增
 
+- 侧栏重构与命令面板：顶部功能菜单（新建任务 / 小助理 / 搜索 / 自动化 / 插件市场）、项目与助理两个可折叠分类、
+  会话行未读点与悬停置顶 / 归档、侧栏可收起（⌘B）、⌘K 命令面板（操作 / 任务 / 文件，文件查看器预留）。
+  契约 `SessionSummary` 增加 `pinnedAt` / `lastReadAt`，新增 `sessions/read`，`sessions/update` 支持 `pinned`，
+  SQLite schema v8 增加 `pinned_at` / `last_read_at` 两列；会话列表排序改为置顶优先。
 - 新增 **桌面端 `apps/desktop`**（Electron）：自带 Vite + React 渲染层，复用 `@ucode/ui` 与 `@ucode/sdk`，
   外壳沿用 web 的约定（品牌注入、i18n、主题、防闪脚本），只把「URL 导航 + 登录闸门」换成窗口内内存导航
   与连接态。主进程从 `$APP_HOME/app/service.json` 读端点与 `serviceToken`，对发往该服务 `/api/v1` 的请求

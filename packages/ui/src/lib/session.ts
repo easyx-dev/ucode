@@ -6,6 +6,16 @@ import type { TFunction } from "i18next";
 export const sessionTitle = (session: SessionSummary, fallback: string): string =>
   session.name || session.preview.split("\n")[0]?.slice(0, 40) || fallback;
 
+/**
+ * 未读判定：距上次打开（标记已读）之后又有更新即未读。
+ * 从未打开过的新会话也算未读；正在生成的不算，避免生成中的侧栏一直亮着未读点。
+ */
+export const isSessionUnread = (session: SessionSummary): boolean => {
+  if (session.running) return false;
+  if (!session.lastReadAt) return true;
+  return session.updatedAt > session.lastReadAt;
+};
+
 /** 归档会话前的确认；标题口径与侧栏保持一致，有子会话时提示会级联归档 */
 export const confirmArchiveSession = (session: SessionSummary, t: TFunction): boolean => {
   const name = sessionTitle(session, t("新会话"));

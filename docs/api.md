@@ -69,6 +69,7 @@
 | `update` | 局部更新 | 资源摘要 |
 | `delete` | 删除 | 动作回执 |
 | `archive` | 归档（软删） | 动作回执 |
+| `read` | 标记已读（写上次打开时间） | 资源摘要 |
 | `prompt` | 发起生成 | 动作回执 |
 | `interrupt` | 中断生成 | 动作回执 |
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
@@ -183,7 +184,7 @@
   - 除消息流（`message_*` / `tool_*` / `queue_update` / `compaction_*`）外，会话列表的增改删也走这里：
     - `session_created`：载荷 `SessionSummary`，新建 / 分叉 / 子智能体创建
     - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals }`，改名 / 换模型 /
-      落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
+      置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、

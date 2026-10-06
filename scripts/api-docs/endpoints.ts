@@ -219,7 +219,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: "sessionUpdateInputSchema",
     requestType: "SessionUpdateInput",
     output: "SessionSummary",
-    summary: "重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位",
+    summary: "重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 / 置顶",
   },
   {
     domain: "sessions",
@@ -229,6 +229,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     requestType: "SessionIdInput",
     output: "SessionArchiveResponse",
     summary: "归档会话（软删：从列表隐藏，文件保留）",
+  },
+  {
+    domain: "sessions",
+    action: "read",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "SessionSummary",
+    summary: "标记会话已读（写上次打开时间）",
   },
   {
     domain: "sessions",

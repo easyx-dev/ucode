@@ -233,4 +233,27 @@ describe("SessionRepository", () => {
     assert.equal(repo.search({ limit: 50, parentSessionId: "cas-root" }).total, 0);
     assert.ok(repo.find("cas-child")?.deletedAt, "子会话行保留但标记为已归档");
   });
+
+  it("置顶项排在列表最前，取消后回落", () => {
+    repo.create("pin-a", {});
+    repo.create("pin-b", {});
+    repo.setPinned("pin-a", "2026-03-01T00:00:00.000Z");
+
+    const ids = repo.search({ limit: 50 }).records.map((item) => item.id);
+    assert.equal(ids[0], "pin-a");
+    assert.equal(repo.find("pin-a")?.pinnedAt, "2026-03-01T00:00:00.000Z");
+    assert.equal(overrideOf(repo.find("pin-a")).pinnedAt, "2026-03-01T00:00:00.000Z");
+
+    repo.setPinned("pin-a", null);
+    assert.equal(repo.find("pin-a")?.pinnedAt, null);
+  });
+
+  it("标记已读写 last_read_at 且不改 updated_at", () => {
+    repo.create("read-1", {});
+    const before = repo.find("read-1");
+    repo.setLastRead("read-1", "2026-04-01T00:00:00.000Z");
+    const after = repo.find("read-1");
+    assert.equal(after?.lastReadAt, "2026-04-01T00:00:00.000Z");
+    assert.equal(after?.updatedAt, before?.updatedAt, "标记已读不应把会话顶到列表最前");
+  });
 });

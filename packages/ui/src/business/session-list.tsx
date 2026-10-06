@@ -1,12 +1,15 @@
-/** 侧栏的会话列表区域：项目区（按目录分组）+ 助理区（平铺），含加载 / 空态 */
+/** 侧栏的会话列表区域：项目（按目录分组）/ 助理 两个可折叠分类，含加载 / 空态 */
 import { brand } from "@ucode/brand";
+import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollArea } from "../base/scroll-area";
-import { groupSessions } from "../lib/session-groups";
+import { Button } from "../base/button";
+import { isSessionUnread } from "../lib/session";
+import { groupSessions, type SessionGroup } from "../lib/session-groups";
 import type { SessionSummary } from "../lib/types";
 import { SessionListItem } from "./session-list-item";
 import { SessionProjectGroup } from "./session-project-group";
+import { SessionSection } from "./session-section";
 
 const COLLAPSED_KEY = `${brand.slug}-collapsed-session-groups`;
 
@@ -20,6 +23,9 @@ const readCollapsed = (): Set<string> => {
   }
 };
 
+/** 顶层分类的折叠键；与项目组的键（完整路径）共用一份存储，用前缀避免撞名 */
+const sectionKey = (kind: "projects" | "assistant"): string => `section:${kind}`;
+
 /** 折叠状态的存储键：项目目录用完整路径，避免不同目录末段重名时互相串 */
 const groupKey = (path: string | null): string => path ?? "";
 
@@ -32,8 +38,13 @@ type SessionListProps = {
   onSelect: (sessionId: string) => void;
   /** 在指定目录里新建会话（项目区组头的 +） */
   onCreate: (cwd: string) => void;
+  /** 新建助理会话（助理分类的 +） */
+  onCreateAssistant: () => void;
+  /** 打开目录选择器（项目分类的 +） */
+  onOpenWorkspace: () => void;
   onRename: (session: SessionSummary) => void;
-  onDelete: (session: SessionSummary) => void;
+  onArchive: (session: SessionSummary) => void;
+  onTogglePin: (session: SessionSummary) => void;
   /** 已加载的子会话，按父会话 id 索引 */
   childrenByParent: Record<string, SessionSummary[]>;
   childrenLoading: Record<string, boolean>;
@@ -51,8 +62,11 @@ export function SessionList({
   loading,
   onSelect,
   onCreate,
+  onCreateAssistant,
+  onOpenWorkspace,
   onRename,
-  onDelete,
+  onArchive,
+  onTogglePin,
   childrenByParent,
   childrenLoading,
   expanded,
@@ -84,8 +98,10 @@ export function SessionList({
         session={session}
         activeId={activeId}
         onSelect={onSelect}
+        unread={session.id !== activeId && isSessionUnread(session)}
+        onTogglePin={() => onTogglePin(session)}
         onRename={() => onRename(session)}
-        onDelete={() => onDelete(session)}
+        onArchive={() => onArchive(session)}
         expandable={!searching && session.childCount > 0}
         expanded={expanded.has(session.id)}
         onToggleExpand={() => onToggleChildren(session.id)}
@@ -98,61 +114,87 @@ export function SessionList({
       childrenByParent,
       childrenLoading,
       expanded,
-      onDelete,
+      onArchive,
       onRename,
       onSelect,
       onToggleChildren,
+      onTogglePin,
       searching,
     ],
   );
 
-  const empty = !loading && sessions.length === 0;
+  // 项目 / 助理始终各渲染一个分类（即使下面没有会话），顺序固定
+  const ordered = useMemo(() => {
+    const byKind = new Map(sections.map((section) => [section.kind, section]));
+    const none: SessionGroup[] = [];
+    return (["projects", "assistant"] as const).map(
+      (kind) => byKind.get(kind) ?? { kind, groups: none },
+    );
+  }, [sections]);
+
+  /** 分类内的空态 / 加载提示 */
+  const placeholder = (text: string) => (
+    <p className="px-2 py-1 text-xs text-muted-foreground">{loading ? t("加载中…") : text}</p>
+  );
 
   return (
-    <ScrollArea className="flex-1">
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <div className="px-2 pb-3">
-        {loading && sessions.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-muted-foreground">{t("加载中…")}</p>
-        ) : null}
-
-        {empty ? <p className="px-2 py-2 text-xs text-muted-foreground">{t("暂无会话")}</p> : null}
-
-        {empty ? null : (
-          <div className="space-y-2">
-            {sections.map((section) => (
-              <div key={section.kind}>
-                <p className="px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground">
-                  {section.kind === "projects" ? t("项目区") : t("助理区")}
-                </p>
-
-                {section.kind === "projects" ? (
-                  <div className="space-y-1">
-                    {section.groups.map((group) => {
-                      const key = groupKey(group.path);
+        <div className="space-y-1.5">
+          {ordered.map((section) => {
+            const key = sectionKey(section.kind);
+            const isProjects = section.kind === "projects";
+            const assistantSessions = isProjects ? [] : (section.groups[0]?.sessions ?? []);
+            return (
+              <SessionSection
+                key={section.kind}
+                title={isProjects ? t("项目") : t("助理")}
+                collapsed={collapsed.has(key)}
+                onCollapsedChange={(next) => toggle(key, next)}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0"
+                    title={isProjects ? t("打开工作区") : t("新建会话")}
+                    onClick={isProjects ? onOpenWorkspace : onCreateAssistant}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                }
+              >
+                {isProjects ? (
+                  section.groups.length === 0 ? (
+                    placeholder(t("暂无项目"))
+                  ) : (
+                    section.groups.map((group) => {
+                      const gKey = groupKey(group.path);
                       return (
                         <SessionProjectGroup
-                          key={key}
+                          key={gKey}
                           name={group.name}
                           path={group.path}
                           sessions={group.sessions}
-                          collapsed={collapsed.has(key)}
-                          onCollapsedChange={(next) => toggle(key, next)}
+                          collapsed={collapsed.has(gKey)}
+                          onCollapsedChange={(next) => toggle(gKey, next)}
                           onCreate={() => group.path && onCreate(group.path)}
                           renderItem={renderItem}
                         />
                       );
-                    })}
-                  </div>
+                    })
+                  )
                 ) : (
                   <div className="space-y-0.5">
-                    {section.groups[0]?.sessions.map((session) => renderItem(session))}
+                    {assistantSessions.length === 0
+                      ? placeholder(t("暂无会话"))
+                      : assistantSessions.map((session) => renderItem(session))}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
+              </SessionSection>
+            );
+          })}
+        </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 }

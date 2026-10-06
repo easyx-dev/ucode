@@ -33,6 +33,10 @@ export type SessionSummary = {
   childCount: number;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
+  /** 置顶时间；非空表示置顶，排序时置顶项排在组内最前 */
+  pinnedAt: string | null;
+  /** 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 */
+  lastReadAt: string | null;
   /** 归档时间；非空表示已归档（软删），列表默认过滤 */
   deletedAt: string | null;
 };

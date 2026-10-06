@@ -51,13 +51,25 @@ export type SessionsStore = {
   setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
+  /** 置顶 / 取消置顶；影响列表排序，不改变会话内容 */
+  pin: (sessionId: string, pinned: boolean) => Promise<void>;
+  /** 标记已读：更新 `lastReadAt`，未读点随之消失 */
+  markRead: (sessionId: string) => Promise<void>;
   archive: (sessionId: string) => Promise<void>;
   /** 加载（或刷新）某个父会话的子会话；重复调用即重取 */
   loadChildren: (parentId: string) => Promise<void>;
 };
 
-const sortByUpdated = (list: SessionSummary[]): SessionSummary[] =>
-  [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+/** 列表排序：置顶优先（按置顶时间倒序），其余按最近更新倒序；与仓储 `SESSION_ORDER` 口径一致 */
+const sortSessions = (list: SessionSummary[]): SessionSummary[] =>
+  [...list].sort((a, b) => {
+    if (a.pinnedAt && b.pinnedAt) {
+      return b.pinnedAt.localeCompare(a.pinnedAt) || b.updatedAt.localeCompare(a.updatedAt);
+    }
+    if (a.pinnedAt) return -1;
+    if (b.pinnedAt) return 1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
 
 const patchList = (
   list: SessionSummary[],
@@ -99,7 +111,7 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
       const next = exists
         ? prev.list.map((item) => (item.id === session.id ? session : item))
         : [...prev.list, session];
-      return { ...prev, list: sortByUpdated(next) };
+      return { ...prev, list: sortSessions(next) };
     });
   };
 
@@ -132,7 +144,7 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     setState((prev) => ({ ...prev, loading: true }));
     try {
       const data = await deps.apis.sessions.list({ limit: LIST_LIMIT });
-      setState((prev) => ({ ...prev, list: sortByUpdated(data.sessions), error: null }));
+      setState((prev) => ({ ...prev, list: sortSessions(data.sessions), error: null }));
 
       // 已展开的父会话随根列表一起刷新：一轮委派结束后新子会话据此出现。
       // 单个父级拉取失败不影响根列表，沿用上一次的子会话缓存
@@ -280,6 +292,25 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     setThinkingLevel: (sessionId, thinkingLevel) => applyUpdate(sessionId, { thinkingLevel }),
     setMode: (sessionId, mode) => applyUpdate(sessionId, { mode }),
     setPermissionMode: (sessionId, permissionMode) => applyUpdate(sessionId, { permissionMode }),
+    async pin(sessionId, pinned) {
+      // 乐观改真实字段 `pinnedAt`（不是入参的 `pinned`）：标记与排序都读它，改错字段会等到事件才生效
+      patchSession(sessionId, { pinnedAt: pinned ? new Date().toISOString() : null });
+      try {
+        await deps.apis.sessions.update({ sessionId, pinned });
+      } catch (error) {
+        setState((prev) => ({ ...prev, error: asApiError(error) }));
+        void refresh();
+      }
+    },
+    async markRead(sessionId) {
+      // 乐观更新未读点，权威摘要由随后的 session_updated 事件覆盖
+      patchSession(sessionId, { lastReadAt: new Date().toISOString() });
+      try {
+        await deps.apis.sessions.read(sessionId);
+      } catch (error) {
+        setState((prev) => ({ ...prev, error: asApiError(error) }));
+      }
+    },
     async archive(sessionId) {
       try {
         await deps.apis.sessions.archive(sessionId);

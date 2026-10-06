@@ -123,6 +123,10 @@ export const createApis = (options: ApisOptions = {}) => {
         } satisfies SessionIdRequest),
       update: (body: SessionUpdateRequest) =>
         transport.post<SessionSummary>("sessions/update", body),
+      read: (sessionId: string) =>
+        transport.post<SessionSummary>("sessions/read", {
+          sessionId,
+        } satisfies SessionIdRequest),
       fork: (body: SessionForkRequest) => transport.post<SessionSummary>("sessions/fork", body),
       archive: (sessionId: string) =>
         transport.post<SessionArchiveResponse>("sessions/archive", {
