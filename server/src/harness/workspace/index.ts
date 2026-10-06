@@ -29,7 +29,7 @@ const assertSafeSessionId = (sessionId: string): void => {
 };
 
 /** 会话工作区目录；只算路径不建目录 */
-export const workspaceDirOf = (sessionId: string, root: string = env.workspaceRoot): string => {
+export const workspaceDirOf = (sessionId: string, root: string = env.workspacesDir): string => {
   assertSafeSessionId(sessionId);
   return join(root, sessionId);
 };
@@ -38,7 +38,7 @@ export const workspaceDirOf = (sessionId: string, root: string = env.workspaceRo
  * 建出会话工作区目录（幂等）；路径只能从 `workspaceDirOf` 来，
  * 这样建目录这一侧也过同一道会话 id 校验，不会指到助理根之外。
  */
-export const ensureWorkspaceDir = (sessionId: string, root: string = env.workspaceRoot): void => {
+export const ensureWorkspaceDir = (sessionId: string, root: string = env.workspacesDir): void => {
   mkdirSync(workspaceDirOf(sessionId, root), { recursive: true });
 };
 
@@ -51,7 +51,7 @@ export const cleanOrphanWorkspaces = (options: {
   keepIds: readonly string[];
   root?: string;
 }): string[] => {
-  const root = options.root ?? env.workspaceRoot;
+  const root = options.root ?? env.workspacesDir;
   const keep = new Set(options.keepIds);
   const removed: string[] = [];
 

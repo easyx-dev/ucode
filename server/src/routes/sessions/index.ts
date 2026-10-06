@@ -21,9 +21,13 @@ import {
 } from "@ucode/contracts";
 import { Hono } from "hono";
 import type { Services } from "../../app";
-import { draftSessionSummary, sessionInfoToDTO } from "../../core/serialize";
+import {
+  draftSessionSummary,
+  type SessionRuntimeState,
+  sessionInfoToDTO,
+} from "../../core/serialize";
 import { assertModel, createSession } from "../../core/session";
-import { indexFromManager, infoFromRecord } from "../../core/session-index";
+import { managerToIndex, recordToInfo } from "../../core/session-index";
 import { describeSessionSummary, type SessionSummarySources } from "../../core/session-summary";
 import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
@@ -83,7 +87,14 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
 const summarySources = (services: Services): SessionSummarySources => ({
   repository: services.sessions,
   isActive: (sessionId) => services.pool.isActive(sessionId),
+  statusOf: (sessionId) => services.pool.statusOf(sessionId),
   defaults: () => runtimeDefaults(services),
+});
+
+/** 列表行的运行态：活跃布尔与细分状态同源，免得两处口径分叉 */
+const runtimeState = (services: Services, sessionId: string): SessionRuntimeState => ({
+  running: services.pool.isActive(sessionId),
+  status: services.pool.statusOf(sessionId),
 });
 
 const listSessions = (services: Services, query: SessionListInput): SessionListResponse => {
@@ -92,14 +103,14 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
 
   // 已落盘行读行里的缓存；草稿行只有覆盖值可展示，用行里的真实时间保持排序口径一致
   const sessions = records.map((record) => {
-    const running = services.pool.isActive(record.id);
+    const runtime = runtimeState(services, record.id);
     return record.sourcePath
       ? sessionInfoToDTO(
-          infoFromRecord(record),
+          recordToInfo(record),
           overrideOf(record),
           model,
           thinkingLevel,
-          running,
+          runtime,
           record.childCount,
         )
       : draftSessionSummary(
@@ -108,7 +119,7 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
           model,
           thinkingLevel,
           workspaceDirOf(record.id),
-          running,
+          runtime,
           record.childCount,
           { createdAt: record.createdAt, updatedAt: record.updatedAt },
         );
@@ -130,7 +141,7 @@ const createSessionRoute = (services: Services, input: SessionCreateInput): Sess
   }
   if (input.model) assertModel(services, input.model);
   if (input.mode) {
-    assertPrimaryMode(input.cwd ? resolveTargetPath(input.cwd) : env.workspaceRoot, input.mode);
+    assertPrimaryMode(input.cwd ? resolveTargetPath(input.cwd) : env.workspacesDir, input.mode);
   }
 
   const sessionId = createSession(services, input);
@@ -151,7 +162,7 @@ const appendTranscriptPatch = (
   cwd: string,
   patch: SessionUpdateInput,
 ): SessionManager => {
-  const manager = SessionManager.open(sourcePath, env.sessionsRoot, cwd);
+  const manager = SessionManager.open(sourcePath, env.sessionsDir, cwd);
   if (patch.name) manager.appendSessionInfo(patch.name);
   if (patch.model) {
     const separator = patch.model.indexOf("/");
@@ -188,7 +199,7 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     // 只有名称 / 模型 / 档位需要追加到会话文件；置顶等元数据不落文件
     if (patch.name || patch.model || patch.thinkingLevel) {
       const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);
-      const index = indexFromManager(manager);
+      const index = managerToIndex(manager);
       if (index) services.sessions.refresh(patch.sessionId, index);
     }
   }
@@ -292,7 +303,7 @@ const forkSession = (services: Services, input: SessionForkInput): SessionSummar
     throw error;
   }
 
-  const index = indexFromManager(forked.manager);
+  const index = managerToIndex(forked.manager);
   if (index) services.sessions.refresh(forked.id, index);
 
   const summary = describeSession(services, forked.id).session;

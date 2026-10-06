@@ -71,7 +71,7 @@ const resolveAppHome = (): string => {
 const homeDir = resolveAppHome();
 const harnessDir = resolve(homeDir, HARNESS_DIRNAME);
 const appDir = resolve(homeDir, APP_DIRNAME);
-const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
+const workspacesDir = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
 
 /** 服务注册文件里的端口是「上次落地的监听形态」；`APP_HOST` / `APP_PORT` 在 .env 里是默认值 */
@@ -112,8 +112,8 @@ export const env = {
   port: resolvePort(),
   /** 服务注册文件：host / port / pid / serviceToken / password（0600，服务独占写） */
   servicePath,
-  /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
-  workspaceRoot,
+  /** 助理根目录：未绑定工作目录的会话落在 `<workspacesDir>/<sessionId>` */
+  workspacesDir,
   /** 运行时数据目录：auth.json / sessions 放这里 */
   harnessDir,
   /** 应用自有数据目录：config.json 与 SQLite 数据库 */
@@ -121,7 +121,7 @@ export const env = {
   /** 附件库：按内容 sha256 存的原始字节，图片与文档共用 */
   attachmentsDir: resolve(appDir, ATTACHMENTS_DIRNAME),
   /** 会话 JSONL 存放目录（保持扁平，便于统一列出） */
-  sessionsRoot: resolve(harnessDir, SESSIONS_DIRNAME),
+  sessionsDir: resolve(harnessDir, SESSIONS_DIRNAME),
   authPath: resolve(harnessDir, AUTH_FILENAME),
   configPath: resolve(appDir, CONFIG_FILENAME),
   /** pi 的 MCP 服务器配置（用户级）；设置页增删改写回这里 */
@@ -138,10 +138,10 @@ export const env = {
 
 for (const dir of new Set([
   env.homeDir,
-  env.workspaceRoot,
+  env.workspacesDir,
   env.harnessDir,
   env.appDir,
-  env.sessionsRoot,
+  env.sessionsDir,
 ])) {
   mkdirSync(dir, { recursive: true });
 }

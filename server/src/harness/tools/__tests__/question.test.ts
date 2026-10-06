@@ -1,4 +1,4 @@
-/** question 工具单测：答复折成给模型的文本，超时 / 取消给出可读错误（Q-01） */
+/** question 工具单测：答复折成给模型的文本，取消给出可读错误（Q-01） */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -36,10 +36,6 @@ describe("createQuestionTool", () => {
     const output = await run({ kind: "answered", answers: [[]] });
     const text = output.content.map((part) => (part.type === "text" ? part.text : "")).join("");
     assert.ok(text.includes("用户跳过"), text);
-  });
-
-  it("超时抛可读错误而非静默", async () => {
-    await assert.rejects(() => run({ kind: "timeout" }), /提问超时/);
   });
 
   it("取消抛可读错误", async () => {

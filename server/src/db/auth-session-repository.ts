@@ -37,7 +37,7 @@ const rowSchema = z.object({
 
 type AuthSessionRow = z.infer<typeof rowSchema>;
 
-const toRecord = (row: AuthSessionRow): AuthSessionRecord => ({
+const rowToRecord = (row: AuthSessionRow): AuthSessionRecord => ({
   id: row.id,
   tokenHash: row.token_hash,
   createdAt: row.created_at,
@@ -72,7 +72,7 @@ export class AuthSessionRepository {
       | undefined;
     if (!row) return null;
     const parsed = rowSchema.safeParse(row);
-    return parsed.success ? toRecord(parsed.data) : null;
+    return parsed.success ? rowToRecord(parsed.data) : null;
   }
 
   findByTokenHash(tokenHash: string): AuthSessionRecord | null {
@@ -81,7 +81,7 @@ export class AuthSessionRepository {
       .get(tokenHash) as AuthSessionRow | undefined;
     if (!row) return null;
     const parsed = rowSchema.safeParse(row);
-    return parsed.success ? toRecord(parsed.data) : null;
+    return parsed.success ? rowToRecord(parsed.data) : null;
   }
 
   /** 全部未撤销会话，最近签发在前 */
@@ -95,7 +95,7 @@ export class AuthSessionRepository {
       .all(now) as AuthSessionRow[];
     return rows.flatMap((row) => {
       const parsed = rowSchema.safeParse(row);
-      return parsed.success ? [toRecord(parsed.data)] : [];
+      return parsed.success ? [rowToRecord(parsed.data)] : [];
     });
   }
 

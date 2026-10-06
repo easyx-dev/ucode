@@ -13,6 +13,7 @@ import { after, before, describe, it } from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 
 import type { SessionRecord, SessionRepository } from "../../../db/session-repository";
+import { localDateKeyOf } from "../aggregate";
 import { collectUsage, UsageService } from "../index";
 
 type UsageShape = { input: number; output: number; cacheRead: number; cacheWrite: number };
@@ -69,6 +70,14 @@ const compactionEntry = (over: { id: string; timeMs: number; usage: UsageShape }
 
 const entriesOf = (list: unknown[]): Parameters<typeof collectUsage>[0] =>
   list as Parameters<typeof collectUsage>[0];
+
+/** 指定「几天前的某个整点」，本地时区（夏令时切换日也落在期望的日期上） */
+const atDaysAgo = (days: number, hour: number, minute = 0): number => {
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  date.setDate(date.getDate() - days);
+  return date.getTime();
+};
 
 describe("collectUsage", () => {
   it("assistant / usage / compaction 三类条目全部计入，合计为四类之和", () => {
@@ -356,5 +365,59 @@ describe("UsageService", () => {
   it("会话未落盘时给不出占用", () => {
     const service = serviceWith([record({ sourcePath: null })]);
     assert.equal(service.contextUsageOf(record({ sourcePath: null })), null);
+  });
+
+  it("汇总带出逐日 / 逐周序列、峰值、连续天数与最长聊天时长", () => {
+    // 今天 09:00 与 09:10 各一次调用（同一段聊天，10 分钟），昨天一次，40 天前一次
+    const chat = withSessionFile("series-chat", (manager) => {
+      appendAssistant(manager, { timeMs: atDaysAgo(0, 9), usage: usageShape(10) });
+      appendAssistant(manager, { timeMs: atDaysAgo(0, 9, 10), usage: usageShape(10) });
+    });
+    const old = withSessionFile("series-old", (manager) => {
+      appendAssistant(manager, { timeMs: atDaysAgo(1, 9), usage: usageShape(5) });
+      appendAssistant(manager, { timeMs: atDaysAgo(40, 9), usage: usageShape(400) });
+    });
+
+    try {
+      const summary = serviceWith([chat.target, old.target]).summary(30);
+
+      assert.equal(summary.total.totalTokens, 25);
+      assert.equal(summary.daily.length, 30);
+      assert.equal(
+        summary.daily.reduce((sum, day) => sum + day.totals.totalTokens, 0),
+        summary.total.totalTokens,
+      );
+      assert.equal(
+        summary.weekly.reduce((sum, week) => sum + week.totals.totalTokens, 0),
+        summary.total.totalTokens,
+      );
+      // 周一为周起点：相邻两周的 weekStart 相差 7 天，且升序
+      for (let i = 1; i < summary.weekly.length; i += 1) {
+        const previous = summary.weekly[i - 1]?.weekStart ?? "";
+        const current = summary.weekly[i]?.weekStart ?? "";
+        assert.equal(
+          Date.parse(`${current}T00:00:00Z`) - Date.parse(`${previous}T00:00:00Z`),
+          7 * 24 * 60 * 60 * 1000,
+        );
+      }
+      assert.deepEqual(summary.peak, { date: localDateKeyOf(atDaysAgo(0, 9)), totalTokens: 20 });
+      // 40 天前那次不进区间，但仍算活跃天；当前连续是今天 + 昨天两天
+      assert.deepEqual(summary.streak, { current: 2, longest: 2, activeDays: 3 });
+      assert.equal(summary.longestSessionMs, 10 * 60 * 1000);
+      assert.equal(summary.bySession.length, 2);
+
+      // 全部时间口径：逐日只含有活动的日子，总量把区间外的也算进来
+      const all = serviceWith([chat.target, old.target]).summary();
+      assert.equal(all.total.totalTokens, 425);
+      assert.deepEqual(
+        all.daily.map((day) => day.date),
+        [...all.daily.map((day) => day.date)].sort(),
+      );
+      assert.equal(all.daily.length, 3);
+      assert.equal(all.streak.activeDays, 3);
+    } finally {
+      chat.cleanup();
+      old.cleanup();
+    }
   });
 });

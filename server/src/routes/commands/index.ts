@@ -24,7 +24,7 @@ const resolveCwd = (services: Services, input: CommandsListInput): string => {
     }
     return resolveSessionCwd(record);
   }
-  return input.cwd ?? env.workspaceRoot;
+  return input.cwd ?? env.workspacesDir;
 };
 
 export const createCommandsRoute = (services: Services) => {

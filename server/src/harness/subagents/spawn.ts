@@ -200,7 +200,7 @@ export const spawnSubagent = async (
   try {
     child = await deps.ensure(childId);
   } catch (error) {
-    // 装配失败（模型未配置等）：删掉刚建的空行，否则会留一条永远没有文件的子会话。
+    // 装配失败（模型未配置等）：删掉刚建的空行，否则会留一条永远没有文件的子会话
     // 续跑时行是早已存在的，不能当空行删掉
     if (!resumed) deps.discardChild(childId);
     throw error;
@@ -227,7 +227,7 @@ export const spawnSubagent = async (
     deps.emit("subagent_end", { toolCallId: input.toolCallId, sessionId: childId, isError });
     // 失败（超时 / 中止）也要回写：子会话可能已写出 JSONL，不回写会永远停在「未落盘」的草稿口径
     deps.refresh(childId);
-    // 子会话挂起的审批 / 提问归属父会话，结束时一并结算，避免它超时前一直挂在前端
+    // 子会话挂起的审批 / 提问归属父会话，结束时一并结算，避免子会话已结束而请求仍挂在前端
     deps.settleInteractions(childId);
     deps.dispose(childId);
   }

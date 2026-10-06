@@ -17,7 +17,7 @@ export const createStatusRoute = (services: Services) => {
         defaultModel: status.defaultModel,
         thinkingLevel: status.thinkingLevel,
         error: status.error,
-        workspace: env.workspaceRoot,
+        workspace: env.workspacesDir,
         activeSessions: services.pool.activeCount(),
         uptimeMs: Math.round(process.uptime() * 1000),
       } satisfies StatusResponse),

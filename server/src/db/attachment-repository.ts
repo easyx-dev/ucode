@@ -35,7 +35,7 @@ const rowSchema = z.object({
 
 type AttachmentRow = z.infer<typeof rowSchema>;
 
-const toRecord = (row: AttachmentRow): AttachmentRecord => ({
+const rowToRecord = (row: AttachmentRow): AttachmentRecord => ({
   id: row.id,
   mimeType: row.mime_type,
   name: row.name,
@@ -71,7 +71,7 @@ export class AttachmentRepository {
       | undefined;
     if (!row) return null;
     const parsed = rowSchema.safeParse(row);
-    return parsed.success ? toRecord(parsed.data) : null;
+    return parsed.success ? rowToRecord(parsed.data) : null;
   }
 
   /** 标记为「已被消息引用」；已标记过的保持不变（幂等） */

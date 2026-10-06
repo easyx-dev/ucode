@@ -72,7 +72,7 @@ describe("resolveSessionCwd", () => {
   });
 
   it("未绑定目录的会话用工作区（由 id 派生）", () => {
-    assert.equal(resolveSessionCwd(recordWith({})), `${env.workspaceRoot}/s1`);
+    assert.equal(resolveSessionCwd(recordWith({})), `${env.workspacesDir}/s1`);
   });
 });
 

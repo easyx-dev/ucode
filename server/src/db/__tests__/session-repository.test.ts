@@ -1,12 +1,35 @@
 /** 会话仓储单测：覆盖值、归档与列表过滤 */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { openDatabase } from "../index";
 import { overrideOf, SessionRepository } from "../session-repository";
+
+/** 造一份最小可解析的会话 JSONL：header + 若干 user 消息（对账只看 header 与消息时间） */
+const sessionFile = (id: string, messages: { at: number; text: string }[]): string => {
+  const header = {
+    type: "session",
+    version: 3,
+    id,
+    timestamp: new Date(messages[0]?.at ?? Date.now()).toISOString(),
+    cwd: "/tmp/project",
+  };
+  const entries = messages.map((message, index) => ({
+    type: "message",
+    id: `${id}-m${index}`,
+    parentId: index === 0 ? null : `${id}-m${index - 1}`,
+    timestamp: new Date(message.at).toISOString(),
+    message: {
+      role: "user",
+      content: [{ type: "text", text: message.text }],
+      timestamp: message.at,
+    },
+  }));
+  return `${[header, ...entries].map((entry) => JSON.stringify(entry)).join("\n")}\n`;
+};
 
 describe("SessionRepository", () => {
   let dir: string;
@@ -255,5 +278,42 @@ describe("SessionRepository", () => {
     const after = repo.find("read-1");
     assert.equal(after?.lastReadAt, "2026-04-01T00:00:00.000Z");
     assert.equal(after?.updatedAt, before?.updatedAt, "标记已读不应把会话顶到列表最前");
+  });
+
+  // 对账放在最后：它会删掉「文件已消失」的行，等于清掉前面用例造的行
+  it("对账时认领有文件的行，删掉文件已消失的行", async () => {
+    const sessionsDir = mkdtempSync(join(tmpdir(), "session-files-"));
+    try {
+      const claimed = join(sessionsDir, "2026-01-01T00-00-00-000Z_claim-1.jsonl");
+      writeFileSync(claimed, sessionFile("claim-1", [{ at: 1767225600000, text: "认领我" }]));
+
+      repo.create("claim-1", { cwd: "/tmp/project" });
+      repo.create("gone-1", {});
+      assert.equal(repo.find("claim-1")?.sourcePath, null, "前置：这一行还没有文件路径");
+
+      await repo.reconcile(sessionsDir);
+
+      assert.equal(repo.find("claim-1")?.sourcePath, claimed);
+      assert.equal(repo.find("gone-1"), undefined, "文件已消失的行应被删掉");
+    } finally {
+      rmSync(sessionsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("对账时同一个 id 有多份文件取最近修改的那份", async () => {
+    const sessionsDir = mkdtempSync(join(tmpdir(), "session-dups-"));
+    try {
+      const earlier = join(sessionsDir, "2026-01-01T00-00-00-000Z_dup-1.jsonl");
+      const later = join(sessionsDir, "2026-01-02T00-00-00-000Z_dup-1.jsonl");
+      writeFileSync(earlier, sessionFile("dup-1", [{ at: 1767225600000, text: "早的那份" }]));
+      writeFileSync(later, sessionFile("dup-1", [{ at: 1767312000000, text: "晚的那份" }]));
+
+      repo.create("dup-1", { cwd: "/tmp/project" });
+      await repo.reconcile(sessionsDir);
+
+      assert.equal(repo.find("dup-1")?.sourcePath, later);
+    } finally {
+      rmSync(sessionsDir, { recursive: true, force: true });
+    }
   });
 });

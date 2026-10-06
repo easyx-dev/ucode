@@ -20,6 +20,7 @@ import { expireTempAttachments } from "./harness/attachment";
 import { GoalService } from "./harness/goal";
 import { MemoryService } from "./harness/memory";
 import { SessionAllowStore } from "./harness/permissions";
+import { TitleService } from "./harness/title";
 import { UsageService } from "./harness/usage";
 import { CredentialStore } from "./lib/auth/credentials";
 import { PairingStore } from "./lib/auth/pairing";
@@ -46,6 +47,8 @@ export type Services = {
   usage: UsageService;
   /** 目标模式：会话目标状态与落定后的校验续跑 */
   goals: GoalService;
+  /** 会话标题：首条消息得到回复后自动起名 */
+  titles: TitleService;
   /** 鉴权：凭证、登录会话、一次性配对码与登录限流 */
   auth: {
     credentials: CredentialStore;
@@ -93,6 +96,13 @@ export const createServices = async (registration: ServiceRegistration): Promise
     goals,
     usage,
   );
+  // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话
+  const titles = new TitleService({
+    sessions,
+    events,
+    liveOf: (sessionId) => pool.get(sessionId),
+    emitSummary: (sessionId) => pool.refreshSummary(sessionId),
+  });
 
   config.load();
   // 以 JSONL 为准对齐索引：清理文件已消失的行
@@ -183,6 +193,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     permissions,
     usage,
     goals,
+    titles,
     auth: {
       credentials,
       sessions: authSessions,

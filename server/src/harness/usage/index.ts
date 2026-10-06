@@ -27,24 +27,19 @@ import type {
 import type { SessionRecord, SessionRepository } from "../../db/session-repository";
 import { logger } from "../../lib/logger";
 import { isRecord } from "../../utils/object";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-const emptyTotals = (): UsageTotals => ({
-  inputTokens: 0,
-  outputTokens: 0,
-  cacheReadTokens: 0,
-  cacheWriteTokens: 0,
-  totalTokens: 0,
-});
-
-const addInto = (target: UsageTotals, usage: UsageTotals): void => {
-  target.inputTokens += usage.inputTokens;
-  target.outputTokens += usage.outputTokens;
-  target.cacheReadTokens += usage.cacheReadTokens;
-  target.cacheWriteTokens += usage.cacheWriteTokens;
-  target.totalTokens += usage.totalTokens;
-};
+import {
+  addInto,
+  dailyBuckets,
+  dateKeysOf,
+  emptyTotals,
+  localDateKeyOf,
+  maxChatDurationMs,
+  nextDayStartMs,
+  peakDayOf,
+  startOfDayMsOfKey,
+  streaksOf,
+  weeklyBuckets,
+} from "./aggregate";
 
 /** 从 pi 的 `Usage` 形状安全取出四类 token；缺失或非数字按 0 处理 */
 const readUsage = (value: unknown): UsageTotals => {
@@ -255,16 +250,41 @@ export class UsageService {
     return { tokens, contextWindow };
   }
 
-  /** 全局汇总：总量、工具调用次数、按模型与按会话；`days` 缺省为全部时间 */
+  /**
+   * 全局汇总：总量、工具调用次数、按模型 / 按会话两个维度，以及仪表盘用的逐日逐周序列、
+   * 峰值与活跃度；`days` 缺省为全部时间。
+   *
+   * 区间按服务端本地日期取「今天往前 N 天」的整日，全部维度都用这一批点算，
+   * 所以逐日求和与 `total` 必然相等；`streak` 例外——它是跨区间的历史口径。
+   */
   summary(days?: number): StatsSummaryResponse {
-    const sinceMs = days ? Date.now() - days * MS_PER_DAY : undefined;
+    const now = Date.now();
+    const dates = days ? dateKeysOf(now, days) : null;
+    const startMs = dates?.[0] ? startOfDayMsOfKey(dates[0]) : 0;
+    // 不带 days 时不设上界：全部时间口径下逐日只输出有活动的日子，不会被零值撑爆
+    const endMs = dates ? nextDayStartMs(now) : Number.MAX_SAFE_INTEGER;
+    const inRange = (point: UsagePoint): boolean => point.timeMs >= startMs && point.timeMs < endMs;
+
+    const all: UsagePoint[] = [];
+    const perSession: Array<{ record: SessionRecord; points: UsagePoint[] }> = [];
+    for (const record of this.sessions.list()) {
+      const points = this.pointsOf(record);
+      if (points.length === 0) continue;
+      all.push(...points);
+      perSession.push({ record, points: points.filter(inRange) });
+    }
+
+    const daily = dailyBuckets(
+      perSession.flatMap((entry) => entry.points),
+      dates ?? undefined,
+    );
     const total = emptyTotals();
     const byModel = new Map<string, ModelUsage>();
     const bySession: SessionUsageEntry[] = [];
     let toolCalls = 0;
 
-    for (const record of this.sessions.list()) {
-      const aggregateOfSession = aggregate(this.pointsOf(record), sinceMs);
+    for (const { record, points } of perSession) {
+      const aggregateOfSession = aggregate(points);
       if (aggregateOfSession.totals.totalTokens === 0 && aggregateOfSession.toolCalls === 0)
         continue;
 
@@ -293,6 +313,11 @@ export class UsageService {
       toolCalls,
       byModel: [...byModel.values()].sort((a, b) => b.totals.totalTokens - a.totals.totalTokens),
       bySession,
+      daily,
+      weekly: weeklyBuckets(daily),
+      streak: streaksOf(all, localDateKeyOf(now)),
+      peak: peakDayOf(daily),
+      longestSessionMs: maxChatDurationMs(perSession.map((entry) => entry.points)),
     };
   }
 

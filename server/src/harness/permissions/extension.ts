@@ -5,7 +5,7 @@
  * 所以模式规则与审批回调在这里收敛成一个扩展工厂，由装配层塞进
  * `DefaultResourceLoader({ extensionFactories })`。
  *
- * 判定为 `deny` 时直接阻断；`ask` 时挂起等前端回答，超时 / 断连按拒绝处理。
+ * 判定为 `deny` 时直接阻断；`ask` 时挂起等前端回答，本轮中断 / 会话清理按拒绝处理。
  * 「本会话恒允」= 往规则表追尾加一条 allow 规则（按判定给出的范围），下次判定即命中。
  * pi 对 `tool_call` 处理器抛错的处理是「按阻断兜底」，与这里的失败姿态一致。
  */
@@ -32,7 +32,7 @@ export type PermissionGate = {
   parentRules?: () => readonly PermissionRule[];
   /** 记下本会话恒允：追加一条 allow 规则 */
   grant: (rule: PermissionRule) => void;
-  /** 发起审批；返回用户答复，超时 / 断连按 `deny` */
+  /** 发起审批；返回用户答复，本轮中断 / 会话清理按 `deny` */
   request: (ask: PermissionAsk) => Promise<PermissionDecision>;
 };
 
@@ -55,7 +55,7 @@ const askDenyReason = (tool: string, subject: string): string =>
 export const createPermissionExtension =
   (gate: PermissionGate): ExtensionFactory =>
   (pi) => {
-    pi.on("tool_call", async (event): Promise<ToolCallEventResult | undefined> => {
+    pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult | undefined> => {
       const input = event.input as Record<string, unknown>;
       let verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
       // 子会话再算一遍父会话的判定，取较严者，保证角色权限放宽不了父的限制
@@ -91,6 +91,8 @@ export const createPermissionExtension =
         tool: event.toolName,
         subject,
         scope: verdict.scope,
+        // 本轮的中断信号随请求一起交给交互中转：审批不设等待时限，只由中断（stop）等事件结算
+        signal: ctx.signal,
       });
       if (decision === "deny") {
         return { block: true, reason: askDenyReason(verdict.tool, subject) };

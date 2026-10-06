@@ -31,18 +31,18 @@ export const createMessagesRoute = (services: Services) => {
     const record = services.sessions.find(sessionId);
     const live = services.pool.get(sessionId);
     // 会话在池中时以它的内存条目为准：草稿（首轮回复完成前）还没写 JSONL，
-    // 只读文件会让刷新后的对话区空着，直到首条 assistant 消息落盘。
+    // 只读文件会让刷新后的对话区空着，直到首条 assistant 消息落盘
     const manager =
       live?.sessionManager ??
       (record?.sourcePath
-        ? SessionManager.open(record.sourcePath, env.sessionsRoot, resolveSessionCwd(record))
+        ? SessionManager.open(record.sourcePath, env.sessionsDir, resolveSessionCwd(record))
         : null);
     const entries = manager ? manager.buildContextEntries() : [];
     // 会话级设置沿完整路径推进：压缩只裁剪展示条目，看裁剪后的列表会让压缩点之后丢档位
     const states = transcriptStates(manager ? manager.getBranch() : []);
 
     // 序号与投影必须在同一同步块内取：中间一旦插入事件，
-    // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量。
+    // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量
     const seq = services.events.latestSeq(sessionId);
     const projection = projectMessages(sessionId, live, entries, states);
 
@@ -83,7 +83,7 @@ export const createMessagesRoute = (services: Services) => {
     return c.json(ok({ sessionId, aborted } satisfies MessageInterruptResponse));
   });
 
-  // 忽略本次计划的决策表单：往会话文件追加一条 custom 标记条目，本轮不再弹表单。
+  // 忽略本次计划的决策表单：往会话文件追加一条 custom 标记条目，本轮不再弹表单
   // 标记只作扩展状态、不进模型上下文，也不触发新一轮；多窗口同步复用 transcript_reset
   router.post("/ignore-plan", jsonBody(sessionIdInputSchema), async (c) => {
     const { sessionId } = c.req.valid("json");
@@ -107,7 +107,7 @@ export const createMessagesRoute = (services: Services) => {
       const manager =
         live?.sessionManager ??
         (record.sourcePath
-          ? SessionManager.open(record.sourcePath, env.sessionsRoot, resolveSessionCwd(record))
+          ? SessionManager.open(record.sourcePath, env.sessionsDir, resolveSessionCwd(record))
           : undefined);
       if (!manager) {
         throw new AppError(ERROR_CODES.invalidRequest, "会话还没有落盘，无法忽略计划", 400);

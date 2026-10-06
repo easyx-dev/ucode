@@ -40,8 +40,8 @@ import { createSessionsRoute } from "./routes/sessions";
 import { createStatsRoute } from "./routes/stats";
 import { createStatusRoute } from "./routes/status";
 
-// 服务注册：复用已有凭证，首次启动生成 serviceToken 与登录密码（权限 0600）。
-// 必须在 createServices 之前，鉴权对象要绑定同一份凭证。
+// 服务注册：复用已有凭证，首次启动生成 serviceToken 与登录密码（权限 0600）
+// 必须在 createServices 之前，鉴权对象要绑定同一份凭证
 const { registration, created } = ensureServiceRegistration({
   path: env.servicePath,
   host: env.host,
@@ -56,8 +56,8 @@ const services = await createServices(registration);
 
 const app = new Hono<AuthVariables>();
 
-// CORS 只对白名单来源开放并允许携带 Cookie；同源与原生客户端不经 CORS。
-// 不能再用 `origin: "*"`——带凭证时通配来源本身就不合法，也会放行任意网页。
+// CORS 只对白名单来源开放并允许携带 Cookie；同源与原生客户端不经 CORS
+// 不能再用 `origin: "*"`——带凭证时通配来源本身就不合法，也会放行任意网页
 const allowedOrigins = env.corsOrigin
   .split(",")
   .map((origin) => origin.trim())
@@ -107,9 +107,9 @@ app.get("/auth/connect/:code", (c) => {
   return c.redirect("/", 302);
 });
 
-// 生产模式：同源托管 web 构建产物。
+// 生产模式：同源托管 web 构建产物
 // 注册在 API 路由之后；dist 不存在时 serveStatic 会直接放行走 notFound，
-// 所以先起服务、后 `pnpm build` 也能生效（不需要重启）。
+// 所以先起服务、后 `pnpm build` 也能生效（不需要重启）
 const webIndexPath = resolve(env.webDistDir, "index.html");
 const webBuildExists = (): boolean => existsSync(webIndexPath);
 

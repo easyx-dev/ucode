@@ -1,4 +1,4 @@
-/** /api/v1/config：读取、更新（热重载）、连通性测试 */
+/** /api/v1/config：读取、更新（热重载）、连通性测试、拉取可用模型 */
 import {
   appConfigPatchSchema,
   type ConfigSnapshot,
@@ -7,10 +7,14 @@ import {
   configTestSchema,
   ERROR_CODES,
   emptyInputSchema,
+  type ProviderModelsInput,
+  type ProviderModelsResponse,
+  providerModelsInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
 
 import type { Services } from "../../app";
+import { fetchProviderModels } from "../../config/provider-models";
 import { publicConfig } from "../../config/store";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
@@ -88,6 +92,36 @@ const testConnection = async (
   return { latencyMs: Date.now() - startedAt, modelEcho, url };
 };
 
+/**
+ * 按 provider 端点拉模型列表。apiKey 允许留空（key 还没填进表单、但配置里存过），
+ * 已保存的同 id 模型作为能力推断的最高优先级来源一并发给解析层。
+ */
+const fetchModels = async (
+  input: ProviderModelsInput,
+  services: Services,
+): Promise<ProviderModelsResponse> => {
+  const provider = services.config.get().providers.find((item) => item.id === input.providerId);
+  const apiKey = input.apiKey?.trim() || provider?.apiKey;
+
+  if (!apiKey) {
+    throw new AppError(
+      ERROR_CODES.invalidRequest,
+      "缺少 apiKey（未保存过该 provider 的 key）",
+      400,
+    );
+  }
+
+  return fetchProviderModels({
+    baseUrl: input.baseUrl,
+    apiKey,
+    api: input.api,
+    configuredModels: provider?.models,
+    // 内置目录只列出「已接入」的 provider，未保存过的新 provider 拿不到线索
+    catalogModels: services.runtime.getCatalog().find((item) => item.id === input.providerId)
+      ?.models,
+  });
+};
+
 export const createConfigRoute = (services: Services) => {
   const router = new Hono();
 
@@ -105,6 +139,10 @@ export const createConfigRoute = (services: Services) => {
 
   router.post("/test", jsonBody(configTestSchema), async (c) => {
     return c.json(ok(await testConnection(c.req.valid("json"), services)));
+  });
+
+  router.post("/fetch-models", jsonBody(providerModelsInputSchema), async (c) => {
+    return c.json(ok(await fetchModels(c.req.valid("json"), services)));
   });
 
   return router;

@@ -6,7 +6,7 @@
  * 消息正文不在这里，仍由 pi 写在 `sessions/*.jsonl`。
  * 命名、SQL 与删除规则见 `docs/database.md`。
  */
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { type SessionInfo, SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_SESSION_MODE,
   PERMISSION_MODES,
@@ -17,6 +17,7 @@ import {
 import { z } from "zod";
 
 import { env } from "../env";
+import { logger } from "../lib/logger";
 import { openDatabase } from "./index";
 
 /** 单会话的可覆盖项；未设置时回落到全局默认 */
@@ -158,7 +159,7 @@ const rowSchema = z.object({
 
 type SessionRow = z.infer<typeof rowSchema>;
 
-const toRecord = (row: SessionRow): SessionRecord => ({
+const rowToRecord = (row: SessionRow): SessionRecord => ({
   id: row.id,
   name: row.name,
   cwd: row.cwd,
@@ -312,7 +313,7 @@ export class SessionRepository {
 
   find(id: string): SessionRecord | undefined {
     const row = this.db.prepare(`${SESSION_SELECT} WHERE id = ?`).get(id);
-    return row ? toRecord(rowSchema.parse(row)) : undefined;
+    return row ? rowToRecord(rowSchema.parse(row)) : undefined;
   }
 
   /** 覆盖值（不含列表缓存），供 pool / 序列化合并生效值 */
@@ -375,6 +376,14 @@ export class SessionRepository {
   }
 
   /**
+   * 补写会话正文文件路径。行里还没有它（首轮未落定就被回收）时按 id 认领回来，
+   * 不补的话下一次打开会新建一份 JSONL，把已有上下文整个丢掉。
+   */
+  setSourcePath(id: string, path: string): void {
+    this.db.prepare("UPDATE session SET source_path = ? WHERE id = ?").run(path, id);
+  }
+
+  /**
    * 丢弃一条从未落盘的会话行（如子智能体装配失败时刚建的行）。
    * 只删 `source_path IS NULL` 的行：文件一旦写出就该走归档 / 对账，不能硬删。
    */
@@ -393,7 +402,7 @@ export class SessionRepository {
     return this.db
       .prepare(`${SESSION_SELECT} ${SESSION_ORDER}`)
       .all()
-      .map((row) => toRecord(rowSchema.parse(row)));
+      .map((row) => rowToRecord(rowSchema.parse(row)));
   }
 
   /** 全部会话 id（含已归档）；工作区孤儿清理据此判定「还有没有主」 */
@@ -466,7 +475,7 @@ export class SessionRepository {
       .all(...params, query.limit);
 
     return {
-      records: rows.map((row) => toRecord(rowSchema.parse(row))),
+      records: rows.map((row) => rowToRecord(rowSchema.parse(row))),
       total: totalRow?.total ?? 0,
     };
   }
@@ -487,15 +496,32 @@ export class SessionRepository {
   }
 
   /**
-   * 启动时全量对账：以 JSONL 为准删除文件已消失的行。
-   * 不再从文件还原元数据（外部导入能力已放弃），所以这里只做减法。
+   * 启动时全量对账：以 JSONL 为准删除文件已消失的行，并认领库里还没有文件路径的行。
+   *
+   * 「有行没路径」是首轮未落定就被回收留下的：文件已经写在盘上、库里却不知道，下一次打开
+   * 会另开一份 JSONL 把上下文清空。同一个 id 有多份文件正是这种遗留的产物，
+   * 取最近修改的那份续写。
    */
-  async reconcile(): Promise<void> {
-    const infos = await SessionManager.listAll(env.sessionsRoot);
-    const seen = new Set(infos.map((info) => info.id));
+  async reconcile(sessionsDir = env.sessionsDir): Promise<void> {
+    const infos = await SessionManager.listAll(sessionsDir);
+    const latest = new Map<string, SessionInfo>();
+    for (const info of infos) {
+      const kept = latest.get(info.id);
+      if (!kept || info.modified.getTime() > kept.modified.getTime()) latest.set(info.id, info);
+    }
 
     for (const record of this.list()) {
-      if (!seen.has(record.id)) this.delete(record.id);
+      const info = latest.get(record.id);
+      if (!info) {
+        this.delete(record.id);
+        continue;
+      }
+      if (record.sourcePath) continue;
+      this.setSourcePath(record.id, info.path);
+      logger.warn(
+        { sessionId: record.id, path: info.path },
+        "会话行没有文件路径，已按 id 认领会话文件",
+      );
     }
   }
 }

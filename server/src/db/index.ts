@@ -47,8 +47,8 @@ const migrations: Record<number, string> = {
   4: `
     ALTER TABLE session ADD COLUMN goal_state TEXT;
   `,
-  // 附件：内容寻址的元数据；字节在 $APP_HOME/app/attachments/<id>，见 plans/input-commands-skills.md。
-  // `referenced_at` 为空表示「只被草稿引用过、随时可过期」，被消息引用后置为时间且不再回退。
+  // 附件：内容寻址的元数据；字节在 $APP_HOME/app/attachments/<id>，见 plans/input-commands-skills.md
+  // `referenced_at` 为空表示「只被草稿引用过、随时可过期」，被消息引用后置为时间且不再回退
   5: `
     CREATE TABLE attachment (
       id            TEXT PRIMARY KEY,
@@ -64,8 +64,8 @@ const migrations: Record<number, string> = {
   6: `
     ALTER TABLE session ADD COLUMN permission_mode TEXT;
   `,
-  // 登录会话：浏览器 Cookie 对应的可撤销会话（见 plans/service-and-auth.md §3.4）。
-  // 库内只存 token 的 sha256，明文只回客户端 Cookie；id 是可展示 / 可撤销的 uuid。
+  // 登录会话：浏览器 Cookie 对应的可撤销会话（见 plans/service-and-auth.md §3.4）
+  // 库内只存 token 的 sha256，明文只回客户端 Cookie；id 是可展示 / 可撤销的 uuid
   7: `
     CREATE TABLE auth_session (
       id            TEXT PRIMARY KEY,

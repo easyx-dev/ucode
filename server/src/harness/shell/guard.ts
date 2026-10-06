@@ -96,7 +96,7 @@ export const withShellGuard = (
         },
       });
     } catch (err) {
-      // 空转在 pi 侧与「用户中断」共用一个错误消息，这里换回超时语义，免得模型以为是人取消了。
+      // 空转在 pi 侧与「用户中断」共用一个错误消息，这里换回超时语义，免得模型以为是人取消了
       // 用户中断优先：真被取消时不要报成超时
       const abortedByUser = execOptions.signal?.aborted === true;
       if (

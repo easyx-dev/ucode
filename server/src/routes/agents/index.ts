@@ -66,7 +66,7 @@ const resolveCwd = (services: Services, input: AgentsListInput): string => {
     }
     return resolveSessionCwd(record);
   }
-  return input.cwd ?? env.workspaceRoot;
+  return input.cwd ?? env.workspacesDir;
 };
 
 export const createAgentsRoute = (services: Services) => {

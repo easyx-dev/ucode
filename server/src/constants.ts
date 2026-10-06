@@ -58,12 +58,6 @@ export const WEBSEARCH_MAX_RESULTS = 10;
 /** websearch 单次请求的超时 */
 export const WEBSEARCH_TIMEOUT_MS = 20_000;
 
-/** 权限审批等待用户答复的时限；超时按拒绝处理，避免工具调用永久挂起 */
-export const PERMISSION_APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
-
-/** question 工具等待用户答复的时限；超时以可读错误结束本轮提问 */
-export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
-
 /** agent 侧 shell 命令的总时长上限（秒）；模型可用 `timeout` 参数放宽 */
 export const SHELL_COMMAND_TIMEOUT_SECONDS = 30 * 60;
 
@@ -159,6 +153,21 @@ export const MEMORY_REVIEW_MAX_TOKENS = 1_024;
 
 /** 自动回顾调用的超时；超时只记日志，不影响会话 */
 export const MEMORY_REVIEW_TIMEOUT_MS = 60_000;
+
+/** 会话标题生成时最多回看的用户轮数；超出即不再尝试（会话已经不是「一件事」） */
+export const TITLE_MAX_USER_TURNS = 2;
+
+/** 会话标题生成时交流文本的字符上限（单条） */
+export const TITLE_INPUT_MAX_CHARS = 2_000;
+
+/** 会话标题长度上限（按码点计） */
+export const TITLE_MAX_LENGTH = 24;
+
+/** 会话标题调用的最长输出 token；标题很短，卡紧上限以免小模型长篇大论 */
+export const TITLE_MAX_TOKENS = 48;
+
+/** 会话标题调用的超时；超时只记日志，列表继续用派生的标题口径 */
+export const TITLE_TIMEOUT_MS = 20_000;
 
 /** 目标模式自动续跑的轮数上限（断路器，见 plans/stage-11-goal.md）；对齐 pi-goal 的 25 */
 export const GOAL_MAX_TURNS = 25;

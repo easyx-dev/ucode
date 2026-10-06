@@ -55,7 +55,7 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   const attachments = input.attachments ?? [];
 
   // 会话必须先存在：查不到的 id 会一路走到「以会话工作目录当 cwd」的推导上，
-  // 而那一步现在只认已有记录（见 `resolveSessionCwd`），这里提前给出明确的 404。
+  // 而那一步现在只认已有记录（见 `resolveSessionCwd`），这里提前给出明确的 404
   const record = services.sessions.find(sessionId);
   if (!record) {
     throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
@@ -84,7 +84,7 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   const body = [expanded, refLines.join("\n"), text].filter((part) => part.length > 0).join("\n\n");
 
   // 只在「创建/取回 AgentSession」这段加锁；run 本身不占锁，
-  // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效。
+  // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
 
   // 装配成功后再把附件转为永久：ensure 失败（如未配模型）时不留下永不清理的附件
@@ -130,8 +130,8 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
   }
 
   // 编辑先改活动分支再开生成，整段决策必须在同一把锁内完成：
-  // 否则并发编辑会各自通过空闲检查、重复 navigateTree，把叶子改乱。
-  // startRun 只做占位、不占用锁，串行化的是决策点而不是整轮生成。
+  // 否则并发编辑会各自通过空闲检查、重复 navigateTree，把叶子改乱
+  // startRun 只做占位、不占用锁，串行化的是决策点而不是整轮生成
   await services.pool.withLock(sessionId, async () => {
     const session = await services.pool.ensure(sessionId);
     // 压缩 / 分支总结 / 重试 / 排队也算不空闲

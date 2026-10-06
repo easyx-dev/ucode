@@ -2,7 +2,7 @@
  * question：模型在信息不足、需要用户拍板时向前端提问，用户回答后本轮继续。
  *
  * 工具本身不做决策，只把结构化问题交给交互中转挂起（见 `core/interactions`）；
- * 答复、超时与取消都以可读结果回给模型，不会让工具调用悬空。
+ * 答复与取消都以可读结果回给模型，不会让工具调用悬空；用户不答复就一直等着。
  */
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { QuestionItem } from "@ucode/contracts";
@@ -66,11 +66,6 @@ export const createQuestionTool = (hooks: QuestionHooks) =>
     parameters: questionSchema,
     async execute(_toolCallId, { questions }, signal) {
       const result = await hooks.ask({ questions }, signal);
-      if (result.kind === "timeout") {
-        throw new Error(
-          "提问超时：用户没有在限定时间内回答。请改为基于现有信息继续，或说明还需要用户补充什么。",
-        );
-      }
       if (result.kind === "cancelled") {
         throw new Error("提问已取消：本轮生成被中断或会话已关闭。");
       }

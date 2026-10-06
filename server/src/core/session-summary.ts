@@ -3,17 +3,19 @@
  *
  * 路由写点与 `session_created/updated` 事件下发都从这里取，避免「列表口径」与「事件口径」分叉。
  */
-import type { SessionSummary, ThinkingLevel } from "@ucode/contracts";
+import type { SessionStatus, SessionSummary, ThinkingLevel } from "@ucode/contracts";
 import { overrideOf, type SessionRepository } from "../db/session-repository";
 import { workspaceDirOf } from "../harness/workspace";
-import { draftSessionSummary, sessionInfoToDTO } from "./serialize";
-import { infoFromRecord } from "./session-index";
+import { draftSessionSummary, type SessionRuntimeState, sessionInfoToDTO } from "./serialize";
+import { recordToInfo } from "./session-index";
 
-/** 构造摘要所需的读取面：仓储 + 活跃判定 + 运行时默认值 */
+/** 构造摘要所需的读取面：仓储 + 运行态 + 运行时默认值 */
 export type SessionSummarySources = {
   repository: SessionRepository;
   /** 是否有活跃生成（池内 run 或流式会话） */
   isActive: (sessionId: string) => boolean;
+  /** 细分状态（含挂起交互与计划待确认），口径见 `core/session-status` */
+  statusOf: (sessionId: string) => SessionStatus;
   /** 运行时默认模型与档位 */
   defaults: () => { model: string | null; thinkingLevel: ThinkingLevel };
 };
@@ -28,7 +30,10 @@ export const describeSessionSummary = (
 
   const { model, thinkingLevel } = sources.defaults();
   const override = overrideOf(record);
-  const running = sources.isActive(sessionId);
+  const runtime: SessionRuntimeState = {
+    running: sources.isActive(sessionId),
+    status: sources.statusOf(sessionId),
+  };
 
   if (!record.sourcePath) {
     return draftSessionSummary(
@@ -37,18 +42,18 @@ export const describeSessionSummary = (
       model,
       thinkingLevel,
       workspaceDirOf(sessionId),
-      running,
+      runtime,
       record.childCount,
       { createdAt: record.createdAt, updatedAt: record.updatedAt },
     );
   }
 
   return sessionInfoToDTO(
-    infoFromRecord(record),
+    recordToInfo(record),
     override,
     model,
     thinkingLevel,
-    running,
+    runtime,
     record.childCount,
   );
 };

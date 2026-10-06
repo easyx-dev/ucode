@@ -31,7 +31,7 @@ const textOf = (content: unknown): string => {
 };
 
 /** 提取入库索引；未落盘（拿不到 header，或文件尚未写出）时返回 null */
-export const indexFromManager = (manager: SessionManager): SessionIndex | null => {
+export const managerToIndex = (manager: SessionManager): SessionIndex | null => {
   const header = manager.getHeader();
   const sourcePath = manager.getSessionFile();
   // pi 只在有 assistant 回复时才真正写文件，sessionFile 已就绪但文件未落盘的窗口期不建索引
@@ -61,7 +61,7 @@ export const indexFromManager = (manager: SessionManager): SessionIndex | null =
 };
 
 /** DB 行还原成 pi 的 `SessionInfo`，让 serialize 与旧路径复用同一套 DTO 口径 */
-export const infoFromRecord = (record: SessionRecord): SessionInfo => ({
+export const recordToInfo = (record: SessionRecord): SessionInfo => ({
   path: record.sourcePath ?? "",
   id: record.id,
   // 未绑定目录的会话，工作区就是它的工作目录（与 draftSessionSummary 同一口径）

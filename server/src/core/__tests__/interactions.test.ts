@@ -1,4 +1,4 @@
-/** 交互中转单测：请求下发、回答结算、超时与会话清理 */
+/** 交互中转单测：请求下发、回答结算、中断 / 会话清理 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -22,7 +22,7 @@ describe("InteractionBroker", () => {
   it("请求时下发事件，回答后结算并广播 resolved", async () => {
     const bus = new SessionEventBus();
     const frames = framesOf(bus);
-    const broker = new InteractionBroker(bus, 1000);
+    const broker = new InteractionBroker(bus);
 
     const pending = broker.requestPermission("s1", {
       tool: "bash",
@@ -46,7 +46,7 @@ describe("InteractionBroker", () => {
 
   it("重复回答返回 resolved=false", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000);
+    const broker = new InteractionBroker(bus);
     const pending = broker.requestPermission("s1", {
       tool: "read",
       subject: ".env",
@@ -67,7 +67,7 @@ describe("InteractionBroker", () => {
 
   it("会话清理时挂起请求按拒绝结算，且标明不是用户答复", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000);
+    const broker = new InteractionBroker(bus);
     const pending = broker.requestPermission("s1", { tool: "edit", subject: "a.ts", scope: "*" });
     broker.forget("s1");
     assert.deepEqual(await pending, { decision: "deny", byUser: false });
@@ -76,7 +76,7 @@ describe("InteractionBroker", () => {
 
   it("forgetSource 只结算指定来源子会话的请求，父会话自身请求保留", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000);
+    const broker = new InteractionBroker(bus);
     const child = broker.requestPermission(
       "p1",
       { tool: "read", subject: "/etc/hosts", scope: "/etc/**" },
@@ -92,11 +92,38 @@ describe("InteractionBroker", () => {
     assert.deepEqual(await parent, { decision: "deny", byUser: false });
   });
 
-  it("超时按拒绝结算，且标明不是用户答复", async () => {
+  it("本轮中断时挂起的审批按拒绝结算", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 10);
-    const pending = broker.requestPermission("s1", { tool: "edit", subject: "a.ts", scope: "*" });
+    const broker = new InteractionBroker(bus);
+    const controller = new AbortController();
+    const pending = broker.requestPermission("s1", {
+      tool: "edit",
+      subject: "a.ts",
+      scope: "*",
+      signal: controller.signal,
+    });
+
+    controller.abort();
     assert.deepEqual(await pending, { decision: "deny", byUser: false });
+    assert.equal(broker.list("s1").length, 0, "中断后不应留下待答请求");
+  });
+
+  it("信号已中断时不挂起请求", async () => {
+    const bus = new SessionEventBus();
+    const frames = framesOf(bus);
+    const broker = new InteractionBroker(bus);
+    const controller = new AbortController();
+    controller.abort();
+
+    const outcome = await broker.requestPermission("s1", {
+      tool: "edit",
+      subject: "a.ts",
+      scope: "*",
+      signal: controller.signal,
+    });
+    assert.deepEqual(outcome, { decision: "deny", byUser: false });
+    assert.equal(broker.list("s1").length, 0);
+    assert.equal(frames.length, 0, "不应下发已经失效的请求");
   });
 });
 
@@ -115,7 +142,7 @@ describe("InteractionBroker question 通道", () => {
   it("提问下发事件，回答后结算并广播 resolved", async () => {
     const bus = new SessionEventBus();
     const frames = framesOf(bus);
-    const broker = new InteractionBroker(bus, 1000, 1000);
+    const broker = new InteractionBroker(bus);
 
     const pending = broker.requestQuestion("s1", questions);
     const request = frames.find((frame) => frame.type === "interaction_request");
@@ -137,7 +164,7 @@ describe("InteractionBroker question 通道", () => {
 
   it("kind 不一致时不结算，原请求保留", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000, 1000);
+    const broker = new InteractionBroker(bus);
     const pending = broker.requestQuestion("s1", questions);
     const requestId = broker.list("s1")[0]?.requestId ?? "";
 
@@ -151,16 +178,9 @@ describe("InteractionBroker question 通道", () => {
     assert.deepEqual(await pending, { kind: "answered", answers: [["main"]] });
   });
 
-  it("超时结算为 timeout", async () => {
-    const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000, 10);
-    const pending = broker.requestQuestion("s1", questions);
-    assert.deepEqual(await pending, { kind: "timeout" });
-  });
-
   it("中断信号取消挂起请求", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000, 1000);
+    const broker = new InteractionBroker(bus);
     const controller = new AbortController();
     const pending = broker.requestQuestion("s1", questions, controller.signal);
 
@@ -171,7 +191,7 @@ describe("InteractionBroker question 通道", () => {
 
   it("会话清理时挂起提问按取消结算", async () => {
     const bus = new SessionEventBus();
-    const broker = new InteractionBroker(bus, 1000, 1000);
+    const broker = new InteractionBroker(bus);
     const pending = broker.requestQuestion("s1", questions);
     broker.forget("s1");
     assert.deepEqual(await pending, { kind: "cancelled" });

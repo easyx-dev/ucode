@@ -13,6 +13,7 @@ import {
   type PermissionDecision,
   type PermissionRecord,
   PLAN_IGNORED_CUSTOM_TYPE,
+  type SessionStatus,
   type SessionSummary,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -209,7 +210,7 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
     case "message": {
       const dto = messageToDTO(entry.message, entry.id, fallbackCreatedAt, state);
       // assistant 的 message.timestamp 是开始生成的时刻，entry.timestamp 才是写完的时刻；
-      // 回复耗时（见 MessageDTO.completedAt）需要后者，故一并带上。
+      // 回复耗时（见 MessageDTO.completedAt）需要后者，故一并带上
       if (dto?.role === "assistant" && fallbackCreatedAt) dto.completedAt = fallbackCreatedAt;
       return dto;
     }
@@ -272,12 +273,21 @@ export const entriesToDTO = (
   return messages;
 };
 
+/**
+ * 列表 / 事件共用的运行态：`running` 是「有活跃生成」的粗粒度布尔，
+ * `status` 是面向用户的细分状态（等待授权 / 回答时 `running` 仍为真）。
+ */
+export type SessionRuntimeState = {
+  running: boolean;
+  status: SessionStatus;
+};
+
 export const sessionInfoToDTO = (
   info: SessionInfo,
   override: SessionOverride,
   defaultModel: string | null,
   defaultThinkingLevel: ThinkingLevel,
-  running: boolean,
+  runtime: SessionRuntimeState,
   childCount: number,
 ): SessionSummary => ({
   id: info.id,
@@ -294,7 +304,8 @@ export const sessionInfoToDTO = (
   agent: override.agent ?? null,
   forkedFromId: override.forkedFromId ?? null,
   childCount,
-  running,
+  running: runtime.running,
+  status: runtime.status,
   pinnedAt: override.pinnedAt ?? null,
   lastReadAt: override.lastReadAt ?? null,
   deletedAt: override.deletedAt ?? null,
@@ -308,7 +319,7 @@ export const draftSessionSummary = (
   defaultThinkingLevel: ThinkingLevel,
   /** 覆盖值与会话工作区都缺失时的兜底（全局工作目录） */
   fallbackCwd: string,
-  running: boolean,
+  runtime: SessionRuntimeState,
   /** 未归档的直接子会话数；草稿阶段恒为 0，由调用方按记录给出 */
   childCount: number,
   /** 来自数据库行的真实时间；缺省（新建会话刚返回）时用当前时间 */
@@ -331,7 +342,8 @@ export const draftSessionSummary = (
     agent: override.agent ?? null,
     forkedFromId: override.forkedFromId ?? null,
     childCount,
-    running,
+    running: runtime.running,
+    status: runtime.status,
     pinnedAt: override.pinnedAt ?? null,
     lastReadAt: override.lastReadAt ?? null,
     deletedAt: override.deletedAt ?? null,

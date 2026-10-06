@@ -33,6 +33,11 @@ export type PermissionAsk = {
   subject: string;
   /** 本次授权覆盖的范围；用户选「本会话恒允」时按它记账 */
   scope: string;
+  /**
+   * 本轮工具调用的中断信号：审批挂起后由它结算（见 `core/interactions`），不能丢。
+   * 挂在请求对象上而不是单开形参，是因为装配层的权限钩子把 `ask` 原样透传给交互中转。
+   */
+  signal?: AbortSignal;
 };
 
 /** 判定结果：动作 + 命中的工具 / 对象 / 规则，以及可授权的范围 */

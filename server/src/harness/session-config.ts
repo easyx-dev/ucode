@@ -129,7 +129,7 @@ const createSessionLoader = async (
   const assetPaths = commandAssetPaths({ cwd: input.cwd, appHome: env.homeDir });
   const gate = {
     cwd: input.cwd,
-    // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效。
+    // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效
     // 技能目录放行排在模式规则之后、会话授权之前——越界读 SKILL.md 不再走审批
     rules: () => [
       ...agentRules(profile),
@@ -201,7 +201,7 @@ export const buildSessionOptions = async (
       (name !== SUBAGENT_TOOL_NAME || Boolean(input.subagents)),
   );
   const override = overrideOf(input.record);
-  // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来。
+  // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来
   // 会话覆盖值的模型在 create / update 已校验，这里只兜角色声明这一路
   if (capability.model && !input.runtime.resolveModelRef(capability.model)) {
     throw new Error(`角色指定的模型不可用：${capability.model}`);
@@ -211,7 +211,7 @@ export const buildSessionOptions = async (
   const thinkingLevel =
     override.thinkingLevel ?? capability.thinkingLevel ?? input.runtime.getStatus().thinkingLevel;
   // 装配要等 loader 重建，而保存配置会在这期间换掉运行时：先把运行时取一次给本次装配用，
-  // 免得出现「模型解析自旧运行时、交给新运行时建会话」的错配。
+  // 免得出现「模型解析自旧运行时、交给新运行时建会话」的错配
   // 这几行之间不得插入 await —— 同代快照靠「同一个同步块内不留让出点」保证
   const modelRuntime = input.runtime.requireRuntime();
 
