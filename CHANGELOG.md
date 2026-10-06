@@ -75,6 +75,10 @@
 
 ### 变更
 
+- `MessageDTO` 新增 `completedAt`（assistant 回复写入会话记录的时刻）：pi 的 `message.timestamp` 是开始
+  生成的时刻，回复的真实耗时需用它减去 `createdAt` 才能得到；server 从会话条目的 `entry.timestamp` 取
+  （实时帧取服务端当前时刻）。对话区据此把模型 / 时间 / 耗时按「一轮回复」聚合展示一次，
+  连续工具调用合并为一条摘要卡片。
 - 配置改为**环境变量声明、代码不带默认值**（缺失 / 非法即启动报错）：`server/src/constants.ts` 移除
   `DEFAULT_PORT` / `DEFAULT_HOST` / `DEFAULT_POOL_IDLE_MS` / `DEFAULT_PROMPT_SOURCE`，
   `env.ts` 改为从环境变量读取并校验。按 `NODE_ENV` 选择环境文件：生产 **`.env.prod`**

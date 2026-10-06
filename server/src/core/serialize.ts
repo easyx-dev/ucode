@@ -161,8 +161,13 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
   const fallbackCreatedAt = isoOf(Date.parse(entry.timestamp));
 
   switch (entry.type) {
-    case "message":
-      return messageToDTO(entry.message, entry.id, fallbackCreatedAt, state);
+    case "message": {
+      const dto = messageToDTO(entry.message, entry.id, fallbackCreatedAt, state);
+      // assistant 的 message.timestamp 是开始生成的时刻，entry.timestamp 才是写完的时刻；
+      // 回复耗时（见 MessageDTO.completedAt）需要后者，故一并带上。
+      if (dto?.role === "assistant" && fallbackCreatedAt) dto.completedAt = fallbackCreatedAt;
+      return dto;
+    }
     case "custom_message":
       return {
         id: entry.id,

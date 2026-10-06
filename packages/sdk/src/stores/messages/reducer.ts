@@ -1,7 +1,7 @@
 /** 会话消息列表的事件归并（纯函数，便于复用与单测） */
 import type { MessageBlock, MessageDTO, MessageRole } from "@ucode/contracts";
 
-import type { ChatItem } from "../../types";
+import type { ChatItem, ChatItemTiming } from "../../types";
 
 export const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -136,6 +136,19 @@ export const mergeMessage = (items: ChatItem[], message: MessageDTO): ChatItem[]
   }
 
   return [...items, { ...message, live: false }];
+};
+
+/** 把本次运行测得的耗时挂到最后一条 assistant 消息上；没有则原样返回 */
+export const attachAssistantTiming = (items: ChatItem[], timing: ChatItemTiming): ChatItem[] => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item?.role === "assistant") {
+      const next = [...items];
+      next[index] = { ...item, timing };
+      return next;
+    }
+  }
+  return items;
 };
 
 /** 一条 SSE 事件 → 新的消息列表 */

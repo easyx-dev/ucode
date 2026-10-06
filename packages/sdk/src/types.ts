@@ -1,8 +1,14 @@
 /** 会话流在界面上消费的类型：消息条目与子智能体进度（供各端复用） */
 import type { AttachmentView, ContextRef, MessageDTO } from "@ucode/contracts";
 
-/** 界面上的一条消息：live 表示还在流式生成中 */
-export type ChatItem = MessageDTO & { live?: boolean };
+/** 单条 assistant 消息的思考耗时；由客户端按事件到达时间测得，不落盘、快照重建后不再有 */
+export type ChatItemTiming = {
+  /** 思考阶段耗时（毫秒） */
+  thinkingMs?: number;
+};
+
+/** 界面上的一条消息：live 表示还在流式生成中，timing 为本次运行测得的耗时 */
+export type ChatItem = MessageDTO & { live?: boolean; timing?: ChatItemTiming };
 
 /**
  * 一次子智能体委派在界面上的进度：`toolCallId` 为键，嵌套内容是子会话自己的消息。

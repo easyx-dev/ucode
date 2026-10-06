@@ -1,5 +1,9 @@
+/**
+ * 单条消息的内容渲染：用户气泡、assistant 内容段（正文 / 思考 / 图片 / 附件）与摘要 / 扩展条目。
+ * 工具调用已由 chat-nodes 抽成独立节点，这里只渲染非工具内容；`trailing` 表示该段是否是来源消息的最后一段。
+ */
 import { API_BASE_PATH } from "@ucode/contracts";
-import { Bot, Brain, ChevronRight, FileText, GitFork, Pencil, Sparkles } from "lucide-react";
+import { Brain, ChevronRight, FileText, Pencil, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
@@ -8,21 +12,23 @@ import { Button } from "../base/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
 import { parseUserMessage } from "../lib/message-chips";
 import { isPlanIgnored } from "../lib/plan";
-import { thinkingLevelLabel } from "../lib/thinking";
-import { clockLabel } from "../lib/time";
-import type { ChatItem, MessageBlock, SubagentStream } from "../lib/types";
+import { durationLabel } from "../lib/time";
+import type { ChatItem, MessageBlock } from "../lib/types";
+import { ForkAction, MessageFooter } from "./message-footer";
 import { ThinkingIndicator } from "./thinking-indicator";
-import { ToolCallCard } from "./tool-call-card";
 
-function ThinkingBlock({ text }: { text: string }) {
+function ThinkingBlock({ text, thinkingMs }: { text: string; thinkingMs?: number }) {
   const { t } = useTranslation();
 
   return (
     <Collapsible className="my-2">
       <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-        <ChevronRight className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
         <Brain className="size-3.5" />
         {t("思考过程")}
+        {thinkingMs !== undefined ? (
+          <span className="text-[11px] text-muted-foreground/70">{durationLabel(thinkingMs)}</span>
+        ) : null}
+        <ChevronRight className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 border-l-2 border-muted pl-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -33,11 +39,18 @@ function ThinkingBlock({ text }: { text: string }) {
   );
 }
 
-function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
-  if (block.type === "thinking") return <ThinkingBlock text={block.text} />;
-  if (block.type === "toolCall") {
-    return <ToolCallCard name={block.name} args={block.args} running={live} />;
-  }
+function BlockView({
+  block,
+  live,
+  thinkingMs,
+}: {
+  block: MessageBlock;
+  live?: boolean;
+  thinkingMs?: number;
+}) {
+  if (block.type === "thinking") return <ThinkingBlock text={block.text} thinkingMs={thinkingMs} />;
+  // 工具调用已由独立节点渲染，这里不再兜底
+  if (block.type === "toolCall") return null;
   if (block.type === "image") {
     return (
       <a href={block.url} target="_blank" rel="noreferrer" className="my-2 inline-block">
@@ -71,61 +84,6 @@ function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
   );
 }
 
-/** 子智能体的内联进度：子会话自己的消息，折叠在父会话的工具卡里 */
-function SubagentProgress({
-  stream,
-  onOpenSession,
-}: {
-  stream: SubagentStream;
-  onOpenSession?: (sessionId: string) => void;
-}) {
-  const { t } = useTranslation();
-  const status = stream.done ? (stream.isError ? t("失败") : t("完成")) : t("执行中");
-
-  return (
-    <div className="border-t border-border pt-2">
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Bot className="size-3.5 shrink-0" />
-        <span className="shrink-0">{t("子智能体过程")}</span>
-        {stream.description ? (
-          <span className="truncate text-foreground/70">{stream.description}</span>
-        ) : null}
-        <span className="ml-auto shrink-0">{status}</span>
-        {onOpenSession && stream.sessionId ? (
-          <button
-            type="button"
-            className="shrink-0 text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
-            onClick={() => onOpenSession(stream.sessionId)}
-          >
-            {t("打开子会话")}
-          </button>
-        ) : null}
-      </div>
-      <div className="space-y-3 border-l-2 border-border pl-3">
-        {stream.items.map((item) => (
-          // 子会话不能再派子智能体，嵌套不会再出现子进度
-          <MessageItem key={item.id} item={item} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** 一条消息悬停时出现的分叉入口：从该条消息抽出新会话 */
-function ForkAction({ onClick }: { onClick: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      className="shrink-0 self-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
-      title={t("从此分叉")}
-      onClick={onClick}
-    >
-      <GitFork className="size-3.5" />
-    </button>
-  );
-}
-
 /** 用户消息悬停时的编辑入口：行内改写并重发 */
 function EditAction({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
@@ -143,17 +101,23 @@ function EditAction({ onClick }: { onClick: () => void }) {
 
 export function MessageItem({
   item,
-  subagent,
-  onOpenSession,
+  blocks,
+  trailing = true,
+  turnEnd = true,
+  durationMs,
   onFork,
   onEdit,
   isLastUser,
 }: {
   item: ChatItem;
-  /** 该条工具结果的子智能体内联进度（仅 subagent 工具调用会有） */
-  subagent?: SubagentStream;
-  /** 打开子会话；子会话自身的嵌套消息不再下传 */
-  onOpenSession?: (sessionId: string) => void;
+  /** 覆盖渲染的内容块（assistant 被拆成多段时只渲染其中一段）；缺省渲染整条消息 */
+  blocks?: MessageBlock[];
+  /** 是否为来源消息的最后一段；流式光标只挂在最后一段上 */
+  trailing?: boolean;
+  /** 是否为「一轮回复」的最后一段；页脚、耗时与分叉入口据此只出现一次 */
+  turnEnd?: boolean;
+  /** 本轮回复的总耗时（毫秒） */
+  durationMs?: number;
   /** 从该条消息分叉；只有主对话传入，子智能体嵌套视图不提供 */
   onFork?: (item: ChatItem) => void;
   /** 编辑该条用户消息并重发；成功后由事件刷新，返回是否已受理 */
@@ -165,11 +129,12 @@ export function MessageItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const content = blocks ?? item.blocks;
   const canFork = Boolean(onFork) && !item.live;
   const canEdit = Boolean(onEdit) && item.role === "user" && !item.live;
 
   const startEdit = () => {
-    const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    const text = content.map((block) => (block.type === "text" ? block.text : "")).join("");
     setDraft(text);
     setEditing(true);
   };
@@ -184,9 +149,9 @@ export function MessageItem({
   };
 
   if (item.role === "user") {
-    const rawText = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    const rawText = content.map((block) => (block.type === "text" ? block.text : "")).join("");
     const parsed = parseUserMessage(rawText);
-    const media = item.blocks.filter((block) => block.type === "image" || block.type === "file");
+    const media = content.filter((block) => block.type === "image" || block.type === "file");
     if (editing) {
       return (
         <div className="flex justify-end">
@@ -288,20 +253,6 @@ export function MessageItem({
     );
   }
 
-  if (item.role === "tool") {
-    const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
-    return (
-      <ToolCallCard
-        name={item.toolName ?? "tool"}
-        result={text}
-        isError={item.isError}
-        running={item.live}
-      >
-        {subagent ? <SubagentProgress stream={subagent} onOpenSession={onOpenSession} /> : null}
-      </ToolCallCard>
-    );
-  }
-
   // 忽略计划的界面标记：沿用 muted 便签，不带「（扩展消息）」前缀
   if (isPlanIgnored(item)) {
     return (
@@ -312,7 +263,7 @@ export function MessageItem({
   }
 
   if (item.role === "summary" || item.role === "custom") {
-    const text = item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+    const text = content.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
       <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
         {item.role === "summary" ? t("（上下文已压缩）") : t("（扩展消息）")} {text.slice(0, 400)}
@@ -321,29 +272,18 @@ export function MessageItem({
   }
 
   return (
-    <div className="group flex items-start gap-1">
-      <div className="min-w-0 flex-1 space-y-1">
-        {item.blocks.map((block, index) => (
+    <div className="min-w-0 flex-1 space-y-1">
+      {content.map((block, index) => (
+        <BlockView
           // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
-          <BlockView key={`${item.id}-${index}`} block={block} live={item.live} />
-        ))}
-        {item.live && item.blocks.length === 0 ? <ThinkingIndicator /> : null}
-        {!item.live && item.model ? (
-          <div className="text-xs text-muted-foreground">
-            {[
-              item.provider ? `${item.provider}/${item.model}` : item.model,
-              // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
-              item.thinkingLevel && item.thinkingLevel !== "off"
-                ? thinkingLevelLabel(item.thinkingLevel, t)
-                : "",
-              clockLabel(item.createdAt),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </div>
-        ) : null}
-      </div>
-      {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
+          key={`${item.id}-${index}`}
+          block={block}
+          live={item.live && trailing && index === content.length - 1}
+          thinkingMs={item.timing?.thinkingMs}
+        />
+      ))}
+      {item.live && content.length === 0 ? <ThinkingIndicator /> : null}
+      {turnEnd ? <MessageFooter item={item} durationMs={durationMs} onFork={onFork} /> : null}
     </div>
   );
 }

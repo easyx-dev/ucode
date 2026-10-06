@@ -1288,6 +1288,7 @@
 | `customType` | string | 否 | custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
+| `completedAt` | string | 否 | assistant 专用：该条回复生成结束、写入会话记录的时刻（ISO 8601 UTC）。 pi 的 `message.timestamp` 是开始生成的时刻，回复的真实耗时要靠它与 createdAt 相减得到。 |
 
 ### PendingInteraction
 

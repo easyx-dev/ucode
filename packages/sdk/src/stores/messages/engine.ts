@@ -8,7 +8,7 @@ import type { Apis } from "../../apis";
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
 import type { ChatItem, PromptPayload, SubagentStreams } from "../../types";
-import { asRecord, reduceEvent, settle } from "./reducer";
+import { asRecord, attachAssistantTiming, reduceEvent, settle } from "./reducer";
 
 /** 会让界面进入「生成中」的事件；agent_settled 是唯一的结束边界 */
 const ACTIVITY_EVENTS: ReadonlySet<string> = new Set([
@@ -45,6 +45,14 @@ export type Engine = {
   childToolCalls: Map<string, string>;
   /** 是否已取过快照；新建会话为「已知空历史」，避免切换时再拉一次 */
   hydrated: boolean;
+  /** 当前 assistant 消息的思考计时，用于测算思考耗时；不落盘 */
+  stream: StreamTiming | null;
+};
+
+/** 当前 assistant 消息的思考计时：一段思考的起点用 `null` 表示不在思考中，`thinkingMs` 为已累计耗时 */
+type StreamTiming = {
+  thinkingStartedAt: number | null;
+  thinkingMs: number;
 };
 
 export const EMPTY_STATE: SessionStreamState = {
@@ -63,6 +71,7 @@ export const createEngine = (): Engine => ({
   buffer: [],
   childToolCalls: new Map(),
   hydrated: false,
+  stream: null,
 });
 
 /** 仅当字段真的变化时才替换快照，避免未知事件返回同一 items 引用时的无意义通知 */
@@ -126,6 +135,47 @@ export const applyChildFrame = (
       ? { ...stream, items: settle(stream.items), done: true }
       : { ...stream, items: reduceEvent(stream.items, frame.type, frame.data) },
   );
+};
+
+/** 按事件到达时间维护当前 assistant 消息的思考计时；返回本帧可挂到条目上的耗时字段 */
+const trackStreamTiming = (engine: Engine, frame: ServerEventPayload): { thinkingMs?: number } => {
+  const now = Date.now();
+  const stream = engine.stream;
+
+  switch (frame.type) {
+    case "message_start": {
+      const data = asRecord(frame.data);
+      engine.stream = data.role === "assistant" ? { thinkingStartedAt: null, thinkingMs: 0 } : null;
+      return {};
+    }
+    case "thinking_delta": {
+      if (stream && stream.thinkingStartedAt === null) {
+        engine.stream = { ...stream, thinkingStartedAt: now };
+      }
+      return {};
+    }
+    // 一段思考以「首个正文 / 工具调用」为界；结束后仍可能再进入思考，故累计而不是取单段
+    case "text_delta":
+    case "tool_call": {
+      if (!stream || stream.thinkingStartedAt === null) return {};
+      const thinkingMs = stream.thinkingMs + (now - stream.thinkingStartedAt);
+      engine.stream = { ...stream, thinkingStartedAt: null, thinkingMs };
+      return { thinkingMs };
+    }
+    case "message_end": {
+      if (!stream) return {};
+      const thinkingMs =
+        stream.thinkingStartedAt !== null
+          ? stream.thinkingMs + (now - stream.thinkingStartedAt)
+          : stream.thinkingMs;
+      engine.stream = null;
+      // 权威消息会把实时条目替换掉（丢 timing），这里再挂一次最终值
+      if (asRecord(frame.data).role !== "assistant" || thinkingMs <= 0) return {};
+      return { thinkingMs };
+    }
+    default:
+      return {};
+  }
 };
 
 /** 应用一条事件帧：维护生成态与子智能体，再交给 reducer 归并 */
@@ -198,7 +248,12 @@ export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
   if (ACTIVITY_EVENTS.has(frame.type)) {
     patch(engine, { running: true, pending: false });
   }
-  patch(engine, {
-    items: reduceEvent(engine.store.getState().items, frame.type, frame.data),
-  });
+
+  // 记录思考耗时（仅本次运行内可见，快照重建后丢失）
+  const timing = trackStreamTiming(engine, frame);
+  let items = reduceEvent(engine.store.getState().items, frame.type, frame.data);
+  if (timing.thinkingMs !== undefined) {
+    items = attachAssistantTiming(items, { thinkingMs: timing.thinkingMs });
+  }
+  patch(engine, { items });
 };

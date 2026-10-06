@@ -235,6 +235,28 @@ export default {
   执行中: "Running",
   失败: "Failed",
   完成: "Done",
+  "耗时 {{value}}": "Took {{value}}",
+
+  // Tool calls
+  读取: "Read",
+  写入: "Write",
+  运行: "Run",
+  查找: "Find",
+  列出: "List",
+  获取网页: "Fetch",
+  子智能体: "Subagent",
+  提问: "Ask",
+  提交计划: "Submit plan",
+  搜索工具: "Search tools",
+  工具: "Tool",
+  读: "Read",
+  写: "Write",
+  执行: "Run",
+  网络: "Web",
+  其他: "Other",
+  "（无输出）": "(no output)",
+  "（无内容）": "(no content)",
+  "显示全部 {{value}} 行": "Show all {{value}} lines",
 
   // Sub-session navigation
   子会话: "Sub-session",

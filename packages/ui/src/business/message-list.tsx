@@ -1,7 +1,8 @@
+/** 对话消息列表：滚动贴底 + 空态 / 加载态，内容按节点渲染 */
 import { useEffect, useRef } from "react";
 import { Skeleton } from "../base/skeleton";
 import type { ChatItem, SubagentStreams } from "../lib/types";
-import { MessageItem } from "./message-item";
+import { MessageNodes } from "./message-nodes";
 import { ThinkingIndicator } from "./thinking-indicator";
 
 type MessageListProps = {
@@ -34,15 +35,6 @@ export function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
 
-  // 最后一条用户消息之后的内容会在编辑重发时被移除，据此给出提示
-  let lastUserIndex = -1;
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (items[index]?.role === "user") {
-      lastUserIndex = index;
-      break;
-    }
-  }
-
   useEffect(() => {
     if (!pinnedRef.current) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -69,19 +61,13 @@ export function MessageList({
 
         {!loading && items.length === 0 ? empty : null}
 
-        {items.map((item, index) => (
-          <MessageItem
-            // 工具项在 `message_end` 合并时 id 会从 `live-tool-*` 换成服务端 id；
-            // 用 toolCallId 作 key，避免重挂导致展开的嵌套进度被收起
-            key={item.role === "tool" && item.toolCallId ? `tool-${item.toolCallId}` : item.id}
-            item={item}
-            subagent={item.toolCallId ? subagents?.[item.toolCallId] : undefined}
-            onOpenSession={onOpenSession}
-            onFork={onFork}
-            onEdit={onEdit}
-            isLastUser={index === lastUserIndex}
-          />
-        ))}
+        <MessageNodes
+          items={items}
+          subagents={subagents}
+          onOpenSession={onOpenSession}
+          onFork={onFork}
+          onEdit={onEdit}
+        />
 
         {pending ? <ThinkingIndicator /> : null}
 

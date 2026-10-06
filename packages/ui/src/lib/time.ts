@@ -32,3 +32,16 @@ export const clockLabel = (iso?: string): string => {
   const time = dayjs(iso);
   return time.isValid() ? time.format("HH:mm:ss") : "";
 };
+
+/** 耗时标签：毫秒 → 紧凑可读（840ms / 3.2s / 1m05s / 1h02m），非法值返回空串 */
+export const durationLabel = (ms: number): string => {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  // 先按一位小数取整再判断进位，避免 59.96s 显示成 60.0s
+  const seconds = Math.round(ms / 100) / 10;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const totalSeconds = Math.round(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}m${String(totalSeconds % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}m`;
+};

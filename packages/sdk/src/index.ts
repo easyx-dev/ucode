@@ -46,4 +46,10 @@ export {
   type Transport,
   type TransportOptions,
 } from "./transport";
-export type { ChatItem, PromptPayload, SubagentStream, SubagentStreams } from "./types";
+export type {
+  ChatItem,
+  ChatItemTiming,
+  PromptPayload,
+  SubagentStream,
+  SubagentStreams,
+} from "./types";

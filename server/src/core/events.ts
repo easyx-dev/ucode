@@ -78,6 +78,8 @@ const toMessageEvents = (event: AgentSessionEvent, state: TranscriptState): SseE
         undefined,
         state,
       );
+      // 实时帧拿不到会话条目，用服务端当前时刻作为回复完成时间
+      if (dto?.role === "assistant") dto.completedAt = new Date().toISOString();
       return dto ? [{ event: "message_end", data: dto }] : [];
     }
 
