@@ -294,6 +294,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     output: "PromptAdmittedResponse",
     summary: "手动压缩上下文（后台执行，走 compaction_* 事件）",
   },
+  {
+    domain: "messages",
+    action: "ignore-plan",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdInput",
+    output: "MessageIgnorePlanResponse",
+    summary: "忽略本次计划的决策表单",
+  },
 
   {
     domain: "events",

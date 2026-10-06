@@ -8,6 +8,7 @@ import {
   DEFAULT_SESSION_MODE,
   type MessageBlock,
   type MessageDTO,
+  PLAN_IGNORED_CUSTOM_TYPE,
   type SessionSummary,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -167,6 +168,16 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
         id: entry.id,
         role: "custom",
         blocks: blocksOf(entry.content),
+        createdAt: fallbackCreatedAt,
+      };
+    case "custom":
+      // 扩展条目默认不打开展示；只放行本项目的界面标记，其余 customType 的 data 不下发
+      if (entry.customType !== PLAN_IGNORED_CUSTOM_TYPE) return null;
+      return {
+        id: entry.id,
+        role: "custom",
+        blocks: [],
+        customType: entry.customType,
         createdAt: fallbackCreatedAt,
       };
     case "compaction":

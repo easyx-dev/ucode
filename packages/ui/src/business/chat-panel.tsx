@@ -78,6 +78,7 @@ type ChatPanelProps = {
   /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
   planReady: boolean;
   onApprovePlan: () => void;
+  onIgnorePlan: () => void;
   onFeedbackPlan: (text: string) => void;
 };
 
@@ -109,6 +110,7 @@ export function ChatPanel({
   onBackToParent,
   planReady,
   onApprovePlan,
+  onIgnorePlan,
   onFeedbackPlan,
 }: ChatPanelProps) {
   const { t } = useTranslation();
@@ -231,7 +233,11 @@ export function ChatPanel({
           </Button>
         </div>
       ) : showPlanForm ? (
-        <PlanDecisionForm onApprove={onApprovePlan} onFeedback={onFeedbackPlan} />
+        <PlanDecisionForm
+          onApprove={onApprovePlan}
+          onIgnore={onIgnorePlan}
+          onFeedback={onFeedbackPlan}
+        />
       ) : (
         <Composer
           sessionId={session?.id ?? null}

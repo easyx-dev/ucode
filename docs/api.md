@@ -72,6 +72,7 @@
 | `read` | 标记已读（写上次打开时间） | 资源摘要 |
 | `prompt` | 发起生成 | 动作回执 |
 | `interrupt` | 中断生成 | 动作回执 |
+| `ignore-plan` | 忽略本次计划的决策表单 | 动作回执 |
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
 | `test` | 连通性测试 | 测试结果 |
 | `respond` | 回答挂起的交互请求 | 动作回执 |
@@ -186,6 +187,8 @@
     - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals }`，改名 / 换模型 /
       置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 仅在实际变化时带上
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
+  - `transcript_reset`：载荷 `{ fromEntryId }`，编辑重发或追加界面标记后活动分支 / 历史已改变，
+    客户端应重取快照；它不参与 `seq` 切分（收到即整表重取）
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、
   `{ type: "error", sessionId?, code, message, params? }`、

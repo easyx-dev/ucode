@@ -8,12 +8,19 @@ import { Button } from "../base/button";
 type PlanDecisionFormProps = {
   /** 批准：切到编码模式并开始执行计划 */
   onApprove: () => void;
+  /** 忽略：本次计划不再弹决策表单（服务端往会话文件落标记） */
+  onIgnore: () => void;
   /** 反馈：带着意见继续讨论计划 */
   onFeedback: (text: string) => void;
   disabled?: boolean;
 };
 
-export function PlanDecisionForm({ onApprove, onFeedback, disabled }: PlanDecisionFormProps) {
+export function PlanDecisionForm({
+  onApprove,
+  onIgnore,
+  onFeedback,
+  disabled,
+}: PlanDecisionFormProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState("");
 
@@ -50,6 +57,15 @@ export function PlanDecisionForm({ onApprove, onFeedback, disabled }: PlanDecisi
           />
 
           <div className="flex items-center gap-2 px-3 pb-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={disabled}
+              title={t("本次计划不再弹出决策表单")}
+              onClick={onIgnore}
+            >
+              {t("忽略")}
+            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { Button } from "../base/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
 import { parseUserMessage } from "../lib/message-chips";
+import { isPlanIgnored } from "../lib/plan";
 import { thinkingLevelLabel } from "../lib/thinking";
 import { clockLabel } from "../lib/time";
 import type { ChatItem, MessageBlock, SubagentStream } from "../lib/types";
@@ -298,6 +299,15 @@ export function MessageItem({
       >
         {subagent ? <SubagentProgress stream={subagent} onOpenSession={onOpenSession} /> : null}
       </ToolCallCard>
+    );
+  }
+
+  // 忽略计划的界面标记：沿用 muted 便签，不带「（扩展消息）」前缀
+  if (isPlanIgnored(item)) {
+    return (
+      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
+        {t("已忽略计划")}
+      </div>
     );
   }
 

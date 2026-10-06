@@ -22,7 +22,7 @@
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 用途 |
 | --- | --- | --- | --- | --- |
 | `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具） | 无（只受全局默认规则约束） | 正常编码与执行 |
-| `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | 先调研出方案；本轮以 `present_plan` 收尾，前端弹决策表单 |
+| `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
 | `ask` | 问答 | 只读集 + `subagent`（无 `present_plan`） | `deny` `edit` / `write` / `bash` | 只读分析与回答 |
 
 - 只读模式**直接禁 `bash`**，不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。

@@ -109,6 +109,15 @@ const CASES: EvalCase[] = [
     toolsAny: ["present_plan"],
     toolsNone: ["edit", "write", "bash"],
   },
+  {
+    name: "plan-no-present",
+    mode: "plan",
+    optional: true,
+    // 反向用例：没有可落地方案、需用户先拍板方向时不应以 present_plan 收尾；
+    // 与 plan-present 互为正反，同样只报通过率、不当门禁
+    prompt: "我想给这个项目加个新功能，你觉得加什么好？",
+    toolsNone: ["present_plan"],
+  },
 ];
 
 /** 隔离工作区的初始文件；会写盘的用例每次尝试前都重建成这个状态 */

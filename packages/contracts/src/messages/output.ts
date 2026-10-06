@@ -23,6 +23,8 @@ export type MessageDTO = {
   toolCallId?: string;
   /** tool 专用 */
   toolName?: string;
+  /** custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 */
+  customType?: string;
   isError?: boolean;
   /** 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 */
   createdAt?: string;
@@ -53,4 +55,9 @@ export type PromptAdmittedResponse = SessionScoped & {
 export type MessageInterruptResponse = SessionScoped & {
   /** 是否真的中断了一个正在跑的 run */
   aborted: boolean;
+};
+
+export type MessageIgnorePlanResponse = SessionScoped & {
+  /** 本次是否真的写入了忽略标记；本轮末尾已是标记（重复点击）时为 false */
+  ignored: boolean;
 };

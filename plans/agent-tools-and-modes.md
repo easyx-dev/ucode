@@ -184,6 +184,10 @@ server/src/agent/
   表单出现时替掉 composer。计划只作为对话消息，不落盘。
   已知：模型可能在 `present_plan` 之后补一句结束语、偶尔重复调用，提示词已收紧但无法强制；
   在消息区过滤该工具卡片记入 `TODO.md` 待评估。
+- 阶段 2.5 补充（[`plan-decision.md`](./plan-decision.md)）：`present_plan` 收尾改为**有条件**——需用户拍板
+  方向时先 `question`，方案成案才收尾；决策表单新增**忽略**——往会话文件追加 `custom` 标记条目
+  （`customType: "ucode.plan-ignored"`）并复用 `transcript_reset` 同步，按次生效、刷新 / 多窗口一致，
+  对话区留「已忽略计划」便签；新增 `messages/ignore-plan` 与 `MessageDTO.customType`，无 DB 变更。
 - 后续新增**会话级权限档位**（`permissionMode`：`default` / `auto` / `full`）：在规则判定之后只放宽 `ask`、
   不突破 `deny`，`auto` 保留越界目录审批。正文见 [`docs/modes-and-permissions.md`](../docs/modes-and-permissions.md)。
 

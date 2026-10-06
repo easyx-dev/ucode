@@ -138,6 +138,11 @@ export function WorkspaceLayout({
     })();
   };
 
+  // 忽略本次计划：服务端往会话文件追加标记条目，表单靠 transcript_reset 收起
+  const ignorePlan = (): void => {
+    void chat.ignorePlan();
+  };
+
   // 空态（还没有会话）时，选择器改的是草稿里的初始设置，建会话时一并生效；
   // 已有会话走 sessions/update，结果落到服务端
   const draftKey = composerKeyOf(activeId);
@@ -440,6 +445,7 @@ export function WorkspaceLayout({
           }}
           planReady={planReady}
           onApprovePlan={approvePlan}
+          onIgnorePlan={ignorePlan}
           onFeedbackPlan={(text) => void chat.send(textPayload(text))}
           onBuiltin={runBuiltin}
         />

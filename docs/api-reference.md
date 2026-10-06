@@ -43,6 +43,7 @@
 | POST | `/api/v1/messages/edit` | 编辑一条已发送的用户消息并重发 |
 | POST | `/api/v1/messages/interrupt` | 中断当前生成 |
 | POST | `/api/v1/messages/compact` | 手动压缩上下文（后台执行，走 compaction_* 事件） |
+| POST | `/api/v1/messages/ignore-plan` | 忽略本次计划的决策表单 |
 | POST | `/api/v1/events` | 全局 SSE 事件流（所有会话的实时事件） |
 | POST | `/api/v1/interactions/list` | 列出会话中尚未回答的交互请求 |
 | POST | `/api/v1/interactions/respond` | 回答一条挂起的交互请求（按 kind 判别） |
@@ -725,6 +726,23 @@
 | `sessionId` | string | 是 | — |
 | `admitted` | boolean | 是 | — |
 
+### POST /api/v1/messages/ignore-plan
+
+忽略本次计划的决策表单
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+
+**响应类型**：`MessageIgnorePlanResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `ignored` | boolean | 是 | 本次是否真的写入了忽略标记；本轮末尾已是标记（重复点击）时为 false |
+
 ## 交互请求（`interactions`）
 
 ### POST /api/v1/interactions/list
@@ -1267,6 +1285,7 @@
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | assistant 专用：产生该回复时生效的推理等级 |
 | `toolCallId` | string | 否 | tool 专用：与 toolCall block 的 id 对应，便于前端精确合并 |
 | `toolName` | string | 否 | tool 专用 |
+| `customType` | string | 否 | custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
 

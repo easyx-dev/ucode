@@ -32,6 +32,8 @@ export type ChatController = {
   stop: () => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: () => Promise<void>;
+  /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
+  ignorePlan: () => Promise<void>;
 };
 
 type ChatOptions = {
@@ -98,6 +100,11 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     await client.messages.compact(sessionId);
   }, [client, sessionId]);
 
+  const ignorePlan = useCallback(async (): Promise<void> => {
+    if (!sessionId) return;
+    await client.messages.ignorePlan(sessionId);
+  }, [client, sessionId]);
+
   // 会话列表的运行态与摘要由 session_updated 事件驱动，无需在落定后再刷新
 
   return {
@@ -112,5 +119,6 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     edit,
     stop,
     compact,
+    ignorePlan,
   };
 }

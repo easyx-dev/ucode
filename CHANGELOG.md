@@ -59,9 +59,15 @@
     错误码 `unauthorized` / `invalid_credentials` / `forbidden` / `pairing_invalid` / `pairing_expired` /
     `rate_limited`；SDK 传输层带 Cookie 与 401 回调、新增 `auth` store；新增登录页与设置里的
     「远程访问」面板（局域网开关 / 二维码配对链接 / 活动会话 / 改密码）；CORS 收紧为白名单 + credentials。
+- 计划决策表单支持**忽略**：plan 模式本轮以 `present_plan` 收尾时，除批准 / 反馈外可点「忽略」，
+  本次计划不再弹表单；忽略往会话文件追加一条 `custom` 标记条目（`customType: "ucode.plan-ignored"`），
+  对话区显示「已忽略计划」，多窗口靠 `transcript_reset` 重取快照同步。新增 `messages/ignore-plan`
+  接口与 `MessageDTO.customType`；无 DB 变更。
 
 ### 变更
 
+- plan 模式的 `present_plan` 收尾改为有条件：需要用户拍板方向时先用 `question` 提问，
+  方案具体到可落地步骤时才在回复末尾调用 `present_plan`。
 - `brand-html` Vite 插件由 `apps/web/plugins` 移到 `@ucode/brand/vite`，web 与桌面端共用；
   i18n 接线由 `apps/web/src/lib/i18n.ts` 抽到 `@ucode/ui/lib/app-i18n`（`createAppI18n`）。
 - `scripts/verify` 的 i18n（硬编码中文）与 tokens（裸色值）扫描范围纳入 `apps/desktop/src/renderer`，

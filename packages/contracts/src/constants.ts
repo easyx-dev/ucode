@@ -37,6 +37,13 @@ export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] 
 export type MessageRole = (typeof MESSAGE_ROLES)[number];
 
 /**
+ * 忽略本次计划的界面标记：plan 模式的决策表单点「忽略」后，服务端往会话文件追加的
+ * pi `custom` 条目（`data.at` 是忽略时间）。跨端常量——服务端写、各端据此渲染「已忽略计划」，
+ * 并让本轮不再弹表单。它只作扩展状态持久化，不进模型上下文。
+ */
+export const PLAN_IGNORED_CUSTOM_TYPE = "ucode.plan-ignored";
+
+/**
  * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
  * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
  *

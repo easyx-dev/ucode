@@ -33,6 +33,7 @@ import type {
   McpWriteResponse,
   MessageCompactRequest,
   MessageEditRequest,
+  MessageIgnorePlanResponse,
   MessageInterruptResponse,
   MessageListRequest,
   MessageListResponse,
@@ -204,6 +205,11 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 手动压缩上下文；进度走 compaction_* 事件 */
       compact: (body: MessageCompactRequest) =>
         transport.post<PromptAdmittedResponse>("messages/compact", body),
+      /** 忽略本次计划的决策表单；刷新由 transcript_reset 事件驱动 */
+      ignorePlan: (sessionId: string) =>
+        transport.post<MessageIgnorePlanResponse>("messages/ignore-plan", {
+          sessionId,
+        } satisfies SessionIdRequest),
     },
     events: {
       /** 建立全局事件流连接；连接结束（含被 signal 中断）后返回 */

@@ -42,6 +42,8 @@ export type MessagesStore = {
   interrupt: (sessionId: string) => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: (sessionId: string, instructions?: string) => Promise<void>;
+  /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
+  ignorePlan: (sessionId: string) => Promise<void>;
 };
 
 type MessagesDeps = {
@@ -245,6 +247,16 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
           sessionId,
           ...(instructions ? { instructions } : {}),
         });
+      } catch (error) {
+        patch(engine, { error: asApiError(error) });
+      }
+    },
+
+    async ignorePlan(sessionId) {
+      const engine = ensure(sessionId);
+      patch(engine, { error: null });
+      try {
+        await deps.apis.messages.ignorePlan(sessionId);
       } catch (error) {
         patch(engine, { error: asApiError(error) });
       }

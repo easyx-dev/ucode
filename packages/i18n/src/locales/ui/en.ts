@@ -214,6 +214,9 @@ export default {
     "Approve to switch to Build mode and start, or add feedback below to keep discussing.",
   批准并执行: "Approve and run",
   提交反馈: "Send feedback",
+  忽略: "Ignore",
+  已忽略计划: "Plan ignored",
+  本次计划不再弹出决策表单: "Stop showing the decision form for this plan",
   "对计划有补充或异议？写在这里继续讨论": "Add feedback or objections to keep refining the plan",
   "计划已批准，请开始执行。": "The plan is approved. Please start executing.",
 
