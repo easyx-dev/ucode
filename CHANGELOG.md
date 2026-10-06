@@ -35,6 +35,8 @@
 
 ### 新增
 
+- 新增项目级提示词目录 `.ucode/prompts`（软链到 `.agents/commands`）：ucode 在本仓库里以项目级提示词读到
+  同一批命令（`/review`、`/todo`），做法与 `.opencode/commands` 一致。
 - 会话上下文占用：`SessionInfoResponse` 与 `session_updated` 事件增加 `contextUsage`（当前上下文的 token 数与
   模型窗口；压缩后未出新回答、模型窗口不可知、会话未落盘时为空）。池内会话直接读 pi 的内存投影，
   离线会话按会话文件 mtime 缓存解析；web 头部用量徽标改显示占用百分比（取不到时回落累计 token），
