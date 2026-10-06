@@ -1,9 +1,6 @@
-/** 环境变量解析：由 APP_HOME 一个主目录派生工作目录与全部配置路径 */
+/** 环境变量解析：配置一律来自环境变量（.env / .env.prod），由 APP_HOME 派生全部路径；缺失即报错退出 */
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-
-import { appHomeDirname } from "@ucode/brand/values";
 
 import {
   APP_DIRNAME,
@@ -11,10 +8,6 @@ import {
   AUTH_FILENAME,
   CONFIG_FILENAME,
   DB_FILENAME,
-  DEFAULT_HOST,
-  DEFAULT_POOL_IDLE_MS,
-  DEFAULT_PORT,
-  DEFAULT_PROMPT_SOURCE,
   HARNESS_DIRNAME,
   LOG_LEVELS,
   MCP_CONFIG_FILENAME,
@@ -24,77 +17,100 @@ import {
   SESSIONS_DIRNAME,
   WORKSPACE_DIRNAME,
 } from "./constants";
+import { envFileName, expandHome, loadEnvFile, resourceRoot, wasPreset } from "./lib/app-paths";
 import { readServiceRegistration } from "./lib/service-file";
 
-const repoRoot = resolve(import.meta.dirname, "../..");
+/** 相对路径的解析基准：环境文件所在目录（无则 cwd） */
+const baseDir = loadEnvFile();
+/** 当前加载的环境文件名，用于缺失 / 非法项的错误提示 */
+const envFile = envFileName();
 
-try {
-  process.loadEnvFile(resolve(repoRoot, ".env"));
-} catch {
-  // 没有 .env 时全部使用默认值
-}
-
-const resolveDir = (value: string | undefined, fallback: string): string => {
-  const raw = value?.trim() || fallback;
-  return isAbsolute(raw) ? raw : resolve(repoRoot, raw);
+/**
+ * 启动期配置缺失 / 非法：logger 依赖 env 尚不可用，故直接写 stderr 并退出。
+ * 显式失败优于带默认值静默跑起来——生产与开发的差异都应由环境变量声明。
+ */
+const die = (message: string): never => {
+  console.error(`[配置错误] ${message}`);
+  console.error(`请在 ${envFile} 或运行环境中声明（模板见 .env.example 与 .env.prod.example）。`);
+  process.exit(1);
 };
 
-const resolveNum = (value: string | undefined, fallback: number): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+const requireEnv = (name: string): string => {
+  const raw = process.env[name]?.trim();
+  return raw ? raw : die(`缺少环境变量 ${name}`);
+};
+
+const requireNum = (name: string): number => {
+  const raw = requireEnv(name);
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : die(`环境变量 ${name} 非法：${raw}`);
 };
 
 /** 非法级别会让 pino 在构造时抛错、直接拖垮启动，所以这里只接受白名单内的值 */
-const resolveLogLevel = (value: string | undefined, fallback: string): string => {
-  const raw = value?.trim().toLowerCase();
-  return raw && (LOG_LEVELS as readonly string[]).includes(raw) ? raw : fallback;
+const resolveLogLevel = (): string => {
+  const raw = requireEnv("APP_LOG_LEVEL").toLowerCase();
+  return (LOG_LEVELS as readonly string[]).includes(raw)
+    ? raw
+    : die(`APP_LOG_LEVEL 非法：${raw}（可选 ${LOG_LEVELS.join(" / ")}）`);
 };
 
-/** 提示词源同样只接受白名单，写错时回落默认而不是让会话装配在运行期才炸 */
-const resolvePromptSource = (value: string | undefined): PromptSource => {
-  const raw = value?.trim().toLowerCase();
-  return raw && (PROMPT_SOURCES as readonly string[]).includes(raw)
+/** 提示词源同样只接受白名单，写错时明确报错而不是让会话装配在运行期才炸 */
+const resolvePromptSource = (): PromptSource => {
+  const raw = requireEnv("APP_PROMPT_SOURCE").toLowerCase();
+  return (PROMPT_SOURCES as readonly string[]).includes(raw)
     ? (raw as PromptSource)
-    : DEFAULT_PROMPT_SOURCE;
+    : die(`APP_PROMPT_SOURCE 非法：${raw}（可选 ${PROMPT_SOURCES.join(" / ")}）`);
 };
 
-/**
- * 应用主目录，同时是 agent 的工作目录。
- * 默认落在用户主目录下（`~/` + `appHomeDirname`），可用 `APP_HOME` 指向别处。
- * 下面按「谁的资产」分成两层：运行时私有数据（auth / sessions）与
- * 应用自有数据（config.json / SQLite），互不混放。
- */
-const homeDir = resolveDir(process.env.APP_HOME, resolve(homedir(), appHomeDirname));
+/** APP_HOME 支持 `~` 与相对路径（相对环境文件所在目录） */
+const resolveAppHome = (): string => {
+  const expanded = expandHome(requireEnv("APP_HOME"));
+  return isAbsolute(expanded) ? expanded : resolve(baseDir, expanded);
+};
+
+const homeDir = resolveAppHome();
 const harnessDir = resolve(homeDir, HARNESS_DIRNAME);
 const appDir = resolve(homeDir, APP_DIRNAME);
 const workspaceRoot = resolve(homeDir, WORKSPACE_DIRNAME);
 const isProduction = process.env.NODE_ENV === "production";
 
-/**
- * 服务注册文件里的 host / port 是「上次落地的监听形态」；
- * 优先级为 显式 env > service.json > 默认，所以没设 APP_PORT 的普通重启会复用上次端口。
- */
+/** 服务注册文件里的端口是「上次落地的监听形态」；`APP_HOST` / `APP_PORT` 在 .env 里是默认值 */
 const servicePath = resolve(appDir, SERVICE_FILENAME);
 const registration = readServiceRegistration(servicePath);
-const explicitPort = process.env.APP_PORT?.trim();
 
+const parsePort = (raw: string, source: string): number => {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : die(`${source} 非法：${raw}`);
+};
+
+/** 端口：显式（--port / shell）> `.env` 声明的默认值；`service.json` 仅在未声明时兜底（端口没有设置入口） */
 const resolvePort = (): number => {
-  if (explicitPort) {
-    const parsed = Number(explicitPort);
-    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  if (wasPreset("APP_PORT")) {
+    const explicit = process.env.APP_PORT?.trim();
+    if (explicit) return parsePort(explicit, "APP_PORT（显式）");
   }
-  return registration && registration.port > 0 ? registration.port : DEFAULT_PORT;
+  const declared = process.env.APP_PORT?.trim();
+  if (declared) return parsePort(declared, "APP_PORT");
+  if (registration && registration.port > 0) return registration.port;
+  return die("缺少 APP_PORT，且没有可复用的 service.json 端口");
+};
+
+/** 监听地址同理：显式 > service.json > .env 默认；设置里的局域网开关据此在重启后生效 */
+const resolveHost = (): string => {
+  const explicit = wasPreset("APP_HOST") ? process.env.APP_HOST?.trim() : undefined;
+  return explicit || registration?.host?.trim() || requireEnv("APP_HOST");
 };
 
 export const env = {
-  repoRoot,
+  /** 资源根（仓库根）：web 产物、package.json 等定位基准 */
+  resourceRoot,
   isProduction,
   /** 工作与配置主目录 */
   homeDir,
-  /** 监听地址：默认仅回环，`APP_HOST=0.0.0.0` 才允许局域网 */
-  host: process.env.APP_HOST?.trim() || registration?.host || DEFAULT_HOST,
+  /** 监听地址与端口（端口 0 表示自选，启动后回写注册文件） */
+  host: resolveHost(),
   port: resolvePort(),
-  /** 服务注册文件：host / port / serviceToken / password（0600，服务独占写） */
+  /** 服务注册文件：host / port / pid / serviceToken / password（0600，服务独占写） */
   servicePath,
   /** 助理根目录：未绑定工作目录的会话落在 `<workspaceRoot>/<sessionId>` */
   workspaceRoot,
@@ -111,12 +127,13 @@ export const env = {
   /** pi 的 MCP 服务器配置（用户级）；设置页增删改写回这里 */
   mcpConfigPath: resolve(harnessDir, MCP_CONFIG_FILENAME),
   dbPath: resolve(appDir, DB_FILENAME),
-  webDistDir: resolve(repoRoot, "apps/web/dist"),
-  poolIdleMs: resolveNum(process.env.APP_POOL_IDLE_MS, DEFAULT_POOL_IDLE_MS),
+  /** web 构建产物（由 pnpm build 生成，server 同源托管） */
+  webDistDir: resolve(resourceRoot, "apps/web/dist"),
+  poolIdleMs: requireNum("APP_POOL_IDLE_MS"),
   corsOrigin: process.env.APP_CORS_ORIGIN?.trim() || "",
-  logLevel: resolveLogLevel(process.env.APP_LOG_LEVEL, isProduction ? "info" : "debug"),
+  logLevel: resolveLogLevel(),
   /** 系统提示词源：`APP_PROMPT_SOURCE=pi|custom`，改它需要重启（会话装配时读取） */
-  promptSource: resolvePromptSource(process.env.APP_PROMPT_SOURCE),
+  promptSource: resolvePromptSource(),
 };
 
 for (const dir of new Set([

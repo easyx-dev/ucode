@@ -127,9 +127,9 @@ const apiKey = readArg("api-key", "devtest");
 const providerId = "local";
 const modelIds = readList("model").length > 0 ? readList("model") : ["deepseek-v4-flash"];
 const attempts = Math.max(1, Number(readArg("attempts", "1")) || 1);
-const harnessDir = resolve(env.repoRoot, ".tmp/eval/harness");
-const workspaceDir = resolve(env.repoRoot, ".tmp/eval/workspace");
-const REPO_CWD = env.repoRoot;
+const harnessDir = resolve(env.resourceRoot, ".tmp/eval/harness");
+const workspaceDir = resolve(env.resourceRoot, ".tmp/eval/workspace");
+const REPO_CWD = env.resourceRoot;
 
 // 未命中就报错退出：静默回落到默认源 / 空用例会让评测假报通过，比跑错更误导
 const requestedSources = readList("source");

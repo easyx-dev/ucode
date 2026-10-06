@@ -1,14 +1,6 @@
-/** server 侧常量：默认值与固定目录名集中于此，避免散落在 env / logger 中 */
+/** server 侧常量：固定目录名与白名单集中于此；可配置的默认值由环境变量声明（见 .env / .env.prod） */
 import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
 import { brand } from "@ucode/brand/values";
-
-export const DEFAULT_PORT = 2048;
-
-/** 默认监听地址：只绑回环，避免同网段任意机器直连 agent */
-export const DEFAULT_HOST = "127.0.0.1";
-
-/** AgentSession 空闲多久后被回收 */
-export const DEFAULT_POOL_IDLE_MS = 10 * 60 * 1000;
 
 /** 运行时数据目录名（位于 APP_HOME 下）：auth.json / sessions */
 export const HARNESS_DIRNAME = "harness";
@@ -185,14 +177,11 @@ export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "
 
 /**
  * 系统提示词源：`custom` 用整段自研提示词，`pi` 用 pi 默认提示词并叠加自研片段。
- * 默认 `custom`——自研提示词是线上交付版本；`pi` 作为可对比的行为基线，供 `pnpm eval` 对照。
+ * 具体取值由 `APP_PROMPT_SOURCE` 声明（见 .env / .env.prod），这里只做白名单校验。
  */
 export const PROMPT_SOURCES = ["pi", "custom"] as const;
 
 export type PromptSource = (typeof PROMPT_SOURCES)[number];
-
-/** 默认提示词源 */
-export const DEFAULT_PROMPT_SOURCE: PromptSource = "custom";
 
 /** 登录会话过期清理 / 限流窗口回收的扫描间隔 */
 export const AUTH_SWEEP_INTERVAL_MS = 10 * 60 * 1000;

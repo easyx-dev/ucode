@@ -28,6 +28,8 @@ const registrationSchema = z.object({
   host: z.string(),
   /** 监听端口：0 表示自选可用端口，启动后回写真实端口 */
   port: z.number().int().min(0).max(65535),
+  /** 服务进程 pid，供 `--restart` 精确结束旧实例；优雅退出时清空，崩溃后为陈旧值 */
+  pid: z.number().int().nullable(),
   /** 本机原生客户端的免交互凭证 */
   serviceToken: z.string().min(1),
   /** 超管密码，明文；供登录页与忘记时回显 */
@@ -89,8 +91,9 @@ export type EnsureOptions = {
 };
 
 /**
- * 确保注册文件存在：已有则复用其凭证，并把 host / port 对齐到本次解析值；
- * 缺失或损坏则生成新凭证。返回 `created` 供启动日志提示初始密码。
+ * 确保注册文件存在：已有则复用其凭证，并把 host / port 对齐到本次启动值；
+ * 缺失或损坏则生成新凭证（pid 先置空，实际值待 listen 成功后由 `writeServicePid` 写入）。
+ * 返回 `created` 供启动日志提示初始密码。
  */
 export const ensureServiceRegistration = (
   options: EnsureOptions,
@@ -106,12 +109,28 @@ export const ensureServiceRegistration = (
     relay: defaultRelay(),
     host: options.host,
     port: options.port,
+    pid: null,
   };
-  const registration: ServiceRegistration = { ...base, host: options.host, port: options.port };
+  // 不动 pid：绑定失败（如端口占用）时注册文件里的旧实例 pid 必须保持不变
+  const registration: ServiceRegistration = {
+    ...base,
+    host: options.host,
+    port: options.port,
+  };
 
   const changed =
     !existing || existing.host !== registration.host || existing.port !== registration.port;
   if (changed) writeServiceRegistration(options.path, registration);
 
   return { registration, created: !existing };
+};
+
+/**
+ * 写入 / 清空注册文件里的 pid。listen 成功后写入本进程 pid，优雅退出时传 `null` 清空；
+ * 异常退出（如崩溃）留下的陈旧 pid 由调用方按存活 + 端口归属判定忽略。
+ */
+export const writeServicePid = (path: string, pid: number | null): void => {
+  const existing = readServiceRegistration(path);
+  if (!existing || existing.pid === pid) return;
+  writeServiceRegistration(path, { ...existing, pid });
 };

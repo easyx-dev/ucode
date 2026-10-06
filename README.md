@@ -2,7 +2,7 @@
 
 把 [pi](https://pi.dev) 编码 agent（`@earendil-works/pi-coding-agent`）封装成 HTTP 服务，并配一个 Vite + React + shadcn/ui 的对话界面。
 
-- **server/**：Hono + TypeScript，端口 `2048`，全部接口前缀 `/api/v1`（`health` 之外都是 `POST`）
+- **server/**：Hono + TypeScript，端口 `19688`，全部接口前缀 `/api/v1`（`health` 之外都是 `POST`）
 - **apps/web/**：Vite + React 19 + Tailwind v4 + shadcn/ui，开发时跑 `5173`，生产由 server 同源托管
 - **apps/desktop/**：Electron 桌面端，自带 Vite + React 渲染层，复用 `@ucode/ui` 与 `@ucode/sdk`；主进程读
   `$APP_HOME/app/service.json` 免登录连接本机服务（凭证只留在主进程）
@@ -20,19 +20,49 @@
 ```bash
 pnpm install
 
-# 开发：server(2048) + web(5173) 一起启动
+# 开发：server(19688) + web(5173) 一起启动
 pnpm dev
 
-# 生产：构建 web 后只用 2048 一个端口
+# 生产：构建后用 19688 一个端口
 pnpm build && pnpm start
 
 # 桌面端：先起 server，再单独起 Electron（渲染层 5174）
 pnpm dev:desktop
 ```
 
-打开 `http://localhost:2048`（生产）或 `http://localhost:5173`（开发）。首次启动会生成登录密码并打印在启动日志里（也可查看 `$APP_HOME/app/service.json`），用密码登录后即可使用。
+打开 `http://localhost:19688`（生产）或 `http://localhost:5173`（开发）。首次启动会生成登录密码并打印在启动日志里（也可查看 `$APP_HOME/app/service.json`），用密码登录后即可使用。
 
 首次启动会提示「尚未配置模型」，点侧栏底部 **设置** 或调用 `POST /api/v1/config/update` 填入端点即可。
+
+### 生产启动与自迭代
+
+生产启动是「先构建、再跑产物」：`pnpm build` 把 web 构到 `apps/web/dist`，再由 esbuild 把
+server 打成单文件 `dist/ucode.js`，`pnpm start` 即 `NODE_ENV=production node dist/ucode.js`。
+主要用途之一是**用 ucode 开发 ucode**：`node dist/ucode.js` 不被 watch，编辑源码不会重启它，
+只在你显式重启时才生效——避开开发环境存盘即重启打断会话的问题。
+
+```bash
+pnpm build                         # 构建 web + server 产物
+pnpm start                         # 前台启动（默认 19688）
+pnpm build && pnpm start -- --restart   # 重建后端到端重启：停旧实例 → 起新版本
+```
+
+`pnpm start` 后的参数原样透传给 `server/src/cli.ts`：
+
+```bash
+pnpm start -- --port 0        # 自选可用端口
+pnpm start -- --open          # 启动后打开浏览器
+pnpm start -- --status        # 只查询是否在运行（运行中退出码 0）
+pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
+```
+
+- 产物运行时从**仓库根**的 `node_modules` 解析第三方依赖（esbuild 里设为 external），
+  故根 `package.json` 的 `dependencies` 必须覆盖 `server` 的第三方运行时依赖——由 `scripts/verify`
+  的 `manifest` 校验兜底。
+- 生产（`NODE_ENV=production`）读 **`.env.prod`**（模板 `.env.prod.example`），从 cwd 向上查找；
+  `.env.prod` 声明 `APP_HOME=~/.ucode`、端口 `19688`，与开发（`.env` → `.tmp/.ucode`）的数据目录隔离。
+  缺失必需项会直接报错退出，代码不带默认值。
+- 需要 Node ≥ 24（`node:sqlite`）。全局命令 / npm 包 / 安装包分发尚未做，留待发布阶段。
 
 ### 桌面端（Electron）
 
@@ -47,24 +77,32 @@ pnpm dev:desktop
 
 > 尚未做：安装包（内置服务运行时）、服务发现与自动拉起、按 `compatRange` 的版本兼容决策；留待打包阶段。
 
-### 环境变量（`.env`）
+### 环境变量（`.env` / `.env.prod`）
 
-`.env` 只放基础设施配置，**模型 / 端点 / API Key 不在这里**，而是通过接口写入 `$APP_HOME/app/config.json`：
+配置项一律由环境变量声明，**代码不带默认值**——缺失或非法即启动报错。按 `NODE_ENV` 选择文件：
+`pnpm dev` 与测试读 `.env`（开发），`pnpm start` 读 `.env.prod`（生产）；两者都从 cwd
+向上查找，模板见 [`.env.example`](./.env.example) 与 [`.env.prod.example`](./.env.prod.example)
+（`.env` / `.env.prod` 为本地文件，不入库）。
+**模型 / 端点 / API Key 不在这里**，而是通过接口写入 `$APP_HOME/app/config.json`：
 
-| 变量 | 默认值 | 说明 |
+| 变量 | 必填 | 说明 |
 | --- | --- | --- |
-| `APP_HOST` | `127.0.0.1` | 监听地址；仅回环，`0.0.0.0` 允许局域网（显式开启并告警） |
-| `APP_PORT` | `2048` | HTTP 端口；`0` 表示自选可用端口，启动后写回 `service.json` |
-| `APP_HOME` | `~/.ucode` | 配置 / 数据主目录：`harness/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
-| `APP_POOL_IDLE_MS` | `600000` | 内存中的 AgentSession 空闲多久后回收 |
-| `APP_CORS_ORIGIN` | 空 | 允许的跨域来源，逗号分隔；缺省不放行跨域（同源与原生客户端不需要 CORS） |
-| `APP_LOG_LEVEL` | 开发 `debug` / 生产 `info` | pino 日志级别 |
-| `APP_PROMPT_SOURCE` | `custom` | 系统提示词源：`custom`（整段自研）/ `pi`（pi 默认 + 自研片段），改后重启生效 |
+| `APP_HOST` | 是 | 监听地址**默认值**；仅回环，`0.0.0.0` 允许局域网（显式开启并告警）。可被 `--host` 或设置里的开关覆盖 |
+| `APP_PORT` | 是 | HTTP 端口**默认值**；`0` 表示自选可用端口，启动后写回 `service.json`。可被 `--port` 或注册文件里的值覆盖 |
+| `APP_HOME` | 是 | 配置 / 数据主目录：`harness/`、`app/`、`workspace/`、`skills/`、`prompts/`、`agents/` |
+| `APP_POOL_IDLE_MS` | 是 | 内存中的 AgentSession 空闲多久后回收（毫秒） |
+| `APP_LOG_LEVEL` | 是 | pino 日志级别（`trace`…`silent`） |
+| `APP_PROMPT_SOURCE` | 是 | 系统提示词源：`custom`（整段自研）/ `pi`（pi 默认 + 自研片段），改后重启生效 |
+| `APP_CORS_ORIGIN` | 否 | 允许的跨域来源，逗号分隔；缺省不放行跨域（同源与原生客户端不需要 CORS） |
 
-> 未设 `APP_PORT` 时会复用 `$APP_HOME/app/service.json` 里上次的端口；`APP_HOST` / `APP_PORT` 也可在设置里改（需重启生效）。
+> `APP_HOST` / `APP_PORT` 是**默认值**，取值顺序按「有没有其它入口」区分：
+> **`APP_HOST`**：显式设置（`--host` 参数或启动前就有的环境变量）> `$APP_HOME/app/service.json`
+> （设置里的「局域网访问」开关写在这里）> `.env(.prod)` 默认值——开关改完重启即生效。
+> **`APP_PORT`**：显式设置（`--port` 或启动前环境变量）> `.env(.prod)`；端口没有设置入口，故以 env 为准，
+> `service.json` 仅在未声明时兜底。改端口只需改 `.env(.prod)`，无需删注册文件。
 
-> `APP_HOME` 不设置时默认落在用户主目录（`~/.<品牌 slug>`，默认品牌即 `~/.ucode`）；
-> 显式指定请用绝对路径，相对路径会按仓库根解析。
+> `APP_HOME` 支持 `~`（展开为用户主目录）与相对路径（相对环境文件所在目录）；
+> 开发模板用仓库内 `.tmp/.ucode`，生产用 `~/.ucode`，两者数据隔离。
 
 `APP_HOME` 派生出的路径（无需单独配置），按「谁的资产」分两层：
 
@@ -142,7 +180,7 @@ openai / anthropic / xai / openrouter / google / groq / mistral / together …�
 pi 不认识的端点用「添加自定义供应商」，必须同时给出 `baseUrl` 与 `models`：
 
 ```bash
-curl -X POST http://localhost:2048/api/v1/config/update \
+curl -X POST http://localhost:19688/api/v1/config/update \
   -H 'content-type: application/json' \
   -d '{
     "providers": [{
@@ -183,7 +221,7 @@ curl -X POST http://localhost:2048/api/v1/config/update \
 ### 连通性测试
 
 ```bash
-curl -X POST http://localhost:2048/api/v1/config/test \
+curl -X POST http://localhost:19688/api/v1/config/test \
   -H 'content-type: application/json' \
   -d '{"baseUrl":"http://localhost:8317/v1","apiKey":"devtest","model":"deepseek-v4-flash"}'
 ```
@@ -235,7 +273,7 @@ agent 有自研的 `webfetch`（抓链接转 markdown）与 `websearch`（联网
 ```
 
 ```bash
-curl -X POST http://localhost:2048/api/v1/config/update \
+curl -X POST http://localhost:19688/api/v1/config/update \
   -H 'content-type: application/json' \
   -d '{"websearch":{"provider":"tavily","apiKey":"tvly-..."}}'
 ```
@@ -300,7 +338,7 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&fo
 生成与连接是解耦的：`messages/prompt` 只负责投递，事件统一从 `POST /api/v1/events` 推送。
 
 ```bash
-curl -N -X POST http://localhost:2048/api/v1/events \
+curl -N -X POST http://localhost:19688/api/v1/events \
   -H 'content-type: application/json' -d '{}'
 ```
 
@@ -358,13 +396,16 @@ SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 
 ```
 DESIGN.md                  # 设计系统（品牌 / 主题 / token / 深浅色）
+.env.example               # 开发环境变量模板（复制为 .env）
+.env.prod.example          # 生产环境变量模板（复制为 .env.prod）
 docs/
   database.md              # 数据库规范
   api.md                   # 接口与字段规范
   api-reference.md         # 接口参考（由 pnpm api:docs 生成，勿手改）
   components.md            # 组件规范
 scripts/api-docs/          # 接口参考生成器（endpoints 清单 + 生成 + 校验）
-scripts/verify/            # 约定校验（migrations / contracts / api-docs / tokens / brand / i18n），由 pnpm check 调用
+scripts/verify/            # 约定校验（migrations / contracts / api-docs / tokens / brand / i18n / manifest），由 pnpm check 调用
+scripts/build-cli.mjs      # esbuild 把 server + CLI 打成 dist/ucode.js（供 pnpm start 运行）
 packages/contracts/
   src/
     envelope.ts            # { success, code, message, data } 封套与错误码
@@ -404,11 +445,13 @@ packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
   src/styles/theme.css     # 设计 token、base 层与 markdown 样式
   components.json          # shadcn CLI 配置
 server/src/
+  cli.ts                   # 命令行入口：参数解析 / --restart / --status / --open，再交给 index
   env.ts                   # APP_HOME 派生 harness/ 与 app/ 下的全部路径
   app.ts                   # Services 装配、配置热重载
   constants.ts             # 默认值与固定目录名
   utils/                   # 纯函数工具（time / object）
   lib/                     # 服务端基建
+    app-paths/             # 源码 / 打包的形态判定：资源根、按 NODE_ENV 加载 .env / .env.prod
     response/              # 统一封套 + AppError（message 为中文兜底，params 给客户端插值）
     validate/              # jsonBody 中间件
     logger/                # pino 实例 + 请求日志
@@ -530,5 +573,5 @@ pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devt
 - **模型列表为空**：`models/list` 只列出配置里有凭证的 provider，检查 `baseUrl` / `apiKey`。
 - **`sessionId` 报 400**：id 只接受 `^[A-Za-z0-9][A-Za-z0-9._-]*$`（与 pi 的会话 id 规则一致），新建会话用返回的 UUID。
 - **调用上游报 400 `invalid_request`**：多为网关兼容性差异。先用 `config/test` 二分定位，必要时通过模型的 `compat` 关掉 `supportsDeveloperRole`、`supportsStore`、`supportsReasoningEffort` 等开关。
-- **端口被占用**：改 `.env` 的 `APP_PORT`，同时改 `apps/web/vite.config.ts` 里的代理目标。
+- **端口被占用**：改 `.env`（开发）或 `.env.prod`（生产）的 `APP_PORT`；web 开发代理会自动读取同一值。
 - **⚠️ 安全**：当前版本没有 HTTP 鉴权、默认监听所有网卡，且背后的 agent 有 `bash` 权限。**不要把它暴露到公网或不可信网络**。待办与整改方案见 [`TODO.md`](./TODO.md)。

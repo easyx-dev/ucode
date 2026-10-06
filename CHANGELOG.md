@@ -35,6 +35,15 @@
 
 ### 新增
 
+- 生产构建与启动：新增 `server/src/cli.ts`（命令行入口）与 `scripts/build-cli.mjs`（esbuild 把
+  server + CLI 打成单文件 `dist/ucode.js`）；`pnpm build` 同时构建 web（`apps/web/dist`）与 server 产物，
+  `pnpm start` 改为 `NODE_ENV=production node dist/ucode.js`（不再经 tsx 直接跑源码）。CLI 提供
+  `--port` / `--host` / `--open` / `--restart` / `--status` / `--version`，经 `pnpm start -- …` 透传；
+  `node dist/ucode.js` 不被 watch，改代码不会打断运行中的会话，方便「用 ucode 开发 ucode」时手动重启。
+  根 `package.json` 增加运行时 `dependencies`（镜像 server 的第三方依赖，供产物从仓库根解析 external），
+  新增 `scripts/verify` 的 `manifest` 校验兜底依赖镜像。
+- `$APP_HOME/app/service.json` 增加 `pid` 字段：启动写入 `process.pid`、优雅退出清空，
+  供 `--restart` 按 pid 精确结束旧实例，不用扫端口。
 - 侧栏重构与命令面板：顶部功能菜单（新建任务 / 小助理 / 搜索 / 自动化 / 插件市场）、项目与助理两个可折叠分类、
   会话行未读点与悬停置顶 / 归档、侧栏可收起（⌘B）、⌘K 命令面板（操作 / 任务 / 文件，文件查看器预留）。
   契约 `SessionSummary` 增加 `pinnedAt` / `lastReadAt`，新增 `sessions/read`，`sessions/update` 支持 `pinned`，
@@ -66,6 +75,18 @@
 
 ### 变更
 
+- 配置改为**环境变量声明、代码不带默认值**（缺失 / 非法即启动报错）：`server/src/constants.ts` 移除
+  `DEFAULT_PORT` / `DEFAULT_HOST` / `DEFAULT_POOL_IDLE_MS` / `DEFAULT_PROMPT_SOURCE`，
+  `env.ts` 改为从环境变量读取并校验。按 `NODE_ENV` 选择环境文件：生产 **`.env.prod`**
+  （`APP_HOME=~/.ucode`、`APP_LOG_LEVEL=info`）、其余 `.env`（开发，`APP_HOME=.tmp/.ucode`），
+  均从 cwd 向上查找；两者为本地文件（新增已提交模板 `.env.prod.example`，`.env` 沿用 `.env.example`）。
+  `APP_HOME` 支持 `~` 与相对路径（相对环境文件所在目录）。
+  `APP_HOST` / `APP_PORT` / `APP_HOME` / `APP_POOL_IDLE_MS` / `APP_LOG_LEVEL` / `APP_PROMPT_SOURCE` 均由环境变量提供；
+  其中 `APP_HOST` / `APP_PORT` 作为**默认值**（取值顺序 显式 > `service.json` > `.env`，见「修复」）；
+  web 开发代理改为读取 `.env` 的 `APP_PORT`，不再写死。
+- 默认端口 `2048` → `19688`（声明在 `.env` / `.env.prod`）。
+- 路径解析：新增 `server/src/lib/app-paths`（定位仓库根资源根 + 按 `NODE_ENV` 选择环境文件），
+  `env.repoRoot` 更名 `env.resourceRoot`。
 - 命名调整：运行时数据目录 `$APP_HOME/agent` 更名为 `$APP_HOME/harness`（`AGENT_DIRNAME` → `HARNESS_DIRNAME`、
   `env.agentDir` → `env.harnessDir`），server 源码模块 `server/src/agent/` 更名为 `server/src/harness/`。
   开发初期不做迁移，删除或改名本地 `~/.ucode/agent` 后由服务重建。
@@ -457,6 +478,12 @@
 
 ### 修复
 
+- 设置里的「局域网访问」开关重启后不再生效：`APP_HOST` 此前被当作强制覆盖值，改用「默认值」语义——
+  取值顺序 显式（`--host` 或启动前已有的环境变量）> `service.json`（设置里改过的值）> `.env(.prod)`；
+  `APP_PORT` 无设置入口，取值 显式（`--port`）> `.env(.prod)`（`service.json` 仅兜底），改端口只需改 env。
+- 启动失败（如端口被占用）会污染注册文件的 `pid`：`pid` 改为 listen 成功后再落盘，不再把正在运行实例的
+  pid 覆盖成即将退出的本进程，避免 `--status` 误报「未运行」、`--restart` 无法停旧。
+- `--restart` 结束旧实例前校验 pid 是否监听在注册端口，避免崩溃遗留的陈旧 pid 被系统复用后误杀无关进程。
 - 聊天区的模型选择器只列已接入的供应商：目录里还有 32 个未配凭证的内置供应商，
   选了必然报 `Provider is not configured`。
 - 内置供应商被注册（写了 `baseUrl` 或 `models`）时，显示名不再从 pi 的 `DeepSeek` 退化成 id `deepseek`

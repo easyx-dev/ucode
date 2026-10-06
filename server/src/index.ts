@@ -16,7 +16,11 @@ import { isSecureRequest, SESSION_COOKIE_NAME, sessionCookieOptions } from "./li
 import { type AuthVariables, createAuthMiddleware } from "./lib/auth/middleware";
 import { logger, requestLogger } from "./lib/logger";
 import { AppError, fail } from "./lib/response";
-import { ensureServiceRegistration, writeServiceRegistration } from "./lib/service-file";
+import {
+  ensureServiceRegistration,
+  writeServicePid,
+  writeServiceRegistration,
+} from "./lib/service-file";
 import { createAgentsRoute } from "./routes/agents";
 import { createAttachmentsRoute } from "./routes/attachments";
 import { createAuthRoute } from "./routes/auth";
@@ -139,12 +143,19 @@ app.onError((error, c) => {
   );
 });
 
+/** 实际监听端口要等 listen 回调才确定（端口 0 时自选），供 CLI `--open` 等待后再打开 */
+let resolveListening: (port: number) => void = () => {};
+export const listening = new Promise<number>((resolvePort) => {
+  resolveListening = resolvePort;
+});
+
 const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => {
-  // 端口 0 时真实端口在监听后才拿到，回写注册文件供下次复用与客户端发现
-  if (info.port !== registration.port) {
-    registration.port = info.port;
-    writeServiceRegistration(env.servicePath, registration);
-  }
+  // listen 成功后才落盘 host / port / pid：绑定失败（如端口占用）时保持既有注册不变，
+  // 否则会把正在运行实例的 pid 覆盖成即将退出的本进程
+  registration.port = info.port;
+  registration.pid = process.pid;
+  writeServiceRegistration(env.servicePath, registration);
+  resolveListening(info.port);
   const status = services.runtime.getStatus();
   logger.info(`http://${env.host}:${info.port}  (home: ${env.homeDir})`);
   if (env.host !== "127.0.0.1" && env.host !== "::1") {
@@ -157,7 +168,7 @@ const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (
   } else {
     logger.warn(`模型未配置：${status.error}（POST ${API_BASE_PATH}/config/update 配置）`);
   }
-  logger.info(webBuildExists() ? "已托管 apps/web/dist" : "未发现 web 构建产物（开发时用 vite）");
+  logger.info(webBuildExists() ? "已托管 web 构建产物" : "未发现 web 构建产物（开发时用 vite）");
 });
 
 // 没有这个监听时，端口占用会以 Unhandled 'error' event 崩掉，只留一段原始堆栈
@@ -175,6 +186,7 @@ server.on("error", (error: NodeJS.ErrnoException) => {
 
 const shutdown = () => {
   logger.info("关闭中…");
+  writeServicePid(env.servicePath, null);
   services.pool.disposeAll();
   services.close();
   server.close(() => process.exit(0));

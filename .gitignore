@@ -4,5 +4,6 @@ dist-electron/
 .tmp/
 .env
 .env.local
+.env.prod
 *.log
 .DS_Store

@@ -109,11 +109,12 @@
 | --- | --- |
 | `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify` |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
-| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / tokens / brand / i18n） |
+| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / api-docs / tokens / brand / i18n / manifest） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web` / `apps/desktop`） |
-| `pnpm build` | 构建 web 到 `apps/web/dist`；server 由 tsx 直接运行，不产出编译物 |
+| `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
+| `pnpm start` | `NODE_ENV=production node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
-| `pnpm dev` | server `:2048` + web `:5173` 同时启动 |
+| `pnpm dev` | server `:19688` + web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
 
 单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
@@ -124,10 +125,32 @@
 否则 `scripts/verify` 的 tests 校验会报错（用例不会被静默跳过）。
 
 UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机已装 `agent-browser`
-（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:2048`，
+（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:19688`，
 或 `pnpm dev` 后开 `:5173`。两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接
 `ERR_UNSAFE_PORT`，换端口即可；弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，
 否则坐标会落到遮罩上把弹层关掉。
+
+### 构建与生产运行
+
+生产启动是「先构建、再跑产物」：`pnpm build` 把 web 构到 `apps/web/dist`，再由
+`scripts/build-cli.mjs`（esbuild）把 `server/src/cli.ts` 打成单文件 `dist/ucode.js`；
+`pnpm start` 即 `NODE_ENV=production node dist/ucode.js`。
+
+- **第三方依赖一律 external**：pi SDK 带原生 / wasm 依赖与运行期动态加载，不能打进单文件。
+  产物运行时从**仓库根**的 `node_modules` 解析 external 依赖，故根 `package.json` 的
+  `dependencies` 必须覆盖 `server` 的第三方运行时依赖——`scripts/verify` 的 `manifest` 校验兜底
+  （工作区包由 esbuild 打进产物，不声明）。
+- **配置一律由环境变量声明，代码不带默认值**（缺失 / 非法即启动报错）：生产读 `.env.prod`、
+  其余读 `.env`，按 `NODE_ENV` 选择，统一从 cwd 向上查找（模板见 `.env.example` / `.env.prod.example`，
+  `.env` / `.env.prod` 为本地文件）；`APP_HOME` 支持 `~` 与相对路径（相对环境文件所在目录）。
+- **CLI 生命周期**：`server/src/cli.ts` 提供 `--port` / `--host` / `--open` / `--restart` /
+  `--status` / `--version`。`node dist/ucode.js` 不被 watch，编辑源码不会重启它——这正是
+  「用 ucode 开发 ucode」时避免打断会话的关键；改完显式 `pnpm build && pnpm start -- --restart`
+  即可停旧起新。见 README「生产启动与自迭代」。
+- **`APP_HOST` / `APP_PORT` 是默认值**：`APP_HOST` 取值顺序为 显式（`--host` 或启动前已有环境变量）
+  > `service.json`（设置里改过的值）> `.env(.prod)`，故「局域网访问」开关重启后生效；`APP_PORT` 无设置入口，
+  取值 显式（`--port`）> `.env(.prod)`，`service.json` 仅兜底。
+- **未做**：全局命令 / npm 包 / 安装包分发（留待发布阶段，届时给根包加 `bin`/`files` 并复用本构建）。
 
 ### 接口规范（server）
 
