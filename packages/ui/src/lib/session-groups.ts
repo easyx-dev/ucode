@@ -32,13 +32,13 @@ export const isWorkspaceSession = (cwd: string, root: string): boolean => {
  */
 export const groupSessions = (
   sessions: SessionSummary[],
-  workspaceRoot: string | null,
+  workspacesDir: string | null,
 ): SessionSection[] => {
   const assistant: SessionSummary[] = [];
   const byDir = new Map<string, SessionSummary[]>();
 
   for (const session of sessions) {
-    if (workspaceRoot && isWorkspaceSession(session.cwd, workspaceRoot)) {
+    if (workspacesDir && isWorkspaceSession(session.cwd, workspacesDir)) {
       assistant.push(session);
       continue;
     }

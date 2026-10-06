@@ -9,9 +9,13 @@
  *
  * 一轮回复的页脚（模型 / 时间 / 耗时）只出现一次，挂在该轮末位节点上；`source` 记的是最后一条贡献内容的
  * assistant 消息，页脚的模型与耗时靠它，孤儿工具结果（调用记录已被裁剪）没有来源。
+ *
+ * `present_plan` 是给界面判断「本轮以计划收尾」的内部信号，不是给用户看的工作产物，故它的调用与结果
+ * 都在这一层就去掉（判定表单直接扫条目，见 `plan.ts`；统计与折叠也因此看不到它）。
  */
 import type { MessageBlock, PermissionRecord, QuestionItem } from "@ucode/contracts";
 import { PERMISSION_DECISION_CUSTOM_TYPE } from "@ucode/contracts";
+import { PRESENT_PLAN_TOOL } from "./plan";
 import type { ChatItem } from "./types";
 
 /** 一次工具调用：调用区块与它的结果已经配好对 */
@@ -70,7 +74,7 @@ type QuestionNode = {
   /** 提问内容；`answers` 与它同序，未答复时为空 */
   questions: QuestionItem[];
   answers: string[][];
-  /** 是否已有结果：超时 / 取消也会给结果，但答复为空，不能与「还在等」混为一谈 */
+  /** 是否已有结果：本轮被中断取消也算有结果，但答复为空，不能与「还在等」混为一谈 */
   settled: boolean;
   /** 发起提问的 assistant 消息 */
   source?: ChatItem;
@@ -196,6 +200,8 @@ const buildAssistantLegs = (item: ChatItem, results: Map<string, ChatItem>): Ass
   const legs: AssistantLeg[] = [];
   item.blocks.forEach((block, index) => {
     if (block.type === "toolCall") {
+      // 收尾信号不成段：它与它的结果都不进消息区
+      if (block.name === PRESENT_PLAN_TOOL) return;
       // 提问要带着答复单独成段：并进聚合行的话，用户事后看不到自己到底答了什么
       if (block.name === QUESTION_TOOL) {
         const result = results.get(block.id);
@@ -275,6 +281,8 @@ const appendLegs = (nodes: ChatNode[], legs: AssistantLeg[], item: ChatItem): vo
 /** 未被任何 assistant 调用认领的工具结果（如历史被裁剪）：单独成一段 */
 const appendToolResult = (nodes: ChatNode[], item: ChatItem, callIds: Set<string>): void => {
   if (item.toolCallId && callIds.has(item.toolCallId)) return;
+  // 调用被裁剪出上下文而结果还在时同样不成段
+  if (item.toolName === PRESENT_PLAN_TOOL) return;
   const entry: ToolEntry = {
     id: item.toolCallId || uidOf(item),
     name: item.toolName ?? "tool",

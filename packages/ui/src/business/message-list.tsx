@@ -60,7 +60,7 @@ export function MessageList({
   const { t } = useTranslation();
   const { showThinking } = useShowThinking();
   const scrollRef = useRef<HTMLDivElement>(null);
-  // 用户是否贴着底部：为真则新内容继续跟随，为假则只亮出「回到底部」。
+  // 用户是否贴着底部：为真则新内容继续跟随，为假则只亮出「回到底部」
   // 它只在 scroll 事件里改写——实测高度让 totalSize 变大并不触发 scroll 事件，用距离直接驱动状态会卡住
   const [following, setFollowing] = useState(true);
   const followingRef = useRef(true);
@@ -111,7 +111,7 @@ export function MessageList({
 
   // 贴底跟随是自己发起的滚动：它引发的那一个 scroll 事件不能当作用户意图（那一刻的距离可能仍大于
   // 阈值，新行高度刚实测完），否则「回到底部」会凭空亮起来。只豁免这一个事件，用户真的滚动（滚轮 /
-  // 触摸 / 拖滚动条）总会另外产生事件，不会被吞掉。
+  // 触摸 / 拖滚动条）总会另外产生事件，不会被吞掉
   const ownScrollRef = useRef(false);
   const scrollToLatest = useCallback(() => {
     ownScrollRef.current = true;
@@ -141,7 +141,7 @@ export function MessageList({
     setFollowingBoth(true);
   }, [virtualizer, resetKey, setFollowingBoth, scrollToLatest]);
 
-  // 行数或总高度变化（新行、实测高度落定）时，只要用户没往上翻就跟到最新。
+  // 行数或总高度变化（新行、实测高度落定）时，只要用户没往上翻就跟到最新
   // 总高度也要看：只盯行数会在实测修正后停在中途，看上去像没贴底
   const totalSize = virtualizer.getTotalSize();
   useLayoutEffect(() => {

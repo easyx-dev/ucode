@@ -2,14 +2,41 @@
  * 会话列表的一行：未读点 / 置顶标记、标题与相对时间；
  * 悬停时右侧露出置顶与归档入口，双击标题可重命名。主会话行可下钻子会话。
  */
-import type { SessionSummary } from "@ucode/contracts";
+import type { SessionStatus, SessionSummary } from "@ucode/contracts";
 import { cn } from "cn";
-import { Archive, Bot, ChevronRight, Pin } from "lucide-react";
+import {
+  Archive,
+  Bot,
+  ChevronRight,
+  CircleAlert,
+  ClipboardCheck,
+  MessageCircleQuestion,
+  Pin,
+  ShieldAlert,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import { Spinner } from "../base/spinner";
 import { sessionTitle } from "../lib/session";
 import { relativeTimeLabel } from "../lib/time";
+
+/** 等待类与出错优先于「生成中」：交互请求挂起时 run 占位可能还在，但它在等的是用户 */
+function StatusMark({ status }: { status: SessionStatus }) {
+  switch (status) {
+    case "waiting_permission":
+      return <ShieldAlert className="size-3.5 shrink-0 text-warning" />;
+    case "waiting_question":
+      return <MessageCircleQuestion className="size-3.5 shrink-0 text-warning" />;
+    case "waiting_plan":
+      return <ClipboardCheck className="size-3.5 shrink-0 text-warning" />;
+    case "error":
+      return <CircleAlert className="size-3.5 shrink-0 text-destructive" />;
+    case "running":
+      return <Spinner className="size-3 text-muted-foreground" />;
+    default:
+      return null;
+  }
+}
 
 type SessionListItemProps = {
   session: SessionSummary;
@@ -54,6 +81,14 @@ export function SessionListItem({
   const pinned = Boolean(session.pinnedAt);
   const title = sessionTitle(session, t("新会话"));
   const hasActions = Boolean(onTogglePin && onArchive);
+  // 等用户动作与出错要一眼看见：图标见 StatusMark，这里给出悬停提示的文案
+  const statusLabels: Partial<Record<SessionStatus, string>> = {
+    waiting_permission: t("等待权限审批"),
+    waiting_question: t("等待你的回答"),
+    waiting_plan: t("等待计划确认"),
+    error: t("会话出错"),
+  };
+  const statusLabel = statusLabels[session.status] ?? null;
 
   return (
     <div>
@@ -82,15 +117,15 @@ export function SessionListItem({
 
         <button
           type="button"
-          title={title}
+          title={statusLabel ? `${title} · ${statusLabel}` : title}
           className="flex min-w-0 flex-1 items-center text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => onSelect(session.id)}
           onDoubleClick={onRename}
         >
           {/* 固定槽位：有没有指示器都占同样宽度，标题才能与父级文字稳定对齐；置顶针与未读点可并存 */}
           <span className="flex w-6 shrink-0 items-center justify-center gap-1">
-            {session.running ? (
-              <Spinner className="size-3 text-muted-foreground" />
+            {statusLabel || session.running ? (
+              <StatusMark status={statusLabel ? session.status : "running"} />
             ) : child ? (
               <Bot className="size-3 text-muted-foreground" />
             ) : (

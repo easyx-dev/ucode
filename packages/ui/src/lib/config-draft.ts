@@ -5,6 +5,7 @@ import type {
   ApiType,
   CatalogProvider,
   ProviderConfigView,
+  ProviderModelSuggestion,
   ProviderModelView,
   SearchProviderId,
   ThinkingLevel,
@@ -33,6 +34,9 @@ export type DraftModel = {
   headers?: Record<string, string>;
   compat?: Record<string, unknown>;
 };
+
+/** 模型的可编辑字段：新增与预填时只给这些，`key` 由草稿层自行生成 */
+export type DraftModelFields = Partial<Omit<DraftModel, "key">>;
 
 /** builtin = 接入 pi 内置目录的供应商；custom = 自描述端点与模型 */
 export type DraftProviderSource = CatalogProvider["source"];
@@ -115,6 +119,20 @@ export const toDraftWebsearch = (view: WebsearchView): DraftWebsearch => ({
   configured: view.configured,
 });
 
+/**
+ * 上游拉取到的模型建议 → 草稿字段：上游能给的只有能力推断结果，其余字段（api / cost 等）
+ * 保持表单默认值，用户可在模型行里继续改。
+ */
+export const suggestionToModelFields = (suggestion: ProviderModelSuggestion): DraftModelFields => ({
+  id: suggestion.id,
+  // 上游没给展示名时服务端回落为 id，此时留空，避免表单里 id 与显示名重复
+  name: suggestion.name === suggestion.id ? "" : suggestion.name,
+  reasoning: suggestion.reasoning,
+  contextWindow: String(suggestion.contextWindow),
+  maxTokens: String(suggestion.maxTokens),
+  input: suggestion.vision ? ["text", "image"] : ["text"],
+});
+
 /** 空表单的缺省模板，按本地 OpenAI 兼容端点预填 */
 export const createDraftProvider = (): DraftProvider => ({
   key: nextDraftKey(),
@@ -137,7 +155,7 @@ export const createDraftProvider = (): DraftProvider => ({
 });
 
 /** 目录里的某个供应商 → 一条待接入的草稿（只需再填 key） */
-export const fromCatalogProvider = (catalog: CatalogProvider): DraftProvider => ({
+export const catalogToDraftProvider = (catalog: CatalogProvider): DraftProvider => ({
   key: nextDraftKey(),
   id: catalog.id,
   name: catalog.name,

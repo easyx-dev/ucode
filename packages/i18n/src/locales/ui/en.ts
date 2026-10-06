@@ -150,6 +150,28 @@ export default {
   名称: "Name",
   添加模型: "Add model",
 
+  // Fetch model list
+  拉取模型列表: "Fetch model list",
+  "按当前端点的 /models 拉取，点条目即填入下方模型。":
+    "Fetch from the endpoint's /models; click an entry to fill in a model below.",
+  "已拉取 {{n}} 个模型 · {{latency}}ms": "Fetched {{n}} models · {{latency}}ms",
+  收起: "Collapse",
+  "上游返回的条数超过上限，只显示前 {{n}} 条。":
+    "The upstream returned more than the limit; only the first {{n}} are shown.",
+  "上游没有返回任何模型，请确认端点是否兼容 /models。":
+    "The upstream returned no models; check that the endpoint serves /models.",
+  已在配置里: "Already configured",
+  "来源：{{source}}": "Source: {{source}}",
+  已配置: "Configured",
+  上游: "Upstream",
+  内置目录: "Built-in catalog",
+  "按 id 推断": "Inferred from id",
+  按默认值: "From defaults",
+  "先填写 baseUrl 再拉取模型列表": "Fill in baseUrl before fetching the model list",
+  "该供应商还没有 apiKey，先填写或保存一个再拉取":
+    "This provider has no apiKey yet; fill one in or save it before fetching",
+  填入这条模型: "Use this model",
+
   // Model picker
   "{{n}} 上下文": "{{n}} context",
   "{{n}} 输出": "{{n}} output",
@@ -260,7 +282,6 @@ export default {
   获取网页: "Fetch",
   子智能体: "Subagent",
   提问: "Ask",
-  提交计划: "Submit plan",
   搜索工具: "Search tools",
   工具: "Tool",
   已提问: "Asked",
@@ -456,20 +477,41 @@ export default {
   "{{used}} / {{window}} token": "{{used}} / {{window}} tokens",
   "从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。":
     "Token usage aggregated from local session records; model cost is not included, and subagent / forked sessions are counted.",
-  输入: "Input",
-  输出: "Output",
-  缓存读: "Cache read",
-  缓存写: "Cache write",
-  "合计 token": "Total tokens",
-  按模型: "By model",
   按会话: "By session",
   "工具调用 {{value}} 次": "{{value}} tool calls",
-  全部时间: "All time",
   "最近 30 天": "Last 30 days",
   "最近 7 天": "Last 7 days",
-  "还没有用量记录。": "No usage recorded yet.",
   主会话: "Primary",
   分叉: "Forked",
+  "累计 token": "Total tokens",
+  "峰值 token": "Peak tokens",
+  最长聊天时长: "Longest chat",
+  当前连续天数: "Current streak",
+  最长连续天数: "Longest streak",
+  "{{value}} 天": "{{value}} days",
+  "活跃 {{value}} 天": "{{value}} active days",
+  "不到 1 分钟": "Under a minute",
+  "{{minutes}} 分钟": "{{minutes}} min",
+  "{{hours}} 小时 {{minutes}} 分": "{{hours}} h {{minutes}} min",
+  "{{days}} 天 {{hours}} 小时": "{{days}} d {{hours}} h",
+  "{{month}} 月": "{{month}}",
+  "{{month}} 月 {{day}} 日": "{{month}}/{{day}}",
+  "{{date}} · {{tokens}} token · {{messages}} 轮消息":
+    "{{date}} · {{tokens}} tokens · {{messages}} responses",
+  "Token 活动": "Token activity",
+  每日: "Daily",
+  每周: "Weekly",
+  累计: "Cumulative",
+  周一: "Mon",
+  周三: "Wed",
+  周五: "Fri",
+  少: "Less",
+  多: "More",
+  "每日 Token 趋势": "Daily token trend",
+  "峰值 {{value}} token": "Peak {{value}} tokens",
+  模型用量: "Model usage",
+  当前区间暂无可用量数据: "No usage in this range",
+  还没有可展示的数据: "Nothing to show yet",
 
   // Goal mode
   目标: "Goal",
@@ -547,6 +589,22 @@ export default {
   新密码: "New password",
   "新密码至少 8 位；修改后所有设备都需要重新登录。":
     "At least 8 characters; all devices will need to sign in again after the change.",
+
+  // Notifications（系统通知的标题与设置项）
+  消息通知: "Notifications",
+  "会话等待你的输入、完成或出错时发送系统通知；页面在前台时不打扰。":
+    "Send a system notification when a session waits for input, finishes or fails; stays quiet while this page is in the foreground.",
+  等待权限审批: "Waiting for permission",
+  等待你的回答: "Waiting for your answer",
+  等待计划确认: "Waiting for plan review",
+  会话已完成: "Session finished",
+  会话出错: "Session failed",
+  允许通知: "Allow notifications",
+  "浏览器还没有允许通知，点「允许通知」授权后才会送达。":
+    "The browser hasn't granted notification permission yet — use “Allow notifications” to grant it.",
+  "浏览器已拒绝通知，需要在浏览器的网站设置里允许后才能送达。":
+    "Notifications are blocked; allow them in the browser's site settings.",
+  "当前环境不支持系统通知。": "This environment doesn't support system notifications.",
 
   // Desktop shell（桌面端启动时的连接态）
   未连接到本机服务: "Not connected to the local service",

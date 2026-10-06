@@ -1,7 +1,12 @@
 /** 草稿里某个 provider 的模型列表编辑：新增、删除、改字段 */
 import { type Dispatch, type SetStateAction, useCallback } from "react";
 
-import { createDraftModel, type DraftModel, type DraftProvider } from "../lib/config-draft";
+import {
+  createDraftModel,
+  type DraftModel,
+  type DraftModelFields,
+  type DraftProvider,
+} from "../lib/config-draft";
 
 export function useConfigModels(setProviders: Dispatch<SetStateAction<DraftProvider[]>>) {
   const updateModels = useCallback(
@@ -26,9 +31,10 @@ export function useConfigModels(setProviders: Dispatch<SetStateAction<DraftProvi
     [updateModels],
   );
 
+  /** 追加一条模型；`fields` 用于按提示预填（拉取到的上游模型建议） */
   const addModel = useCallback(
-    (providerKey: string) => {
-      updateModels(providerKey, (models) => [...models, createDraftModel()]);
+    (providerKey: string, fields: DraftModelFields = {}) => {
+      updateModels(providerKey, (models) => [...models, { ...createDraftModel(), ...fields }]);
     },
     [updateModels],
   );

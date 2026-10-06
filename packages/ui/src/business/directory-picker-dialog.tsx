@@ -17,7 +17,7 @@ import { useClient } from "../provider";
 const PATH_DEBOUNCE_MS = 400;
 
 /** 浏览态的输入框展示：补结尾 `/`，与「带 `/` 即目录」的输入规则保持一致 */
-const asDirectoryInput = (path: string): string => (path.endsWith("/") ? path : `${path}/`);
+const toDirectoryInput = (path: string): string => (path.endsWith("/") ? path : `${path}/`);
 
 /** 一次目录请求的结果；`stale` 表示已被更新的请求取代，调用方应直接放弃 */
 type ListOutcome =
@@ -74,7 +74,7 @@ export function DirectoryPickerDialog({
       if (outcome.status === "stale") return;
       setLoading(false);
       if (outcome.status === "ok") {
-        const input = asDirectoryInput(outcome.data.path);
+        const input = toDirectoryInput(outcome.data.path);
         setListing(outcome.data);
         setQuery(null);
         requestedRef.current = input;

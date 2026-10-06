@@ -13,7 +13,7 @@ import { SessionSidebarMenu } from "./session-sidebar-menu";
 type SessionSidebarProps = {
   sessions: SessionSummary[];
   /** 助理根目录（health.workspace）；用于区分助理区 */
-  workspaceRoot: string | null;
+  workspacesDir: string | null;
   activeId: string | null;
   loading: boolean;
   configured: boolean;
@@ -45,7 +45,7 @@ type SessionSidebarProps = {
 
 export function SessionSidebar({
   sessions,
-  workspaceRoot,
+  workspacesDir,
   activeId,
   loading,
   configured,
@@ -111,7 +111,7 @@ export function SessionSidebar({
 
       <SessionList
         sessions={sessions}
-        workspaceRoot={workspaceRoot}
+        workspacesDir={workspacesDir}
         activeId={activeId}
         loading={loading}
         onSelect={onSelect}

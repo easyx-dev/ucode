@@ -7,7 +7,7 @@ import { Input } from "../../base/input";
 import { Label } from "../../base/label";
 import { Separator } from "../../base/separator";
 import { Spinner } from "../../base/spinner";
-import type { DraftModel, DraftProvider } from "../../lib/config-draft";
+import type { DraftModel, DraftModelFields, DraftProvider } from "../../lib/config-draft";
 import { ProviderFields } from "./provider-fields";
 import { ProviderModels } from "./provider-models";
 
@@ -16,7 +16,7 @@ type ProviderDetailProps = {
   testing: boolean;
   onPatch: (patch: Partial<DraftProvider>) => void;
   onModelPatch: (modelKey: string, patch: Partial<DraftModel>) => void;
-  onAddModel: () => void;
+  onAddModel: (fields?: DraftModelFields) => void;
   onRemoveModel: (modelKey: string) => void;
   onRemove: () => void;
   onTest: () => void;
@@ -106,7 +106,7 @@ export function ProviderDetail({
             <ProviderFields provider={provider} onPatch={onPatch} />
             <Separator />
             <ProviderModels
-              models={provider.models}
+              provider={provider}
               onPatch={onModelPatch}
               onAdd={onAddModel}
               onRemove={onRemoveModel}

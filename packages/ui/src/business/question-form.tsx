@@ -55,7 +55,7 @@ function Choice({
   );
 }
 
-/** 标题：还在等就报「提问中」；已结束却没答复（超时 / 取消）不能继续装作在等 */
+/** 标题：还在等就报「提问中」；已结束却没答复（本轮被中断）不能继续装作在等 */
 const headerOf = (settled: boolean, answered: boolean, t: TFunction): string => {
   if (!settled) return t("提问中");
   return answered ? t("已提问") : t("未回答");

@@ -2,7 +2,8 @@
 import { PLAN_IGNORED_CUSTOM_TYPE } from "@ucode/contracts";
 import type { ChatItem } from "./types";
 
-const PRESENT_PLAN = "present_plan";
+/** 计划收尾工具：内部信号，调用不进消息区（见 chat-nodes 的过滤），但本模块的判定依赖历史条目里的它 */
+export const PRESENT_PLAN_TOOL = "present_plan";
 
 /** 该条是否为「已忽略本次计划」的界面标记（区别于其它扩展消息） */
 export const isPlanIgnored = (item: ChatItem): boolean =>
@@ -17,8 +18,10 @@ export const lastTurnPresentedPlan = (items: ChatItem[]): boolean => {
     if (item.role === "user") return false;
     // 本轮计划已被忽略：表单不再弹出（新计划在标记之后，会先被扫到）
     if (isPlanIgnored(item)) return false;
-    if (item.toolName === PRESENT_PLAN) return true;
-    if (item.blocks.some((block) => block.type === "toolCall" && block.name === PRESENT_PLAN)) {
+    if (item.toolName === PRESENT_PLAN_TOOL) return true;
+    if (
+      item.blocks.some((block) => block.type === "toolCall" && block.name === PRESENT_PLAN_TOOL)
+    ) {
       return true;
     }
   }

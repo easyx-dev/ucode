@@ -7,6 +7,7 @@
 import type { ContextRef } from "@ucode/contracts";
 
 import type { ComposerPayload } from "./composer-payload";
+import { contextMarker } from "./message-chips";
 
 export type ComposerNode = {
   type: string;
@@ -23,7 +24,7 @@ const asNumber = (value: unknown): number | undefined =>
 
 const asString = (value: unknown): string => (typeof value === "string" ? value : "");
 
-/** 文档 → 载荷：mention 从正文剥离，命令 / 技能还原为 `/name`、`/skill:name` */
+/** 文档 → 载荷：引用 mention 在正文里落成 `@路径` 标记并收进 `contexts`，命令 / 技能还原为 `/name`、`/skill:name` */
 export const docToPayload = (doc: ComposerNode | null | undefined): ComposerPayload => {
   const contexts: ContextRef[] = [];
   const lines: string[] = [];
@@ -45,6 +46,8 @@ export const docToPayload = (doc: ComposerNode | null | undefined): ComposerPayl
             ...(startLine !== undefined ? { startLine } : {}),
             ...(endLine !== undefined ? { endLine } : {}),
           });
+          // 标记留在原位置：引用是句子成分，回放时不再是从句子里抽出来的 chip
+          line += contextMarker(path);
         }
       } else if (node.type === "commandMention") {
         const name = asString(node.attrs?.name);

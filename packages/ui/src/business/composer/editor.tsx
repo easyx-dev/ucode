@@ -12,7 +12,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import Text from "@tiptap/extension-text";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useRef } from "react";
+import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import type { ComposerNode } from "../../lib/composer-document";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
@@ -40,6 +40,13 @@ const CommandMention = Mention.extend({
       label: { default: null },
     };
   },
+  /**
+   * 默认实现会把触发符再拼一次（`char` + label），而这里的 label 本身就是 `/name`、`/skill:name`，
+   * 拼上去会在编辑器里显示成 `//review`。直接输出 label。
+   */
+  renderHTML({ node, HTMLAttributes }) {
+    return ["span", HTMLAttributes, node.attrs.label ?? ""];
+  },
 });
 
 export type ComposerEditorProps = {
@@ -58,7 +65,16 @@ export type ComposerEditorProps = {
   onFiles: (files: File[]) => void;
 };
 
+/** 供外层把焦点收回输入区（发送之后、选择器关掉之后） */
+export type ComposerEditorHandle = {
+  focus: () => void;
+};
+
+/** 只在桌面指针环境下自动聚焦：触屏上抢焦点等于凭空唤起键盘 */
+const canAutoFocus = (): boolean => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 export function ComposerEditor({
+  ref,
   initialDoc,
   placeholder,
   onChange,
@@ -67,7 +83,7 @@ export function ComposerEditor({
   commandItems,
   onBuiltin,
   onFiles,
-}: ComposerEditorProps) {
+}: ComposerEditorProps & { ref?: Ref<ComposerEditorHandle> }) {
   // 回调放 ref：Tiptap 实例只在挂载时创建一次，用它拿最新实现
   const onChangeRef = useRef(onChange);
   const onSendRef = useRef(onSend);
@@ -202,9 +218,23 @@ export function ComposerEditor({
     onUpdate: ({ editor: target }) => {
       onChangeRef.current(target.getJSON() as ComposerNode);
     },
+    // 进入 / 切换会话都以新的 key 重挂载，这里等于「开启或切换会话后把光标放回输入区」
+    onCreate: ({ editor: target }) => {
+      if (canAutoFocus()) target.commands.focus("end");
+    },
   });
 
   editorRef.current = editor;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        editorRef.current?.commands.focus("end");
+      },
+    }),
+    [],
+  );
 
   useEffect(
     () => () => {

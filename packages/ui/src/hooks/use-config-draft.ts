@@ -6,10 +6,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  catalogToDraftProvider,
   createDraftProvider,
   type DraftProvider,
   type DraftWebsearch,
-  fromCatalogProvider,
   modelOptions,
   toDraftProvider,
   toDraftWebsearch,
@@ -95,7 +95,7 @@ export function useConfigDraft(open: boolean) {
     (providerId: string): string | null => {
       const entry = catalog.find((item) => item.id === providerId);
       if (!entry) return null;
-      const provider = fromCatalogProvider(entry);
+      const provider = catalogToDraftProvider(entry);
       setProviders((prev) => [
         ...prev.filter((item) => item.id !== providerId || item.source !== "builtin"),
         provider,

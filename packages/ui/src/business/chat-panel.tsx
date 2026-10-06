@@ -10,6 +10,7 @@ import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-docu
 import { type ComposerDraft, composerKeyOf, emptyDraft } from "../lib/composer-draft";
 import type { ComposerPayload } from "../lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
+import { relativizeContextRefs } from "../lib/message-chips";
 import { isWorkspaceSession } from "../lib/session-groups";
 import {
   type ChatItem,
@@ -31,14 +32,14 @@ import { MessageList } from "./message-list";
 import { PlanDecisionForm } from "./plan-decision-form";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
-const showSuggestions = (chat: ChatController): boolean =>
+const shouldShowSuggestions = (chat: ChatController): boolean =>
   !chat.loadingHistory && chat.items.length === 0;
 
 type ChatPanelProps = {
   session: SessionSummary | null;
   models: ModelsResponse | null;
   /** 助理根目录（health.workspace）：判定会话的目录是不是我们分配的 */
-  workspaceRoot: string | null;
+  workspacesDir: string | null;
   chat: ChatController;
   /** 输入区草稿：按上下文持久化未发送的内容与初始设置 */
   composer: ComposerDraftsController;
@@ -88,7 +89,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   session,
   models,
-  workspaceRoot,
+  workspacesDir,
   chat,
   composer,
   empty,
@@ -150,8 +151,12 @@ export function ChatPanel({
         return;
       }
       composer.clear(draftKey);
-      void chat.send(payload, seed).then(({ sessionId: target, admitted }) => {
+      // 正文里的引用标记是编辑器插入的绝对路径，发送前换成相对工作目录的写法：
+      // 句子读起来就是用户写的那句，且与展开块上的 `path` 同口径（编辑器只在有目录时可插引用）
+      const sent = relativizeContextRefs(payload, session?.cwd ?? draft.cwd);
+      void chat.send(sent, seed).then(({ sessionId: target, admitted }) => {
         if (admitted) return;
+        // 回填用换算前的载荷（标记是绝对路径），再次发送时重新换算
         const restored: Partial<ComposerDraft> = {
           text: payload.text,
           doc: textToDoc(payload.text),
@@ -162,13 +167,13 @@ export function ChatPanel({
         composer.update(composerKeyOf(target), restored);
       });
     },
-    [chat, composer, draft, draftKey, onGoalCommand],
+    [chat, composer, draft, draftKey, onGoalCommand, session?.cwd],
   );
 
   // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」；
   // 空态显示草稿绑定的目录（「在目录中新建」选的）
   const inWorkspace = Boolean(
-    session && workspaceRoot && isWorkspaceSession(session.cwd, workspaceRoot),
+    session && workspacesDir && isWorkspaceSession(session.cwd, workspacesDir),
   );
   const cwd = session ? (inWorkspace ? t("助理区") : session.cwd) : (draft.cwd ?? t("助理区"));
 
@@ -257,7 +262,7 @@ export function ChatPanel({
           onSend={submit}
           streaming={chat.streaming}
           onStop={() => void chat.stop()}
-          suggestions={showSuggestions(chat) ? suggestions : undefined}
+          suggestions={shouldShowSuggestions(chat) ? suggestions : undefined}
           providers={providers}
           model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
           thinkingLevel={

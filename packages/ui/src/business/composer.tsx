@@ -13,7 +13,7 @@ import type { ComposerPayload } from "../lib/composer-payload";
 import type { AttachmentView, CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
 import { useClient } from "../provider";
 import { AttachmentStrip } from "./composer/attachment-strip";
-import { ComposerEditor } from "./composer/editor";
+import { ComposerEditor, type ComposerEditorHandle } from "./composer/editor";
 import type { SuggestionItem } from "./composer/suggestion";
 import { filesOf, useComposerAttachments } from "./composer/use-composer-attachments";
 import { ModePicker } from "./mode-picker";
@@ -118,11 +118,20 @@ export function Composer({
   const [openPicker, setOpenPicker] = useState<"model" | "thinking" | "mode" | "permission" | null>(
     null,
   );
+  /** 焦点收回输入区的入口：发送之后、选择器关掉之后 */
+  const editorHandle = useRef<ComposerEditorHandle | null>(null);
   /**
    * 编辑器最后一次拿到的文档（JSON 快照）。Tiptap 不受控，只有重挂载才会换内容；
    * 用它区分「外部草稿变化」（清空 / 回填）与「自己刚写出去的那份」，避免每次按键都重挂载。
    */
   const syncedRef = useRef(JSON.stringify(initialDoc ?? EMPTY_DOC));
+
+  // 选择器关掉后把焦点还给输入区：它是从命令唤起的，用户的下一步多半是接着打字
+  const wasPickerOpen = useRef(false);
+  useEffect(() => {
+    if (wasPickerOpen.current && openPicker === null) editorHandle.current?.focus();
+    wasPickerOpen.current = openPicker !== null;
+  }, [openPicker]);
 
   /** 把编辑器切到给定文档：重挂载并记下已同步内容 */
   const resetEditor = useCallback(
@@ -197,10 +206,12 @@ export function Composer({
       if (builtin) {
         resetEditor(EMPTY_DOC);
         handleBuiltin(builtin);
+        editorHandle.current?.focus();
         return;
       }
     }
     onSend({ ...doc, attachments });
+    editorHandle.current?.focus();
   }, [attachmentItems, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
 
   const handleFiles = useCallback(
@@ -339,6 +350,7 @@ export function Composer({
           ) : null}
 
           <ComposerEditor
+            ref={editorHandle}
             key={`${editorKey}:${version}`}
             initialDoc={externalDoc && externalDoc.key === editorKey ? externalDoc.doc : initialDoc}
             placeholder={t("输入消息，Enter 发送，Shift+Enter 换行")}

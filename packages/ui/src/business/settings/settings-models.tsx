@@ -52,11 +52,13 @@ function ProviderPane({
 
   return (
     <ProviderDetail
+      // 按 provider 重新挂载：拉取结果、错误态等局部状态不跟着选中项串门
+      key={provider.key}
       provider={provider}
       testing={testingKey === provider.key}
       onPatch={(patch) => draft.patchProvider(provider.key, patch)}
       onModelPatch={(modelKey, patch) => draft.patchModel(provider.key, modelKey, patch)}
-      onAddModel={() => draft.addModel(provider.key)}
+      onAddModel={(fields) => draft.addModel(provider.key, fields)}
       onRemoveModel={(modelKey) => draft.removeModel(provider.key, modelKey)}
       onRemove={() => draft.removeProvider(provider.key)}
       onTest={() => onTest(provider)}
@@ -121,7 +123,7 @@ export function SettingsModels({ title, draft, testingKey, onTest }: SettingsMod
         onOpenChange={setAdding}
         catalog={draft.catalog}
         configuredIds={draft.configuredIds}
-        onPick={addFromCatalog}
+        onSelect={addFromCatalog}
         onAddCustom={addCustom}
       />
     </div>

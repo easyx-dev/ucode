@@ -24,3 +24,14 @@ export const dirName = (path: string): string => {
   if (index < 0) return ".";
   return index === 0 ? "/" : trimmed.slice(0, index);
 };
+
+/**
+ * 相对路径：`path` 落在 `root` 之下时去掉该前缀（与 `root` 同级时给 `.`），否则原样返回。
+ * 与服务端展开 `@` 引用时算块上 `path` 属性的口径一致，正文里的引用标记据此保持同一写法。
+ */
+export const toRelativePath = (root: string, path: string): string => {
+  const base = root.replace(/\/+$/, "");
+  if (base === path) return ".";
+  // `base` 为空串（root 是 `/`）时只认绝对路径的前导斜杠
+  return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
+};

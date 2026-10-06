@@ -20,7 +20,7 @@ import { QuestionDialog } from "../business/question-dialog";
 import { RenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
-import { UsageDialog } from "../business/usage-dialog";
+import { UsagePanel } from "../business/usage/usage-panel";
 import { WelcomePanel } from "../business/welcome-panel";
 import { useActiveSession } from "../hooks/use-active-session";
 import { useChat } from "../hooks/use-chat";
@@ -28,6 +28,7 @@ import { useComposerDrafts } from "../hooks/use-composer-drafts";
 import { useGoal } from "../hooks/use-goal";
 import { useInteractions } from "../hooks/use-interactions";
 import { useModels } from "../hooks/use-models";
+import { useSessionNotices } from "../hooks/use-session-notices";
 import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
 import { useStatus } from "../hooks/use-status";
@@ -81,12 +82,14 @@ export function WorkspaceLayout({
   const { t } = useTranslation();
   const sessions = useSessions();
   const models = useModels();
-  const workspaceRoot = useStatus()?.workspace ?? null;
+  const workspacesDir = useStatus()?.workspace ?? null;
   const composer = useComposerDrafts();
   // 会话归档 / id 失效时把选中项清回空态
   const activeSession = useActiveSession(activeId, () => setActiveId(null));
   const interactions = useInteractions(activeId);
   const goal = useGoal(activeId);
+  // 唯一通知触发点：web 与桌面端都在这里判定，点开通知即切到那条会话
+  useSessionNotices({ onSelectSession: setActiveId });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -174,7 +177,7 @@ export function WorkspaceLayout({
    */
   const startNewSession = (): void => {
     const inWorkspace = Boolean(
-      activeSession && workspaceRoot && isWorkspaceSession(activeSession.cwd, workspaceRoot),
+      activeSession && workspacesDir && isWorkspaceSession(activeSession.cwd, workspacesDir),
     );
     const cwd = activeSession && !inWorkspace ? activeSession.cwd : undefined;
     setActiveId(null);
@@ -346,7 +349,7 @@ export function WorkspaceLayout({
 
   const sidebarProps = {
     sessions: sessionsView,
-    workspaceRoot,
+    workspacesDir,
     activeId,
     loading: sessions.loading,
     configured,
@@ -412,14 +415,14 @@ export function WorkspaceLayout({
         <ChatPanel
           session={activeSession}
           models={models.data}
-          workspaceRoot={workspaceRoot}
+          workspacesDir={workspacesDir}
           chat={chat}
           composer={composer}
           empty={
             <WelcomePanel
               configured={configured}
               defaultModel={models.data?.defaultModel ?? null}
-              workspaceRoot={workspaceRoot}
+              workspacesDir={workspacesDir}
               onOpenSettings={openSettings}
             />
           }
@@ -470,7 +473,7 @@ export function WorkspaceLayout({
           }
         />
 
-        <UsageDialog
+        <UsagePanel
           open={usageOpen}
           onOpenChange={setUsageOpen}
           onOpenSession={setActiveId}
@@ -500,7 +503,7 @@ export function WorkspaceLayout({
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
           sessions={sessionsView}
-          fileRoot={activeSession?.cwd ?? workspaceRoot}
+          fileRoot={activeSession?.cwd ?? workspacesDir}
           onSelectSession={setActiveId}
           onRunBuiltin={runBuiltin}
           onNewTask={startNewSession}

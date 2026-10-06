@@ -1,5 +1,5 @@
 /**
- * Electron 主进程：窗口生命周期、服务凭证注入与连接 IPC。
+ * Electron 主进程：窗口生命周期、服务凭证注入、连接与系统通知的 IPC。
  *
  * 只连本机已运行的服务：从 `$APP_HOME/app/service.json` 读端点与 `serviceToken`，
  * 对发往该服务 API 的请求注入 Bearer；未运行 / 凭证失效时由渲染层给出可读提示。
@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import { app, BrowserWindow, ipcMain, session } from "electron";
 
 import { readServiceConnection, serviceFilePath } from "./connection.ts";
+import { registerNotificationIpc } from "./notification.ts";
 
 const rendererDevUrl = process.env.DESKTOP_RENDERER_URL ?? "http://localhost:5174";
 
@@ -75,6 +76,8 @@ ipcMain.handle("desktop:connection", () => {
   const connection = readServiceConnection();
   return { baseUrl: connection?.baseUrl ?? null, servicePath: serviceFilePath() };
 });
+
+registerNotificationIpc();
 
 app.whenReady().then(() => {
   createWindow();

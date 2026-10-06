@@ -64,8 +64,6 @@ export const toolTitleOf = (name: string, t: TFunction): string => {
       return t("子智能体");
     case "question":
       return t("提问");
-    case "present_plan":
-      return t("提交计划");
     case "tool_search":
       return t("搜索工具");
     case "remember":

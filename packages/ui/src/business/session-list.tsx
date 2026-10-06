@@ -32,7 +32,7 @@ const groupKey = (path: string | null): string => path ?? "";
 type SessionListProps = {
   sessions: SessionSummary[];
   /** 助理根目录（health.workspace）；用于区分助理区 */
-  workspaceRoot: string | null;
+  workspacesDir: string | null;
   activeId: string | null;
   loading: boolean;
   onSelect: (sessionId: string) => void;
@@ -57,7 +57,7 @@ type SessionListProps = {
 
 export function SessionList({
   sessions,
-  workspaceRoot,
+  workspacesDir,
   activeId,
   loading,
   onSelect,
@@ -74,7 +74,7 @@ export function SessionList({
   searching,
 }: SessionListProps) {
   const { t } = useTranslation();
-  const sections = useMemo(() => groupSessions(sessions, workspaceRoot), [sessions, workspaceRoot]);
+  const sections = useMemo(() => groupSessions(sessions, workspacesDir), [sessions, workspacesDir]);
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
 
   const toggle = useCallback((key: string, next: boolean) => {

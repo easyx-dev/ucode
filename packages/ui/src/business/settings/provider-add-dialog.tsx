@@ -21,7 +21,7 @@ type ProviderAddDialogProps = {
   /** 配置里已存在的 provider id，用于标记「已加入」 */
   configuredIds: Set<string>;
   /** 选中一个内置供应商：插入草稿并关闭 */
-  onPick: (providerId: string) => void;
+  onSelect: (providerId: string) => void;
   /** 新建一条自定义供应商 */
   onAddCustom: () => void;
 };
@@ -62,11 +62,11 @@ function CatalogSearch({ value, onChange }: { value: string; onChange: (value: s
 function CatalogList({
   providers,
   configuredIds,
-  onPick,
+  onSelect,
 }: {
   providers: CatalogProvider[];
   configuredIds: Set<string>;
-  onPick: (providerId: string) => void;
+  onSelect: (providerId: string) => void;
 }) {
   const { t } = useTranslation();
 
@@ -87,7 +87,7 @@ function CatalogList({
             key={item.id}
             type="button"
             disabled={configured}
-            onClick={() => onPick(item.id)}
+            onClick={() => onSelect(item.id)}
             className="flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left ring-1 ring-foreground/10 transition-colors hover:bg-accent disabled:cursor-default disabled:opacity-60"
           >
             <span className="flex w-full items-center gap-1.5 text-sm">
@@ -109,7 +109,7 @@ export function ProviderAddDialog({
   onOpenChange,
   catalog,
   configuredIds,
-  onPick,
+  onSelect,
   onAddCustom,
 }: ProviderAddDialogProps) {
   const { t } = useTranslation();
@@ -135,7 +135,7 @@ export function ProviderAddDialog({
         <CatalogSearch value={query} onChange={setQuery} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <CatalogList providers={builtins} configuredIds={configuredIds} onPick={onPick} />
+          <CatalogList providers={builtins} configuredIds={configuredIds} onSelect={onSelect} />
         </div>
 
         <Separator className="shrink-0" />

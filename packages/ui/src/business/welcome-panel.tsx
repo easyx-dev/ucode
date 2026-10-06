@@ -9,14 +9,14 @@ type WelcomePanelProps = {
   /** 当前默认模型，"provider/model" */
   defaultModel: string | null;
   /** 助理根目录，来自 health；未取到时退回通用文案 */
-  workspaceRoot: string | null;
+  workspacesDir: string | null;
   onOpenSettings: () => void;
 };
 
 export function WelcomePanel({
   configured,
   defaultModel,
-  workspaceRoot,
+  workspacesDir,
   onOpenSettings,
 }: WelcomePanelProps) {
   const { t } = useTranslation();
@@ -54,9 +54,9 @@ export function WelcomePanel({
       <h2 className="text-xl font-semibold">{greeting()}</h2>
       <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
         {t("模型已就绪：{{model}}。每个会话有独立的工作区", { model: defaultModel ?? "-" })}
-        {workspaceRoot ? (
+        {workspacesDir ? (
           <code className="mx-1 rounded-sm bg-muted px-1 font-mono text-xs break-all">
-            {abbreviateHome(workspaceRoot)}
+            {abbreviateHome(workspacesDir)}
           </code>
         ) : null}
         {t("，agent 在其中读写文件并执行命令。")}

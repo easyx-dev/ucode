@@ -64,7 +64,7 @@ const bootstrap = async (): Promise<void> => {
   const client = createClient({ baseUrl: connection.baseUrl, translate });
 
   // 先用未认证的 info 探活：`auth.load` 会把网络错误也当成匿名，
-  // 单看它会把「服务没起」误报成「凭证无效」。
+  // 单看它会把「服务没起」误报成「凭证无效」
   try {
     await client.apis.info();
   } catch {

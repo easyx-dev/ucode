@@ -35,6 +35,7 @@ export type {
   MessageDTO,
   MessageEditRequest,
   MessageRole,
+  ModelCapabilitySource,
   ModelsResponse,
   ModelUsage,
   PendingInteraction,
@@ -45,6 +46,8 @@ export type {
   PromptCommandView,
   PromptRequest,
   ProviderConfigView,
+  ProviderModelSuggestion,
+  ProviderModelsResponse,
   ProviderModelView,
   QuestionInteraction,
   QuestionItem,
@@ -62,7 +65,11 @@ export type {
   SkillCommandView,
   StatsSummaryResponse,
   ThinkingLevel,
+  UsageDayBucket,
+  UsagePeakDay,
+  UsageStreak,
   UsageTotals,
+  UsageWeekBucket,
   WebsearchView,
 } from "@ucode/contracts";
 export {
