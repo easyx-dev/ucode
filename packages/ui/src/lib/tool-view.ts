@@ -2,6 +2,7 @@
  * 工具调用的展示派生：把工具名 / 入参收敛成界面需要的分类、入参摘要与 diff。
  * 只做纯计算，不引入 i18n——中文文案由组件用 `t()` 取，避免在纯逻辑里散落界面文案。
  */
+import type { ToolEntry } from "./chat-nodes";
 import { type DiffLine, diffLines } from "./text-diff";
 
 export type ToolKind =
@@ -14,9 +15,6 @@ export type ToolKind =
   | "network"
   | "agent"
   | "other";
-
-/** 摘要里的粗分类：读 / 写 / 执行 / 搜索 / 网络 / 其他 */
-export type ToolBucket = "read" | "write" | "command" | "search" | "network" | "other";
 
 const KIND_BY_NAME: Record<string, ToolKind> = {
   read: "read",
@@ -32,27 +30,6 @@ const KIND_BY_NAME: Record<string, ToolKind> = {
 };
 
 export const toolKindOf = (name: string): ToolKind => KIND_BY_NAME[name] ?? "other";
-
-export const toolBucketOf = (kind: ToolKind): ToolBucket => {
-  switch (kind) {
-    case "read":
-      return "read";
-    case "write":
-    case "edit":
-      return "write";
-    case "command":
-      return "command";
-    case "search":
-    case "list":
-      return "search";
-    case "network":
-      return "network";
-    default:
-      return "other";
-  }
-};
-
-/** 摘要分类的中文标签由组件用 `t()` 取，纯逻辑里不落界面文案 */
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -166,29 +143,16 @@ export const toolDiff = (name: string, args: unknown): DiffLine[] | null => {
   return null;
 };
 
-export type ToolSummary = {
-  total: number;
-  failed: number;
-  buckets: Array<{ bucket: ToolBucket; count: number }>;
-};
-
-/** 一组工具调用的分类计数（摘要头用）；bucket 顺序固定，只保留非零项 */
-export const summarizeToolEntries = (
-  entries: ReadonlyArray<{ name: string; isError?: boolean }>,
-): ToolSummary => {
-  const counts = new Map<ToolBucket, number>();
-  let failed = 0;
-  for (const entry of entries) {
-    const bucket = toolBucketOf(toolKindOf(entry.name));
-    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
-    if (entry.isError) failed += 1;
-  }
-  const order: ToolBucket[] = ["read", "write", "command", "search", "network", "other"];
-  return {
-    total: entries.length,
-    failed,
-    buckets: order
-      .filter((bucket) => counts.has(bucket))
-      .map((bucket) => ({ bucket, count: counts.get(bucket) ?? 0 })),
-  };
+/**
+ * 一组调用的工具名计数。
+ *
+ * 按首次出现顺序返回（流式追加只会在尾部改变计数，不会重排已有的条目），界面据此拼出「编辑 3 · 运行 2」
+ * 这类摘要——比按粗分类计数更能说明这批调用到底在干什么，也不会把不认识的工具兜成「其他」。
+ */
+export const summarizeToolNames = (
+  entries: readonly ToolEntry[],
+): Array<{ name: string; count: number }> => {
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(entry.name, (counts.get(entry.name) ?? 0) + 1);
+  return [...counts].map(([name, count]) => ({ name, count }));
 };

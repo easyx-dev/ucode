@@ -8,6 +8,10 @@ import {
   DEFAULT_SESSION_MODE,
   type MessageBlock,
   type MessageDTO,
+  PERMISSION_DECISION_CUSTOM_TYPE,
+  PERMISSION_DECISIONS,
+  type PermissionDecision,
+  type PermissionRecord,
   PLAN_IGNORED_CUSTOM_TYPE,
   type SessionSummary,
   THINKING_LEVELS,
@@ -82,6 +86,46 @@ const toThinkingLevel = (value: unknown): ThinkingLevel | undefined =>
     : undefined;
 
 /**
+ * question 工具的结构化答复：工具把 `answers` 放在 `details` 里，而 `details` 只存在于
+ * 会话记录，不在给模型看的正文里。界面要按「问题 + 选了什么」重新排版，所以把原始答复
+ * 单独下发——去解析那段给模型看的可读文本既脆弱又没必要。
+ */
+const questionAnswersOf = (message: Record<string, unknown>): { questionAnswers?: string[][] } => {
+  if (message.toolName !== "question") return {};
+  const details = message.details;
+  if (!isRecord(details) || !Array.isArray(details.answers)) return {};
+  const answers = details.answers.filter(
+    (entry): entry is string[] =>
+      Array.isArray(entry) && entry.every((value) => typeof value === "string"),
+  );
+  return answers.length > 0 ? { questionAnswers: answers } : {};
+};
+
+/** 权限审批记录的 `data` 来自会话文件，形状不可信：字段缺失或决定值非法就当没有记录 */
+const permissionRecordOf = (data: unknown): PermissionRecord | null => {
+  if (!isRecord(data)) return null;
+  const { tool, subject, scope, decision, sourceSessionId, sourceDescription } = data;
+  if (typeof tool !== "string" || typeof subject !== "string" || typeof scope !== "string") {
+    return null;
+  }
+  if (
+    typeof decision !== "string" ||
+    !(PERMISSION_DECISIONS as readonly string[]).includes(decision)
+  ) {
+    return null;
+  }
+  return {
+    tool,
+    subject,
+    scope,
+    decision: decision as PermissionDecision,
+    // 来源标注与弹窗一致：子会话发起的请求，回放时也要看得出是它
+    ...(typeof sourceSessionId === "string" ? { sourceSessionId } : {}),
+    ...(typeof sourceDescription === "string" ? { sourceDescription } : {}),
+  };
+};
+
+/**
  * 逐条投影时向后传递的会话级设置：assistant 消息自身不携带 pi 档位，
  * 由它之前最近的 `thinking_level_change` / `model_change` 条目补上。
  */
@@ -146,6 +190,7 @@ export const messageToDTO = (
         toolCallId: typeof message.toolCallId === "string" ? message.toolCallId : undefined,
         toolName: typeof message.toolName === "string" ? message.toolName : undefined,
         isError: message.isError === true,
+        ...questionAnswersOf(message),
         createdAt,
       };
     case "custom":
@@ -175,8 +220,20 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
         blocks: blocksOf(entry.content),
         createdAt: fallbackCreatedAt,
       };
-    case "custom":
+    case "custom": {
       // 扩展条目默认不打开展示；只放行本项目的界面标记，其余 customType 的 data 不下发
+      if (entry.customType === PERMISSION_DECISION_CUSTOM_TYPE) {
+        const record = permissionRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          permissionDecision: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
       if (entry.customType !== PLAN_IGNORED_CUSTOM_TYPE) return null;
       return {
         id: entry.id,
@@ -185,6 +242,7 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
         customType: entry.customType,
         createdAt: fallbackCreatedAt,
       };
+    }
     case "compaction":
       return {
         id: entry.id,

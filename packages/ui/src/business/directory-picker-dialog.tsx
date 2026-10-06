@@ -1,5 +1,5 @@
 /** 目录选择对话框：浏览 / 直接输入路径（结尾 `/` 进入目录，否则按末段检索）/ 新建文件夹 / 选定目录 */
-import { ArrowUp, Folder, FolderPlus, Loader2 } from "lucide-react";
+import { ArrowUp, Folder, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { Button } from "../base/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../base/dialog";
 import { Input } from "../base/input";
 import { ScrollArea } from "../base/scroll-area";
+import { Spinner } from "../base/spinner";
 import { errorText } from "../lib/error";
 import { baseName, dirName, joinPath } from "../lib/path";
 import type { FsListRequest, FsListResponse } from "../lib/types";
@@ -238,7 +239,7 @@ export function DirectoryPickerDialog({
           <div className="p-1">
             {loading && !listing ? (
               <p className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
+                <Spinner className="size-3.5" />
                 {t("加载中…")}
               </p>
             ) : null}

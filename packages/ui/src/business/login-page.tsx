@@ -1,10 +1,11 @@
 /** 登录页：用服务密码换取会话 Cookie；`notice` 用于携带配对链接失败等已翻译提示 */
-import { Loader2 } from "lucide-react";
+
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import { Input } from "../base/input";
 import { Label } from "../base/label";
+import { Spinner } from "../base/spinner";
 import { useAuth } from "../hooks/use-auth";
 import { useErrorText } from "../lib/error";
 import { useClient } from "../provider";
@@ -52,7 +53,7 @@ export function LoginPage({ notice }: { notice?: string | null }) {
         {errorText ? <p className="text-sm text-destructive">{errorText}</p> : null}
 
         <Button type="submit" className="w-full" disabled={auth.busy || password.length === 0}>
-          {auth.busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          {auth.busy ? <Spinner className="size-4" /> : null}
           {t("登录")}
         </Button>
 

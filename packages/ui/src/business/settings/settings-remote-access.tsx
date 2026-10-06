@@ -1,12 +1,13 @@
 /** 远程访问设置：局域网开关、配对链接、活动会话与改密码 */
 import type { AuthSessionView, PairingCreateOutput } from "@ucode/contracts";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
 import { Input } from "../../base/input";
 import { Label } from "../../base/label";
+import { Spinner } from "../../base/spinner";
 import { useAuth } from "../../hooks/use-auth";
 import { type RemoteAccess, useRemoteAccess } from "../../hooks/use-remote-access";
 import { useErrorText } from "../../lib/error";
@@ -108,7 +109,7 @@ function PairingPanel({
         ) : (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={busy} onClick={onCreate}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+              {busy ? <Spinner className="size-4" /> : null}
               {t("生成配对链接")}
             </Button>
             {pairing && remaining === 0 ? (
@@ -216,7 +217,7 @@ function PasswordForm() {
         </p>
         {errorText ? <p className="text-xs text-destructive">{errorText}</p> : null}
         <Button type="submit" variant="outline" size="sm" disabled={!canSubmit}>
-          {auth.busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          {auth.busy ? <Spinner className="size-4" /> : null}
           {t("修改密码")}
         </Button>
       </form>

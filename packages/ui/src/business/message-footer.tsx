@@ -1,6 +1,7 @@
 /**
- * 一轮回复的页脚：模型 / 推理档位 / 完成时间 / 耗时，右侧悬停出现分叉入口。
- * 内容段与「以工具调用收尾」的工具分组共用同一份渲染，保证每轮只出现一次。
+ * 消息的操作行：悬停才出现的分叉入口与元信息，常驻占位以免出现 / 消失时把内容顶动。
+ * assistant 段只展示模型与耗时，完整的 provider / 档位 / 时刻放在 `title` 里；内容段与聚合行共用，
+ * 保证每轮只出现一次。要不要渲染由行的 `footer` 决定（生成中的那一轮在投影层就把页脚去掉了）。
  */
 import { GitFork } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,7 +15,7 @@ export function ForkAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 self-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
       title={t("从此分叉")}
       onClick={onClick}
     >
@@ -35,23 +36,25 @@ export function MessageFooter({ item, durationMs, onFork }: MessageFooterProps) 
   const { t } = useTranslation();
   // 页脚描述的是生成这条回复的模型；没有模型信息（非 assistant）时不渲染
   if (!item.model) return null;
-  const canFork = Boolean(onFork) && !item.live;
+  const canFork = Boolean(onFork);
+  const duration = durationMs !== undefined ? durationLabel(durationMs) : "";
+  const full = [
+    item.provider ? `${item.provider}/${item.model}` : item.model,
+    // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
+    item.thinkingLevel && item.thinkingLevel !== "off"
+      ? thinkingLevelLabel(item.thinkingLevel, t)
+      : "",
+    clockLabel(item.completedAt ?? item.createdAt),
+    duration ? t("耗时 {{value}}", { value: duration }) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="group flex items-center gap-1">
-      <div className="min-w-0 flex-1 text-xs text-muted-foreground">
-        {[
-          item.provider ? `${item.provider}/${item.model}` : item.model,
-          // 「关闭」不代表推理，无展示价值；只在真的启用了推理时补上档位
-          item.thinkingLevel && item.thinkingLevel !== "off"
-            ? thinkingLevelLabel(item.thinkingLevel, t)
-            : "",
-          clockLabel(item.completedAt ?? item.createdAt),
-          durationMs !== undefined ? t("耗时 {{value}}", { value: durationLabel(durationMs) }) : "",
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </div>
+    <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={full}>
+        {[item.model, duration].filter(Boolean).join(" · ")}
+      </span>
       {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
     </div>
   );

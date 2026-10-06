@@ -4,7 +4,13 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { ERROR_CODES, type SessionSummary, type WebsearchConfig } from "@ucode/contracts";
+import {
+  ERROR_CODES,
+  PERMISSION_DECISION_CUSTOM_TYPE,
+  type PermissionRecord,
+  type SessionSummary,
+  type WebsearchConfig,
+} from "@ucode/contracts";
 import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { env } from "../env";
@@ -364,8 +370,30 @@ export class SessionPool {
         permission: {
           listGrants: () => this.permissions.allow.list(interactionSessionId),
           grant: (rule) => this.permissions.allow.add(interactionSessionId, rule),
-          request: (ask) =>
-            this.permissions.interactions.requestPermission(interactionSessionId, ask, source),
+          request: async (ask) => {
+            const outcome = await this.permissions.interactions.requestPermission(
+              interactionSessionId,
+              ask,
+              source,
+            );
+            // 只有用户真的作答过才留痕：超时 / 中断代打的 deny 写成「已拒绝」会误导事后回放
+            if (outcome.byUser) {
+              // 记录落在**被提问的会话**上：方案里子会话的审批归属根会话、弹窗也只出现在根会话，
+              // 用户答复时看的就是它；落在发起调用的子会话里，人再也对不上眼
+              const target =
+                interactionSessionId === sessionId
+                  ? manager
+                  : this.entries.get(interactionSessionId)?.session.sessionManager;
+              this.recordPermissionDecision(target, interactionSessionId, {
+                tool: ask.tool,
+                subject: ask.subject,
+                scope: ask.scope,
+                decision: outcome.decision,
+                ...(source ?? {}),
+              });
+            }
+            return outcome.decision;
+          },
         },
         question: {
           ask: (ask, signal) =>
@@ -449,6 +477,25 @@ export class SessionPool {
   /** 是否有活跃生成：池内占位的 run，或会话本身处于流式中 */
   isActive(sessionId: string): boolean {
     return this.isRunning(sessionId) || this.get(sessionId)?.isStreaming === true;
+  }
+
+  /**
+   * 把一次已答复的审批落成扩展条目，供事后回放「当时确认过什么」。
+   *
+   * 条目不进模型上下文；写盘失败或拿不到 manager 都不能影响审批结论，所以全程 best-effort。
+   */
+  private recordPermissionDecision(
+    manager: SessionManager | undefined,
+    sessionId: string,
+    record: PermissionRecord,
+  ): void {
+    if (!manager) return;
+    try {
+      const entryId = manager.appendCustomEntry(PERMISSION_DECISION_CUSTOM_TYPE, record);
+      this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
+    } catch (error) {
+      logger.warn({ sessionId, error }, "写入权限审批记录失败");
+    }
   }
 
   /**

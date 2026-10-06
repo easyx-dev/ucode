@@ -40,7 +40,7 @@ describe("InteractionBroker", () => {
 
     const response = broker.respond({ requestId, kind: "permission", decision: "allow_once" });
     assert.equal(response.resolved, true);
-    assert.equal(await pending, "allow_once");
+    assert.deepEqual(await pending, { decision: "allow_once", byUser: true });
     assert.ok(frames.some((frame) => frame.type === "interaction_resolved"));
   });
 
@@ -62,15 +62,15 @@ describe("InteractionBroker", () => {
       broker.respond({ requestId, kind: "permission", decision: "deny" }).resolved,
       false,
     );
-    assert.equal(await pending, "deny");
+    assert.deepEqual(await pending, { decision: "deny", byUser: true });
   });
 
-  it("会话清理时挂起请求按拒绝结算", async () => {
+  it("会话清理时挂起请求按拒绝结算，且标明不是用户答复", async () => {
     const bus = new SessionEventBus();
     const broker = new InteractionBroker(bus, 1000);
     const pending = broker.requestPermission("s1", { tool: "edit", subject: "a.ts", scope: "*" });
     broker.forget("s1");
-    assert.equal(await pending, "deny");
+    assert.deepEqual(await pending, { decision: "deny", byUser: false });
     assert.equal(broker.list("s1").length, 0);
   });
 
@@ -85,18 +85,18 @@ describe("InteractionBroker", () => {
     const parent = broker.requestPermission("p1", { tool: "bash", subject: "ls", scope: "*" });
 
     broker.forgetSource("p1", "sub-1");
-    assert.equal(await child, "deny");
+    assert.deepEqual(await child, { decision: "deny", byUser: false });
     assert.equal(broker.list("p1").length, 1, "父会话自身的请求不应被清掉");
 
     broker.forget("p1");
-    assert.equal(await parent, "deny");
+    assert.deepEqual(await parent, { decision: "deny", byUser: false });
   });
 
-  it("超时按拒绝结算", async () => {
+  it("超时按拒绝结算，且标明不是用户答复", async () => {
     const bus = new SessionEventBus();
     const broker = new InteractionBroker(bus, 10);
     const pending = broker.requestPermission("s1", { tool: "edit", subject: "a.ts", scope: "*" });
-    assert.equal(await pending, "deny");
+    assert.deepEqual(await pending, { decision: "deny", byUser: false });
   });
 });
 

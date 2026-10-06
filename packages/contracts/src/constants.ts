@@ -44,6 +44,13 @@ export type MessageRole = (typeof MESSAGE_ROLES)[number];
 export const PLAN_IGNORED_CUSTOM_TYPE = "ucode.plan-ignored";
 
 /**
+ * 权限审批记录：每次真正弹过审批的调用（`ask` 规则或越界检查）决定后，服务端往会话文件追加的
+ * pi `custom` 条目（`data` 为 `{tool, subject, scope, decision}`）。跨端常量——服务端写、各端据此
+ * 回放「当时确认过什么」，只作扩展状态持久化，不进模型上下文。
+ */
+export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
+
+/**
  * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
  * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
  *

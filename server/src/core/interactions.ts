@@ -28,6 +28,18 @@ export type QuestionAnswerResult =
   | { kind: "timeout" }
   | { kind: "cancelled" };
 
+/**
+ * 权限审批的结算结果。
+ *
+ * `byUser` 为假表示这次 `deny` 是超时 / 中断 / 回收代打的，不是用户的选择——调用方据此决定要不要
+ * 把它当成「用户拒绝」留痕（写成「已拒绝」会让事后回放读到错误结论）。
+ */
+export type PermissionOutcome = {
+  decision: PermissionDecision;
+  /** 是否由用户实际作答 */
+  byUser: boolean;
+};
+
 type FailureReason = "timeout" | "cancelled";
 
 /** 请求来源：由子会话触发时标注，父会话前端据此提示「来自子智能体」 */
@@ -59,7 +71,7 @@ export class InteractionBroker {
     sessionId: string,
     ask: PermissionAsk,
     source?: InteractionSource,
-  ): Promise<PermissionDecision> {
+  ): Promise<PermissionOutcome> {
     const request: PermissionInteraction = {
       requestId: randomUUID(),
       kind: "permission",
@@ -71,7 +83,7 @@ export class InteractionBroker {
       createdAt: new Date().toISOString(),
     };
 
-    return new Promise<PermissionDecision>((resolve) => {
+    return new Promise<PermissionOutcome>((resolve) => {
       const timer = setTimeout(() => {
         this.settle(request.requestId, (entry) => entry.fail("timeout"));
       }, this.timeoutMs);
@@ -81,9 +93,9 @@ export class InteractionBroker {
         request,
         timer,
         respond: (input) => {
-          if (input.kind === "permission") resolve(input.decision);
+          if (input.kind === "permission") resolve({ decision: input.decision, byUser: true });
         },
-        fail: () => resolve("deny"),
+        fail: () => resolve({ decision: "deny", byUser: false }),
       });
       this.events.emitFrame(sessionId, "interaction_request", request);
     });

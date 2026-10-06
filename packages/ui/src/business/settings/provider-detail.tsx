@@ -1,11 +1,12 @@
 /** 供应商详情：内置供应商只需填 key，自定义供应商才编辑端点与模型 */
-import { Loader2, Trash2, Zap } from "lucide-react";
+import { Trash2, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../base/badge";
 import { Button } from "../../base/button";
 import { Input } from "../../base/input";
 import { Label } from "../../base/label";
 import { Separator } from "../../base/separator";
+import { Spinner } from "../../base/spinner";
 import type { DraftModel, DraftProvider } from "../../lib/config-draft";
 import { ProviderFields } from "./provider-fields";
 import { ProviderModels } from "./provider-models";
@@ -88,7 +89,7 @@ export function ProviderDetail({
         </span>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={onTest} disabled={testing}>
-            {testing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+            {testing ? <Spinner className="size-4" /> : <Zap className="size-4" />}
             {t("测试连接")}
           </Button>
           <Button variant="ghost" size="icon-sm" onClick={onRemove} title={t("删除 provider")}>

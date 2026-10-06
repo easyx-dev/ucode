@@ -12,6 +12,18 @@ const nextLocalId = (): number => {
   return localId;
 };
 
+/** 乐观条目 id / uid 的前缀（`live-user-*` / `live-assistant-*` / `live-tool-*`） */
+const LIVE_PREFIX = "live-";
+
+/**
+ * 是不是乐观条目的界面标识。
+ *
+ * 只有这类 uid 需要被权威条目接管（乐观条目的 id 会被服务端 id 替掉），也是快照刷新时
+ * 敢按位置搬运 uid 的依据：它们不会与服务端 id 撞。
+ */
+export const isLiveUid = (uid: string | undefined): uid is string =>
+  uid !== undefined && uid.startsWith(LIVE_PREFIX);
+
 /** 本地乐观消息的时间戳，与服务端保持一致用 ISO 8601 */
 const nowIso = (): string => new Date().toISOString();
 
@@ -53,7 +65,7 @@ export const appendUserItem = (
   const id = `live-user-${nextLocalId()}`;
   return {
     id,
-    items: [...items, { id, role: "user", blocks, live: true, createdAt: nowIso() }],
+    items: [...items, { id, uid: id, role: "user", blocks, live: true, createdAt: nowIso() }],
   };
 };
 
@@ -62,16 +74,13 @@ export const removeUserItem = (items: ChatItem[], id: string): ChatItem[] =>
   items.some((item) => item.id === id) ? items.filter((item) => item.id !== id) : items;
 
 /** 新建一条待填充的 assistant 消息（message_start） */
-export const appendAssistantItem = (items: ChatItem[]): ChatItem[] => [
-  ...items,
-  {
-    id: `live-assistant-${nextLocalId()}`,
-    role: "assistant",
-    blocks: [],
-    live: true,
-    createdAt: nowIso(),
-  },
-];
+export const appendAssistantItem = (items: ChatItem[]): ChatItem[] => {
+  const id = `live-assistant-${nextLocalId()}`;
+  return [
+    ...items,
+    { id, uid: id, role: "assistant", blocks: [], live: true, createdAt: nowIso() },
+  ];
+};
 
 /** 正文 / 思考增量：追加到最近一条 live 的 assistant 消息 */
 export const appendDelta = (
@@ -94,19 +103,23 @@ export const appendToolCall = (items: ChatItem[], block: MessageBlock): ChatItem
 };
 
 /** 工具开始执行：插入一张待填充的结果卡片 */
-export const startToolItem = (items: ChatItem[], data: Record<string, unknown>): ChatItem[] => [
-  ...items,
-  {
-    id: `live-tool-${String(data.toolCallId ?? nextLocalId())}`,
-    role: "tool",
-    blocks: [{ type: "text", text: "" }],
-    toolCallId: String(data.toolCallId ?? ""),
-    toolName: String(data.toolName ?? "tool"),
-    isError: false,
-    live: true,
-    createdAt: nowIso(),
-  },
-];
+export const startToolItem = (items: ChatItem[], data: Record<string, unknown>): ChatItem[] => {
+  const id = `live-tool-${String(data.toolCallId ?? nextLocalId())}`;
+  return [
+    ...items,
+    {
+      id,
+      uid: id,
+      role: "tool",
+      blocks: [{ type: "text", text: "" }],
+      toolCallId: String(data.toolCallId ?? ""),
+      toolName: String(data.toolName ?? "tool"),
+      isError: false,
+      live: true,
+      createdAt: nowIso(),
+    },
+  ];
+};
 
 /** 工具执行中 / 结束：刷新对应卡片的内容 */
 export const updateToolItem = (items: ChatItem[], data: Record<string, unknown>): ChatItem[] => {
@@ -121,21 +134,31 @@ export const updateToolItem = (items: ChatItem[], data: Record<string, unknown>)
   });
 };
 
-/** 权威消息：优先按 toolCallId 精确替换（pi 默认并发执行工具，按「最后一个」会错位） */
+/**
+ * 权威消息：优先按 toolCallId 精确替换（pi 默认并发执行工具，按「最后一个」会错位）。
+ * 被替掉的乐观条目可能带时间 / 报错等实时字段，但只继承 `uid`：界面的行 key 靠它保持稳定，
+ * 其余字段一律以服务端消息为准。
+ */
 export const mergeMessage = (items: ChatItem[], message: MessageDTO): ChatItem[] => {
   const { role } = message;
 
   if (role === "tool" && message.toolCallId) {
     const exact = items.findIndex((item) => item.id === `live-tool-${message.toolCallId}`);
-    if (exact >= 0) return replaceAt(items, exact, { ...message, live: false });
+    const live = items[exact];
+    if (exact >= 0 && live) {
+      return replaceAt(items, exact, { ...message, live: false, uid: live.uid ?? message.id });
+    }
   }
 
   if (role === "assistant" || role === "tool" || role === "user") {
     const index = lastLiveIndex(items, role);
-    if (index >= 0) return replaceAt(items, index, { ...message, live: false });
+    const live = items[index];
+    if (index >= 0 && live) {
+      return replaceAt(items, index, { ...message, live: false, uid: live.uid ?? message.id });
+    }
   }
 
-  return [...items, { ...message, live: false }];
+  return [...items, { ...message, live: false, uid: message.id }];
 };
 
 /** 把本次运行测得的耗时挂到最后一条 assistant 消息上；没有则原样返回 */

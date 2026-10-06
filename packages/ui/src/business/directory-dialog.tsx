@@ -1,5 +1,5 @@
 /** 会话目录对话框：只读浏览会话的工作目录，复用 fs/list */
-import { ArrowUp, FileText, Folder, Loader2 } from "lucide-react";
+import { ArrowUp, FileText, Folder } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "../base/dialog";
 import { ScrollArea } from "../base/scroll-area";
+import { Spinner } from "../base/spinner";
 import { errorText } from "../lib/error";
 import { abbreviateHome } from "../lib/path";
 import type { FsListResponse } from "../lib/types";
@@ -102,7 +103,7 @@ export function DirectoryDialog({ open, onOpenChange, path }: DirectoryDialogPro
           <div className="p-1">
             {loading && !listing ? (
               <p className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
+                <Spinner className="size-3.5" />
                 {t("加载中…")}
               </p>
             ) : null}

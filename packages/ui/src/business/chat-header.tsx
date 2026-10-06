@@ -5,7 +5,6 @@ import {
   FolderOpen,
   Gauge,
   GitFork,
-  Loader2,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
@@ -14,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
 import { Button } from "../base/button";
+import { Spinner } from "../base/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../base/tooltip";
 import { sessionTitle } from "../lib/session";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
@@ -127,7 +127,7 @@ export function ChatHeader({
       ) : null}
       {session?.running ? (
         <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" />
+          <Spinner className="size-3" />
           {t("生成中")}
         </span>
       ) : null}

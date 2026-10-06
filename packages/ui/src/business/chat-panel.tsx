@@ -216,8 +216,9 @@ export function ChatPanel({
         items={chat.items}
         subagents={chat.subagents}
         loading={chat.loadingHistory}
-        pending={chat.pending}
+        working={chat.streaming}
         empty={empty}
+        resetKey={session?.id ?? ""}
         onOpenSession={onOpenSession}
         onFork={isChild ? undefined : onFork}
         onEdit={isChild || chat.streaming ? undefined : onEdit}

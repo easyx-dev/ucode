@@ -11,7 +11,7 @@
  * 4. 错误码映射：`errorMessageKeys` 的每个值都必须在 domain en 目录里存在（覆盖性由类型保证）。
  * 5. 硬编码中文（只扫 `apps/web/src`、`packages/ui/src` 与 `packages/i18n/src`）：中文必须走 `t(...)`；
  *    注释、`logger` / `console` 日志与带 `i18n-ignore` 标记的行除外。服务端不做本地化，
- *    它的中文是固定兜底文案与日志，不在扫描范围。
+ *    它的中文是固定兜底文案与日志，不在扫描范围。`__tests__` 目录也不扫——用例描述不是界面文案。
  *
  * 第 5 条是启发式的：不解析 AST，只认同行 `t("…")`，以及「上一行以 `t(` 结尾」的折行 key
  * （长 key 会被 Biome 折到下一行）。这样漏翻会立刻在 `pnpm check` 暴露。
@@ -39,10 +39,14 @@ const IGNORE = "i18n-ignore";
 /**
  * 不参与「硬编码中文」扫描的文件：
  * - 目录文件本身就是文案数据；
- * - `error-messages.ts` 是「错误码 → 文案 key」的映射，值就是 key。
+ * - `error-messages.ts` 是「错误码 → 文案 key」的映射，值就是 key；
+ * - `__tests__` 下的用例描述不是界面文案。
  */
 const isCatalogData = (path: string): boolean =>
   path.includes("/locales/") || path.endsWith("packages/i18n/src/error-messages.ts");
+
+/** 测试用例的描述不是界面文案，不参与扫描 */
+const isTestFile = (path: string): boolean => path.includes("/__tests__/");
 
 type Catalog = Record<string, string>;
 
@@ -224,7 +228,7 @@ const sourceProblems = (root: string): string[] =>
   ["apps/web/src", "apps/desktop/src/renderer", "packages/ui/src", "packages/i18n/src"].flatMap(
     (dir) =>
       listFiles(root, dir, (path) => /\.tsx?$/.test(path))
-        .filter((file) => !isCatalogData(file))
+        .filter((file) => !isCatalogData(file) && !isTestFile(file))
         .flatMap((file) => hardcodedProblems(root, file)),
   );
 

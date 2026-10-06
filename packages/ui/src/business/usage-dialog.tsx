@@ -1,5 +1,5 @@
 /** 全局使用统计对话框：总量、按模型、按会话与工具调用次数 */
-import { Loader2 } from "lucide-react";
+
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../base/dialog";
+import { Spinner } from "../base/spinner";
 import { useUsage } from "../hooks/use-usage";
 import type { ContextUsage, ModelUsage, SessionUsageEntry, UsageTotals } from "../lib/types";
 import { contextPercent, formatTokens, usageKindLabel } from "../lib/usage";
@@ -182,7 +183,7 @@ export function UsageDialog({ open, onOpenChange, onOpenSession, context }: Usag
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           {loading && !data ? (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
+              <Spinner className="size-4" />
               {t("加载中…")}
             </div>
           ) : null}

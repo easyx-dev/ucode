@@ -1,15 +1,20 @@
 /**
  * 会话条目 → 渲染节点的投影。
  *
- * 把 assistant 消息里的 `toolCall` 区块与独立的 `role:"tool"` 结果按 `toolCallId` 配对成一次调用，
- * 并把相邻的连续调用合并成一个 `tools` 节点（跨多条 assistant 消息也能合，中间夹正文 / 思考才断开）；
- * 配对上的工具结果不再单独渲染。其余条目按内容段渲染，`trailing` 标记该段是否为来源消息的最后一段
- * （流式光标只挂在最后一段上）。一轮回复的页脚（模型 / 时间 / 耗时）只出现一次：通常挂在
- * 「该轮最后一条以正文结尾的 assistant 段」上，若该轮以工具调用收尾则挂到末位工具分组下方。
+ * 把 assistant 消息里的 `toolCall` 区块与独立的 `role:"tool"` 结果按 `toolCallId` 配对成一次调用。
+ * 思考区块与工具调用按原文顺序抽成「段」（`ChatLeg`），**连续的段合成一个 `activity` 节点**——
+ * 一段回复里动辄几十次「想一下、调一次工具」，逐条铺开会把真正的回答挤出屏幕；界面上它只占一行摘要
+ * （「思考了 3 次，使用了 2 个 运行、1 个 编辑」），展开才逐段回看。正文 / 图片 / 附件是 `content` 节点，
+ * 它按定义打断 activity 的连续段。
+ *
+ * 一轮回复的页脚（模型 / 时间 / 耗时）只出现一次，挂在该轮末位节点上；`source` 记的是最后一条贡献内容的
+ * assistant 消息，页脚的模型与耗时靠它，孤儿工具结果（调用记录已被裁剪）没有来源。
  */
-import type { MessageBlock } from "@ucode/contracts";
+import type { MessageBlock, PermissionRecord, QuestionItem } from "@ucode/contracts";
+import { PERMISSION_DECISION_CUSTOM_TYPE } from "@ucode/contracts";
 import type { ChatItem } from "./types";
 
+/** 一次工具调用：调用区块与它的结果已经配好对 */
 export type ToolEntry = {
   /** 工具调用 id，与结果消息的 `toolCallId` 对应 */
   id: string;
@@ -28,34 +33,122 @@ export type ToolEntry = {
 /** 一轮回复的页脚信息：模型 / 时间取自来源 assistant 消息，耗时由起止时间戳算出 */
 export type ChatFooter = {
   item: ChatItem;
+  /** 本轮从提问到生成结束的耗时（毫秒） */
   durationMs?: number;
 };
+
+/** 聚合行里的一段：一段思考或一次工具调用，按原文顺序排列 */
+export type ChatLeg =
+  | { kind: "thought"; key: string; text: string; item: ChatItem }
+  | { kind: "tool"; key: string; entry: ToolEntry };
 
 type ContentNode = {
   kind: "content";
   key: string;
   item: ChatItem;
   blocks: MessageBlock[];
-  /** 是否为来源消息的最后一段 */
+  /** 是否为来源消息的最后一段（流式光标只挂在最后一段上） */
   trailing: boolean;
-  /** 页脚是否挂在本段（每轮至多一处） */
-  turnEnd: boolean;
-  /** 本轮回复的总耗时（毫秒） */
-  durationMs?: number;
+  footer?: ChatFooter;
 };
 
-type ToolsNode = { kind: "tools"; key: string; entries: ToolEntry[]; footer?: ChatFooter };
+/** 连续的思考与工具调用合成的聚合行 */
+type ActivityNode = {
+  kind: "activity";
+  key: string;
+  /** 该组里的段，按原文顺序 */
+  legs: ChatLeg[];
+  /** 最后一条贡献内容的 assistant 消息 */
+  source?: ChatItem;
+  footer?: ChatFooter;
+};
 
-export type ChatNode = ContentNode | ToolsNode;
+/** 一次提问及其答复：独立成段，不并进聚合行 */
+type QuestionNode = {
+  kind: "question";
+  key: string;
+  /** 提问内容；`answers` 与它同序，未答复时为空 */
+  questions: QuestionItem[];
+  answers: string[][];
+  /** 是否已有结果：超时 / 取消也会给结果，但答复为空，不能与「还在等」混为一谈 */
+  settled: boolean;
+  /** 发起提问的 assistant 消息 */
+  source?: ChatItem;
+  footer?: ChatFooter;
+};
+
+/** 一次权限审批记录：独立成段，不并进聚合行 */
+type PermissionNode = {
+  kind: "permission";
+  key: string;
+  /** 审批对象与结论 */
+  record: PermissionRecord;
+  /** 这条记录自身的条目，页脚要用它的时刻 */
+  source?: ChatItem;
+  footer?: ChatFooter;
+};
+
+export type ChatNode = ContentNode | ActivityNode | QuestionNode | PermissionNode;
 
 type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 
-type AssistantSegment =
-  | { type: "content"; blocks: MessageBlock[] }
-  | { type: "tools"; entries: ToolEntry[] };
+/** assistant 消息内部的一段：思考 / 工具调用 / 提问 / 正文，按区块顺序切出 */
+type AssistantLeg =
+  | { kind: "thought"; key: string; text: string }
+  | { kind: "tool"; key: string; entry: ToolEntry }
+  | {
+      kind: "question";
+      key: string;
+      questions: QuestionItem[];
+      answers: string[][];
+      settled: boolean;
+    }
+  | { kind: "content"; key: string; blocks: MessageBlock[]; trailing: boolean };
+
+/** 交互式提问的工具名：它自己成段展示（含答复），不并进聚合行 */
+const QUESTION_TOOL = "question";
+
+/** 入参来自模型，形状不可信：逐项挑出合法字段，缺 header / question 的条目直接丢弃 */
+const questionItemsOf = (args: unknown): QuestionItem[] => {
+  const record = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {};
+  if (!Array.isArray(record.questions)) return [];
+  return record.questions.flatMap((entry) => {
+    const item =
+      typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
+    if (typeof item.header !== "string" || typeof item.question !== "string") return [];
+    const options = Array.isArray(item.options) ? item.options : [];
+    return [
+      {
+        header: item.header,
+        question: item.question,
+        options: options.flatMap((option) => {
+          const one =
+            typeof option === "object" && option !== null
+              ? (option as Record<string, unknown>)
+              : {};
+          return typeof one.label === "string"
+            ? [
+                {
+                  label: one.label,
+                  description: typeof one.description === "string" ? one.description : "",
+                },
+              ]
+            : [];
+        }),
+        ...(item.multiple === true ? { multiple: true } : {}),
+      },
+    ];
+  });
+};
 
 const itemText = (item: ChatItem): string =>
   item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
+
+/**
+ * 行 key 与轮标识的来源：`uid` 跨「乐观条目 → 权威条目」不变，而 `id` 会在 `message_end` 换成服务端 id。
+ * 拿 `id` 当 key 的话，每次落定都会把整行卸载重建——生成中看得到的闪一下。
+ */
+export const uidOf = (item: ChatItem): string => item.uid ?? item.id;
 
 /** ISO 时间 → 毫秒；缺失或非法返回 undefined */
 const msOf = (iso?: string): number | undefined => {
@@ -63,13 +156,6 @@ const msOf = (iso?: string): number | undefined => {
   const value = Date.parse(iso);
   return Number.isNaN(value) ? undefined : value;
 };
-
-const contentNode = (
-  key: string,
-  item: ChatItem,
-  blocks: MessageBlock[],
-  trailing: boolean,
-): ContentNode => ({ kind: "content", key, item, blocks, trailing, turnEnd: false });
 
 /** 预先索引工具结果（供配对取输出）与所有调用 id（判断结果是否已被吸收） */
 const indexToolResults = (
@@ -102,79 +188,137 @@ const toolEntryOf = (
   };
 };
 
-/** assistant 消息按「工具调用段 / 内容段」切开，连续的同类块各自成段 */
-const segmentAssistant = (item: ChatItem, results: Map<string, ChatItem>): AssistantSegment[] => {
-  const segments: AssistantSegment[] = [];
-  for (const block of item.blocks) {
+/**
+ * 按区块顺序把 assistant 消息切成段：思考与工具调用各自成段，其余区块（正文 / 图片 / 附件）连续合并。
+ * 段 key 用「消息 id + 区块下标」，流式追加区块时已有段的 key 不变；`trailing` 标记消息的最后一段。
+ */
+const buildAssistantLegs = (item: ChatItem, results: Map<string, ChatItem>): AssistantLeg[] => {
+  const legs: AssistantLeg[] = [];
+  item.blocks.forEach((block, index) => {
     if (block.type === "toolCall") {
-      const entry = toolEntryOf(item, block, results);
-      const last = segments[segments.length - 1];
-      if (last?.type === "tools") last.entries.push(entry);
-      else segments.push({ type: "tools", entries: [entry] });
-    } else {
-      const last = segments[segments.length - 1];
-      if (last?.type === "content") last.blocks.push(block);
-      else segments.push({ type: "content", blocks: [block] });
+      // 提问要带着答复单独成段：并进聚合行的话，用户事后看不到自己到底答了什么
+      if (block.name === QUESTION_TOOL) {
+        const result = results.get(block.id);
+        legs.push({
+          kind: "question",
+          key: block.id,
+          questions: questionItemsOf(block.args),
+          answers: result?.questionAnswers ?? [],
+          settled: result !== undefined,
+        });
+        return;
+      }
+      legs.push({ kind: "tool", key: block.id, entry: toolEntryOf(item, block, results) });
+      return;
     }
-  }
-  return segments;
+    if (block.type === "thinking") {
+      legs.push({ kind: "thought", key: `${uidOf(item)}:t${index}`, text: block.text });
+      return;
+    }
+    const last = legs[legs.length - 1];
+    if (last?.kind === "content") last.blocks.push(block);
+    else
+      legs.push({
+        kind: "content",
+        key: `${uidOf(item)}:c${index}`,
+        blocks: [block],
+        trailing: false,
+      });
+  });
+
+  const tail = legs[legs.length - 1];
+  if (tail?.kind === "content") tail.trailing = true;
+  return legs;
 };
 
-/** 相邻 tools 节点就地合并，实现「整轮连续调用」聚合 */
-const appendTools = (nodes: ChatNode[], entries: ToolEntry[]): void => {
-  if (entries.length === 0) return;
-  const last = nodes[nodes.length - 1];
-  if (last?.kind === "tools") {
-    last.entries.push(...entries);
-    return;
+/** 把一段的段追加进节点列表：连续段续到末位聚合行，正文与提问各自成节点 */
+const appendLegs = (nodes: ChatNode[], legs: AssistantLeg[], item: ChatItem): void => {
+  for (const leg of legs) {
+    if (leg.kind === "content") {
+      nodes.push({
+        kind: "content",
+        key: leg.key,
+        item,
+        blocks: leg.blocks,
+        trailing: leg.trailing,
+      });
+      continue;
+    }
+
+    if (leg.kind === "question") {
+      nodes.push({
+        kind: "question",
+        key: `question:${leg.key}`,
+        questions: leg.questions,
+        answers: leg.answers,
+        settled: leg.settled,
+        source: item,
+      });
+      continue;
+    }
+
+    const chatLeg: ChatLeg =
+      leg.kind === "thought"
+        ? { kind: "thought", key: leg.key, text: leg.text, item }
+        : { kind: "tool", key: leg.key, entry: leg.entry };
+    const last = nodes[nodes.length - 1];
+    if (last?.kind === "activity") {
+      last.legs.push(chatLeg);
+      last.source = item;
+      continue;
+    }
+    // key 取首段的 key：后续段只往组里追加，行 key 因此不随流式增量变化
+    nodes.push({ kind: "activity", key: `activity:${leg.key}`, legs: [chatLeg], source: item });
   }
-  // 无自然 id 的兜底（正常调用 id 恒非空）：用当前节点数保证 key 不撞
-  const first = entries[0];
-  const key = first?.id ? `tools:${first.id}` : `tools:#${nodes.length}`;
-  nodes.push({ kind: "tools", key, entries: [...entries] });
 };
 
-/** 未被任何 assistant 调用认领的工具结果（如历史被裁剪）：单独成一组工具节点 */
+/** 未被任何 assistant 调用认领的工具结果（如历史被裁剪）：单独成一段 */
 const appendToolResult = (nodes: ChatNode[], item: ChatItem, callIds: Set<string>): void => {
   if (item.toolCallId && callIds.has(item.toolCallId)) return;
-  appendTools(nodes, [
-    {
-      id: item.toolCallId || item.id,
-      name: item.toolName ?? "tool",
-      result: itemText(item),
-      isError: item.isError === true,
-      running: Boolean(item.live),
-    },
-  ]);
+  const entry: ToolEntry = {
+    id: item.toolCallId || uidOf(item),
+    name: item.toolName ?? "tool",
+    result: itemText(item),
+    isError: item.isError === true,
+    running: Boolean(item.live),
+  };
+  const last = nodes[nodes.length - 1];
+  if (last?.kind === "activity") last.legs.push({ kind: "tool", key: entry.id, entry });
+  else
+    nodes.push({
+      kind: "activity",
+      key: `activity:${entry.id}`,
+      legs: [{ kind: "tool", key: entry.id, entry }],
+    });
 };
 
-const appendAssistant = (
-  nodes: ChatNode[],
-  item: ChatItem,
-  results: Map<string, ChatItem>,
-): void => {
-  const segments = segmentAssistant(item, results);
-  // 空 assistant（正文未到）保留一个内容节点，供尾部等待指示渲染
-  if (segments.length === 0) {
-    nodes.push(contentNode(item.id, item, [], true));
-    return;
-  }
-  segments.forEach((segment, index) => {
-    if (segment.type === "tools") appendTools(nodes, segment.entries);
-    else
-      nodes.push(
-        contentNode(`${item.id}:${index}`, item, segment.blocks, index === segments.length - 1),
-      );
-  });
-};
+/** 本条是不是权限审批记录（`custom` 扩展条目之一） */
+const permissionOf = (item: ChatItem): PermissionRecord | undefined =>
+  item.customType === PERMISSION_DECISION_CUSTOM_TYPE ? item.permissionDecision : undefined;
 
 export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
   const { results, callIds } = indexToolResults(items);
   const nodes: ChatNode[] = [];
   for (const item of items) {
-    if (item.role === "tool") appendToolResult(nodes, item, callIds);
-    else if (item.role === "assistant") appendAssistant(nodes, item, results);
-    else nodes.push(contentNode(item.id, item, item.blocks, true));
+    if (item.role === "tool") {
+      appendToolResult(nodes, item, callIds);
+      continue;
+    }
+    if (item.role !== "assistant") {
+      // 审批记录也自成一段：并进聚合行等于把它藏起来，而它恰恰是要回放给人看的
+      const record = permissionOf(item);
+      if (record) {
+        nodes.push({ kind: "permission", key: uidOf(item), record, source: item });
+        continue;
+      }
+      nodes.push({ kind: "content", key: uidOf(item), item, blocks: item.blocks, trailing: true });
+      continue;
+    }
+
+    // 还没吐任何区块的 assistant（包括思考被设置过滤掉的那种）不成行：
+    // 生成中的提示由列表尾部的「工作中」一行给出
+    const legs = buildAssistantLegs(item, results);
+    if (legs.length > 0) appendLegs(nodes, legs, item);
   }
   markTurnEnd(nodes);
   return nodes;
@@ -183,35 +327,27 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
 /**
  * 标记每轮回复的页脚位置并算出总耗时。
  *
- * 一轮 = 一条用户消息到下一轮用户消息之间。若该轮以工具调用收尾，页脚挂到末位工具分组下方；
- * 否则挂到「该轮最后一条以正文结尾的 assistant 段」上。
+ * 一轮 = 一条用户消息到下一轮用户消息之间，页脚挂在该轮的末位节点上——末位是正文段就落在正文下，
+ * 是聚合行就落在聚合行下。
  */
 const markTurnEnd = (nodes: ChatNode[]): void => {
   let turnStartMs: number | undefined;
-  let lastTrailingIndex = -1;
-  let lastNodeIndex = -1;
-  let lastAssistant: ChatItem | undefined;
-  let lastAssistantMs: number | undefined;
+  let lastIndex = -1;
+  let owner: ChatItem | undefined;
+  let ownerMs: number | undefined;
 
   const finalize = (): void => {
-    const durationMs =
-      turnStartMs !== undefined && lastAssistantMs !== undefined && lastAssistantMs >= turnStartMs
-        ? lastAssistantMs - turnStartMs
-        : undefined;
-    const tail = nodes[lastNodeIndex];
-    if (tail?.kind === "tools" && lastAssistant) {
-      tail.footer = { item: lastAssistant, ...(durationMs !== undefined ? { durationMs } : {}) };
-    } else {
-      const node = nodes[lastTrailingIndex];
-      if (node?.kind === "content") {
-        node.turnEnd = true;
-        if (durationMs !== undefined) node.durationMs = durationMs;
-      }
+    const node = nodes[lastIndex];
+    if (node && owner) {
+      const durationMs =
+        turnStartMs !== undefined && ownerMs !== undefined && ownerMs >= turnStartMs
+          ? ownerMs - turnStartMs
+          : undefined;
+      node.footer = { item: owner, ...(durationMs !== undefined ? { durationMs } : {}) };
     }
-    lastTrailingIndex = -1;
-    lastNodeIndex = -1;
-    lastAssistant = undefined;
-    lastAssistantMs = undefined;
+    lastIndex = -1;
+    owner = undefined;
+    ownerMs = undefined;
   };
 
   nodes.forEach((node, index) => {
@@ -220,11 +356,17 @@ const markTurnEnd = (nodes: ChatNode[]): void => {
       turnStartMs = msOf(node.item.createdAt);
       return;
     }
-    lastNodeIndex = index;
-    if (node.kind !== "content" || node.item.role !== "assistant") return;
-    lastAssistant = node.item;
-    lastAssistantMs = msOf(node.item.completedAt) ?? msOf(node.item.createdAt) ?? lastAssistantMs;
-    if (node.trailing) lastTrailingIndex = index;
+    lastIndex = index;
+    // 聚合行与提问节点自身没有正文段，它携带的 `source` 才是页脚要用的那条 assistant 消息
+    const source =
+      node.kind === "content"
+        ? node.item.role === "assistant"
+          ? node.item
+          : undefined
+        : node.source;
+    if (!source) return;
+    owner = source;
+    ownerMs = msOf(source.completedAt) ?? msOf(source.createdAt) ?? ownerMs;
   });
   finalize();
 };

@@ -1,6 +1,6 @@
 /** 消息接口的响应模型；SSE 事件的 data 也复用这里的区块结构 */
 import type { SessionScoped } from "../common";
-import type { MessageRole, ThinkingLevel } from "../constants";
+import type { MessageRole, PermissionDecision, ThinkingLevel } from "../constants";
 
 export type MessageBlock =
   | { type: "text"; text: string }
@@ -8,6 +8,25 @@ export type MessageBlock =
   | { type: "toolCall"; id: string; name: string; args: unknown }
   | { type: "image"; id: string; mimeType: string; url: string }
   | { type: "file"; id: string; mimeType: string; name: string; size: number; url: string };
+
+/**
+ * 权限审批记录：界面据此回放「当时确认过哪次调用、结论是什么」。
+ * 只作扩展状态持久化（`custom` 条目），不进模型上下文。
+ */
+export type PermissionRecord = {
+  /** 触发审批的工具名，如 `read` / `bash` */
+  tool: string;
+  /** 规则匹配到的对象：路径 / 命令 / URL */
+  subject: string;
+  /** 本次授权覆盖的范围：规则类 ask 是规则串，越界检查是父目录通配 */
+  scope: string;
+  /** 用户的决定 */
+  decision: PermissionDecision;
+  /** 发起请求的子会话 id；主会话自身发起时为空（与弹窗一致地标注来源） */
+  sourceSessionId?: string;
+  /** 发起请求的子会话描述 */
+  sourceDescription?: string;
+};
 
 export type MessageDTO = {
   id: string;
@@ -23,8 +42,12 @@ export type MessageDTO = {
   toolCallId?: string;
   /** tool 专用 */
   toolName?: string;
+  /** tool 专用：`question` 的结构化答复，与调用入参里的 `questions` 同序（每项可多值） */
+  questionAnswers?: string[][];
   /** custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 */
   customType?: string;
+  /** custom 专用：权限审批记录；只有该类型的扩展条目会带上 */
+  permissionDecision?: PermissionRecord;
   isError?: boolean;
   /** 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 */
   createdAt?: string;

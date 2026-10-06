@@ -1,12 +1,14 @@
-/** 外观设置：主题三态与界面语言切换 */
+/** 外观设置：主题三态、界面语言与消息区显示偏好 */
 import type { Locale } from "@ucode/contracts";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { useLocale } from "../../hooks/use-locale";
+import { useShowThinking } from "../../hooks/use-show-thinking";
 import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
 type ThemeValue = "light" | "dark" | "system";
+type ThinkingValue = "visible" | "hidden";
 
 export function SettingsAppearance() {
   const { t } = useTranslation();
@@ -18,6 +20,12 @@ export function SettingsAppearance() {
     { value: "dark", label: t("深色") },
     { value: "system", label: t("跟随系统") },
   ] as const satisfies ReadonlyArray<SegmentedOption<ThemeValue>>;
+
+  const { showThinking, setShowThinking } = useShowThinking();
+  const thinkingOptions = [
+    { value: "visible", label: t("显示") },
+    { value: "hidden", label: t("不显示") },
+  ] as const satisfies ReadonlyArray<SegmentedOption<ThinkingValue>>;
 
   // 语言一律用母语名展示，不随界面语言翻译
   const localeOptions = [
@@ -38,6 +46,18 @@ export function SettingsAppearance() {
             value={value}
             options={themeOptions}
             onChange={setTheme}
+          />
+        }
+      />
+      <SettingsRow
+        title={t("思考过程")}
+        description={t("在消息区展示模型的思考过程；隐藏后只保留回答与工具调用。")}
+        control={
+          <SegmentedControl
+            label={t("思考过程")}
+            value={showThinking ? "visible" : "hidden"}
+            options={thinkingOptions}
+            onChange={(next) => setShowThinking(next === "visible")}
           />
         }
       />

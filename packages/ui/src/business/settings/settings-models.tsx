@@ -1,8 +1,9 @@
 /** 模型设置：左侧供应商列表 + 右侧该供应商详情，两栏各自滚动 */
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
+import { Spinner } from "../../base/spinner";
 import type { ConfigDraft } from "../../hooks/use-config-draft";
 import type { DraftProvider } from "../../lib/config-draft";
 import { ProviderAddDialog } from "./provider-add-dialog";
@@ -26,7 +27,7 @@ function DraftPlaceholder({ loading }: { loading: boolean }) {
   if (loading) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
+        <Spinner className="size-4" />
         {t("加载中…")}
       </p>
     );

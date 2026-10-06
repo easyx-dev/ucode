@@ -4,7 +4,11 @@ import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { API_BASE_PATH, PLAN_IGNORED_CUSTOM_TYPE } from "@ucode/contracts";
+import {
+  API_BASE_PATH,
+  PERMISSION_DECISION_CUSTOM_TYPE,
+  PLAN_IGNORED_CUSTOM_TYPE,
+} from "@ucode/contracts";
 
 import { blocksOf, entryToDTO } from "../serialize";
 
@@ -26,13 +30,13 @@ describe("blocksOf 的 image 分支", () => {
 });
 
 describe("entryToDTO 的 custom 分支", () => {
-  const customEntry = (customType: string): SessionEntry => ({
+  const customEntry = (customType: string, data?: unknown): SessionEntry => ({
     type: "custom",
     id: "entry-1",
     parentId: null,
     timestamp: "2026-01-01T00:00:00.000Z",
     customType,
-    data: { at: "2026-01-01T00:00:00.000Z" },
+    data: data ?? { at: "2026-01-01T00:00:00.000Z" },
   });
 
   it("忽略计划的标记投影为 role custom + customType，且无正文", () => {
@@ -43,6 +47,56 @@ describe("entryToDTO 的 custom 分支", () => {
       customType: PLAN_IGNORED_CUSTOM_TYPE,
       createdAt: "2026-01-01T00:00:00.000Z",
     });
+  });
+
+  it("审批记录投影为带 permissionDecision 的 custom 条目", () => {
+    const data = {
+      tool: "bash",
+      subject: "git push origin main",
+      scope: "bash(git push *)",
+      decision: "allow_session",
+      sourceSessionId: "sub-1",
+      sourceDescription: "侦察影响面",
+    };
+
+    assert.deepEqual(entryToDTO(customEntry(PERMISSION_DECISION_CUSTOM_TYPE, data)), {
+      id: "entry-1",
+      role: "custom",
+      blocks: [],
+      customType: PERMISSION_DECISION_CUSTOM_TYPE,
+      permissionDecision: data,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("审批记录缺来源时不下发来源字段（主会话自身发起的审批就是这种）", () => {
+    const dto = entryToDTO(
+      customEntry(PERMISSION_DECISION_CUSTOM_TYPE, {
+        tool: "read",
+        subject: "/etc/hosts",
+        scope: "/etc/**",
+        decision: "allow_once",
+      }),
+    );
+
+    assert.deepEqual(dto?.permissionDecision, {
+      tool: "read",
+      subject: "/etc/hosts",
+      scope: "/etc/**",
+      decision: "allow_once",
+    });
+  });
+
+  it("审批记录字段缺失或决定值非法时整条不展示", () => {
+    const invalid = [
+      { tool: "bash", subject: "x", scope: "y" },
+      { tool: "bash", subject: "x", scope: "y", decision: "maybe" },
+      { tool: 1, subject: "x", scope: "y", decision: "deny" },
+    ];
+
+    for (const data of invalid) {
+      assert.equal(entryToDTO(customEntry(PERMISSION_DECISION_CUSTOM_TYPE, data)), null);
+    }
   });
 
   it("其它 customType 的扩展条目不展示", () => {

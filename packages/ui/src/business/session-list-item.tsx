@@ -4,9 +4,10 @@
  */
 import type { SessionSummary } from "@ucode/contracts";
 import { cn } from "cn";
-import { Archive, Bot, ChevronRight, Loader2, Pin } from "lucide-react";
+import { Archive, Bot, ChevronRight, Pin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
+import { Spinner } from "../base/spinner";
 import { sessionTitle } from "../lib/session";
 import { relativeTimeLabel } from "../lib/time";
 
@@ -89,7 +90,7 @@ export function SessionListItem({
           {/* 固定槽位：有没有指示器都占同样宽度，标题才能与父级文字稳定对齐；置顶针与未读点可并存 */}
           <span className="flex w-6 shrink-0 items-center justify-center gap-1">
             {session.running ? (
-              <Loader2 className="size-3 animate-spin text-muted-foreground" />
+              <Spinner className="size-3 text-muted-foreground" />
             ) : child ? (
               <Bot className="size-3 text-muted-foreground" />
             ) : (

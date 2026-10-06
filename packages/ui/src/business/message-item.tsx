@@ -1,56 +1,27 @@
 /**
- * 单条消息的内容渲染：用户气泡、assistant 内容段（正文 / 思考 / 图片 / 附件）与摘要 / 扩展条目。
- * 工具调用已由 chat-nodes 抽成独立节点，这里只渲染非工具内容；`trailing` 表示该段是否是来源消息的最后一段。
+ * 单条消息的内容渲染：用户消息、assistant 内容段（正文 / 思考 / 图片 / 附件）与摘要 / 扩展条目。
+ *
+ * 工具调用与思考区块已由 chat-nodes 抽成 activity 聚合行，这里只渲染正文 / 图片 / 附件；
+ * `trailing` 表示该段是否是来源消息的最后一段。
+ * 用户消息用浅底细边框而非反色气泡，操作与时刻悬停才现。
  */
 import { API_BASE_PATH } from "@ucode/contracts";
-import { Brain, ChevronRight, FileText, Pencil, Sparkles } from "lucide-react";
+import { FileText, Pencil, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../base/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
+import type { ChatFooter } from "../lib/chat-nodes";
 import { parseUserMessage } from "../lib/message-chips";
 import { isPlanIgnored } from "../lib/plan";
-import { durationLabel } from "../lib/time";
+import { clockLabel } from "../lib/time";
 import type { ChatItem, MessageBlock } from "../lib/types";
 import { ForkAction, MessageFooter } from "./message-footer";
-import { ThinkingIndicator } from "./thinking-indicator";
 
-function ThinkingBlock({ text, thinkingMs }: { text: string; thinkingMs?: number }) {
-  const { t } = useTranslation();
-
-  return (
-    <Collapsible className="my-2">
-      <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-        <Brain className="size-3.5" />
-        {t("思考过程")}
-        {thinkingMs !== undefined ? (
-          <span className="text-[11px] text-muted-foreground/70">{durationLabel(thinkingMs)}</span>
-        ) : null}
-        <ChevronRight className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-2 border-l-2 border-muted pl-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-          {text}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function BlockView({
-  block,
-  live,
-  thinkingMs,
-}: {
-  block: MessageBlock;
-  live?: boolean;
-  thinkingMs?: number;
-}) {
-  if (block.type === "thinking") return <ThinkingBlock text={block.text} thinkingMs={thinkingMs} />;
-  // 工具调用已由独立节点渲染，这里不再兜底
-  if (block.type === "toolCall") return null;
+function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
+  // 思考区块与工具调用已由 activity 聚合行渲染，这里不再兜底
+  if (block.type === "thinking" || block.type === "toolCall") return null;
   if (block.type === "image") {
     return (
       <a href={block.url} target="_blank" rel="noreferrer" className="my-2 inline-block">
@@ -90,7 +61,7 @@ function EditAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 self-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
       title={t("编辑并重新发送")}
       onClick={onClick}
     >
@@ -103,8 +74,7 @@ export function MessageItem({
   item,
   blocks,
   trailing = true,
-  turnEnd = true,
-  durationMs,
+  footer,
   onFork,
   onEdit,
   isLastUser,
@@ -114,10 +84,8 @@ export function MessageItem({
   blocks?: MessageBlock[];
   /** 是否为来源消息的最后一段；流式光标只挂在最后一段上 */
   trailing?: boolean;
-  /** 是否为「一轮回复」的最后一段；页脚、耗时与分叉入口据此只出现一次 */
-  turnEnd?: boolean;
-  /** 本轮回复的总耗时（毫秒） */
-  durationMs?: number;
+  /** 该轮页脚（模型 / 耗时与分叉入口）；只落在轮末那一行上，缺省不渲染 */
+  footer?: ChatFooter;
   /** 从该条消息分叉；只有主对话传入，子智能体嵌套视图不提供 */
   onFork?: (item: ChatItem) => void;
   /** 编辑该条用户消息并重发；成功后由事件刷新，返回是否已受理 */
@@ -160,7 +128,7 @@ export function MessageItem({
               // biome-ignore lint/a11y/noAutofocus: 点击编辑后焦点应直接落在待改写的输入区
               autoFocus
               rows={3}
-              className="w-full resize-y rounded-2xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -195,8 +163,13 @@ export function MessageItem({
     }
     return (
       <div className="group flex items-center justify-end gap-1">
-        {canEdit ? <EditAction onClick={startEdit} /> : null}
-        {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
+        <span className="shrink-0 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          {clockLabel(item.createdAt)}
+        </span>
+        <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          {canEdit ? <EditAction onClick={startEdit} /> : null}
+          {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
+        </span>
         <div className="flex max-w-[85%] flex-col items-end gap-1.5">
           {parsed.skill || parsed.contexts.length > 0 || parsed.attachments.length > 0 ? (
             <div className="flex flex-wrap justify-end gap-1.5">
@@ -244,7 +217,7 @@ export function MessageItem({
             </div>
           ) : null}
           {parsed.text ? (
-            <div className="rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
+            <div className="rounded-lg rounded-br-sm border border-border bg-muted/60 px-3 py-2 text-sm whitespace-pre-wrap text-foreground">
               {parsed.text}
             </div>
           ) : null}
@@ -272,18 +245,18 @@ export function MessageItem({
   }
 
   return (
-    <div className="min-w-0 flex-1 space-y-1">
+    <div className="group min-w-0 flex-1 space-y-2">
       {content.map((block, index) => (
         <BlockView
           // biome-ignore lint/suspicious/noArrayIndexKey: blocks 是按顺序追加的内容块，没有自然 id，位置即身份
           key={`${item.id}-${index}`}
           block={block}
           live={item.live && trailing && index === content.length - 1}
-          thinkingMs={item.timing?.thinkingMs}
         />
       ))}
-      {item.live && content.length === 0 ? <ThinkingIndicator /> : null}
-      {turnEnd ? <MessageFooter item={item} durationMs={durationMs} onFork={onFork} /> : null}
+      {footer ? (
+        <MessageFooter item={footer.item} durationMs={footer.durationMs} onFork={onFork} />
+      ) : null}
     </div>
   );
 }

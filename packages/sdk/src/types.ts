@@ -7,8 +7,21 @@ export type ChatItemTiming = {
   thinkingMs?: number;
 };
 
-/** 界面上的一条消息：live 表示还在流式生成中，timing 为本次运行测得的耗时 */
-export type ChatItem = MessageDTO & { live?: boolean; timing?: ChatItemTiming };
+/**
+ * 界面上的一条消息。
+ *
+ * `uid` 是跨「乐观条目 → 权威条目」不变的界面标识：`message_end` 会用服务端消息整体替掉乐观条目，
+ * `id` 随之从 `live-assistant-1` 换成服务端 id，而列表行、展开状态与滚动位置都挂在以它为源的 key 上，
+ * 直接拿 `id` 做 key 会在每次落定时把整行卸载重建（看得见的闪一下）。
+ */
+export type ChatItem = MessageDTO & {
+  /** 仍在流式生成中 */
+  live?: boolean;
+  /** 本次运行测得的耗时 */
+  timing?: ChatItemTiming;
+  /** 不变的界面标识；缺失时以 `id` 当值（历史快照里的条目就是如此） */
+  uid?: string;
+};
 
 /**
  * 一次子智能体委派在界面上的进度：`toolCallId` 为键，嵌套内容是子会话自己的消息。

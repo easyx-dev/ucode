@@ -21,7 +21,7 @@ import {
   patch,
   type SessionStreamState,
 } from "./engine";
-import { appendUserItem, removeUserItem } from "./reducer";
+import { appendUserItem, isLiveUid, removeUserItem } from "./reducer";
 
 export type { SessionStreamState } from "./engine";
 
@@ -79,11 +79,21 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       const snapshot = await deps.apis.messages.list(sessionId);
       if (token !== engine.token) return;
 
+      // 位置对齐地沿用旧条目的 uid：首条消息受理后会用权威条目替掉乐观消息，而重连时的重取快照
+      // 是同一批消息的权威版本。uid 一丢，界面行的 key 就变，整行会被卸载重建（看得见地闪一下）。
+      //
+      // 只搬运乐观条目的 uid：服务端条目一律用自己的条目 id（天然唯一且跨快照稳定）。否则插入一条
+      // 记录（审批、压缩摘要）就会把后面的 uid 整体错位，插入点那一条还会与插入项拿到同一个 uid。
+      const previous = engine.store.getState().items;
       patch(engine, {
-        items: snapshot.messages.map((message) => ({
-          ...message,
-          live: message.id === snapshot.liveMessageId,
-        })),
+        items: snapshot.messages.map((message, index) => {
+          const inherited = previous[index]?.uid;
+          return {
+            ...message,
+            live: message.id === snapshot.liveMessageId,
+            uid: isLiveUid(inherited) ? inherited : message.id,
+          };
+        }),
         running: snapshot.running,
         pending: false,
         error: null,

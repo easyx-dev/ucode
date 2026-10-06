@@ -1,6 +1,6 @@
 /**
- * 单次工具调用的展示：标题 + 入参摘要同行，展开后给输出 / diff。
- * 不画外框，由调用方（ToolCallGroup）提供卡片容器与分隔。
+ * 单次工具调用的展示：标题 + 入参摘要压在一行（32px 高），展开后才出输出 / diff。
+ * 不自带底色与外框，直接铺在页面底色上，靠 hover 高亮说明可点。
  */
 import { cn } from "cn";
 import type { TFunction } from "i18next";
@@ -8,7 +8,6 @@ import {
   Bot,
   CheckCircle2,
   ChevronRight,
-  CircleDashed,
   FilePlus2,
   FileText,
   FolderTree,
@@ -23,6 +22,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
+import { Spinner } from "../base/spinner";
 import type { ToolEntry } from "../lib/chat-nodes";
 import type { DiffLine } from "../lib/text-diff";
 import { type ToolInput, type ToolKind, toolDiff, toolInputOf, toolKindOf } from "../lib/tool-view";
@@ -39,7 +39,8 @@ const KIND_ICON: Record<ToolKind, LucideIcon> = {
   other: Wrench,
 };
 
-const titleOf = (name: string, t: TFunction): string => {
+/** 工具名的中文标题；上下文分组与聚合摘要也要用，故对外导出 */
+export const toolTitleOf = (name: string, t: TFunction): string => {
   switch (name) {
     case "read":
       return t("读取");
@@ -48,7 +49,7 @@ const titleOf = (name: string, t: TFunction): string => {
     case "edit":
       return t("编辑");
     case "bash":
-      return t("运行");
+      return t("Shell");
     case "grep":
       return t("搜索");
     case "find":
@@ -75,12 +76,12 @@ const titleOf = (name: string, t: TFunction): string => {
   }
 };
 
-function InputLabel({ input }: { input: ToolInput }) {
+export function InputLabel({ input }: { input: ToolInput }) {
   switch (input.type) {
     case "path":
       return (
         <>
-          <span className="truncate font-mono text-xs text-foreground/80" title={input.path}>
+          <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.path}>
             {input.path}
           </span>
           {input.range ? (
@@ -90,14 +91,16 @@ function InputLabel({ input }: { input: ToolInput }) {
       );
     case "command":
       return (
-        <span className="truncate font-mono text-xs text-foreground/80" title={input.command}>
+        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.command}>
           {input.command}
         </span>
       );
     case "pattern":
       return (
         <>
-          <span className="shrink-0 font-mono text-xs text-foreground/80">/{input.pattern}/</span>
+          <span className="shrink-0 font-mono text-xs text-muted-foreground/70">
+            /{input.pattern}/
+          </span>
           {input.scope ? (
             <span className="truncate text-[11px] text-muted-foreground" title={input.scope}>
               {input.scope}
@@ -107,13 +110,13 @@ function InputLabel({ input }: { input: ToolInput }) {
       );
     case "url":
       return (
-        <span className="truncate font-mono text-xs text-foreground/80" title={input.url}>
+        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.url}>
           {input.url}
         </span>
       );
     case "query":
       return (
-        <span className="truncate font-mono text-xs text-foreground/80" title={input.query}>
+        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.query}>
           {input.query}
         </span>
       );
@@ -126,7 +129,7 @@ function OutputView({ text, isError }: { text: string; isError?: boolean }) {
   return (
     <pre
       className={cn(
-        "max-h-96 overflow-auto rounded-md bg-card p-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap",
+        "max-h-96 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap",
         isError && "text-destructive",
       )}
     >
@@ -152,7 +155,7 @@ function DiffView({ lines }: { lines: DiffLine[] }) {
 
   return (
     <>
-      <div className="max-h-96 overflow-auto rounded-md bg-card py-1 font-mono text-xs leading-relaxed">
+      <div className="max-h-96 overflow-auto rounded-md bg-muted/50 py-1 font-mono text-xs leading-relaxed">
         {rows.map((row) => (
           <div
             key={row.key}
@@ -185,13 +188,11 @@ function DiffView({ lines }: { lines: DiffLine[] }) {
 
 type ToolCallProps = {
   entry: ToolEntry;
-  /** 初始是否展开；分组内展示具体时传 true */
-  defaultOpen?: boolean;
   /** 追加在输出下方的内容（如子智能体内联进度） */
   children?: ReactNode;
 };
 
-export function ToolCall({ entry, defaultOpen, children }: ToolCallProps) {
+export function ToolCall({ entry, children }: ToolCallProps) {
   const { t } = useTranslation();
   const Icon = KIND_ICON[toolKindOf(entry.name)];
   const input = toolInputOf(entry.name, entry.args);
@@ -203,19 +204,18 @@ export function ToolCall({ entry, defaultOpen, children }: ToolCallProps) {
   const diff = useMemo(() => toolDiff(entry.name, entry.args), [entry.name, entry.args]);
   const output = (entry.result ?? "").trimEnd();
 
-  // 运行中 / 出错时若无人工干预则自动展开；用户点过之后以用户的选择为准
-  const [userOpen, setUserOpen] = useState<boolean | null>(defaultOpen ? true : null);
-  const open = userOpen ?? Boolean(!defaultOpen && (entry.running || entry.isError));
+  // 一律默认折叠：失败与执行中由状态图标提示，要不要看细节由用户决定
+  const [open, setOpen] = useState(false);
 
   const hasBody = diff !== null || showArgs || output !== "" || Boolean(children);
   const statusLabel = entry.running ? t("执行中") : entry.isError ? t("失败") : t("完成");
 
   return (
-    <Collapsible open={open} onOpenChange={setUserOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
+    <Collapsible className="group/tool" open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="group flex h-8 w-full items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 text-xs text-muted-foreground">{titleOf(entry.name, t)}</span>
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="shrink-0 text-xs text-muted-foreground">{toolTitleOf(entry.name, t)}</span>
+        <span className="flex min-w-0 shrink items-center gap-1.5">
           <InputLabel input={input} />
         </span>
         <span
@@ -225,7 +225,7 @@ export function ToolCall({ entry, defaultOpen, children }: ToolCallProps) {
           title={statusLabel}
         >
           {entry.running ? (
-            <CircleDashed className="size-3.5 animate-spin text-muted-foreground" />
+            <Spinner className="text-muted-foreground" />
           ) : entry.isError ? (
             <TriangleAlert className="size-3.5 text-destructive" />
           ) : (
@@ -234,17 +234,17 @@ export function ToolCall({ entry, defaultOpen, children }: ToolCallProps) {
         </span>
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+            "size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/tool:opacity-100 group-data-[state=open]:opacity-100",
             open && "rotate-90",
           )}
         />
       </CollapsibleTrigger>
 
       <CollapsibleContent>
-        <div className="space-y-2 border-t border-border px-3 py-2">
+        <div className="space-y-2 py-1 pr-1.5 pl-6">
           {diff !== null ? <DiffView lines={diff} /> : null}
           {showArgs ? (
-            <pre className="max-h-48 overflow-auto rounded-md bg-card p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+            <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">
               {JSON.stringify(args, null, 2)}
             </pre>
           ) : null}

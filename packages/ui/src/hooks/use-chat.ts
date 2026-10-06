@@ -19,8 +19,6 @@ export type ChatController = {
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents: SubagentStreams;
   streaming: boolean;
-  /** 已发送、还没出现任何生成内容：消息区尾部显示等待指示 */
-  pending: boolean;
   /** 当前语言渲染的错误文案 */
   error: string | null;
   loadingHistory: boolean;
@@ -110,9 +108,8 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
   return {
     items: stream.items,
     subagents: stream.subagents,
+    // 在途的三种情况合并成一个「进行中」：列表尾部据此显示工作中提示
     streaming: stream.running || sending || stream.pending,
-    // 活动事件可能先于 prompt 回执到达，此时 running 已接手，pending 不应再显示
-    pending: stream.pending && !stream.running,
     error,
     loadingHistory: stream.loadingHistory,
     send,

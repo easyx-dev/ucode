@@ -4,9 +4,10 @@
  * 导航底部的动作区（取消 / 保存并生效）是草稿模式下唯一始终可见的提交入口。
  */
 import { cn } from "cn";
-import { ArrowLeft, Loader2, type LucideIcon } from "lucide-react";
+import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
+import { Spinner } from "../../base/spinner";
 import {
   SETTINGS_GROUP_IDS,
   SETTINGS_GROUP_SECTIONS,
@@ -91,7 +92,7 @@ function SaveActions({
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-3">
       <Button className="w-full" onClick={onSave} disabled={saving || loading}>
-        {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+        {saving ? <Spinner className="size-4" /> : null}
         {t("保存并生效")}
       </Button>
       <Button className="w-full" variant="ghost" onClick={onClose} disabled={saving}>
@@ -170,7 +171,7 @@ function MobileNav({
             {t("取消")}
           </Button>
           <Button size="sm" onClick={onSave} disabled={saving || loading}>
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {saving ? <Spinner className="size-3.5" /> : null}
             {t("保存")}
           </Button>
         </div>
