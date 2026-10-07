@@ -7,6 +7,8 @@ import {
   GitFork,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   RefreshCw,
   Settings2,
 } from "lucide-react";
@@ -42,6 +44,10 @@ type ChatHeaderProps = {
   onToggleSidebar?: () => void;
   /** 侧栏当前是否收起；决定切换按钮的图标 */
   sidebarCollapsed?: boolean;
+  /** 展开工作台（右侧第三栏）；移动端唤出抽屉 */
+  onToggleWorkbench?: () => void;
+  /** 工作台当前是否展开 */
+  workbenchOpen?: boolean;
   /** 新建任务（顶栏的 + 入口） */
   onNewTask?: () => void;
 };
@@ -60,6 +66,8 @@ export function ChatHeader({
   onOpenUsage,
   onToggleSidebar,
   sidebarCollapsed,
+  onToggleWorkbench,
+  workbenchOpen,
   onNewTask,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
@@ -188,6 +196,28 @@ export function ChatHeader({
           </TooltipTrigger>
           <TooltipContent>{t("按当前配置重建运行时，正在生成的会话本轮结束后切换")}</TooltipContent>
         </Tooltip>
+
+        {/* 工作台开关放在最右，与侧栏开关（最左）对称 */}
+        {onToggleWorkbench ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title={workbenchOpen ? t("收起工作台") : t("打开工作台")}
+                onClick={onToggleWorkbench}
+              >
+                {workbenchOpen ? (
+                  <PanelRightClose className="size-4" />
+                ) : (
+                  <PanelRightOpen className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{workbenchOpen ? t("收起工作台") : t("打开工作台")}</TooltipContent>
+          </Tooltip>
+        ) : null}
       </div>
     </header>
   );

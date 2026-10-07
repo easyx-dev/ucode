@@ -20,8 +20,18 @@ import type {
   FsListResponse,
   FsMkdirRequest,
   FsMkdirResponse,
+  FsReadRequest,
+  FsReadResponse,
   FsSearchRequest,
   FsSearchResponse,
+  GitDiffRequest,
+  GitDiffResponse,
+  GitLogRequest,
+  GitLogResponse,
+  GitShowRequest,
+  GitShowResponse,
+  GitStatusRequest,
+  GitStatusResponse,
   GoalResponse,
   GoalSetRequest,
   InteractionListResponse,
@@ -167,6 +177,16 @@ export const createApis = (options: ApisOptions = {}) => {
       search: (body: FsSearchRequest = {}) => transport.post<FsSearchResponse>("fs/search", body),
       mkdir: (path: string) =>
         transport.post<FsMkdirResponse>("fs/mkdir", { path } satisfies FsMkdirRequest),
+      /** 读单个文件内容（预览器用）；`maxBytes` 是愿意接收的内联体积 */
+      read: (body: FsReadRequest) => transport.post<FsReadResponse>("fs/read", body),
+    },
+    git: {
+      /** 仓库状态与分组的变更列表；不在仓库内时 `isRepo` 为 false */
+      status: (body: GitStatusRequest) => transport.post<GitStatusResponse>("git/status", body),
+      /** 单文件 diff；`source` 选工作区 / index / 某次提交 */
+      diff: (body: GitDiffRequest) => transport.post<GitDiffResponse>("git/diff", body),
+      log: (body: GitLogRequest) => transport.post<GitLogResponse>("git/log", body),
+      show: (body: GitShowRequest) => transport.post<GitShowResponse>("git/show", body),
     },
     commands: {
       /** 列出可用的提示词命令与技能（按会话 / cwd 解析目录） */

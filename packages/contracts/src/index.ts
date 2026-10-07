@@ -17,6 +17,8 @@ export * from "./envelope";
 export * from "./events";
 export * from "./fs/input";
 export * from "./fs/output";
+export * from "./git/input";
+export * from "./git/output";
 export * from "./goals/input";
 export * from "./goals/output";
 export * from "./health/output";

@@ -151,6 +151,28 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * 语法高亮的着色变量：只给 shiki 的高亮结果用（内联 `style="color: var(--code-*)"`），
+ * 既不做成 Tailwind utility 也不用于常规组件。取值全部来自上面的语义 token，
+ * 深浅色自动跟随 `.dark`，映射口径见 DESIGN.md「语法高亮」。
+ */
+:root {
+  --code-foreground: var(--foreground);
+  --code-background: transparent;
+  --code-comment: var(--muted-foreground);
+  --code-punctuation: var(--muted-foreground);
+  --code-keyword: var(--chart-4);
+  --code-string: var(--chart-2);
+  --code-number: var(--chart-3);
+  --code-function: var(--chart-1);
+  --code-type: var(--chart-5);
+  --code-tag: var(--chart-4);
+  --code-property: var(--foreground);
+  --code-variable: var(--foreground);
+  --code-link: var(--chart-1);
+  --code-invalid: var(--destructive);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

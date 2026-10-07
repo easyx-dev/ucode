@@ -81,6 +81,70 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 - 内容卡内不要再用 `bg-card` 套一层同类卡片，改用 `bg-muted/50` 或只加 `ring`（否则白叠白分不出层）
 - 阴影只给真正浮起的层（弹层、对话框）用默认值，其余不写 `shadow-*`
 
+### 分栏
+
+三栏布局（侧栏 | 对话区 | 工作台）用 shadcn 的 `Resizable`（`base/resizable.tsx`，底层
+`react-resizable-panels`）。尺寸一律用**像素**（库把数字当像素、字符串当百分比），栏宽不随窗口缩放：
+
+| 位置 | 取法 |
+| --- | --- |
+| 侧栏 | 200–400，默认 288；**收起时不参与分栏**（`useIsDesktop` + 状态决定是否渲染面板，不用 CSS 隐藏，隐藏后面板仍占份额） |
+| 对话区 | 不设尺寸，占剩余；`flex-1 min-w-0`，上下留 `my-2`，水平间隙交给分隔条 |
+| 工作台 | 320–720，默认 420；与对话区同形的内容卡（`bg-card` + `md:rounded-xl` + `md:border`），外侧留 `py-2 pr-2` |
+| 开关 | 侧栏按钮在最左、工作台按钮在最右（对话区右上角），图标随状态切换（展开 / 收起） |
+| 持久化 | 按栏记宽度（像素），键 `<slug>-panels-<组名>`；只在用户真正拖动时落盘，收起的栏位不会被清掉 |
+
+- 分隔条**不画线**：栏与栏之间靠底色差分层，分隔本身不可见。命中区就是栏间距——侧栏侧 12px、
+  工作台侧 8px（与卡片自身的 `m-2` 对齐）、文件树与预览之间 6px，按 `className` 逐条给；
+  悬停提示只有 `cursor-col-resize`，键盘聚焦时给 `focus-visible:bg-ring/30`，否则键盘用户看不到焦点在哪
+- 需要更明显的悬停 / 拖拽态时挂库给的 `data-separator` 状态属性，不要改回常驻的线
+- 需要一条可见分界时用**面板自己的边框**，而不是分隔条：文件树列自带 `border-r`
+- 拖拽、双击复位与键盘（方向键）由库提供；不自己实现命中区与光标
+- 恢复宽度用每个面板自己的 `defaultSize`，不用库的 `defaultLayout`：后者只在「键数等于当前面板数」时才生效，
+  收起某栏后面板数会变，记忆会被静默忽略
+
+### 交互嵌套
+
+- 一行本身可点时用 `button`（或 Radix 触发器），**里面不能再放可交互元素**：需要第二个动作（如
+  「点这个路径打开预览」）就把动作做成同级按钮，让触发器的命中区缩到「图标 + 名称」那一截；
+  把按钮或 `role="button"` 套进按钮里会产生无效 HTML，读屏与键盘焦点也会错乱
+
+### 面板内部
+
+工作台（右侧第三栏）是「标签条 + 左树右内容」的两栏工具，三处条状区高度与列表行高统一：
+
+| 区域 | 取法 |
+| --- | --- |
+| 标签条 | 高 36px（与对话区头部同档），`border-b border-border`，底色跟面板（`bg-card`）；最左是树面板开关，最右是收起 |
+| 标签 | 两个常驻标签，`rounded-lg` 药丸：激活 `bg-muted text-foreground`，未激活 `text-muted-foreground hover:bg-muted/60` |
+| 左列（树面板） | 宽 200–360（默认 200）；顶部一行控件（改动：改动/历史切换 + 刷新；文件：根名 + 筛选 + 刷新），列表行高 28px、`rounded-lg`、选中 `bg-muted` |
+| 左列分界 | 树面板自己的 `border-r`，不用分隔条（分隔条不画线） |
+| 右列（内容） | 工具条（36px）与滚动内容；diff 用行号 + 增删底色，不叠语法高亮 |
+| 空态 | 垂直居中：图标 `size-7 text-muted-foreground/60` + 主文案 `text-sm font-medium` + 说明 `text-xs` |
+
+- 目录行只用折角符（`ChevronRight` 转 90°），不叠文件夹图标；文件按类型给图标（`lib/file-icons.ts` 的映射），不引图标资源
+- 图标一律 `size-3.5 text-muted-foreground`
+- 右列是「结果」、左列是「入口」：右列未选中时给空态，不做成隐藏入口的空白
+
+### 语法高亮
+
+代码高亮用 shiki（core + JS 引擎 + 按需语言），颜色不写十六进制，而是映射到 `theme.css` 里的
+`--code-*` 变量；变量取值全部来自已有语义 token，因此深浅色自动跟随。
+
+| 变量 | 取自 | 用于 |
+| --- | --- | --- |
+| `--code-comment` / `--code-punctuation` | `muted-foreground` | 注释、标点、运算符 |
+| `--code-keyword` / `--code-tag` | `chart-4` | 关键字、标签 |
+| `--code-string` | `chart-2` | 字符串 |
+| `--code-number` | `chart-3` | 数字与常量 |
+| `--code-function` / `--code-link` | `chart-1` | 函数、链接 |
+| `--code-type` | `chart-5` | 类型与类 |
+| `--code-property` / `--code-variable` | `foreground` | 变量与属性 |
+| `--code-invalid` | `destructive` | 语法错误 |
+
+- 这是项目里唯一把颜色用于「状态」之外的场景；新增语法类一律先复用上表，不新增色相
+- diff 行不叠语法色：增删行用 `success` / `destructive` 底色与文字色，两套着色叠在一起反而更难读
+
 ## 圆角
 
 基准 `--radius: 0.75rem`（12px），其余档位在 `@theme inline` 中由它派生。组件按下表取档，不要临时写 `rounded-[7px]`：

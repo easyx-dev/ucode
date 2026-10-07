@@ -29,6 +29,10 @@ export const errorMessageKeys = {
   path_exists: "目录已存在：{{path}}",
   mkdir_failed: "创建目录失败：{{path}}",
   project_not_found: "项目不存在：{{path}}",
+  not_a_file: "不是普通文件：{{path}}",
+  not_a_repository: "目录不在 git 仓库内：{{path}}",
+  git_unavailable: "未找到 git 可执行文件",
+  git_failed: "git 执行失败",
   image_invalid: "图片无效：{{reason}}",
   payload_too_large: "附件超过大小上限（{{max}}）",
 } as const satisfies Record<ErrorCode, string>;

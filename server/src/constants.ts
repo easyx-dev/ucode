@@ -115,6 +115,30 @@ export const CONTEXT_MAX_TOTAL_BYTES = 512 * 1024;
 /** fs/search 单次扫描的条目上限（交给 pi find 的 limit）；超出即标注截断 */
 export const FS_SEARCH_MAX_SCAN = 20_000;
 
+/** fs/read 判定二进制时嗅探的字节数：这段里出现 NUL 即当二进制 */
+export const FS_BINARY_SNIFF_BYTES = 8 * 1024;
+
+/** fs/read 内联文本的字节上限，超出按上限截断 */
+export const FS_READ_TEXT_MAX_BYTES = 1024 * 1024;
+
+/** fs/read 内联 base64 的字节上限，超出整块不返回（图 / PDF / Word 预览用） */
+export const FS_READ_BINARY_MAX_BYTES = 5 * 1024 * 1024;
+
+/** git 命令的单次执行超时；仓库过大或磁盘卡死时不让请求悬着 */
+export const GIT_TIMEOUT_MS = 10_000;
+
+/** git 命令的输出缓冲上限 */
+export const GIT_MAX_BUFFER = 16 * 1024 * 1024;
+
+/** 单次 diff 返回的行数上限（hunk 内容行，不含头部），超出即截断 */
+export const GIT_DIFF_MAX_LINES = 5_000;
+
+/** git/status 返回的变更条目上限 */
+export const GIT_STATUS_MAX_FILES = 1_000;
+
+/** git/show 返回的文件条数上限 */
+export const GIT_SHOW_MAX_FILES = 500;
+
 /** fs/search 跳过的目录名 */
 export const FS_SEARCH_SKIP_DIRS = ["node_modules", ".git", "dist", ".next", ".turbo", ".cache"];
 

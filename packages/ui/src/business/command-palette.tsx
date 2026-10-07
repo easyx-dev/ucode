@@ -14,6 +14,7 @@ import {
   List,
   MessageSquare,
   PanelLeft,
+  PanelsTopLeft,
   Search,
   Settings2,
   Sparkles,
@@ -61,7 +62,9 @@ type CommandPaletteProps = {
   onOpenWorkspace: () => void;
   onOpenSettings: () => void;
   onToggleSidebar: () => void;
-  /** 打开文件：查看器预留，当前由上层兜底 */
+  /** 展开 / 收起工作台（右侧第三栏） */
+  onToggleWorkbench: () => void;
+  /** 打开文件：交给上层的工作台预览器 */
   onOpenFile: (path: string) => void;
 };
 
@@ -93,6 +96,7 @@ export function CommandPalette({
   onOpenWorkspace,
   onOpenSettings,
   onToggleSidebar,
+  onToggleWorkbench,
   onOpenFile,
 }: CommandPaletteProps) {
   const { t } = useTranslation();
@@ -170,6 +174,13 @@ export function CommandPalette({
       },
       { id: "op:settings", label: t("设置"), icon: Settings2, run: onOpenSettings },
       {
+        id: "op:workbench",
+        label: t("切换工作台"),
+        hint: t("改动 / 文件"),
+        icon: PanelsTopLeft,
+        run: onToggleWorkbench,
+      },
+      {
         id: "op:sidebar",
         label: t("切换侧边栏"),
         icon: PanelLeft,
@@ -232,6 +243,7 @@ export function CommandPalette({
     onOpenWorkspace,
     onOpenSettings,
     onToggleSidebar,
+    onToggleWorkbench,
     onRunBuiltin,
     onSelectSession,
     onOpenFile,

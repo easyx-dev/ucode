@@ -29,6 +29,10 @@ export default {
   "目录已存在：{{path}}": "Directory already exists: {{path}}",
   "创建目录失败：{{path}}": "Failed to create directory: {{path}}",
   "项目不存在：{{path}}": "Project does not exist: {{path}}",
+  "不是普通文件：{{path}}": "Not a regular file: {{path}}",
+  "目录不在 git 仓库内：{{path}}": "Directory is not inside a git repository: {{path}}",
+  "未找到 git 可执行文件": "No git executable found",
+  "git 执行失败": "git command failed",
   "图片无效：{{reason}}": "Invalid image: {{reason}}",
   "附件超过大小上限（{{max}}）": "Attachment exceeds the size limit ({{max}})",
 };

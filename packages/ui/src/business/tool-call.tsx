@@ -24,8 +24,10 @@ import { useTranslation } from "react-i18next";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
 import { Spinner } from "../base/spinner";
 import type { ToolEntry } from "../lib/chat-nodes";
-import type { DiffLine } from "../lib/text-diff";
+import { resolveFromCwd } from "../lib/path";
 import { type ToolInput, type ToolKind, toolDiff, toolInputOf, toolKindOf } from "../lib/tool-view";
+import { useWorkbench } from "../provider/workbench";
+import { type DiffRow, type DiffRowType, DiffView } from "./diff-view";
 
 const KIND_ICON: Record<ToolKind, LucideIcon> = {
   read: FileText,
@@ -74,19 +76,45 @@ export const toolTitleOf = (name: string, t: TFunction): string => {
   }
 };
 
+/**
+ * 入参里的路径：工作台可用时做成按钮，点开右侧预览（路径相对会话工作目录解析）。
+ * 合成在一个完整路径上，因为它只是展示元素，不参与布局。
+ */
+function PathLabel({ path, range }: { path: string; range?: string }) {
+  const { t } = useTranslation();
+  const workbench = useWorkbench();
+  const text = (
+    <span className="truncate font-mono text-xs text-muted-foreground/70" title={path}>
+      {path}
+    </span>
+  );
+  return (
+    <>
+      {workbench ? (
+        <button
+          type="button"
+          className="truncate rounded-sm text-left font-mono text-xs text-muted-foreground/70 hover:text-foreground hover:underline"
+          title={t("预览 {{path}}", { path })}
+          onClick={(event) => {
+            // 工具行本身可展开，路径点击不应该顺带把行打开 / 收起
+            event.stopPropagation();
+            workbench.openPreview(resolveFromCwd(workbench.cwd, path));
+          }}
+        >
+          {text}
+        </button>
+      ) : (
+        text
+      )}
+      {range ? <span className="shrink-0 font-mono text-xs text-warning">:{range}</span> : null}
+    </>
+  );
+}
+
 export function InputLabel({ input }: { input: ToolInput }) {
   switch (input.type) {
     case "path":
-      return (
-        <>
-          <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.path}>
-            {input.path}
-          </span>
-          {input.range ? (
-            <span className="shrink-0 font-mono text-xs text-warning">:{input.range}</span>
-          ) : null}
-        </>
-      );
+      return <PathLabel path={input.path} range={input.range} />;
     case "command":
       return (
         <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.command}>
@@ -136,53 +164,9 @@ function OutputView({ text, isError }: { text: string; isError?: boolean }) {
   );
 }
 
-/** 单次展开最多渲染的 diff 行数；超出后折叠，避免大文件写入撑出上千个节点 */
-const MAX_DIFF_LINES = 200;
-
-function DiffView({ lines }: { lines: DiffLine[] }) {
-  const { t } = useTranslation();
-  const [showAll, setShowAll] = useState(false);
-  if (lines.length === 0) {
-    return <p className="text-xs text-muted-foreground">{t("（无内容）")}</p>;
-  }
-
-  const visible = showAll ? lines : lines.slice(0, MAX_DIFF_LINES);
-  const hidden = lines.length - visible.length;
-  // diff 行无自然 id：位置 + 类型组合即身份；先生成 key 再渲染，避免直接用数组下标作 key
-  const rows = visible.map((line, position) => ({ key: `${position}:${line.type}`, line }));
-
-  return (
-    <>
-      <div className="max-h-96 overflow-auto rounded-md bg-muted/50 py-1 font-mono text-xs leading-relaxed">
-        {rows.map((row) => (
-          <div
-            key={row.key}
-            className={cn(
-              "flex px-2 whitespace-pre-wrap",
-              row.line.type === "add" && "bg-success/10 text-success",
-              row.line.type === "del" && "bg-destructive/10 text-destructive",
-              row.line.type === "ctx" && "text-muted-foreground",
-            )}
-          >
-            <span className="w-3 shrink-0 select-none" aria-hidden>
-              {row.line.type === "add" ? "+" : row.line.type === "del" ? "-" : " "}
-            </span>
-            <span className="min-w-0 flex-1 break-words">{row.line.text || " "}</span>
-          </div>
-        ))}
-      </div>
-      {hidden > 0 ? (
-        <button
-          type="button"
-          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-          onClick={() => setShowAll(true)}
-        >
-          {t("显示全部 {{value}} 行", { value: lines.length })}
-        </button>
-      ) : null}
-    </>
-  );
-}
+/** 工具 diff 只有行类型与文本，交给统一的 `DiffView` 铺开（行号由 git 面板传入） */
+const toDiffRows = (lines: readonly { type: DiffRowType; text: string }[]): DiffRow[] =>
+  lines.map((line) => ({ type: line.type, text: line.text }));
 
 type ToolCallProps = {
   entry: ToolEntry;
@@ -210,9 +194,14 @@ export function ToolCall({ entry, children }: ToolCallProps) {
 
   return (
     <Collapsible className="group/tool" open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group flex h-8 w-full items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
-        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 text-xs text-muted-foreground">{toolTitleOf(entry.name, t)}</span>
+      {/* 工具名那一截是展开触发器；路径按钮是它的兄弟而非子元素——按钮里不能再套按钮 */}
+      <div className="flex h-8 w-full items-center gap-2">
+        <CollapsibleTrigger className="group flex shrink-0 items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
+          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {toolTitleOf(entry.name, t)}
+          </span>
+        </CollapsibleTrigger>
         <span className="flex min-w-0 shrink items-center gap-1.5">
           <InputLabel input={input} />
         </span>
@@ -236,11 +225,13 @@ export function ToolCall({ entry, children }: ToolCallProps) {
             open && "rotate-90",
           )}
         />
-      </CollapsibleTrigger>
+      </div>
 
       <CollapsibleContent>
         <div className="space-y-2 py-1 pr-1.5 pl-6">
-          {diff !== null ? <DiffView lines={diff} /> : null}
+          {diff !== null ? (
+            <DiffView rows={toDiffRows(diff)} className="max-h-96 overflow-y-auto" />
+          ) : null}
           {showArgs ? (
             <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">
               {JSON.stringify(args, null, 2)}

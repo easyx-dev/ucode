@@ -51,6 +51,11 @@
 | POST | `/api/v1/fs/list` | 浏览目录条目 |
 | POST | `/api/v1/fs/search` | 按名模糊检索文件（受跳目录 / 深度 / 条数约束） |
 | POST | `/api/v1/fs/mkdir` | 新建目录（单层） |
+| POST | `/api/v1/fs/read` | 读取单个文件的内容（文本内联，二进制给 base64） |
+| POST | `/api/v1/git/status` | 仓库状态与分组的变更列表（只读） |
+| POST | `/api/v1/git/diff` | 单文件的结构化 diff（工作区 / index / 某次提交） |
+| POST | `/api/v1/git/log` | 提交历史（倒序分页） |
+| POST | `/api/v1/git/show` | 单次提交的元信息与改动文件列表 |
 | POST | `/api/v1/mcp/list` | 列出已配置的 MCP 服务器 |
 | POST | `/api/v1/mcp/upsert` | 按 name 覆盖写入 MCP 服务器 |
 | POST | `/api/v1/mcp/delete` | 按 name 删除 MCP 服务器 |
@@ -877,6 +882,123 @@
 | --- | --- | --- | --- |
 | `path` | string | 是 | 已创建目录的绝对路径 |
 
+### POST /api/v1/fs/read
+
+读取单个文件的内容（文本内联，二进制给 base64）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `maxBytes` | integer（>0，≤8388608） | 否 | — | — |
+
+**响应类型**：`FsReadResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `path` | string | 是 | 已归一化的绝对路径 |
+| `name` | string | 是 | 文件名字（路径末段），供预览器 tab 直接使用 |
+| `size` | number | 是 | 字节数 |
+| `updatedAt` | string | 是 | — |
+| `kind` | "text" \| "binary" | 是 | — |
+| `text` | string | 否 | UTF-8 文本；`kind` 为 `binary` 或超出文本内联上限时缺省 |
+| `base64` | string | 否 | base64 字节；`kind` 为 `text` 或超出二进制内联上限时缺省 |
+| `truncated` | boolean | 是 | 内容是否因体积上限被截断（二进制超限时为 true 且整块不给） |
+
+## git（`git`）
+
+### POST /api/v1/git/status
+
+仓库状态与分组的变更列表（只读）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`GitStatusResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `isRepo` | boolean | 是 | 目标目录是否在 git 仓库内；false 时其余字段缺省 |
+| `repoRoot` | string | 否 | 仓库根绝对路径 |
+| `branch` | string | 否 | 当前分支名；分离头指针时为空字符串 |
+| `upstream` | string | 否 | 上游跟踪分支（如 `origin/main`），未设置时缺省 |
+| `ahead` | number | 否 | 相对上游领先 / 落后的提交数；无上游时缺省 |
+| `behind` | number | 否 | — |
+| `staged` | [GitFileChange](#gitfilechange)[] | 是 | index 相对 HEAD 的改动 |
+| `unstaged` | [GitFileChange](#gitfilechange)[] | 是 | 工作区相对 index 的改动 |
+| `untracked` | [GitFileChange](#gitfilechange)[] | 是 | — |
+| `conflicted` | [GitFileChange](#gitfilechange)[] | 是 | 存在合并冲突的文件（porcelain 的未合并状态） |
+| `truncated` | boolean | 是 | 是否因条数上限被截断 |
+
+### POST /api/v1/git/diff
+
+单文件的结构化 diff（工作区 / index / 某次提交）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `file` | string（长度≥1） | 是 | — | — |
+| `source` | "worktree" \| "staged" \| "commit" | 否 | `worktree` | — |
+| `commit` | string（长度≥1） | 否 | — | `source` 为 `commit` 时的提交 hash；其他来源忽略 |
+| `context` | integer（≥0，≤200） | 否 | `3` | — |
+
+**响应类型**：`GitDiffResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `path` | string | 是 | — |
+| `oldPath` | string | 否 | — |
+| `status` | "added" \| "modified" \| "deleted" \| "renamed" \| "copied" \| "typeChanged" \| "conflicted" | 是 | — |
+| `binary` | boolean | 是 | — |
+| `additions` | number | 是 | — |
+| `deletions` | number | 是 | — |
+| `hunks` | [GitHunk](#githunk)[] | 是 | — |
+| `truncated` | boolean | 是 | — |
+
+### POST /api/v1/git/log
+
+提交历史（倒序分页）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `limit` | integer（>0，≤100） | 否 | `30` | — |
+| `skip` | integer（≥0） | 否 | `0` | — |
+
+**响应类型**：`GitLogResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `commits` | [GitCommitSummary](#gitcommitsummary)[] | 是 | — |
+| `hasMore` | boolean | 是 | 是否还有更早的提交（按 `limit` 判定） |
+
+### POST /api/v1/git/show
+
+单次提交的元信息与改动文件列表
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `hash` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`GitShowResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `commit` | [GitCommitDetail](#gitcommitdetail) | 是 | — |
+| `files` | [GitFileChange](#gitfilechange)[] | 是 | 该提交改动的文件；单个文件的 diff 由客户端按需取 |
+| `truncated` | boolean | 是 | 文件列表是否因条数上限被截断 |
+
 ## MCP 服务器（`mcp`）
 
 ### POST /api/v1/mcp/list
@@ -1384,6 +1506,47 @@
 | `size` | number | 是 | 字节数；目录为 0 |
 | `updatedAt` | string | 是 | — |
 
+### GitFileChange
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `path` | string | 是 | — |
+| `oldPath` | string | 否 | — |
+| `status` | "added" \| "modified" \| "deleted" \| "renamed" \| "copied" \| "typeChanged" \| "conflicted" | 是 | — |
+| `additions` | number \| null | 是 | 新增行数；未跟踪、重命名与二进制文件无法统计时为 null |
+| `deletions` | number \| null | 是 | 删除行数；无法统计时为 null |
+
+### GitHunk
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `header` | string | 是 | — |
+| `lines` | [GitDiffLine](#gitdiffline)[] | 是 | — |
+
+### GitCommitSummary
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `hash` | string | 是 | — |
+| `shortHash` | string | 是 | — |
+| `subject` | string | 是 | — |
+| `authorName` | string | 是 | — |
+| `authoredAt` | string | 是 | 提交时刻（ISO 8601，带提交本身的时区偏移） |
+| `refs` | string[] | 是 | 指向该提交的分支 / 标签装饰；无则空数组 |
+
+### GitCommitDetail
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `hash` | string | 是 | — |
+| `shortHash` | string | 是 | — |
+| `subject` | string | 是 | — |
+| `authorName` | string | 是 | — |
+| `authoredAt` | string | 是 | 提交时刻（ISO 8601，带提交本身的时区偏移） |
+| `refs` | string[] | 是 | 指向该提交的分支 / 标签装饰；无则空数组 |
+| `body` | string | 是 | 提交正文（不含标题行）；无正文时为空字符串 |
+| `parents` | string[] | 是 | 父提交 hash；首次提交为空数组，合并提交有多项 |
+
 ### McpServerView
 
 **取值之一（type = "stdio"）**
@@ -1614,6 +1777,15 @@
 | `question` | string | 是 | — |
 | `options` | [QuestionOption](#questionoption)[] | 是 | — |
 | `multiple` | boolean | 否 | — |
+
+### GitDiffLine
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "ctx" \| "add" \| "del" | 是 | — |
+| `oldLine` | number \| null | 是 | — |
+| `newLine` | number \| null | 是 | — |
+| `text` | string | 是 | 行内容（不含前导的 +/-/空格） |
 
 ### QuestionOption
 

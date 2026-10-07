@@ -35,3 +35,20 @@ export const toRelativePath = (root: string, path: string): string => {
   // `base` 为空串（root 是 `/`）时只认绝对路径的前导斜杠
   return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
 };
+
+/** 是否绝对路径；同时认 POSIX 的 `/` 与 Windows 的盘符 / UNC */
+export const isAbsolutePath = (path: string): boolean =>
+  path.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("\\\\");
+
+/**
+ * 把会话工作目录下的相对路径补成绝对路径。
+ *
+ * 工具入参与 `@` 引用里的路径多半是相对 cwd 的，而服务端解析相对路径用的是**服务进程**的 cwd，
+ * 因此必须在这里先拼成绝对路径再发出去。已经是绝对路径、或没有 cwd 可用时原样返回。
+ */
+export const resolveFromCwd = (cwd: string | null | undefined, path: string): string => {
+  const trimmed = path.trim();
+  if (!trimmed || isAbsolutePath(trimmed) || !cwd) return trimmed;
+  const base = cwd.replace(/\/+$/, "");
+  return `${base}/${trimmed.replace(/^\.\//, "")}`;
+};

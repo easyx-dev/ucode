@@ -31,6 +31,37 @@ export const FS_LIST_FILTERS = ["all", ...FS_ENTRY_TYPES] as const;
 
 export type FsListFilter = (typeof FS_LIST_FILTERS)[number];
 
+/** fs/read 的读取形态：文本按 UTF-8 给内容，二进制给 base64 */
+export const FS_READ_KINDS = ["text", "binary"] as const;
+
+export type FsReadKind = (typeof FS_READ_KINDS)[number];
+
+/** 单文件读取的体积上限（请求 `maxBytes` 不得超过）；服务端另有各自的文本 / 二进制内联上限 */
+export const FS_READ_MAX_BYTES = 8 * 1024 * 1024;
+
+/** git 变更条目的状态；`renamed` / `copied` 会带上原路径 */
+export const GIT_FILE_STATUSES = [
+  "added",
+  "modified",
+  "deleted",
+  "renamed",
+  "copied",
+  "typeChanged",
+  "conflicted",
+] as const;
+
+export type GitFileStatus = (typeof GIT_FILE_STATUSES)[number];
+
+/** git diff 的对比来源：工作区与 index、index 与 HEAD、某次提交与它的父提交 */
+export const GIT_DIFF_SOURCES = ["worktree", "staged", "commit"] as const;
+
+export type GitDiffSource = (typeof GIT_DIFF_SOURCES)[number];
+
+/** git diff 行的类型：上下文 / 新增 / 删除 */
+export const GIT_DIFF_LINE_KINDS = ["ctx", "add", "del"] as const;
+
+export type GitDiffLineKind = (typeof GIT_DIFF_LINE_KINDS)[number];
+
 /** 消息角色；响应用枚举，与 pi 的 AgentMessage 角色对齐（system 等内部角色不下发） */
 export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] as const;
 

@@ -8,6 +8,7 @@ import { brand } from "@ucode/brand";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../base/resizable";
 import { Sheet, SheetContent } from "../base/sheet";
 import { Toaster } from "../base/sonner";
 import { TooltipProvider } from "../base/tooltip";
@@ -22,12 +23,15 @@ import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
 import { UsagePanel } from "../business/usage/usage-panel";
 import { WelcomePanel } from "../business/welcome-panel";
+import { WorkbenchPanel } from "../business/workbench/workbench-panel";
 import { useActiveSession } from "../hooks/use-active-session";
 import { useChat } from "../hooks/use-chat";
 import { useComposerDrafts } from "../hooks/use-composer-drafts";
 import { useGoal } from "../hooks/use-goal";
 import { useInteractions } from "../hooks/use-interactions";
+import { useIsDesktop } from "../hooks/use-is-desktop";
 import { useModels } from "../hooks/use-models";
+import { usePanelLayout } from "../hooks/use-panel-layout";
 import { useSessionNotices } from "../hooks/use-session-notices";
 import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
@@ -36,6 +40,13 @@ import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands
 import { composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
 import type { GoalCommand } from "../lib/goal-command";
+import {
+  HANDLE_IDS,
+  PANEL_IDS,
+  SIDEBAR_PANEL,
+  WORKBENCH_PANEL,
+  WORKSPACE_PANELS,
+} from "../lib/panel-layout";
 import { lastTurnPresentedPlan } from "../lib/plan";
 import { sessionTitle } from "../lib/session";
 import { isWorkspaceSession } from "../lib/session-groups";
@@ -47,6 +58,7 @@ import type {
   SessionSummary,
   ThinkingLevel,
 } from "../lib/types";
+import { WorkbenchProvider, type WorkbenchTab } from "../provider/workbench";
 
 export type WorkspaceLayoutProps = {
   /** 当前选中的会话；null 表示草稿态（新建） */
@@ -92,9 +104,19 @@ export function WorkspaceLayout({
   useSessionNotices({ onSelectSession: setActiveId });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  // 工作台：默认收起（用 open 表示）；标签、树列可见性与预览目标一并受控
+  const [workbenchOpen, setWorkbenchOpen] = useState(false);
+  const [workbenchTab, setWorkbenchTab] = useState<WorkbenchTab>("changes");
+  const [treeVisible, setTreeVisible] = useState(true);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [workbenchSheetOpen, setWorkbenchSheetOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
+
+  const isDesktop = useIsDesktop();
+  // 外层三栏一组：侧栏与工作台各自记住宽度，对话区占剩余
+  const panels = usePanelLayout("workspace", WORKSPACE_PANELS);
 
   const configured = models.data?.configured ?? false;
   const chat = useChat(activeId, { onSessionCreated: setActiveId });
@@ -104,15 +126,13 @@ export function WorkspaceLayout({
   /** 各入口统一落到模型设置页：未配置模型时用户要找的就是它 */
   const openSettings = (): void => setSettingsSection(DEFAULT_SETTINGS_SECTION);
 
-  // 拉宽到桌面断点时自动收起抽屉，避免被已隐藏的菜单按钮困在遮罩里
+  // 拉宽到桌面断点时自动收起两个抽屉：抽屉内容有 `md:hidden` 会消失，遮罩没有，
+  // 不收起来就会留下一层盖住全屏、且把 body 置为 pointer-events: none 的遮罩
   useEffect(() => {
-    const mql = window.matchMedia("(min-width: 768px)");
-    const onChange = (): void => {
-      if (mql.matches) setSidebarOpen(false);
-    };
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
+    if (!isDesktop) return;
+    setSidebarOpen(false);
+    setWorkbenchSheetOpen(false);
+  }, [isDesktop]);
 
   /** 收起 / 展开侧栏并落盘；移动端抽屉由 sidebarOpen 单独管 */
   const toggleSidebar = useCallback(() => {
@@ -126,6 +146,37 @@ export function WorkspaceLayout({
       return next;
     });
   }, []);
+
+  /** 展开工作台；窄屏下同时唤出抽屉 */
+  const showWorkbench = useCallback(() => {
+    setWorkbenchOpen(true);
+    if (!isDesktop) setWorkbenchSheetOpen(true);
+  }, [isDesktop]);
+
+  /** 打开某个文件的预览：展开面板、切到「文件」标签 */
+  const openPreview = useCallback(
+    (path: string) => {
+      setActiveFile(path);
+      setWorkbenchTab("files");
+      showWorkbench();
+    },
+    [showWorkbench],
+  );
+
+  /** 工作台的动作面：面板状态在预设里受控，业务组件只经这里拿动作 */
+  const workbenchApi = useMemo(
+    () => ({
+      tab: workbenchTab,
+      selectTab: setWorkbenchTab,
+      treeVisible,
+      toggleTree: () => setTreeVisible((prev) => !prev),
+      activeFile,
+      openPreview,
+      collapse: () => setWorkbenchOpen(false),
+      cwd: activeSession?.cwd ?? workspacesDir,
+    }),
+    [activeFile, activeSession?.cwd, openPreview, treeVisible, workbenchTab, workspacesDir],
+  );
 
   // 打开会话即标记已读：内容新于上次已读、且不在生成中时才提交，避免自我循环
   useEffect(() => {
@@ -376,156 +427,215 @@ export function WorkspaceLayout({
 
   return (
     <TooltipProvider>
-      <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-        {/* 桌面端固定侧栏；收起时不占宽度，移动端收进抽屉 */}
-        {sidebarCollapsed ? null : (
-          <div className="hidden h-full w-72 shrink-0 md:flex">
-            <SessionSidebar {...sidebarProps} />
-          </div>
-        )}
+      <WorkbenchProvider value={workbenchApi}>
+        <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+          {/* 桌面端三栏分栏；窄屏只有对话区，侧栏与工作台走下方抽屉 */}
+          <ResizablePanelGroup
+            id={`${PANEL_IDS.sidebar}-group`}
+            orientation="horizontal"
+            onLayoutChanged={panels.onLayoutChanged}
+          >
+            {isDesktop && !sidebarCollapsed ? (
+              <>
+                <ResizablePanel
+                  id={SIDEBAR_PANEL.id}
+                  defaultSize={panels.defaultSizeOf(SIDEBAR_PANEL)}
+                  minSize={SIDEBAR_PANEL.min}
+                  maxSize={SIDEBAR_PANEL.max}
+                  className="min-w-0"
+                >
+                  <div className="flex h-full w-full">
+                    <SessionSidebar {...sidebarProps} />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle id={HANDLE_IDS.sidebar} />
+              </>
+            ) : null}
 
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent title={t("会话列表")} className="md:hidden">
-            <SessionSidebar
-              {...sidebarProps}
-              onSelect={(id) => {
-                setActiveId(id);
-                setSidebarOpen(false);
-              }}
-              onCreate={() => {
-                startNewSession();
-                setSidebarOpen(false);
-              }}
-              onCreateAssistant={() => {
-                startAssistantSession();
-                setSidebarOpen(false);
-              }}
-              onCreateInDirectory={(path) => {
-                startInDirectory(path);
-                setSidebarOpen(false);
-              }}
-              onOpenSettings={() => {
-                setSidebarOpen(false);
-                openSettings();
+            <ResizablePanel id={PANEL_IDS.chat} className="min-w-0">
+              <div className="flex h-full w-full">
+                <ChatPanel
+                  session={activeSession}
+                  models={models.data}
+                  workspacesDir={workspacesDir}
+                  chat={chat}
+                  composer={composer}
+                  empty={
+                    <WelcomePanel
+                      configured={configured}
+                      defaultModel={models.data?.defaultModel ?? null}
+                      workspacesDir={workspacesDir}
+                      onOpenSettings={openSettings}
+                    />
+                  }
+                  onReloadModels={() => void models.refresh()}
+                  onSelectModel={selectModel}
+                  onSelectThinkingLevel={selectThinkingLevel}
+                  onSelectMode={selectMode}
+                  onSelectPermissionMode={selectPermissionMode}
+                  onOpenSettings={openSettings}
+                  onOpenSession={setActiveId}
+                  onToggleSidebar={() => {
+                    // 桌面端切换收起，移动端唤出抽屉
+                    if (isDesktop) toggleSidebar();
+                    else setSidebarOpen(true);
+                  }}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onToggleWorkbench={() => {
+                    // 桌面端已展开就收起；否则展开到默认标签。移动端一律唤出抽屉
+                    if (workbenchOpen) setWorkbenchOpen(false);
+                    else showWorkbench();
+                  }}
+                  workbenchOpen={workbenchOpen}
+                  onNewTask={startNewSession}
+                  onFork={forkFrom}
+                  onEdit={editMessage}
+                  forkedFromName={forkSourceName}
+                  goal={goal.goal}
+                  onGoalCommand={runGoalCommand}
+                  usage={sessionUsage.usage}
+                  context={sessionUsage.context}
+                  onOpenUsage={() => setUsageOpen(true)}
+                  onBackToParent={() => {
+                    const parentId = activeSession?.parentSessionId;
+                    if (parentId) setActiveId(parentId);
+                  }}
+                  planReady={planReady}
+                  onApprovePlan={approvePlan}
+                  onIgnorePlan={ignorePlan}
+                  onFeedbackPlan={(text) => void chat.send(textPayload(text))}
+                  onBuiltin={runBuiltin}
+                />
+              </div>
+            </ResizablePanel>
+
+            {isDesktop && workbenchOpen ? (
+              <>
+                {/* 命中区即两栏之间的间距：工作台侧收窄一点（8px），与卡片自身的 m-2 对齐 */}
+                <ResizableHandle id={HANDLE_IDS.workbench} className="w-2" />
+                <ResizablePanel
+                  id={WORKBENCH_PANEL.id}
+                  defaultSize={panels.defaultSizeOf(WORKBENCH_PANEL)}
+                  minSize={WORKBENCH_PANEL.min}
+                  maxSize={WORKBENCH_PANEL.max}
+                  className="min-w-0"
+                >
+                  <div className="flex h-full w-full md:py-2 md:pr-2">
+                    <div className="flex h-full w-full overflow-hidden bg-card md:rounded-xl md:border md:border-border">
+                      <WorkbenchPanel />
+                    </div>
+                  </div>
+                </ResizablePanel>
+              </>
+            ) : null}
+          </ResizablePanelGroup>
+
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetContent title={t("会话列表")} className="md:hidden">
+              <SessionSidebar
+                {...sidebarProps}
+                onSelect={(id) => {
+                  setActiveId(id);
+                  setSidebarOpen(false);
+                }}
+                onCreate={() => {
+                  startNewSession();
+                  setSidebarOpen(false);
+                }}
+                onCreateAssistant={() => {
+                  startAssistantSession();
+                  setSidebarOpen(false);
+                }}
+                onCreateInDirectory={(path) => {
+                  startInDirectory(path);
+                  setSidebarOpen(false);
+                }}
+                onOpenSettings={() => {
+                  setSidebarOpen(false);
+                  openSettings();
+                }}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={workbenchSheetOpen} onOpenChange={setWorkbenchSheetOpen}>
+            <SheetContent side="right" title={t("工作台")} className="md:hidden">
+              <WorkbenchPanel />
+            </SheetContent>
+          </Sheet>
+
+          <PermissionDialog
+            request={interaction?.kind === "permission" ? interaction : null}
+            onRespond={(requestId, decision) =>
+              void interactions.respond({ requestId, kind: "permission", decision })
+            }
+          />
+
+          <QuestionDialog
+            request={interaction?.kind === "question" ? interaction : null}
+            onRespond={(requestId, answers) =>
+              void interactions.respond({ requestId, kind: "question", answers })
+            }
+          />
+
+          <UsagePanel
+            open={usageOpen}
+            onOpenChange={setUsageOpen}
+            onOpenSession={setActiveId}
+            context={sessionUsage.context}
+          />
+
+          <RenameSessionDialog
+            target={renaming}
+            onOpenChange={(open) => {
+              if (!open) setRenaming(null);
+            }}
+            onSubmit={(id, name) => void sessions.rename(id, name)}
+          />
+
+          {settingsSection ? (
+            <SettingsPanel
+              section={settingsSection}
+              onSectionChange={setSettingsSection}
+              onClose={() => setSettingsSection(null)}
+              onSaved={() => {
+                void models.reload();
               }}
             />
-          </SheetContent>
-        </Sheet>
+          ) : null}
 
-        <ChatPanel
-          session={activeSession}
-          models={models.data}
-          workspacesDir={workspacesDir}
-          chat={chat}
-          composer={composer}
-          empty={
-            <WelcomePanel
-              configured={configured}
-              defaultModel={models.data?.defaultModel ?? null}
-              workspacesDir={workspacesDir}
-              onOpenSettings={openSettings}
-            />
-          }
-          onReloadModels={() => void models.refresh()}
-          onSelectModel={selectModel}
-          onSelectThinkingLevel={selectThinkingLevel}
-          onSelectMode={selectMode}
-          onSelectPermissionMode={selectPermissionMode}
-          onOpenSettings={openSettings}
-          onOpenSession={setActiveId}
-          onToggleSidebar={() => {
-            // 桌面端切换收起，移动端唤出抽屉
-            if (window.matchMedia("(min-width: 768px)").matches) toggleSidebar();
-            else setSidebarOpen(true);
-          }}
-          sidebarCollapsed={sidebarCollapsed}
-          onNewTask={startNewSession}
-          onFork={forkFrom}
-          onEdit={editMessage}
-          forkedFromName={forkSourceName}
-          goal={goal.goal}
-          onGoalCommand={runGoalCommand}
-          usage={sessionUsage.usage}
-          context={sessionUsage.context}
-          onOpenUsage={() => setUsageOpen(true)}
-          onBackToParent={() => {
-            const parentId = activeSession?.parentSessionId;
-            if (parentId) setActiveId(parentId);
-          }}
-          planReady={planReady}
-          onApprovePlan={approvePlan}
-          onIgnorePlan={ignorePlan}
-          onFeedbackPlan={(text) => void chat.send(textPayload(text))}
-          onBuiltin={runBuiltin}
-        />
+          <CommandPalette
+            open={paletteOpen}
+            onOpenChange={setPaletteOpen}
+            sessions={sessionsView}
+            fileRoot={activeSession?.cwd ?? workspacesDir}
+            onSelectSession={setActiveId}
+            onRunBuiltin={runBuiltin}
+            onNewTask={startNewSession}
+            onNewAssistant={startAssistantSession}
+            onOpenWorkspace={() => setPicking(true)}
+            onOpenSettings={openSettings}
+            onToggleSidebar={toggleSidebar}
+            onToggleWorkbench={() => {
+              if (workbenchOpen) setWorkbenchOpen(false);
+              else showWorkbench();
+            }}
+            onOpenFile={openPreview}
+          />
 
-        <PermissionDialog
-          request={interaction?.kind === "permission" ? interaction : null}
-          onRespond={(requestId, decision) =>
-            void interactions.respond({ requestId, kind: "permission", decision })
-          }
-        />
-
-        <QuestionDialog
-          request={interaction?.kind === "question" ? interaction : null}
-          onRespond={(requestId, answers) =>
-            void interactions.respond({ requestId, kind: "question", answers })
-          }
-        />
-
-        <UsagePanel
-          open={usageOpen}
-          onOpenChange={setUsageOpen}
-          onOpenSession={setActiveId}
-          context={sessionUsage.context}
-        />
-
-        <RenameSessionDialog
-          target={renaming}
-          onOpenChange={(open) => {
-            if (!open) setRenaming(null);
-          }}
-          onSubmit={(id, name) => void sessions.rename(id, name)}
-        />
-
-        {settingsSection ? (
-          <SettingsPanel
-            section={settingsSection}
-            onSectionChange={setSettingsSection}
-            onClose={() => setSettingsSection(null)}
-            onSaved={() => {
-              void models.reload();
+          <DirectoryPickerDialog
+            open={picking}
+            onOpenChange={setPicking}
+            onSelect={(path) => {
+              startInDirectory(path);
+              setPicking(false);
             }}
           />
-        ) : null}
 
-        <CommandPalette
-          open={paletteOpen}
-          onOpenChange={setPaletteOpen}
-          sessions={sessionsView}
-          fileRoot={activeSession?.cwd ?? workspacesDir}
-          onSelectSession={setActiveId}
-          onRunBuiltin={runBuiltin}
-          onNewTask={startNewSession}
-          onNewAssistant={startAssistantSession}
-          onOpenWorkspace={() => setPicking(true)}
-          onOpenSettings={openSettings}
-          onToggleSidebar={toggleSidebar}
-          onOpenFile={(path) => toast.info(t("文件查看器即将推出"), { description: path })}
-        />
-
-        <DirectoryPickerDialog
-          open={picking}
-          onOpenChange={setPicking}
-          onSelect={(path) => {
-            startInDirectory(path);
-            setPicking(false);
-          }}
-        />
-
-        <Toaster position="top-center" />
-        <ErrorToaster />
-      </div>
+          <Toaster position="top-center" />
+          <ErrorToaster />
+        </div>
+      </WorkbenchProvider>
     </TooltipProvider>
   );
 }

@@ -6,6 +6,8 @@ import { useId } from "react";
 export type SegmentedOption<T extends string> = {
   value: T;
   label: string;
+  /** 可选的选项图标；窄栏（如预览工具条）用它省文字宽度 */
+  icon?: React.ReactNode;
 };
 
 type SegmentedControlProps<T extends string> = {
@@ -40,7 +42,7 @@ export function SegmentedControl<T extends string>({
           <label
             key={option.value}
             className={cn(
-              "cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              "flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
               "has-focus-visible:ring-2 has-focus-visible:ring-ring/50",
               selected
                 ? "bg-card text-foreground shadow-sm"
@@ -55,6 +57,7 @@ export function SegmentedControl<T extends string>({
               onChange={() => onChange(option.value)}
               className="sr-only"
             />
+            {option.icon}
             {option.label}
           </label>
         );

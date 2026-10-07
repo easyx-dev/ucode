@@ -1,4 +1,5 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区 */
+import { cn } from "cn";
 import { Bot } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -57,6 +58,10 @@ type ChatPanelProps = {
   onToggleSidebar?: () => void;
   /** 侧栏是否收起 */
   sidebarCollapsed?: boolean;
+  /** 展开 / 收起工作台（右侧第三栏）；移动端唤出抽屉 */
+  onToggleWorkbench?: () => void;
+  /** 工作台是否展开 */
+  workbenchOpen?: boolean;
   /** 新建任务（顶栏入口） */
   onNewTask?: () => void;
   /** 从某条消息分叉出新会话 */
@@ -102,6 +107,8 @@ export function ChatPanel({
   onOpenSession,
   onToggleSidebar,
   sidebarCollapsed,
+  onToggleWorkbench,
+  workbenchOpen,
   onNewTask,
   onFork,
   onEdit,
@@ -186,7 +193,13 @@ export function ChatPanel({
   const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:m-2 md:ml-0 md:rounded-xl md:border md:border-border">
+    <main
+      className={cn(
+        "flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:my-2 md:rounded-xl md:border md:border-border",
+        // 工作台展开时这段间隙由分隔条充当，收起时卡片得自己留出来，否则右圆角会贴到窗口边缘
+        workbenchOpen ? undefined : "md:mr-2",
+      )}
+    >
       <ChatHeader
         session={session}
         models={models}
@@ -194,6 +207,8 @@ export function ChatPanel({
         onOpenSettings={onOpenSettings}
         onToggleSidebar={onToggleSidebar}
         sidebarCollapsed={sidebarCollapsed}
+        onToggleWorkbench={onToggleWorkbench}
+        workbenchOpen={workbenchOpen}
         onNewTask={onNewTask}
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}

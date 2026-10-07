@@ -200,19 +200,46 @@
 
 ## 文件系统（fs）与应用目录
 
-`fs` 域是通用的文件系统浏览入口（首个消费者是会话侧栏的项目目录选择器，后续文件预览器复用）：
+`fs` 域是通用的文件系统浏览入口（会话侧栏的项目目录选择器、输入区的 `@` 检索与工作台的文件预览共用）：
 
 - `fs/list`：`path` 省略时从用户 home 开始，返回当前目录、上级目录与条目列表；
   条目含 `name` / `path` / `type`(`file` | `directory`) / `size` / `updatedAt`，
   服务端固定排序（目录在前、各自按名称）。`type` 过滤默认 `all`，目录选择器传 `directory`；
   `q` 按名称模糊过滤条目（目录选择器以结尾 `/` 区分：带 `/` 进入该目录，不带则把末段当检索词）。
+- `fs/read`：读单个文件的内容，给工作台的预览器用。只能读普通文件（目录返回 `not_a_file`）；
+  服务端按前 8KB 是否含 NUL 判文本 / 二进制，文本按 1MB、二进制按 5MB 内联，超出时文本按上限截断、
+  二进制整块不给，两种情况都由 `truncated` 标注。响应形如
+  `{ path, name, size, updatedAt, kind: "text" | "binary", text?, base64?, truncated }`：
+  文本给 `text`，二进制给 base64（图片、PDF 等由客户端拼 data URL 或交给专门的渲染器）。
+  调用方可用 `maxBytes` 收窄愿意接收的内联体积。
 - `fs/mkdir`：单层建目录；已存在返回 `path_exists`，父目录不存在返回 `path_not_found`，
   其余失败（权限、只读等）返回 `mkdir_failed`。
+- `fs/search`：受限 walker（尊重 `.gitignore`、跳过 `node_modules` 等），给输入区的 `@` 检索用。
 - 路径一律由服务端归一化（`~` 展开 + `realpath`），不存在的路径返回 `path_not_found`。
+  **客户端传相对路径时必须自己拼成绝对路径**：服务端的相对路径基准是服务进程的 cwd，不是会话 cwd。
 - `fs` 与其他接口一致，需通过鉴权（见「鉴权」）；agent 具备文件读写权限，不要把本服务暴露到不可信网络。
 
-**预留扩展**（本次未实现，形状已为其留白）：`fs/info` 用于单路径 stat / 读文件内容；
-`fs/search` 已实现（受限 walker，给输入区的 `@` 检索用），见 `docs/api-reference.md`。
+## Git（只读）
+
+`git` 域给工作台的面板提供仓库状态与 diff，**全部只读**：没有任何 stage / commit / checkout 能力。
+服务端直接用系统 git（`execFile`，零依赖），参数固定为白名单（不分页、不上色、禁用外部 diff 与 textconv、
+`core.quotepath=false`），用户可控入参只有「仓库内相对路径」与「提交引用」，两者都在服务端校验后才拼进命令。
+
+- `git/status`：`path` 可以是仓库内任意目录，服务端向上找仓库根。返回
+  `{ isRepo, repoRoot?, branch?, upstream?, ahead?, behind?, staged[], unstaged[], untracked[], conflicted[] }`。
+  不在仓库内时返回 `isRepo: false`（不是错误）；单个文件可能同时出现在 `staged` 与 `unstaged`
+  （两侧都改过），客户端按来源区分。条目里的 `path` 是**相对仓库根的 POSIX 路径**，
+  `additions` / `deletions` 在未跟踪、重命名与二进制时为 null（无法统计）。
+- `git/diff`：单个文件的 diff，`source` 选 `worktree`（工作区 vs index）/ `staged`（index vs HEAD）/
+  `commit`（该提交 vs 其父提交，需同时给 `commit`）。返回**结构化的 hunk**
+  （`{ path, oldPath?, status, binary, additions, deletions, hunks[{ header, lines[{ kind, oldLine, newLine, text }] }], truncated }`），
+  由服务端解析 unified diff，客户端不做文本解析；未跟踪文件按「全文新增」生成。
+- `git/log`：提交历史，倒序分页（`limit` / `skip`），每条含 `hash` / `shortHash` / `subject` /
+  `authorName` / `authoredAt` / `refs`。
+- `git/show`：单次提交的元信息与改动文件列表（不含 diff 正文），单个文件的 diff 走 `git/diff` 的
+  `commit` 分支按需取。
+- 服务端**没有文件变更推送**：客户端靠「切回面板时拉一次 + 每轮对话结束（`agent_settled`）后刷新 +
+  手动刷新按钮」保持新鲜，不轮询。
 
 ## 附件（attachments）
 

@@ -83,6 +83,15 @@ export const ERROR_CODES = {
   mkdirFailed: "mkdir_failed",
   /** 指定的项目空间不存在 */
   projectNotFound: "project_not_found",
+  /** 路径存在但不是普通文件（目录 / 特殊文件） */
+  notAFile: "not_a_file",
+
+  /** 目标目录不是 git 仓库（或不在仓库内） */
+  notARepository: "not_a_repository",
+  /** 机器上没有可用的 git */
+  gitUnavailable: "git_unavailable",
+  /** git 命令执行失败 */
+  gitFailed: "git_failed",
 
   /** 图片无法归一化（格式不支持、超限且不可压缩等） */
   imageInvalid: "image_invalid",

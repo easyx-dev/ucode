@@ -1,4 +1,4 @@
-/** /api/v1/fs：文件系统浏览（目录选择器与后续文件预览器共用）与新建目录、按名检索 */
+/** /api/v1/fs：文件系统浏览、新建目录、按名检索与读取文件（读逻辑在 `lib/file-content`） */
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -18,12 +18,14 @@ import {
   type FsSearchResponse,
   fsListInputSchema,
   fsMkdirInputSchema,
+  fsReadInputSchema,
   fsSearchInputSchema,
 } from "@ucode/contracts";
 import fuzzysort from "fuzzysort";
 import { Hono } from "hono";
 
 import { FS_SEARCH_MAX_SCAN } from "../../constants";
+import { readFileContent } from "../../lib/file-content";
 import { AppError, ok } from "../../lib/response";
 import { jsonBody } from "../../lib/validate";
 import { parentPathOf, resolveExistingPath, resolveTargetPath } from "../../utils/path";
@@ -203,6 +205,10 @@ export const createFsRoute = () => {
 
   router.post("/mkdir", jsonBody(fsMkdirInputSchema), (c) =>
     c.json(ok(createDirectory(c.req.valid("json")))),
+  );
+
+  router.post("/read", jsonBody(fsReadInputSchema), (c) =>
+    c.json(ok(readFileContent(c.req.valid("json")))),
   );
 
   return router;
