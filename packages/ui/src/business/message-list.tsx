@@ -22,6 +22,7 @@ const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
   activity: 36,
   question: 180,
   permission: 72,
+  compaction: 44,
   working: 32,
 };
 
@@ -35,6 +36,8 @@ type MessageListProps = {
   loading?: boolean;
   /** 正在进行中：列表尾部显示「工作中」与实时耗时 */
   working?: boolean;
+  /** 本轮进行的是上下文压缩：尾部提示改报「正在压缩上下文」 */
+  compacting?: boolean;
   empty?: React.ReactNode;
   /** 切换会话时变化，用于重置滚动位置与已测量的行高 */
   resetKey?: string;
@@ -51,6 +54,7 @@ export function MessageList({
   subagents,
   loading,
   working,
+  compacting,
   empty,
   resetKey,
   onOpenSession,
@@ -100,8 +104,13 @@ export function MessageList({
     [subagents, onOpenSession],
   );
   const context = useMemo(
-    () => ({ renderExtra, ...(onFork ? { onFork } : {}), ...(onEdit ? { onEdit } : {}) }),
-    [renderExtra, onFork, onEdit],
+    () => ({
+      renderExtra,
+      ...(compacting ? { compacting } : {}),
+      ...(onFork ? { onFork } : {}),
+      ...(onEdit ? { onEdit } : {}),
+    }),
+    [renderExtra, compacting, onFork, onEdit],
   );
 
   const setFollowingBoth = useCallback((next: boolean) => {

@@ -7,10 +7,12 @@
  */
 export default {
   请求参数无效: "Invalid request parameters",
+  "请求超时，请重试": "The request timed out. Please try again.",
   "接口不存在：{{path}}": "No such API endpoint: {{path}}",
   服务内部错误: "Internal server error",
   "会话正在生成，请先中断或等本轮结束":
     "The session is generating. Interrupt it or wait for this turn to finish.",
+  "压缩失败：{{reason}}": "Compaction failed: {{reason}}",
   "模型不可用：{{ref}}": "Model unavailable: {{ref}}",
   "尚未配置模型，请先在设置里添加 provider":
     "No model configured. Add a provider in settings first.",

@@ -114,7 +114,10 @@ export const createInteractionsStore = (deps: {
         return pending === prev.pending ? prev : { ...prev, pending };
       });
       try {
-        await deps.apis.interactions.respond(input);
+        const result = await deps.apis.interactions.respond(input);
+        // 服务端没结算（kind 不一致 / 请求已失效）时本地已把它抹掉：重新取一次，
+        // 免得对话框凭空消失而服务端其实还挂着这条请求
+        if (!result.resolved && sessionId) void hydrate(sessionId);
       } catch (error) {
         store.setState((prev) => ({ ...prev, error: asApiError(error) }));
         // 服务端请求可能仍挂起，重新取回以免对话框消失

@@ -2,14 +2,17 @@
 import {
   type AgentSession,
   createAgentSession,
+  getLatestCompactionEntry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
   PERMISSION_DECISION_CUSTOM_TYPE,
   type PermissionRecord,
+  type ServerEventPayload,
   type SessionStatus,
   type SessionSummary,
+  type SubagentSnapshot,
   type WebsearchConfig,
 } from "@ucode/contracts";
 import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
@@ -37,6 +40,8 @@ import type { UsageService } from "../harness/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
 import { logger } from "../lib/logger";
 import { AppError } from "../lib/response";
+import { isRecord } from "../utils/object";
+import { compactionSkipReasonOf } from "./compaction-skip";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
@@ -76,6 +81,12 @@ export class SessionPool {
   private readonly settling = new Set<string>();
   /** 已把列表索引写进库的会话：首轮期间按条目补写只做一次 */
   private readonly indexedSources = new Set<string>();
+  /**
+   * 进行中的子智能体：父会话 → toolCallId → 快照视图。
+   * 嵌套进度不落盘，只靠事件增量维护 —— 客户端断流时错过 `subagent_end` 就会永远停在「执行中」，
+   * 所以这里留一份清单随 `messages/list` 快照下发（见 `runningSubagentsOf`）。
+   */
+  private readonly subagents = new Map<string, Map<string, SubagentSnapshot>>();
   /** 配置代次：每换一次运行时自增，用来识别「装配跨过了配置变更」的实例 */
   private generation = 0;
   private sweeper: NodeJS.Timeout | null = null;
@@ -101,6 +112,11 @@ export class SessionPool {
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
     // 否则侧栏与通知只能等到下一次摘要刷新才知道这条会话停在了用户身上
     this.events.subscribe((frame) => {
+      // 子智能体的起止只走事件流：这里留一份进行中清单，供快照收敛客户端嵌套进度
+      if (frame.type === "subagent_start" || frame.type === "subagent_end") {
+        this.trackSubagent(frame);
+        return;
+      }
       if (frame.type !== "interaction_request" && frame.type !== "interaction_resolved") return;
       this.emitUpdated(frame.sessionId);
     });
@@ -148,7 +164,36 @@ export class SessionPool {
   }
 
   /**
-   * 把 pi 会话的列表索引写进库；会话文件还没落盘（取不到索引）时什么都不做。
+   * 快照用：该会话仍在进行的子智能体。
+   * 客户端据此重建嵌套进度，并把本地多出来的（快照里已不存在的）收敛为已结束。
+   */
+  runningSubagentsOf(sessionId: string): SubagentSnapshot[] {
+    return [...(this.subagents.get(sessionId)?.values() ?? [])];
+  }
+
+  /** 维护进行中清单；载荷不可信，拿不到 toolCallId 就当没有这次委派 */
+  private trackSubagent(frame: ServerEventPayload): void {
+    const parentId = frame.sessionId;
+    const data = isRecord(frame.data) ? frame.data : {};
+    const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : "";
+    if (!toolCallId) return;
+
+    const running = this.subagents.get(parentId) ?? new Map<string, SubagentSnapshot>();
+    if (frame.type === "subagent_end") {
+      running.delete(toolCallId);
+      if (running.size === 0) this.subagents.delete(parentId);
+      return;
+    }
+
+    running.set(toolCallId, {
+      toolCallId,
+      sessionId: typeof data.sessionId === "string" ? data.sessionId : "",
+      description: typeof data.description === "string" ? data.description : "",
+    });
+    this.subagents.set(parentId, running);
+  }
+
+  /**
    *
    * 除了落定后的例行回写，会话文件一落盘也会补写一次：`source_path` 入库之前若实例被回收
    * （服务重启 / 空闲回收 / 配置变更），下次重装会另开一份 JSONL，把已有上下文整个丢掉。
@@ -158,7 +203,14 @@ export class SessionPool {
     if (!session) return false;
     const index = managerToIndex(session.sessionManager);
     if (!index) return false;
-    this.repository.refresh(sessionId, index);
+    // 写库失败不能打断收尾：索引只影响列表展示，而收尾链上的「释放占位 + 补发摘要」
+    // 一旦跳过，会话就永远停在运行态（见 `RunTracker` 的收尾顺序）
+    try {
+      this.repository.refresh(sessionId, index);
+    } catch (error) {
+      logger.warn({ sessionId, error }, "写入会话索引失败");
+      return false;
+    }
     this.indexedSources.add(sessionId);
     return true;
   }
@@ -234,10 +286,49 @@ export class SessionPool {
     if (!this.beginRun(sessionId)) {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正忙，请先中断", 409);
     }
-    void session
-      .compact(instructions)
-      .catch((error) => this.reportRunError(sessionId, error))
-      .finally(() => this.endRun(sessionId));
+    void this.runCompaction(sessionId, session, instructions);
+  }
+
+  /**
+   * 压缩的收尾：**先 `endRun`、再让客户端重取快照**，顺序是硬约束——
+   * 快照里的 `running` 取自占位状态，占位未释放时重取会把生成态写成真，
+   * 而手动压缩不会再发 `agent_settled`，界面就永久停在「生成中」（见 `RunTracker` 的说明）。
+   */
+  private async runCompaction(
+    sessionId: string,
+    session: AgentSession,
+    instructions?: string,
+  ): Promise<void> {
+    let compacted = false;
+    try {
+      await session.compact(instructions);
+      compacted = true;
+    } catch (error) {
+      const skipped = compactionSkipReasonOf(error);
+      if (skipped) {
+        // 没做任何事，不算失败：不进「本轮出错」，只把拒绝原因带给客户端弹一条轻提示
+        this.events.emitFrame(sessionId, "compaction_end", { reason: "manual", skipped });
+      } else {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.reportRunError(
+          sessionId,
+          new AppError(ERROR_CODES.compactionFailed, "压缩失败", 500, undefined, { reason }),
+        );
+      }
+    } finally {
+      this.endRun(sessionId);
+    }
+    if (compacted) this.resetTranscript(sessionId, session);
+  }
+
+  /**
+   * 可见历史被压缩重写（早期条目被摘要替代、只剩从 `firstKeptEntryId` 起的保留区间）：
+   * 让客户端丢弃本地历史、重新取快照。
+   */
+  private resetTranscript(sessionId: string, session: AgentSession): void {
+    const compaction = getLatestCompactionEntry(session.sessionManager.getBranch());
+    const fromEntryId = compaction?.firstKeptEntryId ?? compaction?.id ?? "";
+    this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId });
   }
 
   /** 后台失败只能通过事件流回传，发起请求的连接此时可能早已断开 */
@@ -462,6 +553,16 @@ export class SessionPool {
           if (!this.indexedSources.has(sessionId)) this.writeIndex(sessionId);
           return;
         }
+        // 压缩完成：记下新的上下文规模，并让客户端重取被重写过的历史。
+        // 手动压缩的占位由 `runCompaction` 在释放后才收尾，这里只就地处理自动压缩
+        // （threshold / overflow 发生在生成中途，run 还要继续跑，等不到落定）
+        if (event.type === "compaction_end") {
+          if (!event.result) return;
+          const estimated = event.result.estimatedTokensAfter;
+          if (estimated !== undefined) this.usage.rememberCompaction(sessionId, estimated);
+          if (event.reason !== "manual") this.resetTranscript(sessionId, session);
+          return;
+        }
         // 子会话不参与记忆回顾与目标续跑，它的事件到索引补写为止
         if (isSubagent || event.type !== "agent_settled") return;
         // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾，
@@ -600,7 +701,9 @@ export class SessionPool {
     this.runs.forget(sessionId);
     this.settling.delete(sessionId);
     this.indexedSources.delete(sessionId);
+    this.subagents.delete(sessionId);
     this.events.detach(sessionId);
+    this.usage.forget(sessionId);
     this.memory.discardReview(sessionId);
     this.goals.forget(sessionId);
     // 挂起审批 / 提问按失败结算，避免回答打到已释放的实例：子会话的请求挂在父会话下
@@ -618,6 +721,10 @@ export class SessionPool {
     } catch {
       // 忽略 dispose 异常
     }
+    // 实例离池会让只存在内存里的状态失效：「本轮出错」「等待计划确认」都取自池内实例，
+    // 不补一帧的话侧栏会一直挂着错误 / 等待标记（归档路径随后还会发 `session_archived`，顺序无碍）
+    const record = this.repository.find(sessionId);
+    if (record && !record.deletedAt) this.emitUpdated(sessionId);
     return true;
   }
 

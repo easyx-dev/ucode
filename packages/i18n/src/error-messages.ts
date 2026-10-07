@@ -10,9 +10,11 @@ import type { ErrorCode } from "@ucode/contracts";
 
 export const errorMessageKeys = {
   invalid_request: "请求参数无效",
+  request_timeout: "请求超时，请重试",
   not_found: "接口不存在：{{path}}",
   internal_error: "服务内部错误",
   session_busy: "会话正在生成，请先中断或等本轮结束",
+  compaction_failed: "压缩失败：{{reason}}",
   unknown_model: "模型不可用：{{ref}}",
   model_not_configured: "尚未配置模型，请先在设置里添加 provider",
   unsupported_api: "连通性测试不支持该 api 类型：{{api}}",

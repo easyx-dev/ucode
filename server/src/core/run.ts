@@ -156,6 +156,7 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
 /**
  * 手动压缩：只在会话空闲时受理，压缩在服务端后台推进。
  * 与 prompt 不同不排队——忙碌时直接 409，避免改变正在进行的这一轮。
+ * 压缩失败（内容太少、已压缩过、总结调用失败）在后台以 `compaction_failed` 回传。
  */
 export const admitCompact = async (
   services: Services,

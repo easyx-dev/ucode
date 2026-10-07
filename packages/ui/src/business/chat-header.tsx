@@ -19,7 +19,7 @@ import { Spinner } from "../base/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../base/tooltip";
 import { sessionTitle } from "../lib/session";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
-import { contextPercent, formatTokens } from "../lib/usage";
+import { contextPercentLabel } from "../lib/usage";
 
 type ChatHeaderProps = {
   session: SessionSummary | null;
@@ -34,9 +34,9 @@ type ChatHeaderProps = {
   onOpenForkSource?: (sessionId: string) => void;
   /** 源会话名；列表里取不到时退化显示 id */
   forkedFromName?: string | null;
-  /** 本会话累计 token 用量；无会话或还没有用量时为 null */
+  /** 本会话累计 token 用量；无会话或还没有用量时为 null（与占用一起决定徽标显不显） */
   usage?: UsageTotals | null;
-  /** 本会话当前上下文占用；无会话或取不到时为 null，此时回落显示累计用量 */
+  /** 本会话当前上下文占用；无会话、没回答过或模型窗口不可知时为 null（徽标此时只显示占位符） */
   context?: ContextUsage | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
@@ -152,10 +152,12 @@ export function ChatHeader({
                 onClick={onOpenUsage}
               >
                 <Gauge className="size-3.5" />
-                {context ? `${contextPercent(context)}%` : formatTokens(usage?.totalTokens ?? 0)}
+                {context ? contextPercentLabel(context) : "—"}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{t("使用统计")}</TooltipContent>
+            <TooltipContent>
+              {context?.estimated ? t("压缩后为估算值，新一轮回答后回到实测") : t("使用统计")}
+            </TooltipContent>
           </Tooltip>
         ) : null}
 

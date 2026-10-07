@@ -15,6 +15,13 @@ export const formatTokens = (value: number): string => {
 export const contextPercent = (context: ContextUsage): number =>
   Math.round((context.tokens / context.contextWindow) * 100);
 
+/**
+ * 占用百分比文案；估算值加 `≈` 前缀——压缩完成到新一轮回答之间只有估算可用，
+ * 不能让它看起来和实测一样精确（见契约 `ContextUsage.estimated`）。
+ */
+export const contextPercentLabel = (context: ContextUsage): string =>
+  `${context.estimated ? "≈" : ""}${contextPercent(context)}%`;
+
 /** 会话来源文案：主会话 / 子智能体 / 分叉 */
 export const usageKindLabel = (kind: SessionUsageKind, t: TFunction): string => {
   switch (kind) {

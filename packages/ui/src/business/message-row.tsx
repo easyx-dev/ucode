@@ -10,6 +10,7 @@ import type { ToolEntry } from "../lib/chat-nodes";
 import type { ChatRow } from "../lib/chat-rows";
 import type { ChatItem } from "../lib/types";
 import { ActivityGroup } from "./activity-group";
+import { CompactionDivider } from "./compaction-divider";
 import { MessageItem } from "./message-item";
 import { PermissionRecordView } from "./permission-record";
 import { QuestionForm } from "./question-form";
@@ -19,6 +20,8 @@ import { WorkingIndicator } from "./working-indicator";
 export type MessageRowContext = {
   /** 工具条目追加的内容（如子智能体内联进度） */
   renderExtra?: (entry: ToolEntry) => ReactNode;
+  /** 正在压缩上下文：尾部的进行中提示据此换文案，且不报本轮耗时 */
+  compacting?: boolean;
   /** 从该条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话） */
@@ -29,7 +32,7 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
   let body: ReactNode;
 
   if (row.kind === "working") {
-    body = <WorkingIndicator startedAt={row.startedAt} />;
+    body = <WorkingIndicator startedAt={row.startedAt} compacting={context.compacting} />;
   } else if (row.kind === "question") {
     body = (
       <QuestionForm
@@ -44,6 +47,8 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
     body = (
       <PermissionRecordView record={row.node.record} footer={row.footer} onFork={context.onFork} />
     );
+  } else if (row.kind === "compaction") {
+    body = <CompactionDivider summary={row.node.summary} />;
   } else if (row.kind === "content") {
     body = (
       <MessageItem

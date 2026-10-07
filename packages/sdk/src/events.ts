@@ -11,6 +11,8 @@ import { type ApiError, toApiError } from "./error";
 export type EventConnect = (
   onEvent: (frame: ServerEvent) => void,
   signal: AbortSignal,
+  /** 每读到一段数据（含 `: heartbeat` 注释行）时回调：看门狗靠它区分「安静」与「半死」 */
+  onActivity: () => void,
 ) => Promise<void>;
 
 export type EventStream = {
@@ -32,6 +34,12 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+
+/**
+ * 连接空闲多久算半死。服务端每 15s 发一次心跳，取三倍余量：
+ * TCP 未断但不再有数据的连接既不会 reject 也不会触发 `onDisconnected`，不主动断开就会一直停在生成中。
+ */
+const STREAM_IDLE_TIMEOUT_MS = 45_000;
 
 export const createEventStream = (connect: EventConnect): EventStream => {
   const eventListeners = new Set<(frame: ServerEvent) => void>();
@@ -59,21 +67,37 @@ export const createEventStream = (connect: EventConnect): EventStream => {
     while (true) {
       const current = controller;
       if (!current || current.signal.aborted) return;
+      let lastActivityAt = Date.now();
+      const watchdog = setInterval(
+        () => {
+          if (Date.now() - lastActivityAt >= STREAM_IDLE_TIMEOUT_MS) current.abort();
+        },
+        Math.floor(STREAM_IDLE_TIMEOUT_MS / 3),
+      );
       try {
-        await connect((frame) => {
-          if (frame.type === "server.connected") {
-            attempt = 0;
-            notifyConnected();
-            return;
-          }
-          for (const listener of eventListeners) listener(frame);
-          if (frame.type === "error") {
-            const error = toApiError(frame);
-            for (const listener of errorListeners) listener(error);
-          }
-        }, current.signal);
+        await connect(
+          (frame) => {
+            lastActivityAt = Date.now();
+            if (frame.type === "server.connected") {
+              attempt = 0;
+              notifyConnected();
+              return;
+            }
+            for (const listener of eventListeners) listener(frame);
+            if (frame.type === "error") {
+              const error = toApiError(frame);
+              for (const listener of errorListeners) listener(error);
+            }
+          },
+          current.signal,
+          () => {
+            lastActivityAt = Date.now();
+          },
+        );
       } catch {
         // 连接失败或被中断，统一走下面的退避重连
+      } finally {
+        clearInterval(watchdog);
       }
 
       notifyDisconnected();

@@ -34,6 +34,14 @@ const toolItem = (id: string, toolCallId: string, name: string): ChatItem => ({
   createdAt: AT,
 });
 
+/** 压缩条目投影出来的摘要消息（`role: "summary"`，正文是 pi 给的结构化摘要） */
+const summaryItem = (id: string, summary: string): ChatItem => ({
+  id,
+  role: "summary",
+  blocks: [text(summary)],
+  createdAt: AT,
+});
+
 const kindsOf = (items: ChatItem[]): string[] => buildChatRows(items).map((row) => row.kind);
 
 const legsOf = (items: ChatItem[]): string[] => {
@@ -86,5 +94,33 @@ describe("present_plan 不进消息区", () => {
     ];
 
     assert.equal(lastTurnPresentedPlan(items), true);
+  });
+});
+
+describe("压缩摘要独立成段", () => {
+  it("压缩条目成 compaction 行，当普通内容行会让人误以为是一轮回答", () => {
+    const items = [
+      summaryItem("c1", "## Goal\n继续实现"),
+      userItem("u1", "继续"),
+      assistantItem("a1", [text("好的")]),
+    ];
+
+    assert.deepEqual(kindsOf(items), ["compaction", "content", "content"]);
+  });
+
+  it("压缩行处在轮末也不抢走页脚，页脚仍落在真正回答的那一行", () => {
+    const items = [
+      userItem("u1", "问一句"),
+      assistantItem("a1", [text("答一句")]),
+      summaryItem("c1", "## Goal\n继续"),
+    ];
+    const rows = buildChatRows(items);
+    // 压缩行与工作中的行都没有页脚字段，故按「有则取，无则空」读
+    const ownerOf = (row: (typeof rows)[number] | undefined): string | undefined =>
+      row && "footer" in row ? row.footer?.item.role : undefined;
+
+    assert.equal(ownerOf(rows[0]), undefined);
+    assert.equal(ownerOf(rows[1]), "assistant", "页脚应落在 assistant 内容行上");
+    assert.equal(rows[2]?.kind, "compaction");
   });
 });

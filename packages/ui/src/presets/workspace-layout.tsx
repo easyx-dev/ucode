@@ -37,6 +37,7 @@ import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
 import { useStatus } from "../hooks/use-status";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
+import { compactionNoticeMessage } from "../lib/compaction";
 import { composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
 import type { GoalCommand } from "../lib/goal-command";
@@ -133,6 +134,16 @@ export function WorkspaceLayout({
     setSidebarOpen(false);
     setWorkbenchSheetOpen(false);
   }, [isDesktop]);
+
+  // 压缩的结果提示（内容太少 / 已压缩过 / 自动压缩失败）：不是错误，只弹一条轻提示——
+  // 它们都没有对应的消息区痕迹，不提示的话用户只会看到「什么都没发生」；弹过即 ack，避免重渲染时重复弹
+  const compactionNotice = chat.compactionNotice;
+  const ackCompactionNotice = chat.ackCompactionNotice;
+  useEffect(() => {
+    if (!compactionNotice) return;
+    toast.info(compactionNoticeMessage(compactionNotice, t));
+    ackCompactionNotice();
+  }, [compactionNotice, ackCompactionNotice, t]);
 
   /** 收起 / 展开侧栏并落盘；移动端抽屉由 sidebarOpen 单独管 */
   const toggleSidebar = useCallback(() => {

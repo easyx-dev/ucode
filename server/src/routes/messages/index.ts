@@ -53,6 +53,8 @@ export const createMessagesRoute = (services: Services) => {
         cwd: record ? resolveSessionCwd(record) : "",
         persisted: Boolean(record?.sourcePath),
         running: services.pool.isActive(sessionId),
+        // 嵌套进度不落盘：断流重连后客户端靠这份清单收敛（快照里没有的即已结束）
+        subagents: services.pool.runningSubagentsOf(sessionId),
         seq,
         ...projection,
       } satisfies MessageListResponse),

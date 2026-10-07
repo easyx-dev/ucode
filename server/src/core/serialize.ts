@@ -257,16 +257,30 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
 };
 
 /**
+ * 最新一次压缩的条目 id：pi 的 `buildContextEntries()` 把最新压缩条目放在**首位**，
+ * 更早的压缩条目只会作为保留区间的普通条目跟在后面（它们对模型已不可见），
+ * 所以这里取第一条，而不是最后一条。没有压缩过时为 undefined。
+ */
+const newestCompactionIdOf = (entries: SessionEntry[]): string | undefined =>
+  entries.find((entry) => entry.type === "compaction")?.id;
+
+/**
  * 把展示用的条目转成前端 DTO；`states` 提供每条条目生效时的会话级设置
  * （由 `transcriptStates` 从全量路径算出，见其说明）。
  * system 提示、usage、label 等内部条目会被过滤掉。
+ *
+ * 只下发**最新**一次压缩的分隔标记：更早的压缩条目会落在外层保留区间里（pi 的
+ * `buildContextEntries()` 一并带出，排在最新那条之后），但它们对模型已经不可见
+ * （见 pi 的 `buildSessionProjection()` 与 `session-format.md`），展示出来只会多出一条没有意义的「已压缩」。
  */
 export const entriesToDTO = (
   entries: SessionEntry[],
   states: ReadonlyMap<string, TranscriptState>,
 ): MessageDTO[] => {
+  const newestCompactionId = newestCompactionIdOf(entries);
   const messages: MessageDTO[] = [];
   for (const entry of entries) {
+    if (entry.type === "compaction" && entry.id !== newestCompactionId) continue;
     const dto = entryToDTO(entry, states.get(entry.id) ?? {});
     if (dto) messages.push(dto);
   }

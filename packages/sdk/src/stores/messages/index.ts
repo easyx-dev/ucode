@@ -4,13 +4,13 @@
  * 每个会话一个 store，全局事件流按 sessionId 路由帧，因此后台会话也能保持最新；
  * React 侧只订阅 store，不关心连接与归并细节。
  */
-import type { ServerEventPayload } from "@ucode/contracts";
+import { ERROR_CODES, type ServerEventPayload } from "@ucode/contracts";
 
 import type { Apis } from "../../apis";
 import { asApiError, toApiError } from "../../error";
 import type { EventStream } from "../../events";
 import { createStore, type Store } from "../../store";
-import type { PromptPayload } from "../../types";
+import type { PromptPayload, SubagentStreams } from "../../types";
 import {
   applyChildFrame,
   applyFrame,
@@ -21,7 +21,7 @@ import {
   patch,
   type SessionStreamState,
 } from "./engine";
-import { appendUserItem, isLiveUid, removeUserItem } from "./reducer";
+import { appendUserItem, isLiveUid, removeUserItem, settle } from "./reducer";
 
 export type { SessionStreamState } from "./engine";
 
@@ -42,6 +42,8 @@ export type MessagesStore = {
   interrupt: (sessionId: string) => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: (sessionId: string, instructions?: string) => Promise<void>;
+  /** 压缩被正常拒绝的提示已展示：清掉标记，避免重连或重渲染时重复弹 */
+  ackCompactionNotice: (sessionId: string) => void;
   /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
   ignorePlan: (sessionId: string) => Promise<void>;
 };
@@ -84,10 +86,31 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       //
       // 只搬运乐观条目的 uid：服务端条目一律用自己的条目 id（天然唯一且跨快照稳定）。否则插入一条
       // 记录（审批、压缩摘要）就会把后面的 uid 整体错位，插入点那一条还会与插入项拿到同一个 uid
-      const previous = engine.store.getState().items;
+      const previous = engine.store.getState();
+      // 嵌套进度先以快照为准：快照里还在跑的保留已归并的内容，本地多出来的（断流期间错过了
+      // `subagent_end`）收敛为已结束；映射也一并重建，免得旧子会话的帧再归到已收敛的卡片上
+      const runningSubagents: SubagentStreams = {};
+      for (const item of snapshot.subagents) {
+        runningSubagents[item.toolCallId] = {
+          sessionId: item.sessionId,
+          description: item.description,
+          items: previous.subagents[item.toolCallId]?.items ?? [],
+          done: false,
+          isError: false,
+        };
+      }
+      for (const [toolCallId, stream] of Object.entries(previous.subagents)) {
+        if (runningSubagents[toolCallId]) continue;
+        runningSubagents[toolCallId] = { ...stream, items: settle(stream.items), done: true };
+      }
+      engine.childToolCalls.clear();
+      for (const item of snapshot.subagents) {
+        if (item.sessionId) engine.childToolCalls.set(item.sessionId, item.toolCallId);
+      }
+
       patch(engine, {
         items: snapshot.messages.map((message, index) => {
-          const inherited = previous[index]?.uid;
+          const inherited = previous.items[index]?.uid;
           return {
             ...message,
             live: message.id === snapshot.liveMessageId,
@@ -95,6 +118,10 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
           };
         }),
         running: snapshot.running,
+        subagents: runningSubagents,
+        // 快照不携带压缩进度与压缩结果提示：压缩中收到快照（如切换会话回来）时只能退回统一的「工作中」提示
+        compacting: false,
+        compactionNotice: null,
         pending: false,
         error: null,
       });
@@ -148,11 +175,13 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
 
   deps.events.onEvent((frame) => {
     if (frame.type === "error") {
+      // 错误帧是一轮的结束信号：「压缩中」也要一并清——留下它会毒到下一轮，
+      // 尾部提示会把普通生成错报成「正在压缩上下文」
       const error = toApiError(frame);
       if (frame.sessionId) {
         const engine = engines.get(frame.sessionId);
         if (!engine) return;
-        patch(engine, { running: false, pending: false, error });
+        patch(engine, { running: false, pending: false, compacting: false, error });
         return;
       }
       for (const engine of engines.values()) patch(engine, { error });
@@ -251,15 +280,26 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
 
     async compact(sessionId, instructions) {
       const engine = ensure(sessionId);
-      patch(engine, { error: null });
+      // 重新发起压缩时一并清掉上一次的压缩结果提示，避免旧标记残留
+      patch(engine, { error: null, compactionNotice: null });
       try {
         await deps.apis.messages.compact({
           sessionId,
           ...(instructions ? { instructions } : {}),
         });
       } catch (error) {
-        patch(engine, { error: asApiError(error) });
+        const apiError = asApiError(error);
+        // 会话还在跑这一轮是预期情况（等它结束再压即可）：走轻提示，不占错误横幅
+        if (apiError.code === ERROR_CODES.sessionBusy) {
+          patch(engine, { compactionNotice: { kind: "busy" } });
+          return;
+        }
+        patch(engine, { error: apiError });
       }
+    },
+
+    ackCompactionNotice(sessionId) {
+      patch(ensure(sessionId), { compactionNotice: null });
     },
 
     async ignorePlan(sessionId) {

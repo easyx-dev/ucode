@@ -1,8 +1,8 @@
 /**
- * 单条消息的内容渲染：用户消息、assistant 内容段（正文 / 思考 / 图片 / 附件）与摘要 / 扩展条目。
+ * 单条消息的内容渲染：用户消息、assistant 内容段（正文 / 思考 / 图片 / 附件）与扩展条目。
  *
- * 工具调用与思考区块已由 chat-nodes 抽成 activity 聚合行，这里只渲染正文 / 图片 / 附件；
- * `trailing` 表示该段是否是来源消息的最后一段。
+ * 工具调用与思考区块已由 chat-nodes 抽成 activity 聚合行，压缩摘要另有分隔行（compaction-divider），
+ * 这里只渲染正文 / 图片 / 附件；`trailing` 表示该段是否是来源消息的最后一段。
  * 用户消息用浅底细边框而非反色气泡，操作与时刻悬停才现。
  */
 import { API_BASE_PATH } from "@ucode/contracts";
@@ -224,11 +224,12 @@ export function MessageItem({
     );
   }
 
-  if (item.role === "summary" || item.role === "custom") {
+  // 扩展条目（custom）不展开内容：它只是界面标记，真正要回放的信息由各标记自己渲染
+  if (item.role === "custom") {
     const text = content.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
       <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
-        {item.role === "summary" ? t("（上下文已压缩）") : t("（扩展消息）")} {text.slice(0, 400)}
+        {t("（扩展消息）")} {text.slice(0, 400)}
       </div>
     );
   }

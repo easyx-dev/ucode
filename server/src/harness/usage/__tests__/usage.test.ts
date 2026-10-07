@@ -312,7 +312,11 @@ describe("UsageService", () => {
   it("上下文占用取最近一次回答的用量，窗口由注入的解析器给出", () => {
     const service = serviceWith([record()]);
     // fixture 里唯一的一次回答：input 10 + output 2
-    assert.deepEqual(service.contextUsageOf(record()), { tokens: 12, contextWindow: 128000 });
+    assert.deepEqual(service.contextUsageOf(record()), {
+      tokens: 12,
+      contextWindow: 128000,
+      estimated: false,
+    });
   });
 
   it("模型窗口不可知时给不出占用", () => {
@@ -340,6 +344,49 @@ describe("UsageService", () => {
     try {
       const service = serviceWith([answered.target]);
       assert.equal(service.contextUsageOf(answered.target)?.tokens, 200);
+    } finally {
+      answered.cleanup();
+    }
+  });
+
+  it("压缩后到新一轮回答之间用压缩结果的估算顶上，且标为估算", () => {
+    const compacted = withSessionFile("ctx-estimated", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(9000) });
+      manager.appendCompaction("summary", null, 9000);
+    });
+    try {
+      const service = serviceWith([compacted.target]);
+      service.rememberCompaction("ctx-estimated", 1500);
+
+      assert.deepEqual(service.contextUsageOf(compacted.target), {
+        tokens: 1500,
+        contextWindow: 128000,
+        estimated: true,
+      });
+
+      // 会话释放（归档 / 删除）后估算一并丢弃
+      service.forget("ctx-estimated");
+      assert.equal(service.contextUsageOf(compacted.target), null);
+    } finally {
+      compacted.cleanup();
+    }
+  });
+
+  it("有实测回答时不采信压缩估算", () => {
+    const answered = withSessionFile("ctx-measured", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(9000) });
+      manager.appendCompaction("summary", null, 9000);
+      appendAssistant(manager, { timeMs: 2000, usage: usageShape(200) });
+    });
+    try {
+      const service = serviceWith([answered.target]);
+      service.rememberCompaction("ctx-measured", 1500);
+
+      assert.deepEqual(service.contextUsageOf(answered.target), {
+        tokens: 200,
+        contextWindow: 128000,
+        estimated: false,
+      });
     } finally {
       answered.cleanup();
     }

@@ -2,13 +2,19 @@
  * 单个会话流的引擎：消息列表、生成态与子智能体进度的 store，以及事件归并。
  * 由 `createSessionStreams` 按 sessionId 复用。
  */
-import type { ServerEventPayload } from "@ucode/contracts";
+import type { CompactionNotice, ServerEventPayload } from "@ucode/contracts";
 
 import type { Apis } from "../../apis";
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
 import type { ChatItem, PromptPayload, SubagentStreams } from "../../types";
-import { asRecord, attachAssistantTiming, reduceEvent, settle } from "./reducer";
+import {
+  asRecord,
+  attachAssistantTiming,
+  compactionNoticeOf,
+  reduceEvent,
+  settle,
+} from "./reducer";
 
 /** 会让界面进入「生成中」的事件；agent_settled 是唯一的结束边界 */
 const ACTIVITY_EVENTS: ReadonlySet<string> = new Set([
@@ -28,6 +34,15 @@ const ACTIVITY_EVENTS: ReadonlySet<string> = new Set([
 export type SessionStreamState = {
   items: ChatItem[];
   running: boolean;
+  /**
+   * 正在压缩上下文：压缩不产出消息，进度只能靠独立标记表达（列表尾部据此换文案）
+   */
+  compacting: boolean;
+  /**
+   * 压缩的结果提示（正常拒绝 / 自动压缩失败）：界面弹过一条轻提示后由 `ackCompactionNotice` 清掉，
+   * 避免重连或重渲染时重复弹
+   */
+  compactionNotice: CompactionNotice | null;
   /** 已受理、还没收到首个活动事件：消息区尾部显示等待指示 */
   pending: boolean;
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
@@ -58,6 +73,8 @@ type StreamTiming = {
 export const EMPTY_STATE: SessionStreamState = {
   items: [],
   running: false,
+  compacting: false,
+  compactionNotice: null,
   pending: false,
   subagents: {},
   loadingHistory: false,
@@ -237,6 +254,8 @@ export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
         : state.subagents;
     patch(engine, {
       running: false,
+      compacting: false,
+      compactionNotice: null,
       pending: false,
       items: settle(state.items),
       subagents,
@@ -247,6 +266,26 @@ export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
   // 首个活动事件到达即接手生成态，pending 让位给 running
   if (ACTIVITY_EVENTS.has(frame.type)) {
     patch(engine, { running: true, pending: false });
+  }
+
+  // 压缩不产出消息：只维护压缩标记与「被正常拒绝」的原因（后者供界面弹一条轻提示）
+  if (frame.type === "compaction_start") {
+    patch(engine, { compacting: true });
+    return;
+  }
+  if (frame.type === "compaction_end") {
+    const data = asRecord(frame.data);
+    // 手动压缩是一轮独立的服务端动作，**不会**再有 `agent_settled` 收尾：
+    // 就地结束「生成中」，否则被拒绝时界面会永远停在「工作中」（成功的另一条路会再由快照校正一次）。
+    // 自动压缩（threshold / overflow）发生在生成轮中途，由后续事件继续驱动，不动它的运行态
+    const manual = data.reason === "manual";
+    const notice = compactionNoticeOf(data, manual);
+    patch(engine, {
+      compacting: false,
+      ...(manual ? { running: false, pending: false } : {}),
+      ...(notice ? { compactionNotice: notice } : {}),
+    });
+    return;
   }
 
   // 记录思考耗时（仅本次运行内可见，快照重建后丢失）

@@ -188,7 +188,13 @@
       置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
       模式），`contextUsage` 与它同帧
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
-  - `transcript_reset`：载荷 `{ fromEntryId }`，编辑重发或追加界面标记后活动分支 / 历史已改变，
+  - 压缩：`compaction_start` 载荷 `{ reason }`（`manual` / `threshold` / `overflow`），`compaction_end` 载荷
+    `{ reason, tokensBefore?, estimatedTokensAfter? }`——两个规模字段只在压缩成功时存在，真失败统一走 error 帧
+    （`compaction_failed`）。被**正常拒绝**时载荷为 `{ reason, skipped }`（`too_small` / `already_compacted`）：
+    没有可总结的跨度或已是压缩后的状态，没做任何事、也不改变会话状态，客户端只弹一条轻提示；
+    **自动压缩**失败时载荷为 `{ reason, errorMessage }`（它不中断这一轮，不能标成「本轮出错」）。
+    压缩会重写可见历史：早期条目被摘要替代，只剩从 `firstKeptEntryId` 起的保留区间，与 `messages/list` 的投影一致
+  - `transcript_reset`：载荷 `{ fromEntryId }`，活动分支或可见历史已改变（编辑重发、追加界面标记、上下文压缩），
     客户端应重取快照；它不参与 `seq` 切分（收到即整表重取）
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、

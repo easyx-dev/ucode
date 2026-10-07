@@ -1,5 +1,12 @@
 /** 会话消息列表的事件归并（纯函数，便于复用与单测） */
-import type { MessageBlock, MessageDTO, MessageRole } from "@ucode/contracts";
+import {
+  COMPACTION_SKIP_REASONS,
+  type CompactionNotice,
+  type CompactionSkipReason,
+  type MessageBlock,
+  type MessageDTO,
+  type MessageRole,
+} from "@ucode/contracts";
 
 import type { ChatItem, ChatItemTiming } from "../../types";
 
@@ -172,6 +179,29 @@ export const attachAssistantTiming = (items: ChatItem[], timing: ChatItemTiming)
     }
   }
   return items;
+};
+
+/** 压缩被正常拒绝的原因；载荷不可信，非白名单值一概当没有 */
+export const compactionSkipOf = (data: Record<string, unknown>): CompactionSkipReason | null => {
+  const value = data.skipped;
+  return typeof value === "string" && (COMPACTION_SKIP_REASONS as readonly string[]).includes(value)
+    ? (value as CompactionSkipReason)
+    : null;
+};
+
+/**
+ * 帧里的压缩结果提示：正常拒绝优先；否则看**自动压缩**的失败原因。
+ * 手动压缩的失败另有 error 帧（`compaction_failed`），不在这里重复报。
+ */
+export const compactionNoticeOf = (
+  data: Record<string, unknown>,
+  manual: boolean,
+): CompactionNotice | null => {
+  const skipped = compactionSkipOf(data);
+  if (skipped) return { kind: "skipped", reason: skipped };
+  const message = data.errorMessage;
+  if (manual || typeof message !== "string" || message.length === 0) return null;
+  return { kind: "failed", reason: message };
 };
 
 /** 一条 SSE 事件 → 新的消息列表 */

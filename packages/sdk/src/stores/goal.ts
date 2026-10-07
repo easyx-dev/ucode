@@ -41,6 +41,16 @@ export const createGoalStore = (deps: { apis: Apis; events: EventStream }): Goal
     store.setState((prev) => ({ ...prev, bySession: { ...prev.bySession, [sessionId]: goal } }));
   };
 
+  /** 从会话详情补一次目标；取不到时保留上一次的值 */
+  const hydrate = async (sessionId: string): Promise<void> => {
+    try {
+      const { goal } = await deps.apis.sessions.info(sessionId);
+      write(sessionId, goal);
+    } catch {
+      // 目标只是展示，取不到不打扰
+    }
+  };
+
   const apply = async (
     sessionId: string,
     action: () => Promise<{ goal: GoalView | null }>,
@@ -58,18 +68,22 @@ export const createGoalStore = (deps: { apis: Apis; events: EventStream }): Goal
     write(frame.sessionId, (frame.data as GoalView | null) ?? null);
   });
 
+  // 重连补快照：目标状态的真相在服务端（连续跑与暂停都可能由服务端自己发起），
+  // 断流期间错过的 `goal_update` 不回放，只重取已加载过的会话
+  let connectedOnce = false;
+  deps.events.onConnected(() => {
+    if (!connectedOnce) {
+      connectedOnce = true;
+      return;
+    }
+    for (const sessionId of Object.keys(store.getState().bySession)) void hydrate(sessionId);
+  });
+
   return {
     getState: store.getState,
     subscribe: store.subscribe,
     get: (sessionId) => (sessionId ? (store.getState().bySession[sessionId] ?? null) : null),
-    async hydrate(sessionId) {
-      try {
-        const { goal } = await deps.apis.sessions.info(sessionId);
-        write(sessionId, goal);
-      } catch {
-        // 目标只是展示，取不到不打扰
-      }
-    },
+    hydrate,
     set: (sessionId, input) => apply(sessionId, () => deps.apis.goals.set({ sessionId, ...input })),
     pause: (sessionId) => apply(sessionId, () => deps.apis.goals.pause(sessionId)),
     resume: (sessionId) => apply(sessionId, () => deps.apis.goals.resume(sessionId)),

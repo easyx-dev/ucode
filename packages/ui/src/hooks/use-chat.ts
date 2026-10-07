@@ -1,5 +1,5 @@
 /** 会话消息流：订阅 SDK 的 messages store，装配「无会话时先建会话再投递」的发送流程 */
-import type { SessionCreateRequest, SessionSummary } from "@ucode/contracts";
+import type { CompactionNotice, SessionCreateRequest, SessionSummary } from "@ucode/contracts";
 import type { ChatItem, SubagentStreams } from "@ucode/sdk";
 import { useCallback, useRef, useState } from "react";
 
@@ -19,6 +19,8 @@ export type ChatController = {
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents: SubagentStreams;
   streaming: boolean;
+  /** 本轮进行的是上下文压缩：尾部提示据此换文案 */
+  compacting: boolean;
   /** 当前语言渲染的错误文案 */
   error: string | null;
   loadingHistory: boolean;
@@ -30,6 +32,9 @@ export type ChatController = {
   stop: () => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: () => Promise<void>;
+  /** 压缩的结果提示（正常拒绝 / 自动压缩失败）；不是错误，界面弹过轻提示后调 ack 清掉 */
+  compactionNotice: CompactionNotice | null;
+  ackCompactionNotice: () => void;
   /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
   ignorePlan: () => Promise<void>;
 };
@@ -98,6 +103,11 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     await client.messages.compact(sessionId);
   }, [client, sessionId]);
 
+  const ackCompactionNotice = useCallback((): void => {
+    if (!sessionId) return;
+    client.messages.ackCompactionNotice(sessionId);
+  }, [client, sessionId]);
+
   const ignorePlan = useCallback(async (): Promise<void> => {
     if (!sessionId) return;
     await client.messages.ignorePlan(sessionId);
@@ -110,12 +120,15 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     subagents: stream.subagents,
     // 在途的三种情况合并成一个「进行中」：列表尾部据此显示工作中提示
     streaming: stream.running || sending || stream.pending,
+    compacting: stream.compacting,
     error,
     loadingHistory: stream.loadingHistory,
     send,
     edit,
     stop,
     compact,
+    compactionNotice: stream.compactionNotice,
+    ackCompactionNotice,
     ignorePlan,
   };
 }

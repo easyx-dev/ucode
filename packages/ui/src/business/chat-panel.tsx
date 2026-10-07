@@ -76,9 +76,9 @@ type ChatPanelProps = {
   onGoalCommand: (command: GoalCommand, seed?: SessionCreateRequest) => void;
   /** 执行内置命令（`/` 菜单里的动作型命令） */
   onBuiltin: (id: BuiltinCommandId) => void;
-  /** 本会话累计 token 用量；用于头部徽标 */
+  /** 本会话累计 token 用量；用于头部徽标的显示条件 */
   usage?: UsageTotals | null;
-  /** 本会话当前上下文占用；取不到时头部回落显示累计用量 */
+  /** 本会话当前上下文占用；取不到时头部徽标只显示占位符 */
   context?: ContextUsage | null;
   /** 打开全局使用统计 */
   onOpenUsage?: () => void;
@@ -237,6 +237,7 @@ export function ChatPanel({
         subagents={chat.subagents}
         loading={chat.loadingHistory}
         working={chat.streaming}
+        compacting={chat.compacting}
         empty={empty}
         resetKey={session?.id ?? ""}
         onOpenSession={onOpenSession}

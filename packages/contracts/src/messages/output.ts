@@ -58,6 +58,21 @@ export type MessageDTO = {
   completedAt?: string;
 };
 
+/**
+ * 快照里的进行中子智能体（只给服务端还在跑的那些）。
+ *
+ * 嵌套进度不落盘，只靠 `subagent_start` / `subagent_end` 增量维护——断流期间的结束帧会丢，
+ * 客户端会永远停在「执行中」；快照带上清单后，客户端以快照为准收敛。
+ */
+export type SubagentSnapshot = {
+  /** 父会话里发起这次委派的工具调用 id */
+  toolCallId: string;
+  /** 子会话 id */
+  sessionId: string;
+  /** 任务简称（服务端已按长度截断） */
+  description: string;
+};
+
 export type MessageListResponse = SessionScoped & {
   messages: MessageDTO[];
   /** 是否已有落盘会话文件 */
@@ -66,6 +81,8 @@ export type MessageListResponse = SessionScoped & {
   cwd: string;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
+  /** 仍在进行的子智能体；断流重连后客户端据此重建/收敛嵌套进度 */
+  subagents: SubagentSnapshot[];
   /**
    * 快照序号：本响应已包含到该序号为止的全部事件效果。
    * 客户端订阅后丢弃 seq <= 它的实时帧，可无缝接续。

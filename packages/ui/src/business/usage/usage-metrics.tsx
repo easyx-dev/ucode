@@ -7,7 +7,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import type { ContextUsage, StatsSummaryResponse } from "../../lib/types";
-import { contextPercent, formatDuration, formatTokens } from "../../lib/usage";
+import { contextPercentLabel, formatDuration, formatTokens } from "../../lib/usage";
 
 type UsageMetricsProps = {
   data: StatsSummaryResponse;
@@ -66,11 +66,18 @@ export function UsageMetrics({ data, context }: UsageMetricsProps) {
       {context ? (
         <MetricCard
           label={t("当前会话上下文占用")}
-          value={`${contextPercent(context)}%`}
-          hint={t("{{used}} / {{window}} token", {
-            used: formatTokens(context.tokens),
-            window: formatTokens(context.contextWindow),
-          })}
+          value={contextPercentLabel(context)}
+          hint={
+            context.estimated
+              ? t("估算 · {{used}} / {{window}} token", {
+                  used: formatTokens(context.tokens),
+                  window: formatTokens(context.contextWindow),
+                })
+              : t("{{used}} / {{window}} token", {
+                  used: formatTokens(context.tokens),
+                  window: formatTokens(context.contextWindow),
+                })
+          }
         />
       ) : null}
     </div>

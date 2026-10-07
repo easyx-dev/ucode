@@ -677,6 +677,7 @@
 | `persisted` | boolean | 是 | 是否已有落盘会话文件 |
 | `cwd` | string | 是 | 会话工作目录 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
+| `subagents` | [SubagentSnapshot](#subagentsnapshot)[] | 是 | 仍在进行的子智能体；断流重连后客户端据此重建/收敛嵌套进度 |
 | `seq` | number | 是 | 快照序号：本响应已包含到该序号为止的全部事件效果。 客户端订阅后丢弃 seq <= 它的实时帧，可无缝接续。 |
 | `liveMessageId` | string | 否 | 投影出的在途消息 id；前端据此把该条标记为生成中 |
 
@@ -1434,6 +1435,7 @@
 | --- | --- | --- | --- |
 | `tokens` | number | 是 | 上下文里的 token 数 |
 | `contextWindow` | number | 是 | 该会话当前生效模型的上下文窗口 |
+| `estimated` | boolean | 是 | 是否为估算值：压缩会重写上下文，而压缩点之前那次回答的用量反映的是压缩前的规模， 因此压缩完成到新一轮回答之间没有可信的实测值，只能用压缩结果里的估算规模顶替。 |
 
 ### GoalView
 
@@ -1467,6 +1469,14 @@
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
 | `completedAt` | string | 否 | assistant 专用：该条回复生成结束、写入会话记录的时刻（ISO 8601 UTC）。 pi 的 `message.timestamp` 是开始生成的时刻，回复的真实耗时要靠它与 createdAt 相减得到。 |
+
+### SubagentSnapshot
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `toolCallId` | string | 是 | 父会话里发起这次委派的工具调用 id |
+| `sessionId` | string | 是 | 子会话 id |
+| `description` | string | 是 | 任务简称（服务端已按长度截断） |
 
 ### PendingInteraction
 

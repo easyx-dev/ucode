@@ -3,6 +3,8 @@ export const readSseStream = async (
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: unknown) => void,
   signal?: AbortSignal,
+  /** 每读到一段数据（含注释行心跳）时回调：调用方的连接看门狗靠它判活 */
+  onActivity?: () => void,
 ): Promise<void> => {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -12,6 +14,7 @@ export const readSseStream = async (
     while (!signal?.aborted) {
       const { value, done } = await reader.read();
       if (done) break;
+      onActivity?.();
       buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
 
       let separator = buffer.indexOf("\n\n");

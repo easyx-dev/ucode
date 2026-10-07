@@ -82,6 +82,31 @@ export const PLAN_IGNORED_CUSTOM_TYPE = "ucode.plan-ignored";
 export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
 
 /**
+ * 手动压缩被**正常拒绝**（不是失败）的原因：
+ * - `too_small`：上下文里没有可总结的跨度（pi 的保留预算里装得下全部内容）；
+ * - `already_compacted`：路径上已经是压缩后的状态，没有新内容可压。
+ *
+ * 两者都不该当错误看——没做任何事，也不改变会话状态，界面只给一条轻提示。
+ * 跨端常量：服务端识别（走 `compaction_end` 的 `skipped`），客户端据此挑文案。
+ */
+export const COMPACTION_SKIP_REASONS = ["too_small", "already_compacted"] as const;
+
+export type CompactionSkipReason = (typeof COMPACTION_SKIP_REASONS)[number];
+
+/**
+ * 一次压缩的结果提示：成功不需要提示（可见历史会自己收缩成摘要 + 保留区间），
+ * 下面两类才需要告知用户——它们都没改变历史，但用户得知道为什么。
+ *
+ * `skipped` 是正常拒绝（没做任何事）；`failed` 是**自动压缩**没压下去（带 pi 的原始原因）：
+ * 它不中断这一轮，但上下文已经逼近窗口，下一轮多半直接报超窗错，不提示的话用户只能看到那个错。
+ */
+export type CompactionNotice =
+  | { kind: "skipped"; reason: CompactionSkipReason }
+  | { kind: "failed"; reason: string }
+  /** 会话还在跑这一轮：等它结束再压即可，不是失败，也不该占错误横幅 */
+  | { kind: "busy" };
+
+/**
  * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
  * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
  *

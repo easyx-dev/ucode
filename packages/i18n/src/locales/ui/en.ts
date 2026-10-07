@@ -264,8 +264,17 @@ export default {
   // Messages
   思考过程: "Reasoning",
   子智能体过程: "Subagent progress",
-  "（上下文已压缩）": "(context compacted)",
   "（扩展消息）": "(extended message)",
+  会话已压缩: "Session compacted",
+  "正在压缩上下文…": "Compacting context",
+  查看摘要: "Show summary",
+  收起摘要: "Hide summary",
+  "当前上下文已经很紧凑，无需压缩": "The context is already compact enough; nothing to compact.",
+  "当前上下文已经是压缩后的状态，无需重复压缩":
+    "The context is already compacted; there is nothing to compact again.",
+  "自动压缩失败：{{reason}}": "Automatic compaction failed: {{reason}}",
+  "会话正在生成，等这一轮结束再压缩":
+    "The session is generating; compact after this turn finishes.",
   工作中: "Working",
   执行中: "Running",
   失败: "Failed",
@@ -474,6 +483,9 @@ export default {
   使用统计: "Usage",
   当前会话上下文占用: "Current session context usage",
   "{{used}} / {{window}} token": "{{used}} / {{window}} tokens",
+  "估算 · {{used}} / {{window}} token": "Estimated · {{used}} / {{window}} tokens",
+  "压缩后为估算值，新一轮回答后回到实测":
+    "Estimated after compaction; the next response restores the measured value.",
   "从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。":
     "Token usage aggregated from local session records; model cost is not included, and subagent / forked sessions are counted.",
   按会话: "By session",

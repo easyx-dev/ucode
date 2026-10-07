@@ -43,9 +43,13 @@ export const ERROR_CODES = {
   notFound: "not_found",
   /** 服务端未预期异常 */
   internal: "internal_error",
+  /** 请求超时（客户端传输层判定，服务端不会返回该码） */
+  requestTimeout: "request_timeout",
 
   /** 会话正在生成，需先中断 */
   sessionBusy: "session_busy",
+  /** 上下文压缩失败（内容太少、已压缩过、总结调用失败等） */
+  compactionFailed: "compaction_failed",
 
   /** 指定的模型不可用 */
   unknownModel: "unknown_model",

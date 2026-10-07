@@ -125,7 +125,10 @@ export const createApis = (options: ApisOptions = {}) => {
         transport.post<ConfigSnapshot>("config/update", patch),
       test: (input: ConfigTestRequest) => transport.post<ConfigTestResponse>("config/test", input),
       fetchModels: (input: ProviderModelsRequest) =>
-        transport.post<ProviderModelsResponse>("config/fetch-models", input),
+        transport.post<ProviderModelsResponse>("config/fetch-models", input, {
+          // 这条要走去上游拉模型目录，慢是正常的
+          timeoutMs: 60_000,
+        }),
     },
     sessions: {
       list: (body: SessionListRequest) =>
@@ -200,6 +203,8 @@ export const createApis = (options: ApisOptions = {}) => {
           "attachments",
           file,
           name ? { name } : undefined,
+          // 附件可达 32MB，别按普通接口的 30s 卡它
+          { timeoutMs: 120_000 },
         ),
     },
     agents: {
@@ -237,7 +242,11 @@ export const createApis = (options: ApisOptions = {}) => {
     },
     events: {
       /** 建立全局事件流连接；连接结束（含被 signal 中断）后返回 */
-      stream: async (onEvent: (frame: ServerEvent) => void, signal: AbortSignal): Promise<void> => {
+      stream: async (
+        onEvent: (frame: ServerEvent) => void,
+        signal: AbortSignal,
+        onActivity: () => void,
+      ): Promise<void> => {
         const body = await transport.postStream("events", {}, signal);
         await readSseStream(
           body,
@@ -245,6 +254,7 @@ export const createApis = (options: ApisOptions = {}) => {
             if (data && typeof data === "object") onEvent(data as ServerEvent);
           },
           signal,
+          onActivity,
         );
       },
     },

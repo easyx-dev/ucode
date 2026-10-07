@@ -59,6 +59,31 @@ export const createUsageStore = (deps: { apis: Apis; events: EventStream }): Usa
     }));
   });
 
+  /** 经 `sessions/info` 补一次会话用量与占用；取不到时沿用上一次 */
+  const loadSession = async (sessionId: string): Promise<void> => {
+    try {
+      const { usage, contextUsage } = await deps.apis.sessions.info(sessionId);
+      store.setState((prev) => ({
+        ...prev,
+        bySession: { ...prev.bySession, [sessionId]: usage },
+        contextBySession: { ...prev.contextBySession, [sessionId]: contextUsage },
+      }));
+    } catch {
+      // 用量只是展示，取不到沿用上一次
+    }
+  };
+
+  // 重连补快照：断流期间错过的 `session_updated` 不回放，只重取已加载过的会话
+  // （头部徽标与统计里的本会话占用都靠它，不补就会一直显示断线前的数字）
+  let connectedOnce = false;
+  deps.events.onConnected(() => {
+    if (!connectedOnce) {
+      connectedOnce = true;
+      return;
+    }
+    for (const sessionId of Object.keys(store.getState().bySession)) void loadSession(sessionId);
+  });
+
   return {
     getState: store.getState,
     subscribe: store.subscribe,
@@ -84,17 +109,6 @@ export const createUsageStore = (deps: { apis: Apis; events: EventStream }): Usa
     getSession: (sessionId) => (sessionId ? (store.getState().bySession[sessionId] ?? null) : null),
     getContext: (sessionId) =>
       sessionId ? (store.getState().contextBySession[sessionId] ?? null) : null,
-    async loadSession(sessionId) {
-      try {
-        const { usage, contextUsage } = await deps.apis.sessions.info(sessionId);
-        store.setState((prev) => ({
-          ...prev,
-          bySession: { ...prev.bySession, [sessionId]: usage },
-          contextBySession: { ...prev.contextBySession, [sessionId]: contextUsage },
-        }));
-      } catch {
-        // 用量只是展示，取不到沿用上一次
-      }
-    },
+    loadSession,
   };
 };

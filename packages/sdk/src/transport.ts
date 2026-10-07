@@ -18,13 +18,26 @@ export type TransportOptions = {
   onUnauthorized?: () => void;
   /** 错误兜底文案的翻译函数；未注入时用中文模板插值 */
   translate?: Translate;
+  /** 请求超时毫秒数；缺省 30s，`0` 表示不设超时（长连接） */
+  timeoutMs?: number;
+};
+
+/** 单个请求的超时覆盖 */
+export type RequestOptions = {
+  /** 毫秒；缺省用 `TransportOptions.timeoutMs` */
+  timeoutMs?: number;
 };
 
 export type Transport = {
   /** POST JSON 并拆封套 */
-  post: <T>(action: string, body?: unknown) => Promise<T>;
+  post: <T>(action: string, body?: unknown, request?: RequestOptions) => Promise<T>;
   /** POST 原始字节（附件上传），响应仍走 JSON 封套 */
-  postBinary: <T>(action: string, body: Blob, query?: Record<string, string>) => Promise<T>;
+  postBinary: <T>(
+    action: string,
+    body: Blob,
+    query?: Record<string, string>,
+    request?: RequestOptions,
+  ) => Promise<T>;
   /** POST 并返回流（事件流），不解析封套 */
   postStream: (
     action: string,
@@ -32,10 +45,16 @@ export type Transport = {
     signal: AbortSignal,
   ) => Promise<ReadableStream<Uint8Array>>;
   /** GET 并拆封套 */
-  get: <T>(action: string) => Promise<T>;
+  get: <T>(action: string, request?: RequestOptions) => Promise<T>;
   /** 拼接绝对（或同源相对）地址，用于附件等直链 */
   absoluteUrl: (action: string) => string;
 };
+
+/**
+ * 请求超时缺省值。本地服务的接口都很快，超过这个时间基本是连接半死；
+ * 已知慢的接口（拉上游模型目录、附件上传）在调用处单独放宽。
+ */
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export const createTransport = (options: TransportOptions = {}): Transport => {
   const root = (options.baseUrl ?? "").replace(/\/+$/, "");
@@ -110,24 +129,59 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     }
   };
 
+  /**
+   * 发请求并处理超时。超时（`AbortSignal.timeout` 触发）映射成可读的业务错误；
+   * 其它异常原样抛出，由调用方决定怎么报。
+   */
+  const send = async (
+    url: string,
+    init: RequestInit,
+    timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  ): Promise<Response> => {
+    const signal = timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
+    try {
+      return await doFetch(url, { ...init, ...(signal ? { signal } : {}) });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new ApiError(ERROR_CODES.requestTimeout, message("请求超时，请重试"), {
+          httpStatus: 0,
+        });
+      }
+      throw error;
+    }
+  };
+
   return {
-    async post<T>(action: string, body: unknown = {}): Promise<T> {
-      const response = await doFetch(`${base}/${action}`, {
-        method: "POST",
-        headers: await requestHeaders("application/json"),
-        body: JSON.stringify(body),
-        credentials: "include",
-      });
+    async post<T>(action: string, body: unknown = {}, request?: RequestOptions): Promise<T> {
+      const response = await send(
+        `${base}/${action}`,
+        {
+          method: "POST",
+          headers: await requestHeaders("application/json"),
+          body: JSON.stringify(body),
+          credentials: "include",
+        },
+        request?.timeoutMs,
+      );
       return unwrap<T>(response);
     },
-    async postBinary<T>(action: string, body: Blob, query?: Record<string, string>): Promise<T> {
+    async postBinary<T>(
+      action: string,
+      body: Blob,
+      query?: Record<string, string>,
+      request?: RequestOptions,
+    ): Promise<T> {
       const search = query ? `?${new URLSearchParams(query).toString()}` : "";
-      const response = await doFetch(`${base}/${action}${search}`, {
-        method: "POST",
-        headers: await requestHeaders(body.type || "application/octet-stream"),
-        body,
-        credentials: "include",
-      });
+      const response = await send(
+        `${base}/${action}${search}`,
+        {
+          method: "POST",
+          headers: await requestHeaders(body.type || "application/octet-stream"),
+          body,
+          credentials: "include",
+        },
+        request?.timeoutMs,
+      );
       return unwrap<T>(response);
     },
     async postStream(
@@ -156,11 +210,12 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
       }
       return response.body;
     },
-    async get<T>(action: string): Promise<T> {
-      const response = await doFetch(`${base}/${action}`, {
-        headers: await requestHeaders(),
-        credentials: "include",
-      });
+    async get<T>(action: string, request?: RequestOptions): Promise<T> {
+      const response = await send(
+        `${base}/${action}`,
+        { headers: await requestHeaders(), credentials: "include" },
+        request?.timeoutMs,
+      );
       return unwrap<T>(response);
     },
     absoluteUrl: (action) => `${base}/${action}`,

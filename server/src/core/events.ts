@@ -138,8 +138,28 @@ const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
       ];
     case "compaction_start":
       return [{ event: "compaction_start", data: { reason: event.reason } }];
-    case "compaction_end":
-      return [{ event: "compaction_end", data: {} }];
+    case "compaction_end": {
+      // 成功时给规模变化；失败时给 pi 的原因——自动压缩失败没有别的通道，不带给客户端
+      // 用户就只能等下一轮超窗报错才知道上下文没压下去（手动压缩的失败另有 error 帧）
+      const result = event.result;
+      const errorMessage = event.errorMessage;
+      return [
+        {
+          event: "compaction_end",
+          data: {
+            reason: event.reason,
+            ...(result
+              ? {
+                  tokensBefore: result.tokensBefore,
+                  estimatedTokensAfter: result.estimatedTokensAfter,
+                }
+              : errorMessage
+                ? { errorMessage }
+                : {}),
+          },
+        },
+      ];
+    }
     case "agent_settled":
       return [{ event: "agent_settled", data: {} }];
     // pi 的会话信息变更（如标题变化）不再单独下发：服务端在写入摘要后统一发 `session_updated`

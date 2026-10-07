@@ -4,6 +4,7 @@
  * 用量已经在会话 JSONL 里（assistant 消息的 `usage`、独立 `usage` 条目、compaction / branch_summary 的 `usage`），
  * 这里只做读取与聚合，不落库；按会话文件 mtime 缓存解析结果，避免重复扫描。
  * 口径与 pi 的 `getSessionStats()` 一致（合计 = input + output + cacheRead + cacheWrite），不计成本。
+ * 上下文占用取最近一次可信回答的规模；压缩后到新一轮回答之间用压缩结果的估算顶替（见 `estimated`）。
  */
 import { existsSync, statSync } from "node:fs";
 
@@ -197,7 +198,7 @@ type CachedSessionUsage = {
   path: string;
   mtimeMs: number;
   points: UsagePoint[];
-  /** 上下文占用 token 数；拿不到有效基准时为 null（见 `contextTokensOfBranch`） */
+  /** 解析出的上下文占用 token 数；拿不到可信基准时为 null（见 `contextTokensOfBranch`） */
   contextTokens: number | null;
 };
 
@@ -207,6 +208,11 @@ type CachedSessionUsage = {
  */
 export class UsageService {
   private readonly cache = new Map<string, CachedSessionUsage>();
+  /**
+   * 压缩后、还没有新回答时的上下文估算（pi 压缩结果里的 `estimatedTokensAfter`），按会话索引。
+   * 存在进程内存：它只是「等新回答期间的展示回填」，服务重启后拿不到也不影响实测口径。
+   */
+  private readonly estimated = new Map<string, number>();
 
   constructor(
     private readonly sessions: SessionRepository,
@@ -231,23 +237,45 @@ export class UsageService {
   }
 
   /**
-   * 单会话当前上下文占用；拿不到有效基准、或模型窗口不可知时返回 null。
+   * 单会话当前上下文占用；没有任何可信口径、或模型窗口不可知时返回 null。
    *
    * 池内会话直接问 pi（内存里已有投影，不必重解析文件）；离线会话按文件 mtime 缓存读基准。
+   * 压缩完成到新一轮回答之间 pi 给不出实测值，此时用压缩结果的估算顶替并置 `estimated`。
    */
   contextUsageOf(
     record: SessionRecord,
     options: { live?: AgentSession | undefined } = {},
   ): ContextUsage | null {
-    if (options.live) {
-      const usage = options.live.getContextUsage();
-      if (!usage || usage.tokens === null) return null;
-      return { tokens: usage.tokens, contextWindow: usage.contextWindow };
+    // pi 的 getContextUsage() 每次都要重建投影，只问一次，窗口与 token 数同源取
+    const piUsage = options.live?.getContextUsage();
+    const contextWindow = piUsage?.contextWindow ?? this.contextWindowOf(record.model);
+    const measured = options.live
+      ? (piUsage?.tokens ?? null)
+      : (this.cachedOf(record)?.contextTokens ?? null);
+    if (measured !== null && contextWindow !== null) {
+      return { tokens: measured, contextWindow, estimated: false };
     }
-    const tokens = this.cachedOf(record)?.contextTokens ?? null;
-    const contextWindow = this.contextWindowOf(record.model);
-    if (tokens === null || contextWindow === null) return null;
-    return { tokens, contextWindow };
+
+    const estimated = this.estimated.get(record.id);
+    if (estimated !== undefined && contextWindow !== null) {
+      return { tokens: estimated, contextWindow, estimated: true };
+    }
+    return null;
+  }
+
+  /**
+   * 记下一次压缩后估算的上下文规模；`tokens` 非法（非有限数 / 负数）时忽略，
+   * 宁可继续给不出占用，也不要展示一个没意义的数。
+   */
+  rememberCompaction(sessionId: string, tokens: number): void {
+    if (!Number.isFinite(tokens) || tokens < 0) return;
+    this.estimated.set(sessionId, tokens);
+  }
+
+  /** 会话被释放（归档 / 删除 / 重建）时丢掉该会话的缓存与估算，避免键无限累积 */
+  forget(sessionId: string): void {
+    this.cache.delete(sessionId);
+    this.estimated.delete(sessionId);
   }
 
   /**

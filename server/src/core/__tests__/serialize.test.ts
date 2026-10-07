@@ -10,7 +10,7 @@ import {
   PLAN_IGNORED_CUSTOM_TYPE,
 } from "@ucode/contracts";
 
-import { blocksOf, entryToDTO } from "../serialize";
+import { blocksOf, entriesToDTO, entryToDTO } from "../serialize";
 
 describe("blocksOf 的 image 分支", () => {
   it("投影为 { id, mimeType, url }，id 与附件库的 sha256 一致", () => {
@@ -101,5 +101,49 @@ describe("entryToDTO 的 custom 分支", () => {
 
   it("其它 customType 的扩展条目不展示", () => {
     assert.equal(entryToDTO(customEntry("other.extension")), null);
+  });
+});
+
+describe("entriesToDTO 的压缩条目", () => {
+  const compactionEntry = (id: string): SessionEntry => ({
+    type: "compaction",
+    id,
+    parentId: null,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    summary: `摘要 ${id}`,
+    firstKeptEntryId: "entry-1",
+    tokensBefore: 100,
+  });
+
+  const userEntry = (id: string): SessionEntry => ({
+    type: "message",
+    id,
+    parentId: null,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    message: {
+      role: "user",
+      content: [{ type: "text", text: "问一句" }],
+      timestamp: 1767225600000,
+    },
+  });
+
+  it("只下发最新一次压缩的分隔标记：最新那条在首位，更早的落在外层保留区间里", () => {
+    // 顺序即 pi 的 buildContextEntries() 输出：最新压缩条目在前，更早的压缩跟在保留区间里
+    const entries = [
+      compactionEntry("c2"),
+      userEntry("u1"),
+      compactionEntry("c1"),
+      userEntry("u2"),
+    ];
+
+    const ids = entriesToDTO(entries, new Map()).map((dto) => `${dto.role}:${dto.id}`);
+    assert.deepEqual(ids, ["summary:c2", "user:u1", "user:u2"]);
+  });
+
+  it("只压缩过一次时照常下发", () => {
+    const ids = entriesToDTO([compactionEntry("c1"), userEntry("u1")], new Map()).map(
+      (dto) => `${dto.role}:${dto.id}`,
+    );
+    assert.deepEqual(ids, ["summary:c1", "user:u1"]);
   });
 });

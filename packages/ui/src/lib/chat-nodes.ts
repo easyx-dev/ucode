@@ -92,7 +92,21 @@ type PermissionNode = {
   footer?: ChatFooter;
 };
 
-export type ChatNode = ContentNode | ActivityNode | QuestionNode | PermissionNode;
+/**
+ * 一次上下文压缩：独立成段，界面渲染成「会话已压缩」分隔行 + 可展开的摘要。
+ * 压缩会重写可见历史，这条摘要就是被替代掉的那段历史的唯一凭据，故不并进任何聚合行。
+ */
+type CompactionNode = {
+  kind: "compaction";
+  key: string;
+  /** 摘要正文（pi 给出的结构化 markdown） */
+  summary: string;
+};
+
+export type ChatNode = ContentNode | ActivityNode | QuestionNode | PermissionNode | CompactionNode;
+
+/** 能承载轮页脚的节点：压缩分隔行不是回答，没有「本轮模型与耗时」可报 */
+type ChatFooterNode = Exclude<ChatNode, { kind: "compaction" }>;
 
 type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 
@@ -313,6 +327,11 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
       continue;
     }
     if (item.role !== "assistant") {
+      // 压缩摘要自成一段：它标出「此前历史已被替代」，当普通内容渲染会让人误以为是一轮回答
+      if (item.role === "summary") {
+        nodes.push({ kind: "compaction", key: uidOf(item), summary: itemText(item) });
+        continue;
+      }
       // 审批记录也自成一段：并进聚合行等于把它藏起来，而它恰恰是要回放给人看的
       const record = permissionOf(item);
       if (record) {
@@ -336,35 +355,35 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
  * 标记每轮回复的页脚位置并算出总耗时。
  *
  * 一轮 = 一条用户消息到下一轮用户消息之间，页脚挂在该轮的末位节点上——末位是正文段就落在正文下，
- * 是聚合行就落在聚合行下。
+ * 是聚合行就落在聚合行下。压缩分隔行不属于任何一轮（它不是回答，也没有本轮耗时），既不挂页脚也不占轮末位置。
  */
 const markTurnEnd = (nodes: ChatNode[]): void => {
   let turnStartMs: number | undefined;
-  let lastIndex = -1;
+  let last: ChatFooterNode | undefined;
   let owner: ChatItem | undefined;
   let ownerMs: number | undefined;
 
   const finalize = (): void => {
-    const node = nodes[lastIndex];
-    if (node && owner) {
+    if (last && owner) {
       const durationMs =
         turnStartMs !== undefined && ownerMs !== undefined && ownerMs >= turnStartMs
           ? ownerMs - turnStartMs
           : undefined;
-      node.footer = { item: owner, ...(durationMs !== undefined ? { durationMs } : {}) };
+      last.footer = { item: owner, ...(durationMs !== undefined ? { durationMs } : {}) };
     }
-    lastIndex = -1;
+    last = undefined;
     owner = undefined;
     ownerMs = undefined;
   };
 
-  nodes.forEach((node, index) => {
+  for (const node of nodes) {
     if (node.kind === "content" && node.item.role === "user") {
       finalize();
       turnStartMs = msOf(node.item.createdAt);
-      return;
+      continue;
     }
-    lastIndex = index;
+    if (node.kind === "compaction") continue;
+    last = node;
     // 聚合行与提问节点自身没有正文段，它携带的 `source` 才是页脚要用的那条 assistant 消息
     const source =
       node.kind === "content"
@@ -372,9 +391,9 @@ const markTurnEnd = (nodes: ChatNode[]): void => {
           ? node.item
           : undefined
         : node.source;
-    if (!source) return;
+    if (!source) continue;
     owner = source;
     ownerMs = msOf(source.completedAt) ?? msOf(source.createdAt) ?? ownerMs;
-  });
+  }
   finalize();
 };

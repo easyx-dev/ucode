@@ -1,6 +1,8 @@
 /**
  * 生成中的尾部提示：统一的加载图标 + 「工作中」，后面跟着本轮已经走的时间。
  * 纯前端计时——起点取本轮用户消息的时刻，与完成后页脚里的耗时同源，刷新页面也能接着算。
+ *
+ * 压缩上下文时改报「正在压缩上下文」且不报耗时：那件事与上一轮提问不在同一段时间轴上。
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,15 +29,22 @@ const useElapsedMs = (startedAt?: string): number | undefined => {
   return Number.isNaN(start) ? undefined : Math.max(0, now - start);
 };
 
-export function WorkingIndicator({ startedAt }: { startedAt?: string }) {
+export function WorkingIndicator({
+  startedAt,
+  compacting,
+}: {
+  startedAt?: string;
+  /** 本轮正在压缩上下文而不是生成：换文案，且不报耗时 */
+  compacting?: boolean;
+}) {
   const { t } = useTranslation();
-  const elapsed = useElapsedMs(startedAt);
+  const elapsed = useElapsedMs(compacting ? undefined : startedAt);
   const label = elapsed !== undefined && elapsed >= MIN_VISIBLE_MS ? durationLabel(elapsed) : "";
 
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <Spinner />
-      {t("工作中")}
+      {compacting ? t("正在压缩上下文…") : t("工作中")}
       {label ? <span className="tabular-nums">{label}</span> : null}
     </div>
   );

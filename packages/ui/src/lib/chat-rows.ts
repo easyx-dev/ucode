@@ -12,6 +12,7 @@ type ContentNode = Extract<ChatNode, { kind: "content" }>;
 type ActivityNode = Extract<ChatNode, { kind: "activity" }>;
 type QuestionNode = Extract<ChatNode, { kind: "question" }>;
 type PermissionNode = Extract<ChatNode, { kind: "permission" }>;
+type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
 
 type ChatRowBase = {
   /** 虚拟列表稳定 key，跨流式增量必须不变 */
@@ -46,6 +47,9 @@ export type ChatQuestionRow = ChatRowBase & { kind: "question"; node: QuestionNo
 /** 审批记录行：一次权限确认的对象与结论，独立成段（不并进聚合行） */
 export type ChatPermissionRow = ChatRowBase & { kind: "permission"; node: PermissionNode };
 
+/** 压缩分隔行：标出「此前的历史已被摘要替代」，摘要可展开回看 */
+export type ChatCompactionRow = ChatRowBase & { kind: "compaction"; node: CompactionNode };
+
 /** 尾部的生成中行：列表最后一道提示，带本轮的实时耗时，没有对应节点也不承载页脚 */
 export type ChatWorkingRow = Omit<ChatRowBase, "footer"> & {
   kind: "working";
@@ -59,6 +63,7 @@ export type ChatRow =
   | ChatActivityRow
   | ChatQuestionRow
   | ChatPermissionRow
+  | ChatCompactionRow
   | ChatWorkingRow;
 
 const WORKING_ROW_KEY = "working";
@@ -70,6 +75,10 @@ const rowOfNode = (
   /** 生成中的那一轮不报模型与耗时，由调用方置 false */
   withFooter: boolean,
 ): ChatRow => {
+  // 压缩分隔行不是回答，没有「这一轮的模型与耗时」可挂，也不参与轮末判定
+  if (node.kind === "compaction") {
+    return { kind: "compaction", key: node.key, turnKey, isTurnStart, node };
+  }
   const base: ChatRowBase = {
     key: node.key,
     turnKey,
