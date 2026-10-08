@@ -195,7 +195,7 @@
 }
 /* markdown 渲染（assistant 输出） */
 .md-content {
-  @apply text-sm leading-relaxed break-words;
+  @apply text-sm leading-7 break-words;
 }
 .md-content > * + * {
   @apply mt-3;
@@ -203,8 +203,14 @@
 .md-content h1,
 .md-content h2,
 .md-content h3,
-.md-content h4 {
-  @apply font-semibold;
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  @apply mt-5 mb-2 font-semibold;
+}
+/* 首元素不带上边距：@apply 里的 first: 变体会被展开成非法选择器，这里显式写 */
+.md-content > :first-child {
+  @apply mt-0;
 }
 .md-content h1 {
   @apply text-lg;
@@ -212,20 +218,36 @@
 .md-content h2 {
   @apply text-base;
 }
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  @apply text-sm;
+}
 .md-content ul {
   @apply list-disc space-y-1 pl-5;
 }
 .md-content ol {
   @apply list-decimal space-y-1 pl-5;
 }
+.md-content li::marker {
+  @apply text-muted-foreground;
+}
+/* GFM 任务列表：勾选框本身就是标记，不要再叠一个圆点 */
+.md-content li:has(> input[type="checkbox"]) {
+  @apply list-none;
+}
+.md-content li > input[type="checkbox"] {
+  @apply mr-1.5 align-middle;
+}
 .md-content a {
-  @apply underline underline-offset-2;
+  @apply underline underline-offset-2 hover:text-muted-foreground;
 }
 .md-content blockquote {
   @apply border-l-2 pl-3 text-muted-foreground;
 }
 .md-content code {
-  @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
 }
 .md-content pre {
   @apply overflow-x-auto rounded-lg bg-muted p-3 text-xs leading-relaxed;
@@ -233,13 +255,20 @@
 .md-content pre code {
   @apply bg-transparent p-0;
 }
+/*
+ * 表格自己滚：宽表不但撑破列宽，还会把整段对话变成横向滚动区。
+ * 因此表格按内容宽度渲染（w-max）、上限不超过列宽（max-w-full），超出时只滚表格自身。
+ */
 .md-content table {
-  @apply w-full border-collapse text-xs;
+  @apply block w-max max-w-full overflow-x-auto border-collapse text-xs;
 }
 .md-content th,
 .md-content td {
-  @apply border px-2 py-1 text-left;
+  @apply border border-border px-3 py-1.5 text-left align-top;
+}
+.md-content th {
+  @apply bg-muted/50 font-medium;
 }
 .md-content hr {
-  @apply border-border;
+  @apply my-4 border-border;
 }

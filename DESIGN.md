@@ -218,6 +218,19 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 - 嵌套的可点行必须用具名 group（`group/thought` / `group/tool`）：无名 group 会被外层聚合行的悬停点亮，让整列小三角一起现形
 - 一屏内的层级只有两档：正文 `text-sm` > 折叠行与摘要 `text-xs text-muted-foreground`
 
+## Markdown 渲染
+
+对话区的正文由 `packages/ui/src/styles/theme.css` 的 `.md-content` 一层渲染（`react-markdown` + `remark-gfm`），
+取值口径就写在那里，新增元素先看这一节再动：
+
+- 层级只有两档：正文 `text-sm leading-7`，代码块与表格 `text-xs`；标题不与正文拉开字号，靠字重
+- 标题 `mt-5 mb-2`（首个元素不带上边距），与段落一同构成长文的阅读节奏
+- 表格**自己滚**：`block w-max max-w-full overflow-x-auto`。宽表不但撑破列宽，还会把整段对话变成
+  横向滚动区；它按内容宽度渲染、上限不超列宽，超出时只滚表格自身。表头 `bg-muted/50`，
+  单元格 `px-3 py-1.5` 且顶对齐（多行单元格不会被另一列拉歪）
+- 列表标记用 `text-muted-foreground`；GFM 任务列表去掉圆点（勾选框本身就是标记）
+- 行内 code 与代码块都只换底色（`bg-muted`）不换色相；字号仍只用 Tailwind 默认档位
+
 ## 阴影
 
 - 默认无阴影，靠 `border` 与底色差分层
