@@ -213,11 +213,21 @@ export class UsageService {
    * 存在进程内存：它只是「等新回答期间的展示回填」，服务重启后拿不到也不影响实测口径。
    */
   private readonly estimated = new Map<string, number>();
+  /** 最近一次自动压缩：原因与时间，供界面说明「它为什么突然小了」 */
+  private readonly compactions = new Map<string, { reason: string; at: number }>();
+  /**
+   * 装配时算出的压缩触发点（会话池写入）。**优先于下面按 `record.model` 的推算**：
+   * 会话实际用的模型可能来自角色声明而不是记录上的覆盖，按记录推算会在「窗口来自实际模型、
+   * 预算来自默认模型」之间对不上号。
+   */
+  private readonly budgets = new Map<string, number>();
 
   constructor(
     private readonly sessions: SessionRepository,
     /** 解析 `provider/model` 的上下文窗口；解析不到为 null（运行时相关，由装配层注入） */
     private readonly contextWindowOf: (modelRef: string | null) => number | null,
+    /** 该模型的压缩触发点（与装配层注入 pi 的阈值同源）；解析不到为 null */
+    private readonly contextBudgetOf: (modelRef: string | null) => number | null = () => null,
   ) {}
 
   /**
@@ -252,30 +262,45 @@ export class UsageService {
     const measured = options.live
       ? (piUsage?.tokens ?? null)
       : (this.cachedOf(record)?.contextTokens ?? null);
+    const budget = this.budgets.get(record.id) ?? this.contextBudgetOf(record.model);
+    const lastCompaction = this.compactions.get(record.id) ?? null;
     if (measured !== null && contextWindow !== null) {
-      return { tokens: measured, contextWindow, estimated: false };
+      return { tokens: measured, contextWindow, estimated: false, budget, lastCompaction };
     }
 
     const estimated = this.estimated.get(record.id);
     if (estimated !== undefined && contextWindow !== null) {
-      return { tokens: estimated, contextWindow, estimated: true };
+      return { tokens: estimated, contextWindow, estimated: true, budget, lastCompaction };
     }
     return null;
   }
 
+  /** 记下装配时算出的压缩触发点；与注入 pi 的阈值同源，见 `harness/budget` */
+  rememberBudget(sessionId: string, triggerTokens: number): void {
+    if (Number.isFinite(triggerTokens) && triggerTokens > 0) {
+      this.budgets.set(sessionId, triggerTokens);
+    }
+  }
+
   /**
-   * 记下一次压缩后估算的上下文规模；`tokens` 非法（非有限数 / 负数）时忽略，
-   * 宁可继续给不出占用，也不要展示一个没意义的数。
+   * 记下一次压缩的结果：压缩后的估算规模 + 发生原因。
+   * `tokens` 非法（非有限数 / 负数）时只记原因，不写估算——宁可继续给不出占用，也不要展示一个没意义的数。
    */
-  rememberCompaction(sessionId: string, tokens: number): void {
-    if (!Number.isFinite(tokens) || tokens < 0) return;
-    this.estimated.set(sessionId, tokens);
+  rememberCompaction(
+    sessionId: string,
+    tokens: number,
+    info?: { reason: string; at: number },
+  ): void {
+    if (Number.isFinite(tokens) && tokens >= 0) this.estimated.set(sessionId, tokens);
+    if (info) this.compactions.set(sessionId, info);
   }
 
   /** 会话被释放（归档 / 删除 / 重建）时丢掉该会话的缓存与估算，避免键无限累积 */
   forget(sessionId: string): void {
     this.cache.delete(sessionId);
     this.estimated.delete(sessionId);
+    this.compactions.delete(sessionId);
+    this.budgets.delete(sessionId);
   }
 
   /**

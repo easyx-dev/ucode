@@ -17,6 +17,7 @@ import { AuthSessionRepository } from "./db/auth-session-repository";
 import { SessionRepository } from "./db/session-repository";
 import { env } from "./env";
 import { expireTempAttachments } from "./harness/attachment";
+import { contextBudgetOf } from "./harness/budget";
 import { GoalService } from "./harness/goal";
 import { MemoryService } from "./harness/memory";
 import { SessionAllowStore } from "./harness/permissions";
@@ -80,7 +81,19 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const events = new SessionEventBus();
   const interactions = new InteractionBroker(events);
   const permissions = new SessionAllowStore();
-  const usage = new UsageService(sessions, (ref) => runtime.contextWindowOf(ref));
+  const usage = new UsageService(
+    sessions,
+    (ref) => runtime.contextWindowOf(ref),
+    // 触发点与装配层注入 pi 的阈值同源：界面显示的「预算」就是实际会压缩的那个数
+    (ref) => {
+      const contextWindow = runtime.contextWindowOf(ref);
+      if (!contextWindow) return null;
+      return contextBudgetOf({
+        contextWindow,
+        override: runtime.contextBudgetOf(ref),
+      }).triggerTokens;
+    },
+  );
   const memory = new MemoryService(() => config.get().memory);
   const goals = new GoalService(sessions, usage, events);
   const pool = new SessionPool(

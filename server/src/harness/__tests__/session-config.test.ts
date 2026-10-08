@@ -32,6 +32,7 @@ import {
   loadAgentRegistry,
   PRIMARY_PROFILES,
   primaryCapability,
+  primaryToolNames,
   type ResolvedCapability,
   resolveSubagentCapability,
   subagentProfile,
@@ -97,7 +98,13 @@ const provider: ProviderConfig = {
 const root = mkdtempSync(join(tmpdir(), "session-config-test-"));
 const cwd = join(root, "cwd");
 
-type SessionSnapshot = { tools: string[]; allTools: string[]; systemPrompt: string };
+type SessionSnapshot = {
+  tools: string[];
+  allTools: string[];
+  systemPrompt: string;
+  /** 实际注入的压缩设置：窗口与触发点是两个不同的数，这里验证注入真的落地 */
+  compaction: { enabled: boolean; reserveTokens: number; keepRecentTokens: number };
+};
 
 const sessionOf = async (
   mode: SessionMode,
@@ -116,11 +123,14 @@ const sessionOf = async (
   const model = modelRuntime.getModel(provider.id, "m");
   assert.ok(model, "dummy 模型未注册");
 
-  // 只用到三个方法，装配层不关心 PiRuntime 的其余行为
+  // 只用到这几个方法，装配层不关心 PiRuntime 的其余行为
   const runtime = {
     requireRuntime: () => modelRuntime,
     resolveModelRef: () => model,
     getStatus: () => ({ thinkingLevel: "off" }),
+    // 预算注入的两个口径：给一个百万窗口的模型，验证它不再等于「永不触发」
+    contextWindowOf: () => 1_048_576,
+    contextBudgetOf: () => null,
   } as unknown as PiRuntime;
 
   const options = await buildSessionOptions({
@@ -162,6 +172,7 @@ const snapshotOf = async (
     tools: session.getActiveToolNames(),
     allTools: session.getAllTools().map((tool) => tool.name),
     systemPrompt: session.systemPrompt,
+    compaction: session.settingsManager.getCompactionSettings(),
   };
   session.dispose();
   return snapshot;
@@ -183,6 +194,14 @@ const agentOptionsOf = (session: AgentSession): string[] => {
 };
 
 describe("buildSessionOptions 工具装配", () => {
+  it("按有效预算注入压缩设置：百万窗口不再等于「永不触发」", async () => {
+    const { compaction } = await snapshotOf("build");
+    assert.equal(compaction.enabled, true);
+    // 触发点 = 窗口 − reserveTokens，应落在绝对上限而不是贴近窗口
+    assert.equal(compaction.reserveTokens, 1_048_576 - 400_000);
+    assert.ok(compaction.keepRecentTokens > 0);
+  });
+
   it("TS-01 build 走 defaultTools：codemode 激活，自研工具不被过滤", async () => {
     const { tools } = await snapshotOf("build");
     for (const name of [...DEFAULT_EXTENSION_TOOLS, "webfetch", "websearch", "question"]) {

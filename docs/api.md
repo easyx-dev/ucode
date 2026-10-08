@@ -186,7 +186,9 @@
     - `session_created`：载荷 `SessionSummary`，新建 / 分叉 / 子智能体创建
     - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals, contextUsage?: ContextUsage | null }`，改名 / 换模型 /
       置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
-      模式），`contextUsage` 与它同帧
+      模式），`contextUsage` 与它同帧。`ContextUsage` 除 `tokens / contextWindow / estimated` 外，还带
+      `budget`（本会话的压缩触发点，按 `harness/budget` 的有效预算算，不等于窗口）与 `lastCompaction`
+      （最近一次自动压缩的 `{ reason, at }`）——界面据此说明「上下文为什么突然小了」
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
   - 压缩：`compaction_start` 载荷 `{ reason }`（`manual` / `threshold` / `overflow`），`compaction_end` 载荷
     `{ reason, tokensBefore?, estimatedTokensAfter? }`——两个规模字段只在压缩成功时存在，真失败统一走 error 帧

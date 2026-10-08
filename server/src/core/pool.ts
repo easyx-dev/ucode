@@ -34,7 +34,12 @@ import type { GoalService } from "../harness/goal";
 import type { PromptImage } from "../harness/image";
 import type { MemoryService } from "../harness/memory";
 import type { PermissionRule, SessionAllowStore } from "../harness/permissions";
-import { buildSessionOptions, resolveSessionCwd } from "../harness/session-config";
+import { pruneToolOutputs } from "../harness/prune";
+import {
+  buildSessionOptions,
+  contextBudgetFor,
+  resolveSessionCwd,
+} from "../harness/session-config";
 import { type SubagentHooks, spawnSubagent } from "../harness/subagents";
 import type { UsageService } from "../harness/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
@@ -373,6 +378,23 @@ export class SessionPool {
     };
   }
 
+  /**
+   * 清掉过期工具输出（见 `harness/prune`）：同步、不喊模型，失败也不能影响会话本身。
+   */
+  private pruneContext(session: AgentSession): void {
+    try {
+      const outcome = pruneToolOutputs(session.sessionManager);
+      if (outcome.cleared > 0) {
+        logger.debug(
+          { cleared: outcome.cleared, freedTokens: outcome.freedTokens },
+          "清理了过期的工具输出",
+        );
+      }
+    } catch (error) {
+      logger.warn({ error }, "清理过期工具输出失败");
+    }
+  }
+
   /** 主会话的委派钩子：并发上限按父会话计数，超限立即报错而非排队 */
   private subagentHooks(
     record: SessionRecord,
@@ -559,10 +581,17 @@ export class SessionPool {
         if (event.type === "compaction_end") {
           if (!event.result) return;
           const estimated = event.result.estimatedTokensAfter;
-          if (estimated !== undefined) this.usage.rememberCompaction(sessionId, estimated);
+          if (estimated !== undefined) {
+            this.usage.rememberCompaction(sessionId, estimated, {
+              reason: event.reason,
+              at: Date.now(),
+            });
+          }
           if (event.reason !== "manual") this.resetTranscript(sessionId, session);
           return;
         }
+        // 本轮落定：先把已经用不上的旧工具输出清掉（子会话同样清），再走记忆回顾 / 目标续跑
+        if (event.type === "agent_settled") this.pruneContext(session);
         // 子会话不参与记忆回顾与目标续跑，它的事件到索引补写为止
         if (isSubagent || event.type !== "agent_settled") return;
         // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾，
@@ -597,6 +626,10 @@ export class SessionPool {
         // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
         stale: generation !== this.generation,
       };
+      // 压缩触发点在这里算一次并交给用量服务：口径与注入 pi 的阈值一致，
+      // 界面上的「预算」不会与实际压缩点对不上（角色声明的模型与记录覆盖不一致时尤其明显）
+      const budget = contextBudgetFor({ record, capability, runtime: this.runtime });
+      if (budget) this.usage.rememberBudget(sessionId, budget.triggerTokens);
       this.entries.set(sessionId, entry);
       // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
       // 序号也不能随 detach 重置，否则重连的客户端会错判帧的新旧

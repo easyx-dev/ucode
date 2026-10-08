@@ -178,6 +178,20 @@ export class PiRuntime {
     return contextWindow > 0 ? contextWindow : null;
   }
 
+  /**
+   * 该模型的有效上下文预算覆盖值（配置里的 `contextBudget`）；没配就是 null，由调用方按窗口推算。
+   * 判据不能只看模型声明的窗口：1M 的声明值常常远大于可用窗口。
+   */
+  contextBudgetOf(ref: string | null): number | null {
+    const target = ref ?? this.status.defaultModel;
+    if (!target) return null;
+    const separator = target.indexOf("/");
+    if (separator <= 0) return null;
+    const provider = this.providers.find((item) => item.id === target.slice(0, separator));
+    const model = provider?.models?.find((item) => item.id === target.slice(separator + 1));
+    return model?.contextBudget ?? null;
+  }
+
   /** 配置未指定默认模型时的回落：第一个已配置鉴权的可用模型 */
   private firstAvailableRef(): string | null {
     const model = this.runtime?.getAvailableSnapshot()[0];

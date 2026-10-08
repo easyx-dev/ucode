@@ -236,3 +236,43 @@ export const LOGIN_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
 /** 一次性配对码有效期（5 分钟） */
 export const PAIRING_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * 上下文预算：压缩的触发点与保留量。
+ *
+ * 触发点按「有效预算」而不是模型声明的窗口算——声明 1M 的模型常常在 400k 前后就开始明显退化，
+ * 而 pi 的默认判据（窗口 − 16k）在 1M 窗口下几乎永不触发。
+ */
+export const CONTEXT_BUDGET_MAX_TOKENS = 400_000;
+
+/** 触发点相对窗口的留白比例：给输出与下一批工具结果留空间 */
+export const CONTEXT_BUDGET_RESERVE_RATIO = 0.1;
+
+/** 触发点留白的下限；小窗口模型按这个走，不要按比例缩到没有余量 */
+export const CONTEXT_BUDGET_RESERVE_MIN_TOKENS = 16_384;
+
+/** 压缩后保留的最近 token 比例 / 上下限 */
+export const CONTEXT_KEEP_RATIO = 0.15;
+export const CONTEXT_KEEP_MIN_TOKENS = 4_000;
+export const CONTEXT_KEEP_MAX_TOKENS = 40_000;
+
+/** 旧工具输出清理：最近这么多轮（用户消息为界）的工具结果受保护，不动 */
+export const PRUNE_PROTECTED_USER_TURNS = 2;
+
+/** 旧工具输出清理：最近这么多 token 的工具结果受保护，不动 */
+export const PRUNE_PROTECT_TOKENS = 40_000;
+
+/** 一次清理至少要腾出这么多 token 才动手；碎片式清理会把前缀缓存打断得毫无收益 */
+export const PRUNE_MIN_CLEARED_TOKENS = 20_000;
+
+/** 清理后的占位文本：保留消息本身，只换掉正文，避免 tool-call 与结果配不上 */
+export const PRUNE_PLACEHOLDER = "[旧工具输出已清理。需要原文就重跑那条命令或重新读取。]";
+
+/** 清旧工具输出时跳过的工具：这些结果本身就是结论，清掉等于让模型重做一遍 */
+export const PRUNE_PROTECTED_TOOLS = ["subagent", "edit", "write", "present_plan"];
+
+/**
+ * 单次清理的条数上限：每条都要落一次盘，且都在一轮结束的回调里同步做。
+ * 旧会话第一次清理可能命中几十上百条，这里切一刀，剩下的留给下一轮。
+ */
+export const PRUNE_MAX_EDITS_PER_PASS = 50;

@@ -138,7 +138,12 @@ export default {
   // Model row
   "模型 id": "Model id",
   显示名: "Display name",
+  "{{label}} 的{{field}}要填正整数": "{{field}} of {{label}} must be a positive integer",
   上下文窗口: "Context window",
+  上下文预算: "Context budget",
+  "有效上下文预算：到达即自动压缩；留空按窗口推算":
+    "Effective context budget: compaction triggers when reached; leave empty to derive it from the window",
+  留空自动: "Leave empty for auto",
   最大输出: "Max output",
   思考: "Reasoning",
   删除模型: "Remove model",

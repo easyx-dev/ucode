@@ -23,8 +23,9 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
 
   return (
     <div className="space-y-2 rounded-lg p-2 ring-1 ring-foreground/10">
+      {/* 12 列网格：3+3+2+2+1+1 之外再插一栏就会挤到第二行，所以这里用 2+2 留出余量 */}
       <div className="grid items-end gap-2 sm:grid-cols-12">
-        <div className="space-y-1.5 sm:col-span-3">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-[11px] text-muted-foreground">{t("模型 id")}</Label>
           <Input
             value={model.id}
@@ -32,7 +33,7 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
             placeholder="deepseek-v4-flash"
           />
         </div>
-        <div className="space-y-1.5 sm:col-span-3">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-[11px] text-muted-foreground">{t("显示名")}</Label>
           <Input value={model.name} onChange={(event) => onChange({ name: event.target.value })} />
         </div>
@@ -41,6 +42,19 @@ export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
           <Input
             value={model.contextWindow}
             onChange={(event) => onChange({ contextWindow: event.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label
+            className="text-[11px] text-muted-foreground"
+            title={t("有效上下文预算：到达即自动压缩；留空按窗口推算")}
+          >
+            {t("上下文预算")}
+          </Label>
+          <Input
+            value={model.contextBudget}
+            placeholder={t("留空自动")}
+            onChange={(event) => onChange({ contextBudget: event.target.value })}
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">

@@ -30,6 +30,13 @@ export type ContextUsage = {
    * 因此压缩完成到新一轮回答之间没有可信的实测值，只能用压缩结果里的估算规模顶替。
    */
   estimated: boolean;
+  /**
+   * 本次会话的压缩触发阈值（token）：到达它就自动压缩（见 `harness/budget`）。
+   * 与窗口分开给出，因为触发点按「有效预算」算，不等于模型声明的窗口。
+   */
+  budget?: number | null;
+  /** 最近一次自动压缩：原因与实际发生时间；没发生过为空 */
+  lastCompaction?: { reason: string; at: number } | null;
 };
 
 /** 按模型归并的用量；模型键为 `provider/model` */

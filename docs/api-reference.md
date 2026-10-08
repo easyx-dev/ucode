@@ -372,6 +372,7 @@
 | `providers[].models[].inputLimits.images.maxPerMessage` | integer（>0） | 否 | — | — |
 | `providers[].models[].inputLimits.images.maxPerRequest` | integer（>0） | 否 | — | — |
 | `providers[].models[].contextWindow` | integer（>0） | 否 | `128000` | — |
+| `providers[].models[].contextBudget` | integer（>0） | 否 | — | 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/budget`）。 声明窗口常常远大于可用窗口（1M 的模型可能 400k 就开始明显退化），这里给一个人工覆盖的口子。 |
 | `providers[].models[].maxTokens` | integer（>0） | 否 | `8192` | — |
 | `providers[].models[].cost` | object | 否 | `{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}` | — |
 | `providers[].models[].cost.input` | number（≥0） | 否 | `0` | — |
@@ -1436,6 +1437,8 @@
 | `tokens` | number | 是 | 上下文里的 token 数 |
 | `contextWindow` | number | 是 | 该会话当前生效模型的上下文窗口 |
 | `estimated` | boolean | 是 | 是否为估算值：压缩会重写上下文，而压缩点之前那次回答的用量反映的是压缩前的规模， 因此压缩完成到新一轮回答之间没有可信的实测值，只能用压缩结果里的估算规模顶替。 |
+| `budget` | number \| null | 否 | 本次会话的压缩触发阈值（token）：到达它就自动压缩（见 `harness/budget`）。 与窗口分开给出，因为触发点按「有效预算」算，不等于模型声明的窗口。 |
+| `lastCompaction` | object \| null | 否 | 最近一次自动压缩：原因与实际发生时间；没发生过为空 |
 
 ### GoalView
 

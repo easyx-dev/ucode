@@ -237,8 +237,13 @@ describe("UsageService", () => {
   const serviceWith = (
     records: SessionRecord[],
     contextWindow: number | null = 128000,
+    contextBudget: number | null = null,
   ): UsageService =>
-    new UsageService({ list: () => records } as unknown as SessionRepository, () => contextWindow);
+    new UsageService(
+      { list: () => records } as unknown as SessionRepository,
+      () => contextWindow,
+      () => contextBudget,
+    );
 
   it("从会话文件聚合单会话用量", () => {
     const service = serviceWith([record()]);
@@ -316,6 +321,9 @@ describe("UsageService", () => {
       tokens: 12,
       contextWindow: 128000,
       estimated: false,
+      // 没注入预算解析器（第 3 个参数缺省返回 null）时，预算与压缩记录如实为空
+      budget: null,
+      lastCompaction: null,
     });
   });
 
@@ -362,6 +370,8 @@ describe("UsageService", () => {
         tokens: 1500,
         contextWindow: 128000,
         estimated: true,
+        budget: null,
+        lastCompaction: null,
       });
 
       // 会话释放（归档 / 删除）后估算一并丢弃
@@ -369,6 +379,47 @@ describe("UsageService", () => {
       assert.equal(service.contextUsageOf(compacted.target), null);
     } finally {
       compacted.cleanup();
+    }
+  });
+
+  it("注入预算解析器时带出触发点，并记下最近一次压缩的原因与时间", () => {
+    const session = withSessionFile("ctx-budget", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(500) });
+    });
+    try {
+      const service = serviceWith([session.target], 1_048_576, 400_000);
+      const usage = service.contextUsageOf(session.target);
+      assert.equal(usage?.budget, 400_000);
+      assert.equal(usage?.lastCompaction, null);
+
+      service.rememberCompaction(session.target.id, 1_500, { reason: "threshold", at: 1_700 });
+      const after = service.contextUsageOf(session.target);
+      assert.equal(after?.budget, 400_000);
+      assert.deepEqual(after?.lastCompaction, { reason: "threshold", at: 1_700 });
+
+      service.forget(session.target.id);
+      assert.equal(service.contextUsageOf(session.target)?.lastCompaction, null);
+    } finally {
+      session.cleanup();
+    }
+  });
+
+  it("装配时写入的触发点优先于按记录推算的值", () => {
+    const session = withSessionFile("ctx-budget-source", (manager) => {
+      appendAssistant(manager, { timeMs: 1000, usage: usageShape(500) });
+    });
+    try {
+      // 解析器按记录上的模型给 400k，而装配实际算出的是 300k（角色声明的模型可能不同）：
+      // 以装配为准，界面显示的预算才与真正生效的阈值一致
+      const service = serviceWith([session.target], 1_048_576, 400_000);
+      service.rememberBudget(session.target.id, 300_000);
+      assert.equal(service.contextUsageOf(session.target)?.budget, 300_000);
+
+      // 会话释放后回落到按记录推算：列表里没进池的会话仍能看到一个近似值
+      service.forget(session.target.id);
+      assert.equal(service.contextUsageOf(session.target)?.budget, 400_000);
+    } finally {
+      session.cleanup();
     }
   });
 
@@ -386,6 +437,8 @@ describe("UsageService", () => {
         tokens: 200,
         contextWindow: 128000,
         estimated: false,
+        budget: null,
+        lastCompaction: null,
       });
     } finally {
       answered.cleanup();

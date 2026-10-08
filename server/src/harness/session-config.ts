@@ -14,7 +14,6 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_PERMISSION_MODE, type WebsearchConfig } from "@ucode/contracts";
-
 import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
@@ -32,6 +31,7 @@ import {
   usesDefaultToolSet,
 } from "./agents";
 import { commandAssetPaths } from "./assets";
+import { type ContextBudget, contextBudgetOf } from "./budget";
 import { mcpExtension } from "./mcp";
 import type { MemoryService } from "./memory";
 import {
@@ -61,6 +61,27 @@ import { workspaceDirOf } from "./workspace";
  */
 export const resolveSessionCwd = (record: SessionRecord): string =>
   record.cwd || workspaceDirOf(record.id);
+
+/**
+ * 本会话模型的压缩预算：按配置里的有效预算（`contextBudget`）或声明窗口推算。
+ *
+ * 装配层用它注入 pi 的 compaction 设置，会话池用它把触发点写进每步耗时记录——同一个口径只算一次，
+ * 免得「注入的阈值」与「界面 / 记录里显示的阈值」对不上。模型解析不出时返回 null（由 pi 的默认判据兜底）。
+ */
+export const contextBudgetFor = (input: {
+  record: SessionRecord | undefined;
+  capability?: ResolvedCapability;
+  runtime: PiRuntime;
+}): ContextBudget | null => {
+  const override = overrideOf(input.record);
+  const modelRef = override.model ?? input.capability?.model ?? null;
+  const model = input.runtime.resolveModelRef(modelRef) ?? input.runtime.resolveModelRef(null);
+  if (!model) return null;
+  const ref = `${model.provider}/${model.id}`;
+  const contextWindow = input.runtime.contextWindowOf(ref);
+  if (!contextWindow) return null;
+  return contextBudgetOf({ contextWindow, override: input.runtime.contextBudgetOf(ref) });
+};
 
 export type SessionAssemblyInput = {
   record: SessionRecord | undefined;
@@ -230,6 +251,17 @@ export const buildSessionOptions = async (
   // 覆盖必须在 loader.reload() 之后：reload 会重读设置，冲掉 reload 前的 in-memory 覆盖
   if (toolSelection.kind === "defaultTools")
     settingsManager.applyOverrides({ defaultTools: toolSelection.defaultTools });
+  // 压缩预算同样在这里注入：pi 默认的 reserveTokens(16384) 在百万窗口的模型上等于永不触发
+  const budget = contextBudgetFor({ record: input.record, capability, runtime: input.runtime });
+  if (budget) {
+    settingsManager.applyOverrides({
+      compaction: {
+        enabled: true,
+        reserveTokens: budget.reserveTokens,
+        keepRecentTokens: budget.keepRecentTokens,
+      },
+    });
+  }
 
   // 记忆工具只在主会话的 build 模式注册；子会话与只读模式都不纳入
   const memoryTools =

@@ -19,6 +19,8 @@ export type DraftModel = {
   name: string;
   reasoning: boolean;
   contextWindow: string;
+  /** 有效上下文预算（压缩触发点）；留空表示按窗口自动推算 */
+  contextBudget: string;
   maxTokens: string;
   /** 支持的输入类型；文本恒在，图片可选 */
   input: Array<"text" | "image">;
@@ -85,6 +87,7 @@ export const createDraftModel = (): DraftModel => ({
   name: "",
   reasoning: true,
   contextWindow: "128000",
+  contextBudget: "",
   maxTokens: "8192",
   input: ["text"],
   thinkingLevelMap: {},
@@ -97,6 +100,7 @@ const toDraftModel = (model: ProviderModelView): DraftModel => ({
   name: model.name ?? "",
   reasoning: model.reasoning,
   contextWindow: String(model.contextWindow),
+  contextBudget: model.contextBudget === undefined ? "" : String(model.contextBudget),
   maxTokens: String(model.maxTokens),
   input: model.input,
   thinkingLevelMap: model.thinkingLevelMap ?? {},
@@ -205,7 +209,25 @@ export const isDraftProviderReady = (provider: DraftProvider): boolean => {
   );
 };
 
-/** 保存前校验：自定义 provider 要有端点与模型，且每个模型都要有 id */
+/**
+ * 数字字段：留空表示用默认值；填了就必须是正整数。
+ * 不拦的话它会以 NaN / 负数 / 小数发到服务端，用户只看到一句校验失败，看不出是哪个框写错了。
+ */
+const numberProblem = (
+  value: string,
+  field: string,
+  label: string,
+  t: TFunction,
+): string | null => {
+  const raw = value.trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0
+    ? null
+    : t("{{label}} 的{{field}}要填正整数", { label, field });
+};
+
+/** 保存前校验：自定义 provider 要有端点与模型，每个模型都要有 id，数字字段要是正整数 */
 export const validateDrafts = (drafts: DraftProvider[], t: TFunction): string | null => {
   for (const provider of drafts) {
     const label = provider.name || provider.id || t("(未命名)");
@@ -214,6 +236,18 @@ export const validateDrafts = (drafts: DraftProvider[], t: TFunction): string | 
     if (provider.models.length === 0) return t("{{label}} 至少要有一个模型", { label });
     if (provider.models.some((model) => !model.id.trim()))
       return t("{{label}} 里有模型没填 id", { label });
+    for (const model of provider.models) {
+      const modelLabel = model.id.trim() || label;
+      // 字段名走 t()：它要出现在提示语里，也得跟着语言走
+      for (const [field, value] of [
+        [t("上下文窗口"), model.contextWindow],
+        [t("上下文预算"), model.contextBudget],
+        [t("最大输出"), model.maxTokens],
+      ] as const) {
+        const problem = numberProblem(value, field, modelLabel, t);
+        if (problem) return problem;
+      }
+    }
   }
   return null;
 };
@@ -224,6 +258,8 @@ const toModelPayload = (model: DraftModel) => ({
   name: model.name.trim() || undefined,
   reasoning: model.reasoning,
   contextWindow: Number(model.contextWindow) || 128000,
+  // 留空即不写进配置：预算由服务端按窗口推算（见 harness/budget）
+  ...(Number(model.contextBudget) > 0 ? { contextBudget: Number(model.contextBudget) } : {}),
   maxTokens: Number(model.maxTokens) || 8192,
   input: model.input,
   cost: model.cost,
