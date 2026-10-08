@@ -1,4 +1,4 @@
-/** 对话区：头部 + 错误提示 + 消息列表 + 输入区 */
+/** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
 import { cn } from "cn";
 import { Bot } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
@@ -18,7 +18,9 @@ import {
   type ContextUsage,
   DEFAULT_PERMISSION_MODE,
   type GoalView,
+  type InteractionRespondRequest,
   type ModelsResponse,
+  type PendingInteraction,
   type PermissionMode,
   type SessionCreateRequest,
   type SessionSummary,
@@ -27,10 +29,13 @@ import {
 } from "../lib/types";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
+import { DecisionArea } from "./decision-area";
 import { DirectoryDialog } from "./directory-dialog";
 import { GoalBar } from "./goal-bar";
 import { MessageList } from "./message-list";
+import { PermissionRequest } from "./permission-request";
 import { PlanDecisionForm } from "./plan-decision-form";
+import { QuestionRequest } from "./question-request";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
 const shouldShowSuggestions = (chat: ChatController): boolean =>
@@ -84,6 +89,10 @@ type ChatPanelProps = {
   onOpenUsage?: () => void;
   /** 从子会话视图返回父会话 */
   onBackToParent?: () => void;
+  /** 本会话待答的权限审批 / 提问；有值时决策区替掉输入区 */
+  interaction: PendingInteraction | null;
+  /** 回填一条答复（服务端按 kind 判别载荷） */
+  onRespondInteraction: (input: InteractionRespondRequest) => void;
   /** plan 模式本轮以 present_plan 收尾：用决策表单替掉输入区 */
   planReady: boolean;
   onApprovePlan: () => void;
@@ -120,6 +129,8 @@ export function ChatPanel({
   context,
   onOpenUsage,
   onBackToParent,
+  interaction,
+  onRespondInteraction,
   planReady,
   onApprovePlan,
   onIgnorePlan,
@@ -204,6 +215,7 @@ export function ChatPanel({
   const providers = (models?.providers ?? []).filter((provider) => provider.available);
   /** 子会话由委派产生、只读查看，不提供输入区与 plan 决策表单 */
   const isChild = Boolean(session?.parentSessionId);
+  /** 待答的审批 / 提问优先于计划决策：它正在阻塞工具调用，先答完才谈得上继续 */
   const showPlanForm = planReady && !isChild;
   /** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
   const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
@@ -266,6 +278,7 @@ export function ChatPanel({
         <GoalBar goal={goal} onCommand={(command) => onGoalCommand(command)} />
       ) : null}
 
+      {/* 输入区的位置按优先级让给决策：子会话只读，待答交互优先于计划决策 */}
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">
           <Bot className="size-4 shrink-0 text-muted-foreground" />
@@ -276,12 +289,32 @@ export function ChatPanel({
             {t("返回父会话")}
           </Button>
         </div>
+      ) : interaction ? (
+        <DecisionArea>
+          {interaction.kind === "permission" ? (
+            <PermissionRequest
+              request={interaction}
+              onRespond={(requestId, decision) =>
+                onRespondInteraction({ requestId, kind: "permission", decision })
+              }
+            />
+          ) : (
+            <QuestionRequest
+              request={interaction}
+              onRespond={(requestId, answers) =>
+                onRespondInteraction({ requestId, kind: "question", answers })
+              }
+            />
+          )}
+        </DecisionArea>
       ) : showPlanForm ? (
-        <PlanDecisionForm
-          onApprove={onApprovePlan}
-          onIgnore={onIgnorePlan}
-          onFeedback={onFeedbackPlan}
-        />
+        <DecisionArea>
+          <PlanDecisionForm
+            onApprove={onApprovePlan}
+            onIgnore={onIgnorePlan}
+            onFeedback={onFeedbackPlan}
+          />
+        </DecisionArea>
       ) : (
         <Composer
           sessionId={session?.id ?? null}

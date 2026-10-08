@@ -247,6 +247,9 @@ export default {
   也可以直接输入你的答案: "Or type your own answer",
   提交回答: "Submit answers",
   跳过回答: "Skip",
+  展开: "Expand",
+  "已答 {{answered}} / {{total}} 题": "Answered {{answered}} of {{total}}",
+  "待答：{{headers}}": "Pending: {{headers}}",
 
   // Plan decision
   计划已就绪: "Plan ready",

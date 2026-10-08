@@ -16,8 +16,6 @@ import { ChatPanel } from "../business/chat-panel";
 import { CommandPalette } from "../business/command-palette";
 import { DirectoryPickerDialog } from "../business/directory-picker-dialog";
 import { ErrorToaster } from "../business/error-toaster";
-import { PermissionDialog } from "../business/permission-dialog";
-import { QuestionDialog } from "../business/question-dialog";
 import { RenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
@@ -515,6 +513,8 @@ export function WorkspaceLayout({
                   onApprovePlan={approvePlan}
                   onIgnorePlan={ignorePlan}
                   onFeedbackPlan={(text) => void chat.send(textPayload(text))}
+                  interaction={interaction}
+                  onRespondInteraction={(input) => void interactions.respond(input)}
                   onBuiltin={runBuiltin}
                 />
               </div>
@@ -574,20 +574,6 @@ export function WorkspaceLayout({
               <WorkbenchPanel />
             </SheetContent>
           </Sheet>
-
-          <PermissionDialog
-            request={interaction?.kind === "permission" ? interaction : null}
-            onRespond={(requestId, decision) =>
-              void interactions.respond({ requestId, kind: "permission", decision })
-            }
-          />
-
-          <QuestionDialog
-            request={interaction?.kind === "question" ? interaction : null}
-            onRespond={(requestId, answers) =>
-              void interactions.respond({ requestId, kind: "question", answers })
-            }
-          />
 
           <UsagePanel
             open={usageOpen}

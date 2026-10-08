@@ -1,47 +1,32 @@
-/** 提问弹窗：question 工具触发时，用户选择选项或自填答案后本轮继续 */
-
+/** 提问：question 工具触发时，用户选择选项或自填答案后本轮继续 */
 import { cn } from "cn";
-import { useState } from "react";
+import { MessageCircleQuestion } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../base/dialog";
 import { Input } from "../base/input";
 import type { QuestionInteraction } from "../lib/types";
 
-type QuestionDialogProps = {
-  /** 当前待答提问；为空或不是提问时不展示 */
-  request: QuestionInteraction | null;
+type QuestionRequestProps = {
+  request: QuestionInteraction;
   onRespond: (requestId: string, answers: string[][]) => void;
 };
 
 /** 单个问题的作答草稿；自填内容优先于勾选的选项 */
 type Draft = { selected: string[]; custom: string };
 
-export function QuestionDialog({ request, onRespond }: QuestionDialogProps) {
+export function QuestionRequest({ request, onRespond }: QuestionRequestProps) {
   return (
-    <Dialog open={Boolean(request)}>
-      <DialogContent showCloseButton={false} className="sm:max-w-lg">
-        {request ? (
-          <QuestionForm
-            // requestId 变化即换一份草稿，避免上一题的作答串到下一题
-            key={request.requestId}
-            request={request}
-            onSubmit={(answers) => onRespond(request.requestId, answers)}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <QuestionPrompt
+      // requestId 变化即换一份草稿与展开态，避免上一题的作答串到下一题
+      key={request.requestId}
+      request={request}
+      onSubmit={(answers) => onRespond(request.requestId, answers)}
+    />
   );
 }
 
-function QuestionForm({
+function QuestionPrompt({
   request,
   onSubmit,
 }: {
@@ -52,6 +37,20 @@ function QuestionForm({
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     request.questions.map(() => ({ selected: [], custom: "" })),
   );
+  /** 收起只留一行摘要：多题时内容很长，用户常想先回看对话再作答 */
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Esc 收起：焦点可能在任何子控件上，监听挂在 document 才不至于漏掉
+  useEffect(() => {
+    if (collapsed) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setCollapsed(true);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [collapsed]);
 
   const toggle = (index: number, label: string): void => {
     const isMultiple = request.questions[index]?.multiple ?? false;
@@ -83,29 +82,46 @@ function QuestionForm({
   };
 
   const answers = drafts.map(answerOf);
-  const isComplete = answers.every((answer) => answer.length > 0);
+  const answered = answers.filter((answer) => answer.length > 0).length;
+  const unansweredHeaders = request.questions
+    .filter((_, index) => (answers[index]?.length ?? 0) === 0)
+    .map((item) => item.header);
+  const total = request.questions.length;
 
-  const submit = (): void => {
-    if (isComplete) onSubmit(answers);
-  };
+  if (collapsed) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2">
+        <MessageCircleQuestion aria-hidden className="size-3.5 shrink-0 text-warning" />
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {t("已答 {{answered}} / {{total}} 题", { answered, total })}
+          {unansweredHeaders.length > 0 ? (
+            <>
+              {" · "}
+              {t("待答：{{headers}}", { headers: unansweredHeaders.join("、") })}
+            </>
+          ) : null}
+        </span>
+        <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)}>
+          {t("展开")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("需要你回答")}</DialogTitle>
-        <DialogDescription>
-          {request.sourceSessionId ? (
-            <span className="mb-1 block text-xs text-muted-foreground">
-              {t("来自子智能体「{{description}}」的请求：", {
-                description: request.sourceDescription ?? request.sourceSessionId,
-              })}
-            </span>
-          ) : null}
-          {t("agent 需要你的输入才能继续；选择一个选项，或自行填写答案。")}
-        </DialogDescription>
-      </DialogHeader>
+    <div className="space-y-2 px-3 pt-2.5 pb-3">
+      <p className="text-xs text-muted-foreground">
+        {request.sourceSessionId ? (
+          <span className="block">
+            {t("来自子智能体「{{description}}」的请求：", {
+              description: request.sourceDescription ?? request.sourceSessionId,
+            })}
+          </span>
+        ) : null}
+        {t("agent 需要你的输入才能继续；选择一个选项，或自行填写答案。")}
+      </p>
 
-      <div className="-mx-1 max-h-[55vh] space-y-4 overflow-y-auto px-1">
+      <div className="max-h-[40vh] space-y-4 overflow-y-auto pr-1">
         {request.questions.map((item, index) => {
           const draft = drafts[index] ?? { selected: [], custom: "" };
           return (
@@ -148,9 +164,10 @@ function QuestionForm({
                 aria-label={t("也可以直接输入你的答案")}
                 onChange={(event) => setCustom(index, event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
+                  // 只在自填框中允许 Enter 提交：选项按钮上的 Enter 属于选择，不该顺带提交
+                  if (event.key !== "Enter" || unansweredHeaders.length > 0) return;
                   event.preventDefault();
-                  submit();
+                  onSubmit(answers);
                 }}
                 placeholder={t("也可以直接输入你的答案")}
               />
@@ -159,14 +176,22 @@ function QuestionForm({
         })}
       </div>
 
-      <DialogFooter className="sm:justify-between">
-        <Button variant="ghost" onClick={() => onSubmit(request.questions.map(() => []))}>
+      <div className="flex items-center gap-2 pt-1">
+        <Button variant="ghost" size="sm" onClick={() => setCollapsed(true)}>
+          {t("收起")}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => onSubmit(request.questions.map(() => []))}>
           {t("跳过回答")}
         </Button>
-        <Button disabled={!isComplete} onClick={submit}>
+        <Button
+          size="sm"
+          className="ml-auto"
+          disabled={unansweredHeaders.length > 0}
+          onClick={() => onSubmit(answers)}
+        >
           {t("提交回答")}
         </Button>
-      </DialogFooter>
-    </>
+      </div>
+    </div>
   );
 }
