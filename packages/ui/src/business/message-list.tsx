@@ -14,7 +14,7 @@ import type { ToolEntry } from "../lib/chat-nodes";
 import { buildChatRows, type ChatRow, withoutThinking } from "../lib/chat-rows";
 import { subagentSessionIdOf } from "../lib/tool-view";
 import type { ChatItem, SubagentStreams } from "../lib/types";
-import { MessageRow, type MessageRowContext } from "./message-row";
+import { MessageRow } from "./message-row";
 import { SubagentProgress, SubagentSessionLink } from "./subagent-progress";
 
 /** 首屏尚未测量时的行高估计；实测后由 ResizeObserver 校正，只影响未渲染行的滚动条长度 */

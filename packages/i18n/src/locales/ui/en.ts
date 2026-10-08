@@ -330,10 +330,6 @@ export default {
   返回父会话: "Back to parent",
   打开子会话: "Open sub-session",
   查看子会话: "View sub-session",
-  展开子会话: "Expand sub-sessions",
-  收起子会话: "Collapse sub-sessions",
-  无子会话: "No sub-sessions",
-  子会话加载失败: "Failed to load sub-sessions",
   还没有内容: "No content yet",
   "子会话是委派产生的独立对话，只能查看；需要它继续请在父会话里说明。":
     "Sub-sessions are independent delegated conversations and are read-only. To continue, ask in the parent session.",
