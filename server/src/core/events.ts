@@ -7,6 +7,17 @@ import { messageToDTO, type TranscriptState } from "./serialize";
 /** 事件名与数据的组合；总线负责补 sessionId 与 seq */
 export type SseEvent = { event: EventName; data: Record<string, unknown> };
 
+/** 投影一帧时由调用方补的信息 */
+export type SseEventOptions = {
+  /**
+   * `message_end` 这一帧里消息的条目 id。
+   *
+   * pi 先发事件、后落盘（`appendMessage`），事件里拿不到条目 id，缺省时只能给个临时 id（界面拿
+   * 条目 id 做编辑与分叉）；调用方通常在下一微任务里按消息对象身份把它查出来补上，见 `SessionEventBus`。
+   */
+  messageEntryId?: string;
+};
+
 type MessageUpdateEvent = Extract<AgentSessionEvent, { type: "message_update" }>;
 type AssistantEvent = MessageUpdateEvent["assistantMessageEvent"];
 
@@ -61,7 +72,11 @@ const toDeltaEvents = (inner: AssistantEvent): SseEvent[] => {
 };
 
 /** 消息相关事件 */
-const toMessageEvents = (event: AgentSessionEvent, state: TranscriptState): SseEvent[] | null => {
+const toMessageEvents = (
+  event: AgentSessionEvent,
+  state: TranscriptState,
+  options: SseEventOptions,
+): SseEvent[] | null => {
   switch (event.type) {
     case "message_start":
       return [
@@ -74,7 +89,8 @@ const toMessageEvents = (event: AgentSessionEvent, state: TranscriptState): SseE
     case "message_end": {
       const dto = messageToDTO(
         event.message,
-        `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        // 落盘前的退路：临时 id 只保证同一条消息在本次会话里可辨认，不是条目 id
+        options.messageEntryId ?? `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         undefined,
         state,
       );
@@ -170,5 +186,9 @@ const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
   }
 };
 
-export const toSseEvents = (event: AgentSessionEvent, state: TranscriptState = {}): SseEvent[] =>
-  toMessageEvents(event, state) ?? toToolEvents(event) ?? toSessionEvents(event) ?? [];
+export const toSseEvents = (
+  event: AgentSessionEvent,
+  state: TranscriptState = {},
+  options: SseEventOptions = {},
+): SseEvent[] =>
+  toMessageEvents(event, state, options) ?? toToolEvents(event) ?? toSessionEvents(event) ?? [];

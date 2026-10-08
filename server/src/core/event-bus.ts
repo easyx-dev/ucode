@@ -17,9 +17,22 @@ import type {
   UsageTotals,
 } from "@ucode/contracts";
 
-import { toSseEvents } from "./events";
+import { type SseEvent, toSseEvents } from "./events";
 
 export type EventSubscriber = (frame: ServerEvent) => void;
+
+/**
+ * 落盘后的条目 id：pi 把消息对象本身当成 key（`_entryIdsByMessage`），所以按对象身份在分支里找
+ * 就是它对应的条目。查不到（落盘失败 / 分支已被改写）时返回 undefined，由调用方退回临时 id。
+ */
+const entryIdOfMessage = (session: AgentSession, message: unknown): string | undefined => {
+  const branch = session.sessionManager.getBranch();
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const entry = branch[index];
+    if (entry?.type === "message" && entry.message === message) return entry.id;
+  }
+  return undefined;
+};
 
 export class SessionEventBus {
   private readonly subscribers = new Set<EventSubscriber>();
@@ -30,14 +43,29 @@ export class SessionEventBus {
     if (this.attached.has(sessionId)) return;
     const unsubscribe = session.subscribe((event) => {
       const state = { thinkingLevel: session.thinkingLevel };
-      for (const item of toSseEvents(event, state)) {
-        this.publish({
-          type: item.event,
-          sessionId,
-          seq: this.nextSeq(sessionId),
-          data: item.data,
+      const publish = (frames: SseEvent[]): void => {
+        for (const item of frames) {
+          this.publish({
+            type: item.event,
+            sessionId,
+            seq: this.nextSeq(sessionId),
+            data: item.data,
+          });
+        }
+      };
+
+      if (event.type === "message_end") {
+        // pi 先发 message_end、后 appendMessage：此刻还查不到条目 id，而界面拿这个 id 做编辑 / 分叉。
+        // 落盘是同步跟在事件之后的，等一个微任务就能按消息对象身份把条目 id 找回来。
+        const message = event.message;
+        queueMicrotask(() => {
+          const entryId = entryIdOfMessage(session, message);
+          publish(toSseEvents(event, state, entryId ? { messageEntryId: entryId } : {}));
         });
+        return;
       }
+
+      publish(toSseEvents(event, state));
     });
     this.attached.set(sessionId, unsubscribe);
   }

@@ -71,3 +71,24 @@ describe("压缩事件的映射", () => {
     );
   });
 });
+
+describe("message_end 的条目 id", () => {
+  const userMessage = () => ({ role: "user", content: [{ type: "text", text: "看这个" }] });
+
+  it("调用方补了条目 id 就用它（界面拿这个 id 做编辑 / 分叉）", () => {
+    const frames = toSseEvents(
+      piEvent({ type: "message_end", message: userMessage() }),
+      {},
+      { messageEntryId: "e7f1" },
+    );
+
+    assert.equal(frames[0]?.event, "message_end");
+    assert.equal(frames[0]?.data.id, "e7f1");
+  });
+
+  it("没补时退回可辨认的临时 id，不假装是条目 id", () => {
+    const frames = toSseEvents(piEvent({ type: "message_end", message: userMessage() }));
+
+    assert.match(String(frames[0]?.data.id), /^live-\d+-[0-9a-f]+$/);
+  });
+});
