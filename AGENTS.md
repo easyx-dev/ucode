@@ -126,9 +126,9 @@
 
 UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机已装 `agent-browser`
 （`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:19688`，
-或 `pnpm dev` 后开 `:5173`。两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接
-`ERR_UNSAFE_PORT`，换端口即可；弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，
-否则坐标会落到遮罩上把弹层关掉。
+或 `pnpm dev` 后开 `:5173`。harness 自带的浏览器能力已撤（过于局限，改由插件提供，见 `TODO.md`）。
+两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接 `ERR_UNSAFE_PORT`，换端口即可；
+弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，否则坐标会落到遮罩上把弹层关掉。
 
 ### 构建与生产运行
 
@@ -167,6 +167,8 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 - `core/` 是 pi SDK 封装；`harness/` 是会话装配层（把覆盖值与运行时收敛成 `createAgentSession` 参数，
   后续模式 / 工具集 / 自研提示词都在这里汇入）；`lib/` 是服务端基建（封套 / 校验中间件 / 日志）；
   `utils/` 只放无业务语义的纯函数；默认值与固定目录名放 `constants.ts`。
+  `harness/` 里几个自带子系统：`budget.ts`（窗口 → 压缩触发点，唯一口径）、`prune/`（清过期工具输出）、
+  `telemetry/`（每步耗时归因，写成 `ucode.step` 条目）。
 - 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
 - 日志统一走 `lib/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
 
