@@ -2,9 +2,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { TITLE_INPUT_MAX_CHARS, TITLE_MAX_LENGTH, TITLE_MAX_USER_TURNS } from "../../../constants";
-import { firstExchange, firstPromptExchange, isFirstTurn, parseSessionTitle } from "../generate";
+import {
+  firstExchange,
+  firstPromptExchange,
+  generateSessionTitle,
+  isFirstTurn,
+  parseSessionTitle,
+} from "../generate";
 
 type SessionMessage = AgentSession["messages"][number];
 
@@ -102,5 +108,55 @@ describe("parseSessionTitle", () => {
   it("清理后为空按失败处理", () => {
     assert.equal(parseSessionTitle("   \n  "), null);
     assert.equal(parseSessionTitle("「」"), null);
+  });
+});
+
+describe("generateSessionTitle", () => {
+  /** 只关心请求参数与「从哪个块取正文」，用一个捕获参数的替身就能覆盖 */
+  const withRuntime = async (
+    answer: unknown,
+  ): Promise<{ title: string | null; options: { maxTokens?: number; reasoning?: string } }> => {
+    let options: { maxTokens?: number; reasoning?: string } = {};
+    const runtime = {
+      completeSimple: async (
+        _model: unknown,
+        _context: unknown,
+        requestOptions: { maxTokens?: number; reasoning?: string },
+      ) => {
+        options = requestOptions;
+        return answer;
+      },
+    } as unknown as ModelRuntime;
+
+    const title = await generateSessionTitle({
+      runtime,
+      model: {} as never,
+      exchange: { userText: "登录超时了" },
+    });
+    return { title, options };
+  };
+
+  it("从 text 块取正文，并给足输出预算与最低档思考", async () => {
+    const { title, options } = await withRuntime({
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "先想一下要不要起名" },
+        { type: "text", text: "「修复登录超时」" },
+      ],
+    });
+
+    assert.equal(title, "修复登录超时");
+    // 思考与正文共享 maxTokens：给少了只会拿到 thinking（实测 48 时正文为空）
+    assert.ok((options.maxTokens ?? 0) >= 512, `maxTokens 太小：${options.maxTokens}`);
+    assert.equal(options.reasoning, "minimal");
+  });
+
+  it("只有 thinking、没有正文时返回 null，不把思考当标题", async () => {
+    const { title } = await withRuntime({
+      role: "assistant",
+      content: [{ type: "thinking", thinking: "思考很长、被上限截断…" }],
+    });
+
+    assert.equal(title, null);
   });
 });

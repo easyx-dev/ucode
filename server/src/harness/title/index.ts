@@ -80,7 +80,11 @@ export class TitleService {
     this.generating.add(sessionId);
     void generateSessionTitle({ runtime: session.modelRuntime, model, exchange })
       .then((title) => {
-        if (!title) return;
+        if (!title) {
+          // 模型没给出可用标题（空输出 / 解析失败）：留痕，不然这类失败在界面上完全看不出来
+          logger.warn({ sessionId }, "会话标题未产出，继续用派生的标题口径");
+          return;
+        }
         this.retryable.delete(sessionId);
         this.apply(sessionId, session, title);
       })

@@ -140,8 +140,9 @@ export const generateSessionTitle = async (input: GenerateTitleInput): Promise<s
     },
     {
       maxTokens: TITLE_MAX_TOKENS,
-      // 不传 `reasoning` 就是最省的一档：pi 的 simple 请求在未指定档位时关掉思考
-      // （`!options.reasoning` → `thinkingEnabled: false`），也就不会把思考花在标题上
+      // 思考与正文共享 `maxTokens`，而 pi 的 simple 请求最低只能到 `minimal`（关不掉思考）：
+      // 实测一次标题调用思考约 300 token，上限必须留足，否则只见 thinking、不见正文。
+      reasoning: "minimal",
       signal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
     },
   );
