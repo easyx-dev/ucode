@@ -159,10 +159,13 @@ export const summarizeToolNames = (
 
 /**
  * 子智能体开的子会话 id：`subagent` 工具的结果首行就是 `task_id: <id>（需要时可带 task_id 续跑）`。
- * 子会话跑完之后进度快照里已经没有它了，事后回看只能靠这一行——输出模板在
- * `server/src/harness/subagents/tool.ts`，两处要一起改。
+ * 子会话跑完之后进度快照里已经没有它了，事后回看只能靠这一行。
+ *
+ * 两个细节都是实测出来的，改的时候一起看：id 形如 `sub-<uuid>`（`server/src/harness/subagents/spawn.ts`
+ * 的 `sub-${randomUUID()}`），所以不能按裸 uuid 匹配；id 后面紧跟全角括号，不能按空白切。
+ * 输出模板在 `server/src/harness/subagents/tool.ts`。
  */
-const TASK_ID_LINE = /^task_id:\s*([0-9a-f-]{36})\b/m;
+const TASK_ID_LINE = /^task_id:\s*([\w-]+)/m;
 
 export const subagentSessionIdOf = (entry: ToolEntry): string | null =>
   entry.result ? (TASK_ID_LINE.exec(entry.result)?.[1] ?? null) : null;

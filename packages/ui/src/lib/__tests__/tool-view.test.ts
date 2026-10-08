@@ -21,9 +21,9 @@ describe("summarizeToolNames", () => {
 });
 
 describe("subagentSessionIdOf", () => {
-  it("从子智能体的结果里取出 task_id", () => {
+  it("从子智能体的结果里取出 task_id（id 带 sub- 前缀、后面紧跟全角括号）", () => {
     const result = [
-      "task_id: 11111111-2222-3333-4444-555555555555（需要时可带 task_id 续跑）",
+      "task_id: sub-11111111-2222-3333-4444-555555555555（需要时可带 task_id 续跑）",
       "",
       "<task_result>",
       "数完了",
@@ -31,7 +31,7 @@ describe("subagentSessionIdOf", () => {
     ].join("\n");
     assert.equal(
       subagentSessionIdOf({ id: "1", name: "subagent", result }),
-      "11111111-2222-3333-4444-555555555555",
+      "sub-11111111-2222-3333-4444-555555555555",
     );
   });
 
