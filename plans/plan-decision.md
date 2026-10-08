@@ -149,7 +149,7 @@
   （标记判定已收进 `lastTurnPresentedPlan`）；把 `onIgnorePlan` 传给 `ChatPanel`。
 - `src/business/chat-panel.tsx`：props 增加 `onIgnorePlan`，在渲染 `<PlanDecisionForm>` 处传 `onIgnore`。
 - `src/business/plan-decision-form.tsx`：props 增加 `onIgnore`；footer 行序为
-  `忽略`（`variant="ghost"`，最左，同位 `question-dialog.tsx` 的「跳过回答」）→ `提交反馈`（outline）→
+  `忽略`（`variant="ghost"`，最左，同位 `question-request.tsx` 的「跳过回答」）→ `提交反馈`（outline）→
   `批准并执行`（primary，`ml-auto`）；`title` 用「本次计划不再弹出决策表单」。（表单当前未接 `disabled`，
   且 `planReady` 已含 `!chat.streaming`，生成中本就不显示，故无需额外禁用逻辑。）
 - 子会话不受影响（`showPlanForm = planReady && !isChild`）。
