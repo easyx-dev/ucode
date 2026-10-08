@@ -127,6 +127,8 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { t } = useTranslation();
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  /** 发送 / 编辑重发被受理后自增，交给消息列表把视口拉回最新一行 */
+  const [sentTick, setSentTick] = useState(0);
   const draftKey = composerKeyOf(session?.id ?? null);
   const draft = composer.drafts[draftKey] ?? emptyDraft();
 
@@ -162,7 +164,11 @@ export function ChatPanel({
       // 句子读起来就是用户写的那句，且与展开块上的 `path` 同口径（编辑器只在有目录时可插引用）
       const sent = relativizeContextRefs(payload, session?.cwd ?? draft.cwd);
       void chat.send(sent, seed).then(({ sessionId: target, admitted }) => {
-        if (admitted) return;
+        // 受理即把视口交回最新一行；未受理（回填草稿）时不能动视口
+        if (admitted) {
+          setSentTick((tick) => tick + 1);
+          return;
+        }
         // 回填用换算前的载荷（标记是绝对路径），再次发送时重新换算
         const restored: Partial<ComposerDraft> = {
           text: payload.text,
@@ -175,6 +181,16 @@ export function ChatPanel({
       });
     },
     [chat, composer, draft, draftKey, onGoalCommand, session?.cwd],
+  );
+
+  /** 编辑重发与发送同一条路径：受理后同样要落回最新一行 */
+  const handleEdit = useCallback(
+    async (item: ChatItem, text: string): Promise<boolean> => {
+      const accepted = await onEdit(item, text);
+      if (accepted) setSentTick((tick) => tick + 1);
+      return accepted;
+    },
+    [onEdit],
   );
 
   // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」；
@@ -240,9 +256,10 @@ export function ChatPanel({
         compacting={chat.compacting}
         empty={empty}
         resetKey={session?.id ?? ""}
+        sentTick={sentTick}
         onOpenSession={onOpenSession}
         onFork={isChild ? undefined : onFork}
-        onEdit={isChild || chat.streaming ? undefined : onEdit}
+        onEdit={isChild || chat.streaming ? undefined : handleEdit}
       />
 
       {!isChild && goal ? (

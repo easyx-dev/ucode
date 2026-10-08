@@ -41,6 +41,8 @@ type MessageListProps = {
   empty?: React.ReactNode;
   /** 切换会话时变化，用于重置滚动位置与已测量的行高 */
   resetKey?: string;
+  /** 发送被受理后自增：即使视口停在历史位置，也要落回最新一行并重新打开跟随 */
+  sentTick?: number;
   /** 打开子会话（子智能体工具卡中的入口） */
   onOpenSession?: (sessionId: string) => void;
   /** 从某条消息分叉（仅主对话） */
@@ -57,6 +59,7 @@ export function MessageList({
   compacting,
   empty,
   resetKey,
+  sentTick,
   onOpenSession,
   onFork,
   onEdit,
@@ -149,6 +152,15 @@ export function MessageList({
     scrollToLatest();
     setFollowingBoth(true);
   }, [virtualizer, resetKey, setFollowingBoth, scrollToLatest]);
+
+  // 发送 / 编辑重发被受理：视口一律落回最新一行并重新打开跟随，
+  // 否则上翻看历史后发出的那条只会追加在列表末尾，用户看不到自己刚发的内容。
+  // 跳过 0：初值不该与上面的重置重复触发。
+  useLayoutEffect(() => {
+    if (!sentTick) return;
+    setFollowingBoth(true);
+    scrollToLatest();
+  }, [sentTick, setFollowingBoth, scrollToLatest]);
 
   // 行数或总高度变化（新行、实测高度落定）时，只要用户没往上翻就跟到最新
   // 总高度也要看：只盯行数会在实测修正后停在中途，看上去像没贴底
