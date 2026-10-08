@@ -20,6 +20,11 @@ export type EventStream = {
   start: () => void;
   /** 断开连接并停止重连 */
   stop: () => void;
+  /**
+   * 重开连接：丢掉积压的旧帧，走既有的「重连 → 按服务端快照收敛」路径。
+   * 用于连接可能已半死、积压的增量又已过期的场合（如页面从后台回到前台）。
+   */
+  restart: () => void;
   /** 订阅所有帧（不含 `server.connected`），返回退订函数 */
   onEvent: (listener: (frame: ServerEvent) => void) => () => void;
   /** 订阅错误帧，返回退订函数 */
@@ -110,17 +115,27 @@ export const createEventStream = (connect: EventConnect): EventStream => {
     }
   };
 
+  const start = (): void => {
+    if (controller) return;
+    controller = new AbortController();
+    void run();
+  };
+
+  const stop = (): void => {
+    controller?.abort();
+    controller = null;
+    attempt = 0;
+    notifyDisconnected();
+  };
+
   return {
-    start() {
-      if (controller) return;
-      controller = new AbortController();
-      void run();
-    },
-    stop() {
-      controller?.abort();
-      controller = null;
-      attempt = 0;
-      notifyDisconnected();
+    start,
+    stop,
+    restart() {
+      // 没在连就不动：起停由生命周期决定（见 UiProvider），这里只负责换一条新连接
+      if (!controller) return;
+      stop();
+      start();
     },
     onEvent(listener) {
       eventListeners.add(listener);

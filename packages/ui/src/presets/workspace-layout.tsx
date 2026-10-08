@@ -26,6 +26,7 @@ import { WorkbenchPanel } from "../business/workbench/workbench-panel";
 import { useActiveSession } from "../hooks/use-active-session";
 import { useChat } from "../hooks/use-chat";
 import { useComposerDrafts } from "../hooks/use-composer-drafts";
+import { useForegroundResync } from "../hooks/use-foreground-resync";
 import { useGoal } from "../hooks/use-goal";
 import { useInteractions } from "../hooks/use-interactions";
 import { useIsDesktop } from "../hooks/use-is-desktop";
@@ -117,6 +118,10 @@ export function WorkspaceLayout({
 
   const configured = models.data?.configured ?? false;
   const chat = useChat(activeId, { onSessionCreated: setActiveId });
+  // 回到前台时状态校准：后台期间错过的收尾帧只靠定时器看门狗收敛不了（见 useForegroundResync）
+  const hasActiveRun =
+    chat.streaming || chat.compacting || sessions.sessions.some((session) => session.running);
+  useForegroundResync(hasActiveRun);
   const sessionUsage = useSessionUsage(activeId);
   const interaction = interactions.pending[0] ?? null;
 
