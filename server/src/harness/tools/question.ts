@@ -36,6 +36,7 @@ const questionItemSchema = Type.Object({
 
 const questionSchema = Type.Object({
   questions: Type.Array(questionItemSchema, {
+    minItems: 1,
     description: "一次提出的问题，合并成一次提问展示给用户",
   }),
 });
@@ -60,7 +61,7 @@ export const createQuestionTool = (hooks: QuestionHooks) =>
     promptGuidelines: [
       "只在确实需要用户决定、且无法从代码或资料中查证时提问；能自己查清楚的不要问。",
       "一次把要问的问全（合并成一条 question 调用）；用户始终可以自行输入答案，不要单列「其他」选项。",
-      "需要多选时设 multiple: true，否则为单选；有推荐项时放第一个并在标签末尾标注「（推荐）」。",
+      "需要多选时设 multiple: true，否则为单选；有你推荐的那一项就放第一个，并在标签末尾标注「（推荐）」。",
       "用户回答后继续任务；不要就同一个问题反复追问。",
     ],
     parameters: questionSchema,

@@ -80,6 +80,12 @@ describe("旧工具输出清理", () => {
     const outcome = pruneToolOutputs(target);
     assert.equal(outcome.cleared, 1);
     assert.ok(outcome.freedTokens >= PRUNE_MIN_CLEARED_TOKENS);
+    // 记录要能对上账：清掉的是哪条、当时是什么工具
+    assert.deepEqual(
+      outcome.targets.map((item) => item.tool),
+      ["read"],
+    );
+    assert.ok(outcome.targets[0]?.id);
 
     const edits = editsOf(target);
     assert.deepEqual(edits, [old[0] ?? ""]);

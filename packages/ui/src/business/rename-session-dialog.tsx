@@ -1,35 +1,43 @@
-/** 重命名会话对话框 */
-import { useEffect, useState } from "react";
+/**
+ * 重命名会话弹层：函数式入口 `openRenameSessionDialog`，组件本体只管表单。
+ *
+ * 挂载即打开、收起即结算：待改名的会话在入队时就定了，不必再受控 open。
+ */
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-
 import { Button } from "../base/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../base/dialog";
 import { Input } from "../base/input";
+import { openDialog } from "../lib/dialog";
+import { sessionTitle } from "../lib/session";
+import type { SessionSummary } from "../lib/types";
 
 type RenameSessionDialogProps = {
-  /** 待重命名的会话；null 表示关闭 */
-  target: { sessionId: string; name: string } | null;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (sessionId: string, name: string) => void;
+  /** 待重命名的会话；初始名称由它派生 */
+  session: SessionSummary;
+  /** 提交新名称（已 trim、非空） */
+  onSubmit: (name: string) => void;
+  /** 取消 / Esc / 点遮罩：不改名收起 */
+  onCancel: () => void;
 };
 
-export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSessionDialogProps) {
+export function RenameSessionDialog({ session, onSubmit, onCancel }: RenameSessionDialogProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => sessionTitle(session, t("新会话")));
 
-  useEffect(() => {
-    setName(target?.name ?? "");
-  }, [target]);
-
-  const submit = () => {
+  const submit = (): void => {
     const trimmed = name.trim();
-    if (!target || !trimmed) return;
-    onSubmit(target.sessionId, trimmed);
-    onOpenChange(false);
+    if (!trimmed) return;
+    onSubmit(trimmed);
   };
 
   return (
-    <Dialog open={target !== null} onOpenChange={onOpenChange}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{t("重命名会话")}</DialogTitle>
@@ -43,7 +51,7 @@ export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSe
           }}
         />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={onCancel}>
             {t("取消")}
           </Button>
           <Button disabled={!name.trim()} onClick={submit}>
@@ -54,3 +62,13 @@ export function RenameSessionDialog({ target, onOpenChange, onSubmit }: RenameSe
     </Dialog>
   );
 }
+
+/** 打开重命名弹层；返回用户填的新名称，取消返回 null */
+export const openRenameSessionDialog = (session: SessionSummary): Promise<string | null> =>
+  openDialog<string>((close) => (
+    <RenameSessionDialog
+      session={session}
+      onSubmit={(name) => close(name)}
+      onCancel={() => close()}
+    />
+  )).then((name) => name ?? null);

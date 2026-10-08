@@ -19,6 +19,70 @@ const requestIdOf = (frame: { data: unknown }): string =>
   (frame.data as { requestId: string }).requestId;
 
 describe("InteractionBroker", () => {
+  it("结算留痕：答复、来源子会话结束各记一次，带会话与请求 id", async () => {
+    const bus = new SessionEventBus();
+    const frames = framesOf(bus);
+    const records: Array<{ sessionId: string; outcome: string; requestId: string }> = [];
+    const broker = new InteractionBroker(bus, ({ sessionId, request, outcome }) =>
+      records.push({ sessionId, outcome, requestId: request.requestId }),
+    );
+
+    const answered = broker.requestQuestion("s1", [
+      {
+        header: "确认",
+        question: "要不要继续？",
+        options: [{ label: "要", description: "继续跑" }],
+      },
+    ]);
+    const question = frames.find((frame) => frame.type === "interaction_request");
+    assert.ok(question, "应下发 interaction_request");
+    const questionId = requestIdOf(question);
+    broker.respond({ requestId: questionId, kind: "question", answers: [["要"]] });
+    await answered;
+
+    // 子会话结束时的结算：来源是子会话，请求挂在父会话下
+    const orphan = broker.requestPermission(
+      "s1",
+      { tool: "bash", subject: "ls", scope: "命令" },
+      { sourceSessionId: "sub-1", sourceDescription: "侦察" },
+    );
+    broker.forgetSource("s1", "sub-1");
+    await orphan;
+
+    assert.deepEqual(
+      records.map((item) => item.outcome),
+      ["resolved", "dismissed"],
+    );
+    assert.equal(records[0]?.sessionId, "s1");
+    assert.equal(records[0]?.requestId, questionId);
+  });
+
+  it("中止与清理分别留 aborted / dismissed", async () => {
+    const bus = new SessionEventBus();
+    const outcomes: string[] = [];
+    const broker = new InteractionBroker(bus, ({ outcome }) => outcomes.push(outcome));
+
+    const controller = new AbortController();
+    const pending = broker.requestPermission("s1", {
+      tool: "bash",
+      subject: "ls",
+      scope: "命令",
+      signal: controller.signal,
+    });
+    controller.abort();
+    await pending;
+
+    const forgotten = broker.requestPermission("s1", {
+      tool: "write",
+      subject: "a.ts",
+      scope: "文件",
+    });
+    broker.forget("s1");
+    await forgotten;
+
+    assert.deepEqual(outcomes, ["aborted", "dismissed"]);
+  });
+
   it("请求时下发事件，回答后结算并广播 resolved", async () => {
     const bus = new SessionEventBus();
     const frames = framesOf(bus);

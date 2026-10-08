@@ -20,6 +20,8 @@ export default {
   会话列表: "Session list",
   设置: "Settings",
   取消: "Cancel",
+  确定: "OK",
+  知道了: "Got it",
   保存: "Save",
   重命名: "Rename",
   删除: "Delete",
@@ -241,15 +243,7 @@ export default {
   拒绝: "Deny",
 
   // Question (question tool)
-  "agent 需要你的输入才能继续；选择一个选项，或自行填写答案。":
-    "The agent needs your input to continue. Pick an option, or type your own answer.",
-  可多选: "Multiple choice",
-  也可以直接输入你的答案: "Or type your own answer",
-  提交回答: "Submit answers",
-  跳过回答: "Skip",
   展开: "Expand",
-  "已答 {{answered}} / {{total}} 题": "Answered {{answered}} of {{total}}",
-  "待答：{{headers}}": "Pending: {{headers}}",
 
   // Plan decision
   计划已就绪: "Plan ready",
@@ -273,10 +267,39 @@ export default {
   思考过程: "Reasoning",
   子智能体过程: "Subagent progress",
   "（扩展消息）": "(extended message)",
-  会话已压缩: "Session compacted",
+  对话已压缩: "Conversation compacted",
+  目标完成: "Goal completed",
+  需要权限: "Permission required",
+  提示音: "Notification sound",
+  试听: "Preview",
+  "等待输入、本轮完成或出错时播放提示音；与系统通知各自独立，页面在前台也会响。":
+    "Play a sound when input is needed, a turn finishes, or an error occurs; independent of system notifications and audible while the page is in the foreground.",
+  输入自己的答案: "Type your own answer",
+  "{{current}}/{{total}} 个问题": "{{current}}/{{total}} questions",
+  选择一个答案: "Pick one answer",
+  选择多个答案: "Pick one or more answers",
+  "输入你的答案…": "Type your answer…",
+  下一步: "Next",
+  返回: "Back",
+  回到上一个问题: "Go back to the previous question",
+  提交全部作答: "Submit every answer",
+  看下一个问题: "Show the next question",
+  "跳到第 {{index}} 题": "Jump to question {{index}}",
+  "放弃这组问题，本轮按没有答复继续": "Discard these questions and continue without answers",
+  提交: "Submit",
+  模式已切换: "Mode changed",
+  权限档位已切换: "Permission level changed",
+  模式与权限档位已切换: "Mode and permission level changed",
+  "{{turns}} 轮 · {{tokens}}": "{{turns}} turns · {{tokens}}",
+  目标启动: "Goal started",
+  "目标续跑 · 第 {{turn}} 轮": "Goal continued · round {{turn}}",
+  目标恢复: "Goal resumed",
+  计划已批准: "Plan approved",
+  手动: "Manual",
+  达阈值: "Token threshold",
+  超窗口: "Context overflow",
+  未知原因: "unknown reason",
   "正在压缩上下文…": "Compacting context",
-  查看摘要: "Show summary",
-  收起摘要: "Hide summary",
   "当前上下文已经很紧凑，无需压缩": "The context is already compact enough; nothing to compact.",
   "当前上下文已经是压缩后的状态，无需重复压缩":
     "The context is already compacted; there is nothing to compact again.",
@@ -364,10 +387,11 @@ export default {
 
   // Archive
   归档: "Archive",
-  "归档会话「{{name}}」？会话会从列表里隐藏，对话与文件都保留。":
-    'Archive session "{{name}}"? It disappears from the list; the conversation and files are kept.',
-  "归档会话「{{name}}」？它的子会话会一并归档，对话与文件都保留。":
-    'Archive session "{{name}}"? Its sub-sessions are archived too; the conversations and files are kept.',
+  "归档会话「{{name}}」？": 'Archive session "{{name}}"?',
+  "会话会从列表里隐藏，对话与文件都保留。":
+    "It is hidden from the list; the conversation and files are kept.",
+  "它的子会话会一并归档，对话与文件都保留。":
+    "Its sub-sessions are archived too; the conversations and files are kept.",
   已归档: "Archived",
   归档失败: "Archive failed",
 

@@ -13,8 +13,22 @@
  * `present_plan` 是给界面判断「本轮以计划收尾」的内部信号，不是给用户看的工作产物，故它的调用与结果
  * 都在这一层就去掉（判定表单直接扫条目，见 `plan.ts`；统计与折叠也因此看不到它）。
  */
-import type { MessageBlock, PermissionRecord, QuestionItem } from "@ucode/contracts";
-import { PERMISSION_DECISION_CUSTOM_TYPE } from "@ucode/contracts";
+import type {
+  CompactionRecord,
+  GoalRecord,
+  MessageBlock,
+  ModeRecord,
+  PermissionRecord,
+  QuestionItem,
+} from "@ucode/contracts";
+import {
+  COMPACTION_RECORD_CUSTOM_TYPE,
+  GOAL_PROMPT_CUSTOM_TYPE,
+  GOAL_RECORD_CUSTOM_TYPE,
+  MODE_RECORD_CUSTOM_TYPE,
+  PERMISSION_DECISION_CUSTOM_TYPE,
+  PLAN_APPROVED_CUSTOM_TYPE,
+} from "@ucode/contracts";
 import { PRESENT_PLAN_TOOL } from "./plan";
 import type { ChatItem } from "./types";
 
@@ -93,20 +107,59 @@ type PermissionNode = {
 };
 
 /**
- * 一次上下文压缩：独立成段，界面渲染成「会话已压缩」分隔行 + 可展开的摘要。
+ * 一次上下文压缩：独立成段，界面渲染成「对话已压缩」分隔行 + 可展开的摘要。
  * 压缩会重写可见历史，这条摘要就是被替代掉的那段历史的唯一凭据，故不并进任何聚合行。
+ *
+ * `record` 是这一次压缩的触发与规模（`COMPACTION_RECORD_CUSTOM_TYPE` 条目）：摘要登在保留区间之前，
+ * 而压缩真正发生在保留区间之后，两者并成一行后位置取记录（时间线上真实的那一点）；只有摘要（老会话）
+ * 就按摘要位置渲染。
  */
 type CompactionNode = {
   kind: "compaction";
   key: string;
-  /** 摘要正文（pi 给出的结构化 markdown） */
+  /** 摘要正文（pi 给出的结构化 markdown）；跳过 / 失败的记录没有摘要 */
   summary: string;
+  /** 触发来源与规模；记录缺失（老会话）或记录不合法时为空 */
+  record?: CompactionRecord;
 };
 
-export type ChatNode = ContentNode | ActivityNode | QuestionNode | PermissionNode | CompactionNode;
+/**
+ * 一条合成输入（`custom_message`）：目标启动 / 续跑 / 恢复、计划批准。
+ * 它不是用户打的字，只占一条细线，展开才看注入给模型的原文。
+ */
+type InjectedNode = {
+  kind: "injected";
+  key: string;
+  item: ChatItem;
+  text: string;
+};
 
-/** 能承载轮页脚的节点：压缩分隔行不是回答，没有「本轮模型与耗时」可报 */
-type ChatFooterNode = Exclude<ChatNode, { kind: "compaction" }>;
+/** 模式 / 权限档位的变更：一条细线，说明这一轮之后按什么口径干活 */
+type ModeNode = {
+  kind: "mode";
+  key: string;
+  record: ModeRecord;
+};
+
+/** 目标跑完（校验通过）：一条细线，展开看校验结论 */
+type GoalNode = {
+  kind: "goal";
+  key: string;
+  record: GoalRecord;
+};
+
+export type ChatNode =
+  | ContentNode
+  | ActivityNode
+  | QuestionNode
+  | PermissionNode
+  | CompactionNode
+  | InjectedNode
+  | GoalNode
+  | ModeNode;
+
+/** 能承载轮页脚的节点：压缩、合成输入与目标完成都不是回答，没有「本轮模型与耗时」可报 */
+type ChatFooterNode = Exclude<ChatNode, { kind: "compaction" | "injected" | "goal" | "mode" }>;
 
 type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 
@@ -318,9 +371,32 @@ const appendToolResult = (nodes: ChatNode[], item: ChatItem, callIds: Set<string
 const permissionOf = (item: ChatItem): PermissionRecord | undefined =>
   item.customType === PERMISSION_DECISION_CUSTOM_TYPE ? item.permissionDecision : undefined;
 
+/** 本条是不是压缩记录（`custom` 扩展条目之一） */
+const compactionRecordOf = (item: ChatItem): CompactionRecord | undefined =>
+  item.customType === COMPACTION_RECORD_CUSTOM_TYPE ? item.compactionRecord : undefined;
+
+/** 本条是不是目标记录里要展示的那一条（校验结论与暂停原因只留在文件里） */
+const goalCompletionOf = (item: ChatItem): GoalRecord | undefined =>
+  item.customType === GOAL_RECORD_CUSTOM_TYPE && item.goalRecord?.event === "completed"
+    ? item.goalRecord
+    : undefined;
+
+/** 合成输入：目标注入与计划批准，两者都是 `custom_message` */
+const isInjected = (item: ChatItem): boolean =>
+  item.customType === GOAL_PROMPT_CUSTOM_TYPE || item.customType === PLAN_APPROVED_CUSTOM_TYPE;
+
+/** 摘要正文：列表里只会有最新那一条压缩条目（更早的被服务端过滤），没有就是空串 */
+const summaryTextOf = (items: ChatItem[]): string => {
+  const item = items.find((candidate) => candidate.role === "summary");
+  return item ? itemText(item) : "";
+};
+
 export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
   const { results, callIds } = indexToolResults(items);
   const nodes: ChatNode[] = [];
+  // 摘要挂到**最后一条**记录上：一次会话可能压过多次，只有最新那次配得上前面的摘要
+  const lastRecord = [...items].reverse().find((item) => compactionRecordOf(item));
+  const lastRecordUid = lastRecord ? uidOf(lastRecord) : null;
   for (const item of items) {
     if (item.role === "tool") {
       appendToolResult(nodes, item, callIds);
@@ -329,13 +405,43 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
     if (item.role !== "assistant") {
       // 压缩摘要自成一段：它标出「此前历史已被替代」，当普通内容渲染会让人误以为是一轮回答
       if (item.role === "summary") {
-        nodes.push({ kind: "compaction", key: uidOf(item), summary: itemText(item) });
+        // 有压缩记录时，分隔行落在记录的位置（真正的压缩时刻），这里不重复渲染
+        if (lastRecordUid === null) {
+          nodes.push({ kind: "compaction", key: uidOf(item), summary: itemText(item) });
+        }
+        continue;
+      }
+      const record = compactionRecordOf(item);
+      if (record) {
+        const isNewest = uidOf(item) === lastRecordUid;
+        nodes.push({
+          kind: "compaction",
+          key: uidOf(item),
+          summary: isNewest ? summaryTextOf(items) : "",
+          record,
+        });
+        continue;
+      }
+      // 合成输入自成一条细线：它是注入给模型的指令，不是用户发的消息
+      if (isInjected(item)) {
+        nodes.push({ kind: "injected", key: uidOf(item), item, text: itemText(item) });
+        continue;
+      }
+      const modeChange = item.customType === MODE_RECORD_CUSTOM_TYPE ? item.modeChange : undefined;
+      if (modeChange) {
+        nodes.push({ kind: "mode", key: uidOf(item), record: modeChange });
+        continue;
+      }
+      // 其它目标记录（每轮校验、暂停原因）只留在会话文件里，不进消息区
+      if (item.customType === GOAL_RECORD_CUSTOM_TYPE) {
+        const completed = goalCompletionOf(item);
+        if (completed) nodes.push({ kind: "goal", key: uidOf(item), record: completed });
         continue;
       }
       // 审批记录也自成一段：并进聚合行等于把它藏起来，而它恰恰是要回放给人看的
-      const record = permissionOf(item);
-      if (record) {
-        nodes.push({ kind: "permission", key: uidOf(item), record, source: item });
+      const permission = permissionOf(item);
+      if (permission) {
+        nodes.push({ kind: "permission", key: uidOf(item), record: permission, source: item });
         continue;
       }
       nodes.push({ kind: "content", key: uidOf(item), item, blocks: item.blocks, trailing: true });
@@ -382,7 +488,15 @@ const markTurnEnd = (nodes: ChatNode[]): void => {
       turnStartMs = msOf(node.item.createdAt);
       continue;
     }
-    if (node.kind === "compaction") continue;
+    // 压缩、合成输入、目标完成与模式切换不是回答，不参与轮末判定（拿它们当轮末会把页脚挂到细线上）
+    if (
+      node.kind === "compaction" ||
+      node.kind === "injected" ||
+      node.kind === "goal" ||
+      node.kind === "mode"
+    ) {
+      continue;
+    }
     last = node;
     // 聚合行与提问节点自身没有正文段，它携带的 `source` 才是页脚要用的那条 assistant 消息
     const source =

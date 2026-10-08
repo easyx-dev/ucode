@@ -6,7 +6,7 @@
  * 避免连续两轮各起一次回顾同时改索引。
  */
 import type { AgentSession, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { MemoryConfig } from "@ucode/contracts";
+import { MEMORY_REVIEW_RECORD_CUSTOM_TYPE, type MemoryConfig } from "@ucode/contracts";
 
 import { MEMORY_INDEX_MAX_CHARS } from "../../constants";
 import { env } from "../../env";
@@ -64,6 +64,16 @@ export class MemoryService {
       cwd,
       appDir: this.appDir,
       turns,
+      record: (saved) => {
+        try {
+          session.sessionManager.appendCustomEntry(MEMORY_REVIEW_RECORD_CUSTOM_TYPE, {
+            ...saved,
+            at: new Date().toISOString(),
+          });
+        } catch (error) {
+          logger.warn({ sessionId, error }, "记忆回顾记录写入失败");
+        }
+      },
     })
       .catch((error: unknown) => logger.warn({ sessionId, error }, "记忆回顾失败"))
       .finally(() => this.reviewing.delete(sessionId));

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { GOAL_MAX_OBJECTIVE_LENGTH } from "@ucode/contracts";
+import { GOAL_MAX_OBJECTIVE_LENGTH, GOAL_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
 
 import { SessionEventBus } from "../../../core/event-bus";
 import type { SessionRecord, SessionRepository } from "../../../db/session-repository";
@@ -181,7 +181,15 @@ describe("GoalService 落定处理", () => {
     events.subscribe((frame) => frames.push(frame));
     const service = new GoalService(repository, usage, events);
 
+    // 追加到会话文件的观测条目：断言「状态变迁有没有落盘」用
+    const entries: Array<{ customType: string; data: Record<string, unknown> }> = [];
     const session = {
+      sessionManager: {
+        appendCustomEntry: (customType: string, data: Record<string, unknown>) => {
+          entries.push({ customType, data });
+          return `e${entries.length}`;
+        },
+      },
       messages: options.messages ?? [],
       model: { provider: "p", id: "m" },
       modelRuntime: {
@@ -193,11 +201,11 @@ describe("GoalService 落定处理", () => {
       },
     } as unknown as AgentSession;
 
-    return { service, session, state: () => parseGoalState(stored), frames };
+    return { service, session, state: () => parseGoalState(stored), frames, entries };
   };
 
-  it("达成时标记 completed 且不续跑", async () => {
-    const { service, session, state } = makeService({
+  it("达成时标记 completed 且不续跑，并留下一条目标记录", async () => {
+    const { service, session, state, entries } = makeService({
       state: startGoal("目标", null),
       verdict: '{"achieved": true, "reason": "已完成", "nextStep": ""}',
     });
@@ -205,6 +213,39 @@ describe("GoalService 落定处理", () => {
     assert.equal(outcome, null);
     assert.equal(state()?.status, "completed");
     assert.equal(state()?.verification?.reason, "已完成");
+
+    assert.equal(entries.length, 1, "完成要落一条记录");
+    assert.equal(entries[0]?.customType, GOAL_RECORD_CUSTOM_TYPE);
+    assert.equal(entries[0]?.data.event, "completed");
+    assert.equal(entries[0]?.data.status, "completed");
+    assert.deepEqual(entries[0]?.data.verdict, {
+      achieved: true,
+      reason: "已完成",
+      nextStep: "",
+    });
+  });
+
+  it("每轮校验结论与暂停原因都落一条记录（文件里可回溯）", async () => {
+    const running = makeService({
+      state: startGoal("目标", null),
+      messages: asMessages([toolMessage()]),
+    });
+    await running.service.onSettled("s1", running.session);
+    assert.equal(running.entries[0]?.data.event, "verdict");
+    const verdict = running.entries[0]?.data.verdict as { achieved?: boolean } | undefined;
+    assert.equal(verdict?.achieved, false);
+
+    const paused = makeService({
+      state: { ...startGoal("目标", null), turns: 25 },
+      messages: asMessages([toolMessage()]),
+    });
+    await paused.service.onSettled("s1", paused.session);
+    // 先落校验结论，再落暂停：两条都在文件里，顺序即时间顺序
+    assert.deepEqual(
+      paused.entries.map((entry) => entry.data.event),
+      ["verdict", "pause"],
+    );
+    assert.equal(paused.entries[1]?.data.cause, "limit");
   });
 
   it("未达成且有工具调用时递增轮数并续跑", async () => {

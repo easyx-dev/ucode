@@ -66,7 +66,8 @@ export const zhCN: PromptCatalog = {
     if (has("write")) rules.push("write 只用于新建文件或整体重写。");
     if (has("question")) {
       rules.push(
-        "信息不足或需要用户拍板时用 question 提问，把选项与代价写清楚；能自己查证的先查证，不要动辄打断用户。",
+        "信息不足或需要用户拍板时用 question 提问，把选项与代价写清楚，有推荐项就标「（推荐）」并放第一个；" +
+          "能自己查证的先查证，不要动辄打断用户。",
       );
     }
     if (has("subagent")) {

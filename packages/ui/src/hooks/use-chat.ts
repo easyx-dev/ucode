@@ -37,6 +37,8 @@ export type ChatController = {
   ackCompactionNotice: () => void;
   /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
   ignorePlan: () => Promise<void>;
+  /** 批准计划：服务端注入开工指令并起一轮（模式由调用方先切回 build） */
+  approvePlan: () => Promise<void>;
 };
 
 type ChatOptions = {
@@ -113,6 +115,11 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     await client.messages.ignorePlan(sessionId);
   }, [client, sessionId]);
 
+  const approvePlan = useCallback(async (): Promise<void> => {
+    if (!sessionId) return;
+    await client.messages.approvePlan(sessionId);
+  }, [client, sessionId]);
+
   // 会话列表的运行态与摘要由 session_updated 事件驱动，无需在落定后再刷新
 
   return {
@@ -130,5 +137,6 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     compactionNotice: stream.compactionNotice,
     ackCompactionNotice,
     ignorePlan,
+    approvePlan,
   };
 }

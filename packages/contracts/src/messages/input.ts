@@ -63,6 +63,15 @@ export type MessageEditRequest = z.input<typeof messageEditInputSchema>;
 export type MessageEditInput = z.infer<typeof messageEditInputSchema>;
 export type MessageCompactRequest = z.input<typeof messageCompactInputSchema>;
 export type MessageCompactInput = z.infer<typeof messageCompactInputSchema>;
+
+/**
+ * 批准计划：模式由客户端先经 `sessions/update` 切回 `build`，这里只负责注入
+ * 「计划已批准，请开始执行。」并起一轮——自定义条目只有服务端写得进去。
+ */
+export const messageApprovePlanInputSchema = z.object({ sessionId: sessionIdSchema });
+
+export type MessageApprovePlanRequest = z.input<typeof messageApprovePlanInputSchema>;
+export type MessageApprovePlanInput = z.infer<typeof messageApprovePlanInputSchema>;
 export type AttachmentRefInput = z.infer<typeof attachmentRefSchema>;
 export type AttachmentRefRequest = z.input<typeof attachmentRefSchema>;
 export type AttachmentRef = AttachmentRefInput;

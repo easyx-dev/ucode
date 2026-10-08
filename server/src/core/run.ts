@@ -2,14 +2,18 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
+  GOAL_PROMPT_CUSTOM_TYPE,
+  type GoalPromptKind,
   type MessageCompactInput,
   type MessageEditInput,
+  PLAN_APPROVED_CUSTOM_TYPE,
   type PromptInput,
 } from "@ucode/contracts";
 import type { Services } from "../app";
 import { resolveAttachment } from "../harness/attachment";
 import { expandContexts } from "../harness/context";
 import { resolveEditableUserEntry } from "../harness/edit";
+import { buildPlanApproval } from "../harness/goal/prompt";
 import { type PromptImage, toPromptImage } from "../harness/image";
 import { resolveSessionCwd } from "../harness/session-config";
 import { AppError } from "../lib/response";
@@ -212,8 +216,36 @@ export const admitCompact = async (
 export const admitGoalRun = async (
   services: Services,
   sessionId: string,
-  text: string,
+  injected: { content: string; kind: GoalPromptKind },
 ): Promise<void> => {
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
-  services.pool.startRun(sessionId, session, text);
+  services.pool.startInjectedRun(sessionId, session, {
+    customType: GOAL_PROMPT_CUSTOM_TYPE,
+    content: injected.content,
+    details: { kind: injected.kind },
+  });
+  // 注入不产生普通消息事件：客户端不重取快照就看不到那行「目标启动 / 目标恢复」
+  services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
+};
+
+/**
+ * 计划批准：注入「已批准」的合成输入并起一轮。
+ *
+ * 切回 build 模式仍走 `sessions/update`（那里才是模式的校验与生效点），客户端先切后调这里；
+ * 注入本身必须由服务端做——自定义条目只有会话这一侧写得进去。
+ */
+export const admitPlanApproval = async (services: Services, sessionId: string): Promise<void> => {
+  const record = services.sessions.find(sessionId);
+  if (!record) {
+    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+      path: sessionId,
+    });
+  }
+  const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
+  services.pool.startInjectedRun(sessionId, session, {
+    customType: PLAN_APPROVED_CUSTOM_TYPE,
+    content: buildPlanApproval(),
+  });
+  // 注入不产生普通消息事件：客户端不重取快照就看不到那行「计划已批准」
+  services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
 };

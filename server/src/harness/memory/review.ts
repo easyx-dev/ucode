@@ -99,6 +99,8 @@ export type MemoryReviewInput = {
   cwd: string;
   appDir: string;
   turns: readonly ExchangeTurn[];
+  /** 固化了一条项目记忆时回调（写进会话文件的观测记录），失败与否由调用方兜底 */
+  record?: (input: { file: string; title: string }) => void;
 };
 
 export const runMemoryReview = async (input: MemoryReviewInput): Promise<void> => {
@@ -113,5 +115,11 @@ export const runMemoryReview = async (input: MemoryReviewInput): Promise<void> =
 
   const decision = parseReviewDecision(textOf(answer));
   if (!decision?.remember) return;
-  rememberFact(input.cwd, { title: decision.title, content: decision.content }, input.appDir);
+  const entry = rememberFact(
+    input.cwd,
+    { title: decision.title, content: decision.content },
+    input.appDir,
+  );
+  // 回顾是后台动作，落在哪个会话、固化了哪条记忆只有文件里查得到（记忆文件本身不带会话）
+  input.record?.({ file: entry.file, title: entry.title });
 };

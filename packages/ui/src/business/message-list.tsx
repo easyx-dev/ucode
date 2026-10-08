@@ -24,11 +24,18 @@ const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
   question: 180,
   permission: 72,
   compaction: 44,
+  injected: 36,
+  goal: 44,
+  mode: 36,
   working: 32,
 };
 
 /** 距底部多少像素内算「贴着底部」；更远就认为用户在回看历史 */
 const SCROLL_END_THRESHOLD = 96;
+
+/** 列表里第一条压缩分隔行的 key；没有压缩过时为 null */
+const compactionKeyOf = (rows: ChatRow[]): string | null =>
+  rows.find((row) => row.kind === "compaction")?.key ?? null;
 
 type MessageListProps = {
   items: ChatItem[];
@@ -72,6 +79,8 @@ export function MessageList({
   // 它只在 scroll 事件里改写——实测高度让 totalSize 变大并不触发 scroll 事件，用距离直接驱动状态会卡住
   const [following, setFollowing] = useState(true);
   const followingRef = useRef(true);
+  /** 上一次见过的压缩分隔行：新出现一条时才知道「这次重写带来了压缩」 */
+  const lastCompactionKeyRef = useRef<string | null>(null);
 
   const rows = useMemo(
     () => buildChatRows(showThinking ? items : withoutThinking(items), working),
@@ -155,6 +164,8 @@ export function MessageList({
 
   // 首次挂载与切换会话都直接落到最新一条，避免先渲染顶部再跳一次
   useLayoutEffect(() => {
+    // 记住这一刻的分隔行：打开一个早就压缩过的会话不该被当成「刚压缩」，否则会停在旧的压缩点
+    lastCompactionKeyRef.current = compactionKeyOf(rowsRef.current);
     virtualizer.measure();
     scrollToLatest();
     setFollowingBoth(true);
@@ -168,6 +179,20 @@ export function MessageList({
     setFollowingBoth(true);
     scrollToLatest();
   }, [sentTick, setFollowingBoth, scrollToLatest]);
+
+  // 新出现一条压缩分隔行：把视口落到它，否则压缩完历史一换，用户只会看到内容平白变短。
+  // 有压缩记录时行就落在底部（用户正看着它，也在跟随），这种情况不动视口——
+  // 滚过去反而会关掉跟随，随后流式生成的回答就看不到了；没有记录的旧数据才需要这一下。
+  useLayoutEffect(() => {
+    const key = compactionKeyOf(rows);
+    if (key === lastCompactionKeyRef.current) return;
+    lastCompactionKeyRef.current = key;
+    if (key === null) return;
+    const index = rows.findIndex((row) => row.kind === "compaction");
+    if (index < 0 || index >= rows.length - 2) return;
+    setFollowingBoth(false);
+    virtualizer.scrollToIndex(index, { align: "start" });
+  }, [rows, setFollowingBoth, virtualizer]);
 
   // 行数或总高度变化（新行、实测高度落定）时，只要用户没往上翻就跟到最新
   // 总高度也要看：只盯行数会在实测修正后停在中途，看上去像没贴底

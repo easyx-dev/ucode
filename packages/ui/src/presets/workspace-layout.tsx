@@ -14,9 +14,10 @@ import { Toaster } from "../base/sonner";
 import { TooltipProvider } from "../base/tooltip";
 import { ChatPanel } from "../business/chat-panel";
 import { CommandPalette } from "../business/command-palette";
-import { DirectoryPickerDialog } from "../business/directory-picker-dialog";
+import { DialogHost } from "../business/dialog-host";
+import { openDirectoryPickerDialog } from "../business/directory-picker-dialog";
 import { ErrorToaster } from "../business/error-toaster";
-import { RenameSessionDialog } from "../business/rename-session-dialog";
+import { openRenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
 import { UsagePanel } from "../business/usage/usage-panel";
@@ -47,7 +48,6 @@ import {
   WORKSPACE_PANELS,
 } from "../lib/panel-layout";
 import { lastTurnPresentedPlan } from "../lib/plan";
-import { sessionTitle } from "../lib/session";
 import { isWorkspaceSession } from "../lib/session-groups";
 import { DEFAULT_SETTINGS_SECTION, type SettingsSectionId } from "../lib/settings-section";
 import type {
@@ -110,8 +110,6 @@ export function WorkspaceLayout({
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [workbenchSheetOpen, setWorkbenchSheetOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [renaming, setRenaming] = useState<{ sessionId: string; name: string } | null>(null);
 
   const isDesktop = useIsDesktop();
   // 外层三栏一组：侧栏与工作台各自记住宽度，对话区占剩余
@@ -198,11 +196,12 @@ export function WorkspaceLayout({
   const planReady =
     activeSession?.mode === "plan" && !chat.streaming && lastTurnPresentedPlan(chat.items);
 
+  /** 批准计划：先切回编码模式（模式的校验与生效在服务端），再让服务端注入开工指令 */
   const approvePlan = (): void => {
     if (!activeId) return;
     void (async () => {
       await sessions.setMode(activeId, "build");
-      await chat.send(textPayload(t("计划已批准，请开始执行。")));
+      await chat.approvePlan();
     })();
   };
 
@@ -280,9 +279,23 @@ export function WorkspaceLayout({
     });
   };
 
+  /** 请求重命名：弹层自己管开关，拿到新名称再提交 */
   const requestRename = (session: SessionSummary): void => {
-    setRenaming({ sessionId: session.id, name: sessionTitle(session, t("新会话")) });
+    void openRenameSessionDialog(session).then((name) => {
+      if (name) void sessions.rename(session.id, name);
+    });
   };
+
+  /** 选目录（⌘O / 侧栏 / 命令面板共用）：选中的目录成为草稿的工作目录 */
+  const pickDirectory = (): void => {
+    void openDirectoryPickerDialog().then((path) => {
+      if (path) startInDirectory(path);
+    });
+  };
+
+  // 快捷键监听同上：pickDirectory 也随会话重建，经 ref 取最新
+  const pickDirectoryRef = useRef(pickDirectory);
+  pickDirectoryRef.current = pickDirectory;
 
   /** `/goal` 命令：草稿态先建会话再设目标；其余命令作用于当前会话 */
   const runGoalCommand = (command: GoalCommand, seed: SessionCreateRequest = {}): void => {
@@ -378,7 +391,7 @@ export function WorkspaceLayout({
           break;
         case "o":
           event.preventDefault();
-          setPicking(true);
+          pickDirectoryRef.current();
           break;
         case "n":
           event.preventDefault();
@@ -424,7 +437,7 @@ export function WorkspaceLayout({
     },
     onTogglePin: togglePin,
     onOpenSearch: () => setPaletteOpen(true),
-    onOpenWorkspace: () => setPicking(true),
+    onOpenWorkspace: pickDirectory,
     onOpenAutomation: () => toast.info(t("自动化功能即将推出")),
     onOpenMarketplace: () => toast.info(t("插件市场即将推出")),
     onOpenSettings: openSettings,
@@ -578,14 +591,6 @@ export function WorkspaceLayout({
             context={sessionUsage.context}
           />
 
-          <RenameSessionDialog
-            target={renaming}
-            onOpenChange={(open) => {
-              if (!open) setRenaming(null);
-            }}
-            onSubmit={(id, name) => void sessions.rename(id, name)}
-          />
-
           {settingsSection ? (
             <SettingsPanel
               section={settingsSection}
@@ -606,7 +611,7 @@ export function WorkspaceLayout({
             onRunBuiltin={runBuiltin}
             onNewTask={startNewSession}
             onNewAssistant={startAssistantSession}
-            onOpenWorkspace={() => setPicking(true)}
+            onOpenWorkspace={pickDirectory}
             onOpenSettings={openSettings}
             onToggleSidebar={toggleSidebar}
             onToggleWorkbench={() => {
@@ -616,16 +621,8 @@ export function WorkspaceLayout({
             onOpenFile={openPreview}
           />
 
-          <DirectoryPickerDialog
-            open={picking}
-            onOpenChange={setPicking}
-            onSelect={(path) => {
-              startInDirectory(path);
-              setPicking(false);
-            }}
-          />
-
           <Toaster position="top-center" />
+          <DialogHost />
           <ErrorToaster />
         </div>
       </WorkbenchProvider>

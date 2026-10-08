@@ -76,12 +76,37 @@ const depsOf = (over: Partial<SubagentSpawnDeps> = {}): SubagentSpawnDeps => ({
   refresh: () => {},
   emitSessionCreated: () => {},
   settleInteractions: () => {},
+  record: () => {},
   dispose: () => {},
   emit: () => {},
   ...over,
 });
 
 describe("spawnSubagent", () => {
+  it("委派在父会话留下建立与结束两条记录（失败也留）", async () => {
+    const records: Array<Record<string, unknown>> = [];
+    const ok = await spawnSubagent(
+      {
+        parent: parentRecord,
+        toolCallId: "call-1",
+        cwd: "/tmp/project",
+        request: { agent: "explore", description: "查一下", task: "看代码" },
+      },
+      depsOf({
+        ensure: async () => fakeChild({ entries: [assistantEntry("结论")] }).session,
+        record: (data) => records.push(data),
+      }),
+    );
+    assert.ok(ok.sessionId.startsWith("sub-"));
+    assert.deepEqual(
+      records.map((item) => item.event),
+      ["start", "end"],
+    );
+    assert.equal(records[1]?.isError, false);
+    assert.equal(records[0]?.toolCallId, "call-1");
+    assert.equal(records[0]?.agent, "explore");
+  });
+
   it("建出子会话行，返回最后一条有正文的 assistant 文本，并回写 / 结算 / 回收", async () => {
     const { session } = fakeChild({ entries: [assistantEntry("结论 A"), emptyAssistantEntry] });
     const created: Array<Record<string, unknown>> = [];

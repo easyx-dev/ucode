@@ -321,6 +321,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     output: "MessageIgnorePlanResponse",
     summary: "忽略本次计划的决策表单",
   },
+  {
+    domain: "messages",
+    action: "approve-plan",
+    method: "POST",
+    input: "messageApprovePlanInputSchema",
+    requestType: "MessageApprovePlanRequest",
+    output: "MessageApprovePlanResponse",
+    summary: "批准计划（注入开工指令并起一轮）",
+  },
 
   {
     domain: "events",

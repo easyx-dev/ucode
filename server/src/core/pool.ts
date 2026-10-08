@@ -6,17 +6,23 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import {
+  COMPACTION_RECORD_CUSTOM_TYPE,
+  type CompactionRecord,
   ERROR_CODES,
+  GOAL_PROMPT_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   type PermissionRecord,
+  PRUNE_RECORD_CUSTOM_TYPE,
   type ServerEventPayload,
   type SessionStatus,
   type SessionSummary,
+  SUBAGENT_RECORD_CUSTOM_TYPE,
   type SubagentSnapshot,
   type WebsearchConfig,
 } from "@ucode/contracts";
 import { SUBAGENT_MAX_CONCURRENCY, SUBAGENT_QUEUE_MAX, SUBAGENT_QUEUE_WAIT_MS } from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
+
 import { env } from "../env";
 import {
   type AgentProfile,
@@ -51,6 +57,7 @@ import { compactionSkipReasonOf } from "./compaction-skip";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
+import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
 import { RunTracker } from "./run-tracker";
 import type { PiRuntime } from "./runtime";
@@ -296,6 +303,52 @@ export class SessionPool {
   }
 
   /**
+   * 起一轮**合成输入**（目标的启动 / 续跑 / 恢复、计划批准）：内容不是用户打的字，走
+   * `custom_message` 落地——pi 会把它当 user 文本送进模型，但条目类型与来源都标得出来，
+   * 对话里也不再装成用户气泡。
+   */
+  startInjectedRun(
+    sessionId: string,
+    session: AgentSession,
+    injected: { customType: string; content: string; details?: unknown },
+  ): void {
+    if (!this.beginRun(sessionId)) {
+      throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
+    }
+    void session
+      .sendCustomMessage(
+        {
+          customType: injected.customType,
+          content: injected.content,
+          display: true,
+          ...(injected.details !== undefined ? { details: injected.details } : {}),
+        },
+        { triggerTurn: true },
+      )
+      .catch((error) => this.reportRunError(sessionId, error))
+      .finally(() => this.endRun(sessionId));
+  }
+
+  /**
+   * 目标续跑：注入下一条指令并起一轮。
+   *
+   * 条目落在盘上后补一个 `transcript_reset`：注入不产生普通消息事件，客户端不重取快照
+   * 就看不到那行「目标续跑」。
+   */
+  private startGoalRun(
+    sessionId: string,
+    session: AgentSession,
+    outcome: { content: string; turn: number },
+  ): void {
+    this.startInjectedRun(sessionId, session, {
+      customType: GOAL_PROMPT_CUSTOM_TYPE,
+      content: outcome.content,
+      details: { kind: "continuation", turn: outcome.turn },
+    });
+    this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
+  }
+
+  /**
    * 手动压缩上下文：后台执行，结果走事件流（`compaction_start` / `compaction_end`）。
    * 与一轮生成共用 `running` 占位，保证压缩期间不会被并发 prompt 打断。
    */
@@ -318,15 +371,27 @@ export class SessionPool {
   ): Promise<void> {
     let compacted = false;
     try {
-      await session.compact(instructions);
+      const result = await session.compact(instructions);
       compacted = true;
+      this.recordCompaction(session, {
+        reason: "manual",
+        outcome: "done",
+        tokensBefore: result.tokensBefore,
+        ...(result.estimatedTokensAfter !== undefined
+          ? { tokensAfter: result.estimatedTokensAfter }
+          : {}),
+        ...(result.firstKeptEntryId ? { keptFrom: result.firstKeptEntryId } : {}),
+      });
     } catch (error) {
       const skipped = compactionSkipReasonOf(error);
       if (skipped) {
         // 没做任何事，不算失败：不进「本轮出错」，只把拒绝原因带给客户端弹一条轻提示
+        // 条目要落在提示之前：客户端收到 compaction_end 后可能重取快照，那时得已经能在文件里找到它
+        this.recordCompaction(session, { reason: "manual", outcome: "skipped", skip: skipped });
         this.events.emitFrame(sessionId, "compaction_end", { reason: "manual", skipped });
       } else {
         const reason = error instanceof Error ? error.message : String(error);
+        this.recordCompaction(session, { reason: "manual", outcome: "failed", error: reason });
         this.reportRunError(
           sessionId,
           new AppError(ERROR_CODES.compactionFailed, "压缩失败", 500, undefined, { reason }),
@@ -336,6 +401,23 @@ export class SessionPool {
       this.endRun(sessionId);
     }
     if (compacted) this.resetTranscript(sessionId, session);
+  }
+
+  /**
+   * 把一次压缩的结果落成扩展条目：pi 的 `compaction` 条目只有摘要与压缩前规模，
+   * 触发来源、跳过与失败都不在里面（以前只发一条 SSE 提示，刷新即失）。
+   *
+   * 全程 best-effort：观测记录不能影响压缩本身。
+   */
+  private recordCompaction(session: AgentSession, record: Omit<CompactionRecord, "at">): void {
+    try {
+      session.sessionManager.appendCustomEntry(COMPACTION_RECORD_CUSTOM_TYPE, {
+        ...record,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.warn({ error }, "写入压缩记录失败");
+    }
   }
 
   /**
@@ -393,17 +475,24 @@ export class SessionPool {
   }
 
   /**
-   * 清掉过期工具输出（见 `harness/prune`）：同步、不喊模型，失败也不能影响会话本身。
+   * 清掉过期的工具输出（`context_edit` 只改模型看到的视图，见 `harness/prune`），并落一条
+   * `PRUNE_RECORD_CUSTOM_TYPE` 记录：上下文里那批工具输出是哪一轮、被谁清掉的、省了多少，
+   * 只有文件里查得到。
    */
   private pruneContext(session: AgentSession): void {
     try {
       const outcome = pruneToolOutputs(session.sessionManager);
-      if (outcome.cleared > 0) {
-        logger.debug(
-          { cleared: outcome.cleared, freedTokens: outcome.freedTokens },
-          "清理了过期的工具输出",
-        );
-      }
+      if (outcome.cleared === 0) return;
+      logger.debug(
+        { cleared: outcome.cleared, freedTokens: outcome.freedTokens },
+        "清理了过期的工具输出",
+      );
+      session.sessionManager.appendCustomEntry(PRUNE_RECORD_CUSTOM_TYPE, {
+        cleared: outcome.cleared,
+        freedTokens: outcome.freedTokens,
+        targets: outcome.targets,
+        at: new Date().toISOString(),
+      });
     } catch (error) {
       logger.warn({ error }, "清理过期工具输出失败");
     }
@@ -444,6 +533,14 @@ export class SessionPool {
               ensure: (id) => this.ensure(id),
               refresh: (id) => this.refreshIndex(id),
               settleInteractions: (id) => this.permissions.interactions.forgetSource(record.id, id),
+              // 父会话正在跑（委派发生在它的工具调用里），记录走池里那个 manager
+              record: (data) =>
+                appendSessionRecord(
+                  record,
+                  SUBAGENT_RECORD_CUSTOM_TYPE,
+                  { ...data, at: new Date().toISOString() },
+                  this.get(record.id)?.sessionManager,
+                ),
               dispose: (id) => {
                 this.dispose(id);
               },
@@ -594,6 +691,29 @@ export class SessionPool {
         // 手动压缩的占位由 `runCompaction` 在释放后才收尾，这里只就地处理自动压缩
         // （threshold / overflow 发生在生成中途，run 还要继续跑，等不到落定）
         if (event.type === "compaction_end") {
+          // 自动压缩（threshold / overflow）没有走 runCompaction，记录在这里补上；
+          // 手动压缩的 success / skip / fail 由 runCompaction 写，这里不重复
+          if (event.reason !== "manual") {
+            if (event.result) {
+              this.recordCompaction(session, {
+                reason: event.reason,
+                outcome: "done",
+                tokensBefore: event.result.tokensBefore,
+                ...(event.result.estimatedTokensAfter !== undefined
+                  ? { tokensAfter: event.result.estimatedTokensAfter }
+                  : {}),
+                ...(event.result.firstKeptEntryId
+                  ? { keptFrom: event.result.firstKeptEntryId }
+                  : {}),
+              });
+            } else if (event.errorMessage) {
+              this.recordCompaction(session, {
+                reason: event.reason,
+                outcome: "failed",
+                error: event.errorMessage,
+              });
+            }
+          }
           if (!event.result) return;
           const estimated = event.result.estimatedTokensAfter;
           if (estimated !== undefined) {
@@ -622,7 +742,7 @@ export class SessionPool {
             // 会话可能在校验期间被回收 / 重建：只有仍是池里这一个实例才起续跑
             if (this.entries.get(sessionId)?.session !== session) return;
             try {
-              this.startRun(sessionId, session, outcome.continue);
+              this.startGoalRun(sessionId, session, outcome.continue);
             } catch (error) {
               logger.warn({ sessionId, error }, "目标续跑启动失败");
             }

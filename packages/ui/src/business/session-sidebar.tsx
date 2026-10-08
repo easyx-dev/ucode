@@ -85,7 +85,9 @@ export function SessionSidebar({
         onCreateAssistant={onCreateAssistant}
         onRename={onRenameRequest}
         onArchive={(session) => {
-          if (confirmArchiveSession(session, t)) onArchive(session.id);
+          void confirmArchiveSession(session, t).then((confirmed) => {
+            if (confirmed) onArchive(session.id);
+          });
         }}
         onTogglePin={onTogglePin}
         onOpenWorkspace={onOpenWorkspace}

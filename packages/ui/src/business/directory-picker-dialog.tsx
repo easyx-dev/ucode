@@ -1,4 +1,9 @@
 /** 目录选择对话框：浏览 / 直接输入路径（结尾 `/` 进入目录，否则按末段检索）/ 新建文件夹 / 选定目录 */
+/**
+ * 目录选择弹层：浏览 / 直接输入路径（结尾 `/` 进入目录，否则按末段检索）/ 新建文件夹 / 选定目录。
+ *
+ * 函数式入口 `openDirectoryPickerDialog`；挂载即打开，不再受控 `open`。
+ */
 import { ArrowUp, Folder, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "../base/input";
 import { ScrollArea } from "../base/scroll-area";
 import { Spinner } from "../base/spinner";
+import { openDialog } from "../lib/dialog";
 import { errorText } from "../lib/error";
 import { baseName, dirName, joinPath } from "../lib/path";
 import type { FsListRequest, FsListResponse } from "../lib/types";
@@ -26,17 +32,13 @@ type ListOutcome =
   | { status: "stale" };
 
 type DirectoryPickerDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   /** 确认选择；返回浏览到的绝对路径，由服务端再归一化 */
   onSelect: (path: string) => void;
+  /** 取消 / Esc / 点遮罩：不选目录收起 */
+  onCancel: () => void;
 };
 
-export function DirectoryPickerDialog({
-  open,
-  onOpenChange,
-  onSelect,
-}: DirectoryPickerDialogProps) {
+export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDialogProps) {
   const { t } = useTranslation();
   const client = useClient();
   const [listing, setListing] = useState<FsListResponse | null>(null);
@@ -139,27 +141,18 @@ export function DirectoryPickerDialog({
     [request, listing?.path, t],
   );
 
-  // 每次打开都从用户 home 重新开始，避免残留上一次的位置
+  // 挂载即打开：每次打开都从用户 home 重新开始，避免残留上一次的位置
   useEffect(() => {
-    if (!open) return;
-    setListing(null);
-    setPathInput("");
-    setQuery(null);
-    requestedRef.current = null;
-    setError(null);
-    setCreating(false);
-    setFolderName("");
     void navigateTo();
-  }, [open, navigateTo]);
+  }, [navigateTo]);
 
   // 输入防抖：停顿后自动定位；无输入或已处理过则跳过
   useEffect(() => {
-    if (!open) return;
     const next = pathInput.trim();
     if (!next || next === requestedRef.current) return;
     const timer = setTimeout(() => void locate(next), PATH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [pathInput, open, locate]);
+  }, [pathInput, locate]);
 
   const submitFolder = async () => {
     const name = folderName.trim();
@@ -177,7 +170,12 @@ export function DirectoryPickerDialog({
   const emptyText = query ? t("没有匹配的目录") : t("此处没有子目录");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("选择目录")}</DialogTitle>
@@ -263,7 +261,7 @@ export function DirectoryPickerDialog({
         </ScrollArea>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={onCancel}>
             {t("取消")}
           </Button>
           <Button
@@ -279,3 +277,9 @@ export function DirectoryPickerDialog({
     </Dialog>
   );
 }
+
+/** 打开目录选择弹层；返回选中的绝对路径，取消返回 null */
+export const openDirectoryPickerDialog = (): Promise<string | null> =>
+  openDialog<string>((close) => (
+    <DirectoryPickerDialog onSelect={(path) => close(path)} onCancel={() => close()} />
+  )).then((path) => path ?? null);

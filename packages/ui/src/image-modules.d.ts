@@ -1,5 +1,5 @@
 /**
- * 图片导入的模块声明。
+ * 资源导入的模块声明（图片与音频）。
  *
  * 品牌包不依赖 Vite（也不在 tsconfig 里引入 `vite/client`），这里就地声明
  * `import url from "./x.png"` 的类型；Vite 侧仍按自身规则解析成资源 URL。
@@ -42,6 +42,11 @@ declare module "*.avif" {
 }
 
 declare module "*.ico" {
+  const url: string;
+  export default url;
+}
+
+declare module "*.wav" {
   const url: string;
   export default url;
 }

@@ -42,6 +42,7 @@ import type {
   McpListResponse,
   McpUpsertRequest,
   McpWriteResponse,
+  MessageApprovePlanResponse,
   MessageCompactRequest,
   MessageEditRequest,
   MessageIgnorePlanResponse,
@@ -273,6 +274,14 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 忽略本次计划的决策表单；刷新由 transcript_reset 事件驱动 */
       ignorePlan: (sessionId: string) =>
         transport.post<MessageIgnorePlanResponse>("messages/ignore-plan", {
+          sessionId,
+        } satisfies SessionIdRequest),
+      /**
+       * 批准计划：服务端注入「已批准」的合成输入并起一轮；模式由调用方先经
+       * `sessions/update` 切回 build（那里才是模式的校验与生效点）
+       */
+      approvePlan: (sessionId: string) =>
+        transport.post<MessageApprovePlanResponse>("messages/approve-plan", {
           sessionId,
         } satisfies SessionIdRequest),
     },

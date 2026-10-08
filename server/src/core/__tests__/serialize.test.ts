@@ -6,6 +6,9 @@ import { describe, it } from "node:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   API_BASE_PATH,
+  COMPACTION_RECORD_CUSTOM_TYPE,
+  GOAL_PROMPT_CUSTOM_TYPE,
+  GOAL_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_IGNORED_CUSTOM_TYPE,
 } from "@ucode/contracts";
@@ -99,8 +102,108 @@ describe("entryToDTO 的 custom 分支", () => {
     }
   });
 
+  it("目标记录带上 goalRecord，事件不合法时整条不展示", () => {
+    const data = {
+      event: "completed",
+      status: "completed",
+      turns: 2,
+      verdict: { achieved: true, reason: "测试全绿", nextStep: "" },
+      tokensUsed: 1234,
+      at: "2026-01-01T00:00:00.000Z",
+    };
+    assert.deepEqual(entryToDTO(customEntry(GOAL_RECORD_CUSTOM_TYPE, data)), {
+      id: "entry-1",
+      role: "custom",
+      blocks: [],
+      customType: GOAL_RECORD_CUSTOM_TYPE,
+      goalRecord: data,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(entryToDTO(customEntry(GOAL_RECORD_CUSTOM_TYPE, { event: "?", at: "x" })), null);
+  });
+
+  it("合成输入带出 customType 与来源（目标注入的 kind / turn）", () => {
+    const entry: SessionEntry = {
+      type: "custom_message",
+      id: "entry-2",
+      parentId: null,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      customType: GOAL_PROMPT_CUSTOM_TYPE,
+      content: "目标：把 TODO 做完",
+      display: true,
+      details: { kind: "continuation", turn: 3 },
+    };
+    assert.deepEqual(entryToDTO(entry), {
+      id: "entry-2",
+      role: "custom",
+      blocks: [{ type: "text", text: "目标：把 TODO 做完" }],
+      customType: GOAL_PROMPT_CUSTOM_TYPE,
+      goalPrompt: { kind: "continuation", turn: 3 },
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
   it("其它 customType 的扩展条目不展示", () => {
     assert.equal(entryToDTO(customEntry("other.extension")), null);
+  });
+
+  it("压缩记录投影为带 compactionRecord 的 custom 条目", () => {
+    const at = "2026-01-01T00:00:00.000Z";
+    const data = {
+      reason: "threshold",
+      outcome: "done",
+      tokensBefore: 12_300,
+      tokensAfter: 4_100,
+      keptFrom: "entry-9",
+      at,
+    };
+    const dto = entryToDTO(customEntry(COMPACTION_RECORD_CUSTOM_TYPE, data));
+
+    assert.deepEqual(dto, {
+      id: "entry-1",
+      role: "custom",
+      blocks: [],
+      customType: COMPACTION_RECORD_CUSTOM_TYPE,
+      compactionRecord: data,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("压缩记录的触发来源或结局非法时整条不展示，缺可选字段照常带上", () => {
+    assert.equal(
+      entryToDTO(
+        customEntry(COMPACTION_RECORD_CUSTOM_TYPE, { reason: "?", outcome: "done", at: "x" }),
+      ),
+      null,
+    );
+    assert.equal(
+      entryToDTO(
+        customEntry(COMPACTION_RECORD_CUSTOM_TYPE, { reason: "manual", outcome: "?", at: "x" }),
+      ),
+      null,
+    );
+    assert.equal(
+      entryToDTO(
+        customEntry(COMPACTION_RECORD_CUSTOM_TYPE, { reason: "manual", outcome: "skipped" }),
+      ),
+      null,
+    );
+
+    const skipped = entryToDTO(
+      customEntry(COMPACTION_RECORD_CUSTOM_TYPE, {
+        reason: "manual",
+        outcome: "skipped",
+        skip: "too_small",
+        at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+    assert.deepEqual(skipped?.compactionRecord, {
+      reason: "manual",
+      outcome: "skipped",
+      skip: "too_small",
+      at: "2026-01-01T00:00:00.000Z",
+    });
   });
 });
 

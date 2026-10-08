@@ -84,11 +84,17 @@ export const firstPromptExchange = (userText: string): TitleExchange => ({
 });
 
 /**
- * 会话里还没有带正文的用户消息：即将投递的这条就是首轮。
+ * 会话里还没有带正文的用户侧输入：即将投递的这条就是首轮。
  * 没有正文的用户消息（纯附件）不占这一轮，否则标题永远没有可概括的料。
+ *
+ * 合成输入（`custom` 角色的目标启动 / 续跑、计划批准）也算：目标会话没有普通用户消息，
+ * 不认它的话下一次普通的 “继续” 会把会话按那句话重新命名。
  */
 export const isFirstTurn = (messages: readonly SessionMessage[]): boolean =>
-  !messages.some((message) => message.role === "user" && textOf(message).trim().length > 0);
+  !messages.some(
+    (message) =>
+      (message.role === "user" || message.role === "custom") && textOf(message).trim().length > 0,
+  );
 
 const buildTitleMessage = (exchange: TitleExchange): string =>
   exchange.assistantText

@@ -1,6 +1,14 @@
 /** 消息接口的响应模型；SSE 事件的 data 也复用这里的区块结构 */
 import type { SessionScoped } from "../common";
-import type { MessageRole, PermissionDecision, ThinkingLevel } from "../constants";
+import type {
+  CompactionRecord,
+  GoalPromptDetails,
+  GoalRecord,
+  MessageRole,
+  ModeRecord,
+  PermissionDecision,
+  ThinkingLevel,
+} from "../constants";
 
 export type MessageBlock =
   | { type: "text"; text: string }
@@ -48,6 +56,14 @@ export type MessageDTO = {
   customType?: string;
   /** custom 专用：权限审批记录；只有该类型的扩展条目会带上 */
   permissionDecision?: PermissionRecord;
+  /** custom 专用：压缩记录；只有该类型的扩展条目会带上 */
+  compactionRecord?: CompactionRecord;
+  /** custom 专用：目标记录；只有该类型的扩展条目会带上（界面展示 `completed` 那一条） */
+  goalRecord?: GoalRecord;
+  /** 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） */
+  modeChange?: ModeRecord;
+  /** custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 */
+  goalPrompt?: GoalPromptDetails;
   isError?: boolean;
   /** 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 */
   createdAt?: string;
@@ -105,4 +121,9 @@ export type MessageInterruptResponse = SessionScoped & {
 export type MessageIgnorePlanResponse = SessionScoped & {
   /** 本次是否真的写入了忽略标记；本轮末尾已是标记（重复点击）时为 false */
   ignored: boolean;
+};
+
+export type MessageApprovePlanResponse = SessionScoped & {
+  /** 是否已受理并起了一轮 */
+  admitted: boolean;
 };

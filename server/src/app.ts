@@ -1,5 +1,6 @@
 /** 服务装配：配置、ModelRuntime、会话仓储与池，以及配置应用（热重载）的编排 */
 import type { AppConfig, AppConfigPatchInput, ConfigSnapshot } from "@ucode/contracts";
+import { INTERACTION_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
 import { classifyConfigChange } from "./config/classify";
 import { ConfigStore, publicConfig } from "./config/store";
 import {
@@ -10,6 +11,7 @@ import {
 import { SessionEventBus } from "./core/event-bus";
 import { InteractionBroker } from "./core/interactions";
 import { SessionPool } from "./core/pool";
+import { appendSessionRecord } from "./core/records";
 import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
 import { AttachmentRepository } from "./db/attachment-repository";
@@ -79,7 +81,21 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const loginLimiter = new RateLimiter();
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
-  const interactions = new InteractionBroker(events);
+  // 池在这里之后才建，回调用到时现取（挂起的交互只存在于正在跑的会话上）
+  const interactions = new InteractionBroker(events, ({ sessionId, request, outcome }) => {
+    appendSessionRecord(
+      sessions.find(sessionId),
+      INTERACTION_RECORD_CUSTOM_TYPE,
+      {
+        kind: request.kind,
+        requestId: request.requestId,
+        outcome,
+        ...("sourceSessionId" in request ? { sourceSessionId: request.sourceSessionId } : {}),
+        at: new Date().toISOString(),
+      },
+      pool.get(sessionId)?.sessionManager,
+    );
+  });
   const permissions = new SessionAllowStore();
   const usage = new UsageService(
     sessions,

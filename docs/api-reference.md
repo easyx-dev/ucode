@@ -46,6 +46,7 @@
 | POST | `/api/v1/messages/interrupt` | 中断当前生成 |
 | POST | `/api/v1/messages/compact` | 手动压缩上下文（后台执行，走 compaction_* 事件） |
 | POST | `/api/v1/messages/ignore-plan` | 忽略本次计划的决策表单 |
+| POST | `/api/v1/messages/approve-plan` | 批准计划（注入开工指令并起一轮） |
 | POST | `/api/v1/events` | 全局 SSE 事件流（所有会话的实时事件） |
 | POST | `/api/v1/interactions/list` | 列出会话中尚未回答的交互请求 |
 | POST | `/api/v1/interactions/respond` | 回答一条挂起的交互请求（按 kind 判别） |
@@ -797,6 +798,23 @@
 | `sessionId` | string | 是 | — |
 | `ignored` | boolean | 是 | 本次是否真的写入了忽略标记；本轮末尾已是标记（重复点击）时为 false |
 
+### POST /api/v1/messages/approve-plan
+
+批准计划（注入开工指令并起一轮）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+
+**响应类型**：`MessageApprovePlanResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `admitted` | boolean | 是 | 是否已受理并起了一轮 |
+
 ## 交互请求（`interactions`）
 
 ### POST /api/v1/interactions/list
@@ -1488,6 +1506,10 @@
 | `questionAnswers` | string[][] | 否 | tool 专用：`question` 的结构化答复，与调用入参里的 `questions` 同序（每项可多值） |
 | `customType` | string | 否 | custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 |
 | `permissionDecision` | [PermissionRecord](#permissionrecord) | 否 | custom 专用：权限审批记录；只有该类型的扩展条目会带上 |
+| `compactionRecord` | [CompactionRecord](#compactionrecord) | 否 | custom 专用：压缩记录；只有该类型的扩展条目会带上 |
+| `goalRecord` | [GoalRecord](#goalrecord) | 否 | custom 专用：目标记录；只有该类型的扩展条目会带上（界面展示 `completed` 那一条） |
+| `modeChange` | [ModeRecord](#moderecord) | 否 | 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） |
+| `goalPrompt` | [GoalPromptDetails](#goalpromptdetails) | 否 | custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
 | `completedAt` | string | 否 | assistant 专用：该条回复生成结束、写入会话记录的时刻（ISO 8601 UTC）。 pi 的 `message.timestamp` 是开始生成的时刻，回复的真实耗时要靠它与 createdAt 相减得到。 |
@@ -1800,6 +1822,47 @@
 | `decision` | "allow_once" \| "allow_session" \| "deny" | 是 | 用户的决定 |
 | `sourceSessionId` | string | 否 | 发起请求的子会话 id；主会话自身发起时为空（与弹窗一致地标注来源） |
 | `sourceDescription` | string | 否 | 发起请求的子会话描述 |
+
+### CompactionRecord
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `reason` | "manual" \| "threshold" \| "overflow" | 是 | — |
+| `outcome` | "done" \| "skipped" \| "failed" | 是 | — |
+| `tokensBefore` | number | 否 | 压缩前的上下文占用（token） |
+| `tokensAfter` | number | 否 | 压缩后的估算占用（token）；pi 拿不到时省略 |
+| `keptFrom` | string | 否 | 保留区间的起点条目 id（压缩后模型还看得到的部分从这里开始） |
+| `skip` | "too_small" \| "already_compacted" | 否 | `skipped` 专用：正常拒绝的原因 |
+| `error` | string | 否 | `failed` 专用：pi 给的原始失败原因 |
+| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
+
+### GoalRecord
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `event` | "set" \| "completed" \| "pause" \| "resume" \| "clear" \| "verdict" | 是 | — |
+| `status` | "active" \| "paused" \| "completed" | 否 | 本次事件后的状态（`clear` 时缺省） |
+| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" | 否 | `pause` 专用：暂停原因 |
+| `turns` | number | 否 | 目标激活后累计的轮数 |
+| `verdict` | object | 否 | 校验结论；`verdict` 与 `completed` 都带 |
+| `tokensUsed` | number | 否 | 本轮的用量累计（token）；存储态只给当前值，历史需要自己带 |
+| `objective` | string | 否 | 目标正文；只在 `set` 时带，其余从存储态能看出 |
+| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
+
+### ModeRecord
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `mode` | string | 否 | 变更后的模式（编码 / 计划 / 提问）；只改权限档位时没有 |
+| `permissionMode` | string | 否 | 变更后的权限档位 |
+| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
+
+### GoalPromptDetails
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "resume" \| "kickoff" \| "continuation" | 是 | — |
+| `turn` | number | 否 | 续跑专用：这是目标激活后的第几轮 |
 
 ### QuestionItem
 

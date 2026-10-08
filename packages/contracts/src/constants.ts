@@ -92,6 +92,217 @@ export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
 export const STEP_RECORD_CUSTOM_TYPE = "ucode.step";
 
 /**
+ * 委派记录：父会话里一次 `subagent` 调用的建立与结束，服务端往父会话文件追加的
+ * pi `custom` 条目，`data` 为 `SubagentRecord`。
+ *
+ * 子会话自己的文件只记它干了什么，看不出「谁把它派出来、为什么任务、结果算是成功还是超时」；
+ * 子会话被归档后更是只剩这条。只为回溯：不进模型上下文，也不下发客户端。
+ */
+export const SUBAGENT_RECORD_CUSTOM_TYPE = "ucode.subagent";
+
+export type SubagentRecord = {
+  /** `start` 建立、`end` 结束 */
+  event: "start" | "end";
+  /** 子会话 id */
+  childId: string;
+  /** 父会话里这次调用的 id */
+  toolCallId: string;
+  /** 子角色 slug 与当时起的名字 */
+  agent?: string;
+  name?: string;
+  /** 结束时的结果：失败 / 被中止（超时也走失败） */
+  isError?: boolean;
+  aborted?: boolean;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 挂起交互的结算记录：一次权限审批 / 提问从挂起到有结论，服务端往会话文件追加的
+ * pi `custom` 条目，`data` 为 `InteractionRecord`。
+ *
+ * `ucode.permission-decision` 只记权限审批的结论，且由客户端回传；忽略 / 失效 / 中止导致的
+ * 结算没有来源可回传，只能由服务端自己记。只为回溯：不进模型上下文，也不下发客户端。
+ */
+export const INTERACTION_RECORD_CUSTOM_TYPE = "ucode.interaction";
+
+export type InteractionRecord = {
+  /** 交互类型：权限审批 / 提问 */
+  kind: "permission" | "question";
+  requestId: string;
+  /** 结算方式：有答复、被忽略、会话结束 / 中止 */
+  outcome: "resolved" | "dismissed" | "aborted";
+  /** 该交互的来源会话（子会话发起时不是当前会话） */
+  sourceSessionId?: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 记忆回顾记录：后台回顾固化了一条项目记忆，服务端往会话文件追加的 pi `custom` 条目，
+ * `data` 为 `MemoryReviewRecord`。
+ *
+ * 记忆文件本身不带会话，事后说不清「这条记忆是从哪次交流里来的」。只为回溯：
+ * 不进模型上下文，也不下发客户端。
+ */
+export const MEMORY_REVIEW_RECORD_CUSTOM_TYPE = "ucode.memory-review";
+
+export type MemoryReviewRecord = {
+  /** 固化的记忆文件名（项目记忆目录下） */
+  file: string;
+  /** 记忆标题 */
+  title: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 模式 / 权限档位的变更记录：服务端往会话文件追加的 pi `custom` 条目，`data` 为 `ModeRecord`。
+ *
+ * 两者都决定每轮的工具集与审批口径（编码 / 计划 / 提问、默认 / 全允 / 只读），换了什么、
+ * 什么时候换的没有别的地方记，客户端按它渲染一条细线。
+ */
+export const MODE_RECORD_CUSTOM_TYPE = "ucode.mode";
+
+export type ModeRecord = {
+  /** 变更后的模式（编码 / 计划 / 提问）；只改权限档位时没有 */
+  mode?: string;
+  /** 变更后的权限档位 */
+  permissionMode?: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 旧工具输出清理（prune）的记录：清掉哪些条目、省了多少 token，服务端往会话文件追加的
+ * pi `custom` 条目，`data` 为 `PruneRecord`。
+ *
+ * `context_edit` 只说明「某条被换成了占位」，看不出是谁在什么时候清的、一次清了几个；
+ * 上下文规模突然掉一截时，这条是唯一的账目。只为回溯：不进模型上下文，也不下发客户端。
+ */
+export const PRUNE_RECORD_CUSTOM_TYPE = "ucode.prune";
+
+export type PruneRecord = {
+  /** 被清理的条目数 */
+  cleared: number;
+  /** 估算腾出的 token 数 */
+  freedTokens: number;
+  /** 被清掉的条目：id 与当时的工具名 */
+  targets: Array<{ id: string; tool: string }>;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 目标记录：目标状态每次变迁（设定 / 暂停 / 恢复 / 清除）与每轮校验结论，服务端往会话文件
+ * 追加的 pi `custom` 条目，`data` 为 `GoalRecord`。
+ *
+ * 补的是存储态看不到的历史：`goal_state` 只有当前值，校验走一次模型调用却只在下一轮注入里
+ * 出现一次（上下文一压就没了）。跨端常量——服务端写，界面只展示「目标完成」那一条，
+ * 其余留在文件里供回溯；它不进模型上下文。
+ */
+export const GOAL_RECORD_CUSTOM_TYPE = "ucode.goal";
+
+/** 目标状态变迁的种类（`GoalRecord.event`，除 `verdict` / `completed` 外与操作一一对应） */
+export const GOAL_RECORD_EVENTS = [
+  "set",
+  "pause",
+  "resume",
+  "clear",
+  "verdict",
+  "completed",
+] as const;
+
+export type GoalRecordEvent = (typeof GOAL_RECORD_EVENTS)[number];
+
+/**
+ * 目标记录的 payload。字段按事件可选：状态变迁带 `status` / `cause`，校验与完成带 `verdict`。
+ */
+export type GoalRecord = {
+  event: GoalRecordEvent;
+  /** 本次事件后的状态（`clear` 时缺省） */
+  status?: "active" | "paused" | "completed";
+  /** `pause` 专用：暂停原因 */
+  cause?: GoalPauseCause;
+  /** 目标激活后累计的轮数 */
+  turns?: number;
+  /** 校验结论；`verdict` 与 `completed` 都带 */
+  verdict?: { achieved: boolean; reason: string; nextStep: string };
+  /** 本轮的用量累计（token）；存储态只给当前值，历史需要自己带 */
+  tokensUsed?: number;
+  /** 目标正文；只在 `set` 时带，其余从存储态能看出 */
+  objective?: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
+ * 目标指令的注入来源：启动 / 续跑 / 恢复（`details.kind`）。
+ * 这三种都是合成输入，用 `custom_message` 落地，不再伪装成用户消息。
+ */
+export const GOAL_PROMPT_KINDS = ["kickoff", "continuation", "resume"] as const;
+
+export type GoalPromptKind = (typeof GOAL_PROMPT_KINDS)[number];
+
+/** 目标指令的 `custom_message` 类型与 `details` */
+export const GOAL_PROMPT_CUSTOM_TYPE = "ucode.goal-prompt";
+
+export type GoalPromptDetails = {
+  kind: GoalPromptKind;
+  /** 续跑专用：这是目标激活后的第几轮 */
+  turn?: number;
+};
+
+/**
+ * 计划批准后的合成输入（`custom_message`）：原先由客户端发一条「计划已批准，请开始执行。」的
+ * 用户消息，同样不是用户打的字，改成服务端注入并标出来源。
+ */
+export const PLAN_APPROVED_CUSTOM_TYPE = "ucode.plan-approved";
+
+/**
+ * 压缩记录：每次真正跑过压缩（手动或自动）后，服务端往会话文件追加的 pi `custom` 条目。
+ * `data` 为 `CompactionRecord`（触发来源 / 结局 / 规模 / 跳过或失败的原因）。
+ *
+ * 它补的是 pi 那个 `compaction` 条目看不到的信息：触发来源、**跳过与失败**（那两种情况压根没有
+ * pi 条目，以前只发一条 SSE 提示，刷新就没）。跨端常量——服务端写，各端据此在对话里渲染压缩分隔行，
+ * 它只作扩展状态持久化，不进模型上下文。
+ */
+export const COMPACTION_RECORD_CUSTOM_TYPE = "ucode.compaction";
+
+/** 压缩的触发来源：手动 / 到了阈值 / 逼近窗口 */
+export const COMPACTION_REASONS = ["manual", "threshold", "overflow"] as const;
+
+export type CompactionReason = (typeof COMPACTION_REASONS)[number];
+
+/** 一次压缩的结局：真正压了 / 正常拒绝 / 失败 */
+export const COMPACTION_OUTCOMES = ["done", "skipped", "failed"] as const;
+
+export type CompactionOutcome = (typeof COMPACTION_OUTCOMES)[number];
+
+/**
+ * 压缩记录的 payload。
+ *
+ * `done` 带规模（`tokensBefore` 压缩前的占用、`tokensAfter` pi 给的压缩后估算）与保留区间起点；
+ * `skipped` 带 `CompactionSkipReason`；`failed` 带 pi 的原始原因。
+ */
+export type CompactionRecord = {
+  reason: CompactionReason;
+  outcome: CompactionOutcome;
+  /** 压缩前的上下文占用（token） */
+  tokensBefore?: number;
+  /** 压缩后的估算占用（token）；pi 拿不到时省略 */
+  tokensAfter?: number;
+  /** 保留区间的起点条目 id（压缩后模型还看得到的部分从这里开始） */
+  keptFrom?: string;
+  /** `skipped` 专用：正常拒绝的原因 */
+  skip?: CompactionSkipReason;
+  /** `failed` 专用：pi 给的原始失败原因 */
+  error?: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
  * 手动压缩被**正常拒绝**（不是失败）的原因：
  * - `too_small`：上下文里没有可总结的跨度（pi 的保留预算里装得下全部内容）；
  * - `already_compacted`：路径上已经是压缩后的状态，没有新内容可压。

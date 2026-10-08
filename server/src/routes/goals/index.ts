@@ -59,7 +59,10 @@ const setGoal = async (services: Services, input: GoalSetInput): Promise<GoalRes
     services.pool.get(input.sessionId),
   );
   try {
-    await admitGoalRun(services, input.sessionId, buildGoalKickoff(view.objective));
+    await admitGoalRun(services, input.sessionId, {
+      content: buildGoalKickoff(view.objective),
+      kind: "kickoff",
+    });
   } catch (error) {
     // 起不来就别让目标停在 active：暂停保留目标，用户可稍后恢复
     services.goals.pause(record, "error", services.pool.get(input.sessionId));
@@ -90,7 +93,10 @@ const resumeGoal = async (services: Services, sessionId: string): Promise<GoalRe
     !services.pool.isActive(sessionId)
   ) {
     try {
-      await admitGoalRun(services, sessionId, buildGoalResume(view.objective));
+      await admitGoalRun(services, sessionId, {
+        content: buildGoalResume(view.objective),
+        kind: "resume",
+      });
     } catch (error) {
       services.goals.pause(record, "error", services.pool.get(sessionId));
       throw error;
@@ -102,7 +108,7 @@ const resumeGoal = async (services: Services, sessionId: string): Promise<GoalRe
 /** 清除目标；不中断当前轮，仅停止后续续跑 */
 const clearGoal = (services: Services, sessionId: string): GoalResponse => {
   const record = requireSession(services, sessionId);
-  services.goals.clear(record);
+  services.goals.clear(record, services.pool.get(sessionId));
   return { sessionId, goal: null };
 };
 

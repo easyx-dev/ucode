@@ -1,10 +1,12 @@
-/** /api/v1/messages：会话历史读取，以及发起生成（投递）、编辑重发、中断与忽略计划 */
+/** /api/v1/messages：会话历史读取，以及发起生成（投递）、编辑重发、中断、忽略 / 批准计划 */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
+  type MessageApprovePlanResponse,
   type MessageIgnorePlanResponse,
   type MessageInterruptResponse,
   type MessageListResponse,
+  messageApprovePlanInputSchema,
   messageCompactInputSchema,
   messageEditInputSchema,
   messageListInputSchema,
@@ -16,7 +18,7 @@ import {
 import { Hono } from "hono";
 import type { Services } from "../../app";
 import { projectMessages } from "../../core/projection";
-import { admitCompact, admitEdit, admitPrompt } from "../../core/run";
+import { admitCompact, admitEdit, admitPlanApproval, admitPrompt } from "../../core/run";
 import { transcriptStates } from "../../core/serialize";
 import { env } from "../../env";
 import { resolveSessionCwd } from "../../harness/session-config";
@@ -129,6 +131,15 @@ export const createMessagesRoute = (services: Services) => {
     });
 
     return c.json(ok({ sessionId, ignored } satisfies MessageIgnorePlanResponse));
+  });
+
+  // 批准计划：模式已由客户端切回 build，这里注入开工指令并起一轮（注入只有服务端做得出来）
+  router.post("/approve-plan", jsonBody(messageApprovePlanInputSchema), async (c) => {
+    const input = c.req.valid("json");
+    await admitPlanApproval(services, input.sessionId);
+    return c.json(
+      ok({ sessionId: input.sessionId, admitted: true } satisfies MessageApprovePlanResponse),
+    );
   });
 
   // 手动压缩：只做受理，压缩在后台推进，进度与结果走 /events 的 compaction_* 帧

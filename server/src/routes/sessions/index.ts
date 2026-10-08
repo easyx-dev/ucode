@@ -4,6 +4,7 @@ import { rmSync } from "node:fs";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
+  MODE_RECORD_CUSTOM_TYPE,
   type SessionArchiveResponse,
   type SessionCreateInput,
   type SessionForkInput,
@@ -161,14 +162,24 @@ const appendTranscriptPatch = (
   sourcePath: string,
   cwd: string,
   patch: SessionUpdateInput,
+  /** 池里那个活会话的 manager：内存里的叶子才是权威，另开一句柄追加会让新条目挂在旧父节点上 */
+  live?: SessionManager,
 ): SessionManager => {
-  const manager = SessionManager.open(sourcePath, env.sessionsDir, cwd);
+  const manager = live ?? SessionManager.open(sourcePath, env.sessionsDir, cwd);
   if (patch.name) manager.appendSessionInfo(patch.name);
   if (patch.model) {
     const separator = patch.model.indexOf("/");
     manager.appendModelChange(patch.model.slice(0, separator), patch.model.slice(separator + 1));
   }
   if (patch.thinkingLevel) manager.appendThinkingLevelChange(patch.thinkingLevel);
+  // 模式与权限档位决定每轮的工具集与审批口径：换了什么、什么时候换的，只有文件里查得到
+  if (patch.mode || patch.permissionMode) {
+    manager.appendCustomEntry(MODE_RECORD_CUSTOM_TYPE, {
+      ...(patch.mode ? { mode: patch.mode } : {}),
+      ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
+      at: new Date().toISOString(),
+    });
+  }
   return manager;
 };
 
@@ -196,9 +207,14 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     }
   }
   if (record.sourcePath) {
-    // 只有名称 / 模型 / 档位需要追加到会话文件；置顶等元数据不落文件
-    if (patch.name || patch.model || patch.thinkingLevel) {
-      const manager = appendTranscriptPatch(record.sourcePath, resolveSessionCwd(record), patch);
+    // 只有名称 / 模型 / 档位 / 模式需要追加到会话文件；置顶等元数据不落文件
+    if (patch.name || patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
+      const manager = appendTranscriptPatch(
+        record.sourcePath,
+        resolveSessionCwd(record),
+        patch,
+        services.pool.get(patch.sessionId)?.sessionManager,
+      );
       const index = managerToIndex(manager);
       if (index) services.sessions.refresh(patch.sessionId, index);
     }
@@ -220,6 +236,10 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   // 换模型 / 换 thinking / 换模式 / 换权限档位需要重建会话实例才会生效，历史留在盘上
   if (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
     services.pool.dispose(patch.sessionId);
+  }
+  // 模式变更会在转录里多一条细线，转录已变、客户端手上的那份作废
+  if (patch.mode || patch.permissionMode) {
+    services.events.emitFrame(patch.sessionId, "transcript_reset", { fromEntryId: "" });
   }
 
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）

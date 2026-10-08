@@ -97,10 +97,11 @@
 | [`DESIGN.md`](./DESIGN.md) | 设计系统：品牌、主题、颜色 / 圆角 / 字号 token、深色模式、动效 |
 | [`docs/database.md`](./docs/database.md) | 数据库：迁移、命名、类型映射、SQL 约束、删除语义 |
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
+| [`docs/session-entries.md`](./docs/session-entries.md) | 会话条目（JSONL）：条目类型、payload、进不进模型上下文、界面是否展示 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、有测试用例必须有 `test` 脚本），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令

@@ -39,6 +39,8 @@ export type PruneOutcome = {
   cleared: number;
   /** 估算腾出的 token 数 */
   freedTokens: number;
+  /** 被清掉的条目：id 与当时的工具名，落在会话文件里供事后对账 */
+  targets: Array<{ id: string; tool: string }>;
 };
 
 const contentCost = (content: unknown): number => {
@@ -76,7 +78,7 @@ export const pruneToolOutputs = (manager: SessionManager): PruneOutcome => {
   const edited = new Set(
     branch.flatMap((entry) => (entry.type === "context_edit" ? [entry.targetId] : [])),
   );
-  const candidates: Array<{ id: string; tokens: number }> = [];
+  const candidates: Array<{ id: string; tool: string; tokens: number }> = [];
   let protectedTokens = PRUNE_PROTECT_TOKENS;
   let userTurns = 0;
 
@@ -100,25 +102,27 @@ export const pruneToolOutputs = (manager: SessionManager): PruneOutcome => {
       protectedTokens -= tokens;
       continue;
     }
-    candidates.push({ id: entry.id, tokens });
+    candidates.push({ id: entry.id, tool: toolName, tokens });
     // 一次别清太多：每条都是一次同步落盘，剩下的留给下一轮
     if (candidates.length >= PRUNE_MAX_EDITS_PER_PASS) break;
   }
 
   const freedTokens = candidates.reduce((sum, item) => sum + item.tokens, 0);
-  if (freedTokens < PRUNE_MIN_CLEARED_TOKENS) return { cleared: 0, freedTokens: 0 };
+  if (freedTokens < PRUNE_MIN_CLEARED_TOKENS) return { cleared: 0, freedTokens: 0, targets: [] };
 
   let cleared = 0;
+  const targets: Array<{ id: string; tool: string }> = [];
   for (const candidate of candidates) {
     try {
       manager.appendContextEdit(candidate.id, {
         content: [{ type: "text", text: PRUNE_PLACEHOLDER }],
       });
       cleared += 1;
+      targets.push({ id: candidate.id, tool: candidate.tool });
     } catch (error) {
       // 单条失败不该中断整轮清理：已经清掉的仍然有效
       logger.warn({ error }, "清理旧工具输出失败");
     }
   }
-  return { cleared, freedTokens };
+  return { cleared, freedTokens, targets };
 };

@@ -1,4 +1,4 @@
-/** 外观设置：主题三态、界面语言与消息区显示偏好 */
+/** 外观设置：主题三态、界面语言、消息区显示偏好与提醒方式 */
 import type { Locale } from "@ucode/contracts";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
@@ -6,6 +6,7 @@ import { Button } from "../../base/button";
 import { useLocale } from "../../hooks/use-locale";
 import { useNoticeEnabled } from "../../hooks/use-notice-enabled";
 import { useShowThinking } from "../../hooks/use-show-thinking";
+import { useSoundEnabled } from "../../hooks/use-sound-enabled";
 import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
@@ -36,6 +37,8 @@ export function SettingsAppearance() {
   ] as const satisfies ReadonlyArray<SegmentedOption<Locale>>;
 
   const value: ThemeValue = theme === "light" || theme === "dark" ? theme : "system";
+
+  const { soundEnabled, setSoundEnabled, preview } = useSoundEnabled();
 
   const { noticeEnabled, noticePermission, requestPermission, setNoticeEnabled } =
     useNoticeEnabled();
@@ -99,6 +102,25 @@ export function SettingsAppearance() {
               value={noticeEnabled ? "on" : "off"}
               options={noticeOptions}
               onChange={(next) => setNoticeEnabled(next === "on")}
+            />
+          </div>
+        }
+      />
+      <SettingsRow
+        title={t("提示音")}
+        description={t(
+          "等待输入、本轮完成或出错时播放提示音；与系统通知各自独立，页面在前台也会响。",
+        )}
+        control={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={preview}>
+              {t("试听")}
+            </Button>
+            <SegmentedControl
+              label={t("提示音")}
+              value={soundEnabled ? "on" : "off"}
+              options={noticeOptions}
+              onChange={(next) => setSoundEnabled(next === "on")}
             />
           </div>
         }

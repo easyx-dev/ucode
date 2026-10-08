@@ -6,11 +6,16 @@
  */
 import { cn } from "cn";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { ToolEntry } from "../lib/chat-nodes";
 import type { ChatRow } from "../lib/chat-rows";
+import { modeChangeText } from "../lib/mode";
 import type { ChatItem } from "../lib/types";
 import { ActivityGroup } from "./activity-group";
 import { CompactionDivider } from "./compaction-divider";
+import { DividerLine } from "./divider-line";
+import { GoalDivider } from "./goal-divider";
+import { InjectedLine } from "./injected-line";
 import { MessageItem } from "./message-item";
 import { PermissionRecordView } from "./permission-record";
 import { QuestionForm } from "./question-form";
@@ -29,6 +34,7 @@ export type MessageRowContext = {
 };
 
 export function MessageRow({ row, context }: { row: ChatRow; context: MessageRowContext }) {
+  const { t } = useTranslation();
   let body: ReactNode;
 
   if (row.kind === "working") {
@@ -48,7 +54,20 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
       <PermissionRecordView record={row.node.record} footer={row.footer} onFork={context.onFork} />
     );
   } else if (row.kind === "compaction") {
-    body = <CompactionDivider summary={row.node.summary} />;
+    body = <CompactionDivider summary={row.node.summary} record={row.node.record} />;
+  } else if (row.kind === "injected") {
+    body = (
+      <InjectedLine
+        customType={row.node.item.customType}
+        prompt={row.node.item.goalPrompt}
+        text={row.node.text}
+      />
+    );
+  } else if (row.kind === "goal") {
+    body = <GoalDivider record={row.node.record} />;
+  } else if (row.kind === "mode") {
+    const change = modeChangeText(row.node.record, t);
+    body = <DividerLine label={change.label} detail={change.detail} />;
   } else if (row.kind === "content") {
     body = (
       <MessageItem

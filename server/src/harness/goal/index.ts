@@ -6,7 +6,12 @@
  * 需要续跑时把下一轮文本交回给池去投递（不反向依赖池）。
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { GoalPauseCause, GoalView } from "@ucode/contracts";
+import {
+  GOAL_RECORD_CUSTOM_TYPE,
+  type GoalPauseCause,
+  type GoalRecord,
+  type GoalView,
+} from "@ucode/contracts";
 
 import { GOAL_MAX_TURNS, GOAL_NO_PROGRESS_TURNS } from "../../constants";
 import type { SessionEventBus } from "../../core/event-bus";
@@ -37,8 +42,8 @@ export type GoalSetInput = {
   tokenBudget: number | null;
 };
 
-/** 落定处理结果：`continue` 为下一轮文本，null 表示不续跑 */
-export type GoalSettleOutcome = { continue: string } | null;
+/** 落定处理结果：`continue` 为下一轮注入的内容与轮次，null 表示不续跑 */
+export type GoalSettleOutcome = { continue: { content: string; turn: number } } | null;
 
 export class GoalService {
   /** 正在跑校验的会话；避免同一会话并发校验 */
@@ -58,26 +63,30 @@ export class GoalService {
 
   /** 设定 / 替换目标：重置计数与校验结果 */
   set(record: SessionRecord, input: GoalSetInput, live?: AgentSession): GoalView {
-    return this.persist(record, startGoal(input.objective, input.tokenBudget), live);
+    return this.persist(record, startGoal(input.objective, input.tokenBudget), live, {
+      event: "set",
+      objective: input.objective,
+    });
   }
 
   /** 暂停；只有 `active` 才生效 */
   pause(record: SessionRecord, cause: GoalPauseCause, live?: AgentSession): GoalView | null {
     const state = parseGoalState(record.goalState);
     if (state?.status !== "active") return this.view(record, live);
-    return this.persist(record, pauseGoal(state, cause), live);
+    return this.persist(record, pauseGoal(state, cause), live, { event: "pause", cause });
   }
 
   /** 恢复；只有 `paused` 才生效 */
   resume(record: SessionRecord, live?: AgentSession): GoalView | null {
     const state = parseGoalState(record.goalState);
     if (state?.status !== "paused") return this.view(record, live);
-    return this.persist(record, resumeGoal(state), live);
+    return this.persist(record, resumeGoal(state), live, { event: "resume" });
   }
 
   /** 清除目标；不中断当前轮 */
-  clear(record: SessionRecord): void {
+  clear(record: SessionRecord, live?: AgentSession): void {
     this.sessions.setGoal(record.id, null);
+    this.recordGoal(record, live, { event: "clear" });
     this.events.emitFrame(record.id, "goal_update", null);
   }
 
@@ -103,11 +112,8 @@ export class GoalService {
 
     const stopReason = lastAssistantStopReason(session.messages);
     if (stopReason === "aborted" || stopReason === "error") {
-      this.persist(
-        record,
-        pauseGoal(state, stopReason === "aborted" ? "interrupted" : "error"),
-        session,
-      );
+      const cause = stopReason === "aborted" ? "interrupted" : "error";
+      this.persist(record, pauseGoal(state, cause), session, { event: "pause", cause });
       return null;
     }
 
@@ -129,7 +135,12 @@ export class GoalService {
       } catch (error) {
         logger.warn({ sessionId, error }, "目标校验调用失败");
         const current = this.activeStateOf(sessionId, activationId);
-        if (current) this.persist(record, pauseGoal(current, "error"), session);
+        if (current) {
+          this.persist(record, pauseGoal(current, "error"), session, {
+            event: "pause",
+            cause: "error",
+          });
+        }
         return null;
       }
 
@@ -138,15 +149,21 @@ export class GoalService {
 
       const now = new Date().toISOString();
       if (verdict?.achieved) {
-        this.persist(
-          record,
-          completeGoal(
-            current,
-            { achieved: true, reason: verdict.reason, nextStep: verdict.nextStep, at: now },
-            now,
-          ),
-          session,
-        );
+        const achieved = {
+          achieved: true,
+          reason: verdict.reason,
+          nextStep: verdict.nextStep,
+          at: now,
+        };
+        const completed = completeGoal(current, achieved, now);
+        const tokensUsed = this.tokensUsed(completed, record, session);
+        const view = this.persist(record, completed, session, {
+          event: "completed",
+          verdict: { achieved: true, reason: verdict.reason, nextStep: verdict.nextStep },
+          tokensUsed,
+        });
+        // 目标完成会在对话里留一条线，界面得重取快照才看得见
+        if (view) this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
         return null;
       }
 
@@ -171,22 +188,47 @@ export class GoalService {
       );
 
       const tokensUsed = this.tokensUsed(next, record, session);
+      // 每轮校验的结论都落一条：它花了一次模型调用，只留在下一轮注入里会被压缩抹掉
+      this.recordGoal(record, session, {
+        event: "verdict",
+        turns: next.turns,
+        verdict: {
+          achieved: false,
+          reason: next.verification?.reason ?? "",
+          nextStep: next.verification?.nextStep ?? "",
+        },
+        tokensUsed,
+      });
       if (next.tokenBudget !== null && tokensUsed >= next.tokenBudget) {
-        this.persist(record, pauseGoal(next, "budget", now), session);
+        this.persist(record, pauseGoal(next, "budget", now), session, {
+          event: "pause",
+          cause: "budget",
+        });
         return null;
       }
       if (noProgress >= GOAL_NO_PROGRESS_TURNS) {
-        this.persist(record, pauseGoal(next, "no_progress", now), session);
+        this.persist(record, pauseGoal(next, "no_progress", now), session, {
+          event: "pause",
+          cause: "no_progress",
+        });
         return null;
       }
       if (next.turns >= GOAL_MAX_TURNS) {
-        this.persist(record, pauseGoal(next, "limit", now), session);
+        this.persist(record, pauseGoal(next, "limit", now), session, {
+          event: "pause",
+          cause: "limit",
+        });
         return null;
       }
 
       next = advanceTurn(next, now);
       this.persist(record, next, session);
-      return { continue: buildGoalContinuation(next.objective, verdict?.nextStep ?? "") };
+      return {
+        continue: {
+          content: buildGoalContinuation(next.objective, verdict?.nextStep ?? ""),
+          turn: next.turns,
+        },
+      };
     } finally {
       this.verifying.delete(sessionId);
     }
@@ -198,12 +240,46 @@ export class GoalService {
     return state?.status === "active" && state.id === activationId ? state : null;
   }
 
-  /** 落库 + 发事件；返回补好 `tokensUsed` 的视图 */
-  private persist(record: SessionRecord, state: GoalState, live?: AgentSession): GoalView {
+  /** 落库 + 发事件；返回补好 `tokensUsed` 的视图。`record` 是这次变迁要落的会话条目 */
+  private persist(
+    record: SessionRecord,
+    state: GoalState,
+    live?: AgentSession,
+    entry?: Omit<GoalRecord, "at" | "status" | "turns">,
+  ): GoalView {
     this.sessions.setGoal(record.id, serializeGoalState(state));
+    if (entry) {
+      this.recordGoal(record, live, {
+        ...entry,
+        status: state.status,
+        turns: state.turns,
+      });
+    }
     const view = this.toView(state, record, live);
     this.events.emitFrame(record.id, "goal_update", view);
     return view;
+  }
+
+  /**
+   * 把目标的状态变迁 / 校验结论落成扩展条目（best-effort）。
+   *
+   * 只在会话已装配时写：没有 manager 就拿不到会话文件，而这属于观测记录，不该为它去拉起会话。
+   */
+  private recordGoal(
+    record: SessionRecord,
+    live: AgentSession | undefined,
+    payload: Omit<GoalRecord, "at" | "turns"> & { turns?: number },
+  ): void {
+    const manager = live?.sessionManager;
+    if (!manager) return;
+    try {
+      manager.appendCustomEntry(GOAL_RECORD_CUSTOM_TYPE, {
+        ...payload,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.warn({ sessionId: record.id, error }, "写入目标记录失败");
+    }
   }
 
   private toView(state: GoalState, record: SessionRecord, live?: AgentSession): GoalView {

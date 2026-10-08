@@ -3,6 +3,8 @@
  *
  * web 与桌面端共用这一处判定，平台差异只在 `lib/notice`。免打扰口径是「页面不可见才通知」
  * （可见即视为在读），开关在设置的外观页、落 localStorage，两者都在 `lib/notice` 与 `lib/session-notice` 里。
+ * 提示音是另一个通道（见 `lib/sound`）：它有自己的开关，且不看页面可见性——人就坐在前台，
+ * 声音仍要比界面更早把人叫回来；系统通知不重复打扰。
  */
 import type { SessionSummary } from "@ucode/contracts";
 import type { SessionsState } from "@ucode/sdk";
@@ -12,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { readNoticeEnabled, showNotice, subscribeNoticeClick } from "../lib/notice";
 import { sessionTitle } from "../lib/session";
 import { collectNotices, type SessionNoticeKind, shouldNotify } from "../lib/session-notice";
+import { playNoticeSound, readSoundEnabled } from "../lib/sound";
 import { useClient } from "../provider";
 
 export type SessionNoticesOptions = {
@@ -69,6 +72,8 @@ export function useSessionNotices({ onSelectSession }: SessionNoticesOptions): v
       const collected = collectNotices(cursor, collectSessions(sessions.getState()));
       cursor = collected.cursor;
       if (collected.notices.length === 0) return;
+      // 先响铃再发通知：声音不依赖通知开关与页面可见性
+      if (readSoundEnabled()) playNoticeSound();
       if (!shouldNotify({ enabled: readNoticeEnabled(), pageVisible: !document.hidden })) return;
 
       const t = translateRef.current;

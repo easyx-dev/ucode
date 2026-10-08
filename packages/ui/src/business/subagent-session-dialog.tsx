@@ -1,4 +1,8 @@
-/** 子智能体详情小窗：在对话区内查看子会话的完整往来，不离开当前会话 */
+/**
+ * 子智能体详情小窗：在对话区内查看子会话的完整往来，不离开当前会话。
+ *
+ * 函数式入口 `openSubagentSessionDialog`；挂载即打开，不再受控 `open`。
+ */
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -9,12 +13,13 @@ import {
 } from "../base/dialog";
 import { useActiveSession } from "../hooks/use-active-session";
 import { useSessionStream } from "../hooks/use-session-stream";
+import { openDialog } from "../lib/dialog";
 import { sessionTitle } from "../lib/session";
 import { MessageList } from "./message-list";
 
 type SubagentSessionDialogProps = {
-  /** 要查看的子会话 id；为空即不展示 */
-  sessionId: string | null;
+  /** 要查看的子会话 id */
+  sessionId: string;
   /** 关闭小窗；会话已归档或 id 失效时也会被调用 */
   onClose: () => void;
 };
@@ -28,7 +33,7 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
 
   return (
     <Dialog
-      open={Boolean(sessionId)}
+      open
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
@@ -50,7 +55,7 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
             subagents={stream.subagents}
             loading={stream.loadingHistory}
             working={stream.running}
-            resetKey={sessionId ?? ""}
+            resetKey={sessionId}
             empty={<p className="text-sm text-muted-foreground">{t("还没有内容")}</p>}
           />
         </div>
@@ -58,3 +63,9 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
     </Dialog>
   );
 }
+
+/** 打开子会话详情小窗；关闭时完成 */
+export const openSubagentSessionDialog = (sessionId: string): Promise<void> =>
+  openDialog((close) => (
+    <SubagentSessionDialog sessionId={sessionId} onClose={() => close()} />
+  )).then(() => undefined);

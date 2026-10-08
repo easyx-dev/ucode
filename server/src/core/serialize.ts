@@ -4,10 +4,29 @@ import { createHash } from "node:crypto";
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import {
   API_BASE_PATH,
+  COMPACTION_OUTCOMES,
+  COMPACTION_REASONS,
+  COMPACTION_RECORD_CUSTOM_TYPE,
+  COMPACTION_SKIP_REASONS,
+  type CompactionOutcome,
+  type CompactionReason,
+  type CompactionRecord,
+  type CompactionSkipReason,
   DEFAULT_PERMISSION_MODE,
   DEFAULT_SESSION_MODE,
+  GOAL_PROMPT_CUSTOM_TYPE,
+  GOAL_PROMPT_KINDS,
+  GOAL_RECORD_CUSTOM_TYPE,
+  GOAL_RECORD_EVENTS,
+  type GoalPauseCause,
+  type GoalPromptDetails,
+  type GoalPromptKind,
+  type GoalRecord,
+  type GoalRecordEvent,
   type MessageBlock,
   type MessageDTO,
+  MODE_RECORD_CUSTOM_TYPE,
+  type ModeRecord,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PERMISSION_DECISIONS,
   type PermissionDecision,
@@ -202,6 +221,104 @@ export const messageToDTO = (
   }
 };
 
+/**
+ * 压缩记录的 `data` 同样来自会话文件：`reason` / `outcome` 非法就当没有记录（不瞎猜），
+ * 其余字段按类型可选带上，缺字段不影响这条记录本身的意义。
+ */
+const compactionRecordOf = (data: unknown): CompactionRecord | null => {
+  if (!isRecord(data)) return null;
+  const { reason, outcome, tokensBefore, tokensAfter, keptFrom, skip, error, at } = data;
+  if (
+    typeof reason !== "string" ||
+    !(COMPACTION_REASONS as readonly string[]).includes(reason) ||
+    typeof outcome !== "string" ||
+    !(COMPACTION_OUTCOMES as readonly string[]).includes(outcome) ||
+    typeof at !== "string"
+  ) {
+    return null;
+  }
+  return {
+    reason: reason as CompactionReason,
+    outcome: outcome as CompactionOutcome,
+    ...(typeof tokensBefore === "number" ? { tokensBefore } : {}),
+    ...(typeof tokensAfter === "number" ? { tokensAfter } : {}),
+    ...(typeof keptFrom === "string" ? { keptFrom } : {}),
+    ...(typeof skip === "string" && (COMPACTION_SKIP_REASONS as readonly string[]).includes(skip)
+      ? { skip: skip as CompactionSkipReason }
+      : {}),
+    ...(typeof error === "string" ? { error } : {}),
+    at,
+  };
+};
+
+/** 模式 / 权限档位的变更记录：`mode` / `permissionMode` 至少有一个，缺 `at` 视为损坏 */
+const modeRecordOf = (data: unknown): ModeRecord | null => {
+  if (!isRecord(data)) return null;
+  const { mode, permissionMode, at } = data;
+  if (typeof at !== "string") return null;
+  if (typeof mode !== "string" && typeof permissionMode !== "string") return null;
+  return {
+    ...(typeof mode === "string" ? { mode } : {}),
+    ...(typeof permissionMode === "string" ? { permissionMode } : {}),
+    at,
+  };
+};
+
+/**
+ * 目标记录的 `data` 同样不可信：`event` 不在枚举内就当没有记录；其余字段按类型带上。
+ * 界面只看 `completed`，但字典要完整——`verdict` / `pause` 这些留给回溯。
+ */
+const goalRecordOf = (data: unknown): GoalRecord | null => {
+  if (!isRecord(data)) return null;
+  const { event, status, cause, turns, verdict, tokensUsed, objective, at } = data;
+  if (
+    typeof event !== "string" ||
+    !(GOAL_RECORD_EVENTS as readonly string[]).includes(event) ||
+    typeof at !== "string"
+  ) {
+    return null;
+  }
+  return {
+    event: event as GoalRecordEvent,
+    ...(status === "active" || status === "paused" || status === "completed" ? { status } : {}),
+    ...(typeof cause === "string" ? { cause: cause as GoalPauseCause } : {}),
+    ...(typeof turns === "number" ? { turns } : {}),
+    ...(isRecord(verdict) && typeof verdict.reason === "string"
+      ? {
+          verdict: {
+            achieved: verdict.achieved === true,
+            reason: verdict.reason,
+            nextStep: typeof verdict.nextStep === "string" ? verdict.nextStep : "",
+          },
+        }
+      : {}),
+    ...(typeof tokensUsed === "number" ? { tokensUsed } : {}),
+    ...(typeof objective === "string" ? { objective } : {}),
+    at,
+  };
+};
+
+/**
+ * 目标注入的条目带出来源（启动 / 续跑 / 恢复）：界面据此把那行写成「目标续跑 · 第 n 轮」。
+ * 其它 `custom_message`（如计划批准）没有 details，靠 `customType` 就够。
+ */
+const goalPromptOf = (entry: {
+  customType: string;
+  details?: unknown;
+}): { goalPrompt?: GoalPromptDetails } => {
+  if (entry.customType !== GOAL_PROMPT_CUSTOM_TYPE || !isRecord(entry.details)) return {};
+  const { kind, turn } = entry.details;
+  if (typeof kind !== "string" || !(GOAL_PROMPT_KINDS as readonly string[]).includes(kind)) {
+    return {};
+  }
+  return {
+    goalPrompt: {
+      kind: kind as GoalPromptKind,
+      ...(typeof turn === "number" ? { turn } : {}),
+    },
+  };
+};
+
 /** 把会话条目转成前端 DTO；system 提示、usage、label 等内部条目会被过滤掉 */
 export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): MessageDTO | null => {
   const fallbackCreatedAt = isoOf(Date.parse(entry.timestamp));
@@ -219,6 +336,8 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
         id: entry.id,
         role: "custom",
         blocks: blocksOf(entry.content),
+        customType: entry.customType,
+        ...goalPromptOf(entry),
         createdAt: fallbackCreatedAt,
       };
     case "custom": {
@@ -232,6 +351,42 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
           blocks: [],
           customType: entry.customType,
           permissionDecision: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
+      if (entry.customType === COMPACTION_RECORD_CUSTOM_TYPE) {
+        const record = compactionRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          compactionRecord: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
+      if (entry.customType === GOAL_RECORD_CUSTOM_TYPE) {
+        const record = goalRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          goalRecord: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
+      if (entry.customType === MODE_RECORD_CUSTOM_TYPE) {
+        const record = modeRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          modeChange: record,
           createdAt: fallbackCreatedAt,
         };
       }

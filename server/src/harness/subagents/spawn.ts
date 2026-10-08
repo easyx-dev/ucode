@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { PermissionMode, ThinkingLevel } from "@ucode/contracts";
+import type { PermissionMode, SubagentRecord, ThinkingLevel } from "@ucode/contracts";
 
 import {
   SUBAGENT_DESCRIPTION_MAX_LENGTH,
@@ -45,6 +45,8 @@ export type SubagentSpawnDeps = {
   emitSessionCreated: (sessionId: string) => void;
   /** 结算该子会话发起的挂起交互（归属父会话，但只清来源是它的） */
   settleInteractions: (sessionId: string) => void;
+  /** 往父会话文件留一条委派记录（建立 / 结束）；子会话文件里看不出「谁派的、结果算不算成功」 */
+  record: (data: Omit<SubagentRecord, "at">) => void;
   dispose: (sessionId: string) => void;
   /** 只发关联帧（`toolCallId ↔ 子会话 id`），子会话进度帧仍由它自身的广播承载 */
   emit: (type: "subagent_start" | "subagent_end", data: Record<string, unknown>) => void;
@@ -267,6 +269,13 @@ export const spawnSubagent = async (
     sessionId: childId,
     description: name,
   });
+  deps.record({
+    event: "start",
+    childId,
+    toolCallId: input.toolCallId,
+    agent: profile.slug,
+    name,
+  });
 
   let isError = false;
   let aborted = false;
@@ -293,6 +302,15 @@ export const spawnSubagent = async (
     deps.emit("subagent_end", {
       toolCallId: input.toolCallId,
       sessionId: childId,
+      isError,
+      aborted,
+    });
+    deps.record({
+      event: "end",
+      childId,
+      toolCallId: input.toolCallId,
+      agent: profile.slug,
+      name,
       isError,
       aborted,
     });

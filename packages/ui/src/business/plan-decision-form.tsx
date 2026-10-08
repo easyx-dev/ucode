@@ -1,9 +1,10 @@
-/** 计划决策：plan 模式以 present_plan 收尾时替掉输入区，让用户批准或反馈 */
-import { Check, Send } from "lucide-react";
+/** 计划决策：plan 模式以 present_plan 收尾时由决策面板承接，让用户批准、补意见或忽略 */
+import { Check, ClipboardList, Send } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../base/button";
+import { DecisionHeader } from "./decision-panel";
 
 type PlanDecisionFormProps = {
   /** 批准：切到编码模式并开始执行计划 */
@@ -15,7 +16,7 @@ type PlanDecisionFormProps = {
   disabled?: boolean;
 };
 
-/** 只渲染内容，外壳由 `DecisionArea` 提供——与权限审批、提问共用同一个外形 */
+/** 外壳由 `DecisionPanel` 提供——与权限审批、提问共用同一个外形 */
 export function PlanDecisionForm({
   onApprove,
   onIgnore,
@@ -34,9 +35,9 @@ export function PlanDecisionForm({
 
   return (
     <>
+      <DecisionHeader icon={ClipboardList} title={t("计划已就绪")} />
+
       <div className="px-3 pt-2.5 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{t("计划已就绪")}</span>
-        {" · "}
         {t("批准后切换到编码模式开始执行；也可以在下方补充意见，继续讨论计划。")}
       </div>
 

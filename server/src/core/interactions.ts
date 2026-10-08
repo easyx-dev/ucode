@@ -2,7 +2,8 @@
  * 交互中转：服务端挂起一条请求，前端回答后才继续。
  *
  * 这是「服务端提问、前端回答」的通用原语，承载两类请求：权限审批（`ask` 规则）与
- * question 工具（模型向用户提问）。请求不落盘：刷新 / 重连后由 `interactions/list` 补齐。
+ * question 工具（模型向用户提问）。请求不落盘：刷新 / 重连后由 `interactions/list` 补齐；
+ * 但结算结果会经 `record` 回调留一条会话记录（见 `INTERACTION_RECORD_CUSTOM_TYPE`）。
  *
  * 待答请求只在进程内存，且不设等待时限：结算只由用户答复、本轮中断（`stop`）与会话归档 / 回收触发，
  * 各 kind 按自己的失败姿态收尾（审批 `deny`、提问 `cancelled`），工具调用不会悬空。
@@ -10,6 +11,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  InteractionRecord,
   InteractionRespondInput,
   InteractionRespondResponse,
   PendingInteraction,
@@ -55,7 +57,18 @@ type Pending = {
 export class InteractionBroker {
   private readonly pending = new Map<string, Pending>();
 
-  constructor(private readonly events: SessionEventBus) {}
+  /**
+   * `record` 是结算留痕的回调（写进会话文件）；挂在会话上的请求在结算后不再有任何痕迹，
+   * 而「谁在什么时候把它撤了」正是事后回放要看的信息。省略时只做结算、不留痕。
+   */
+  constructor(
+    private readonly events: SessionEventBus,
+    private readonly record?: (input: {
+      sessionId: string;
+      request: PendingInteraction;
+      outcome: InteractionRecord["outcome"];
+    }) => void,
+  ) {}
 
   /**
    * 权限审批：挂起并向事件流发一条请求，返回用户答复（本轮中断 / 会话清理为 `deny`）。
@@ -148,7 +161,7 @@ export class InteractionBroker {
     }
     return {
       requestId: input.requestId,
-      resolved: this.settle(input.requestId, (pending) => pending.respond(input)),
+      resolved: this.settle(input.requestId, (pending) => pending.respond(input), "resolved"),
     };
   }
 
@@ -164,7 +177,7 @@ export class InteractionBroker {
   forget(sessionId: string): void {
     for (const [requestId, entry] of this.pending) {
       if (entry.request.sessionId === sessionId) {
-        this.settle(requestId, (pending) => pending.fail());
+        this.settle(requestId, (pending) => pending.fail(), "dismissed");
       }
     }
   }
@@ -177,7 +190,7 @@ export class InteractionBroker {
     for (const requestId of [...this.pending.keys()]) {
       const request = this.pending.get(requestId)?.request;
       if (request?.sessionId !== sessionId || request.sourceSessionId !== sourceSessionId) continue;
-      this.settle(requestId, (pending) => pending.fail());
+      this.settle(requestId, (pending) => pending.fail(), "dismissed");
     }
   }
 
@@ -185,18 +198,23 @@ export class InteractionBroker {
   private settleOnAbort(requestId: string, signal?: AbortSignal): () => void {
     if (!signal) return () => {};
     const onAbort = (): void => {
-      this.settle(requestId, (entry) => entry.fail());
+      this.settle(requestId, (entry) => entry.fail(), "aborted");
     };
     signal.addEventListener("abort", onAbort, { once: true });
     return () => signal.removeEventListener("abort", onAbort);
   }
 
-  private settle(requestId: string, apply: (entry: Pending) => void): boolean {
+  private settle(
+    requestId: string,
+    apply: (entry: Pending) => void,
+    outcome: InteractionRecord["outcome"],
+  ): boolean {
     const entry = this.pending.get(requestId);
     if (!entry) return false;
     this.pending.delete(requestId);
     apply(entry);
     this.events.emitFrame(entry.request.sessionId, "interaction_resolved", { requestId });
+    this.record?.({ sessionId: entry.request.sessionId, request: entry.request, outcome });
     return true;
   }
 }

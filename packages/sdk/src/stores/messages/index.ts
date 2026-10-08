@@ -46,6 +46,8 @@ export type MessagesStore = {
   ackCompactionNotice: (sessionId: string) => void;
   /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
   ignorePlan: (sessionId: string) => Promise<void>;
+  /** 批准计划：服务端注入开工指令并起一轮；模式由调用方先切回 build */
+  approvePlan: (sessionId: string) => Promise<void>;
 };
 
 type MessagesDeps = {
@@ -304,6 +306,16 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       patch(engine, { error: null });
       try {
         await deps.apis.messages.ignorePlan(sessionId);
+      } catch (error) {
+        patch(engine, { error: asApiError(error) });
+      }
+    },
+
+    async approvePlan(sessionId) {
+      const engine = ensure(sessionId);
+      patch(engine, { error: null });
+      try {
+        await deps.apis.messages.approvePlan(sessionId);
       } catch (error) {
         patch(engine, { error: asApiError(error) });
       }

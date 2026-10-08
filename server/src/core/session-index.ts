@@ -42,6 +42,14 @@ export const managerToIndex = (manager: SessionManager): SessionIndex | null => 
   let lastActivity = 0;
 
   for (const entry of entries) {
+    // 合成输入（目标启动 / 续跑、计划批准）也是「用户侧的第一句」：
+    // 目标会话没有普通用户消息，不认它会在侧栏退化成「新会话」
+    if (entry.type === "custom_message") {
+      const time = Date.parse(entry.timestamp);
+      if (!Number.isNaN(time)) lastActivity = Math.max(lastActivity, time);
+      if (!preview) preview = textOf(entry.content).trim();
+      continue;
+    }
     if (entry.type !== "message") continue;
     const time = entryTime(entry);
     if (typeof time === "number") lastActivity = Math.max(lastActivity, time);

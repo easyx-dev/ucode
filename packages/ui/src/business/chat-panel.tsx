@@ -29,14 +29,14 @@ import {
 } from "../lib/types";
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
-import { DecisionArea } from "./decision-area";
+import { DecisionPanel } from "./decision-panel";
 import { DirectoryDialog } from "./directory-dialog";
 import { GoalBar } from "./goal-bar";
 import { MessageList } from "./message-list";
 import { PermissionRequest } from "./permission-request";
 import { PlanDecisionForm } from "./plan-decision-form";
 import { QuestionRequest } from "./question-request";
-import { SubagentSessionDialog } from "./subagent-session-dialog";
+import { openSubagentSessionDialog } from "./subagent-session-dialog";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
 const shouldShowSuggestions = (chat: ChatController): boolean =>
@@ -139,10 +139,12 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { t } = useTranslation();
   const [directoryOpen, setDirectoryOpen] = useState(false);
-  /** 详情小窗里查看的子会话 id；子智能体工具卡的入口就落在这里，不再切走整个对话区 */
-  const [subagentSessionId, setSubagentSessionId] = useState<string | null>(null);
   /** 发送 / 编辑重发被受理后自增，交给消息列表把视口拉回最新一行 */
   const [sentTick, setSentTick] = useState(0);
+  // 子智能体工具卡的入口直接开详情小窗（弹层自己管开关），保持引用稳定以免作废消息行的记忆化
+  const openSubagent = useCallback((sessionId: string): void => {
+    void openSubagentSessionDialog(sessionId);
+  }, []);
   const draftKey = composerKeyOf(session?.id ?? null);
   const draft = composer.drafts[draftKey] ?? emptyDraft();
 
@@ -220,6 +222,31 @@ export function ChatPanel({
   const isChild = Boolean(session?.parentSessionId);
   /** 待答的审批 / 提问优先于计划决策：它正在阻塞工具调用，先答完才谈得上继续 */
   const showPlanForm = planReady && !isChild;
+
+  /** 盖在输入区上的决策面板：待答交互优先，其次才是计划决策；子会话只读、没有决策 */
+  const decision = isChild ? null : interaction ? (
+    interaction.kind === "permission" ? (
+      <PermissionRequest
+        request={interaction}
+        onRespond={(requestId, decision) =>
+          onRespondInteraction({ requestId, kind: "permission", decision })
+        }
+      />
+    ) : (
+      <QuestionRequest
+        request={interaction}
+        onRespond={(requestId, answers) =>
+          onRespondInteraction({ requestId, kind: "question", answers })
+        }
+      />
+    )
+  ) : showPlanForm ? (
+    <PlanDecisionForm
+      onApprove={onApprovePlan}
+      onIgnore={onIgnorePlan}
+      onFeedback={onFeedbackPlan}
+    />
+  ) : null;
   /** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
   const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
@@ -272,16 +299,17 @@ export function ChatPanel({
         empty={empty}
         resetKey={session?.id ?? ""}
         sentTick={sentTick}
-        onOpenSession={setSubagentSessionId}
+        onOpenSession={openSubagent}
         onFork={isChild ? undefined : onFork}
         onEdit={isChild || chat.streaming ? undefined : handleEdit}
       />
 
-      {!isChild && goal ? (
+      {/* 完成后收起状态条：目标在哪儿结束由对话里的「目标完成」细线负责，条不再常驻 */}
+      {!isChild && goal && goal.status !== "completed" ? (
         <GoalBar goal={goal} onCommand={(command) => onGoalCommand(command)} />
       ) : null}
 
-      {/* 输入区的位置按优先级让给决策：子会话只读，待答交互优先于计划决策 */}
+      {/* 输入区照常留在原位，等用户作答时由决策面板盖住它（待答交互优先于计划决策）；子会话只读，连同输入区一起收起 */}
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">
           <Bot className="size-4 shrink-0 text-muted-foreground" />
@@ -292,65 +320,43 @@ export function ChatPanel({
             {t("返回父会话")}
           </Button>
         </div>
-      ) : interaction ? (
-        <DecisionArea>
-          {interaction.kind === "permission" ? (
-            <PermissionRequest
-              request={interaction}
-              onRespond={(requestId, decision) =>
-                onRespondInteraction({ requestId, kind: "permission", decision })
-              }
-            />
-          ) : (
-            <QuestionRequest
-              request={interaction}
-              onRespond={(requestId, answers) =>
-                onRespondInteraction({ requestId, kind: "question", answers })
-              }
-            />
-          )}
-        </DecisionArea>
-      ) : showPlanForm ? (
-        <DecisionArea>
-          <PlanDecisionForm
-            onApprove={onApprovePlan}
-            onIgnore={onIgnorePlan}
-            onFeedback={onFeedbackPlan}
-          />
-        </DecisionArea>
       ) : (
-        <Composer
-          sessionId={session?.id ?? null}
-          cwd={cwd}
-          cwdPath={session?.cwd ?? draft.cwd}
-          initialDoc={initialDoc}
-          initialAttachments={draft.attachments}
-          editorKey={draftKey}
-          onDocChange={(doc) => composer.update(draftKey, { doc, text: docToPayload(doc).text })}
-          onAttachmentsChange={(attachments) => composer.update(draftKey, { attachments })}
-          onSend={submit}
-          streaming={chat.streaming}
-          onStop={() => void chat.stop()}
-          suggestions={shouldShowSuggestions(chat) ? suggestions : undefined}
-          providers={providers}
-          model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
-          thinkingLevel={
-            session?.thinkingLevel ?? draft.thinkingLevel ?? models?.thinkingLevel ?? "off"
-          }
-          mode={session?.mode ?? draft.mode ?? "build"}
-          permissionMode={session?.permissionMode ?? DEFAULT_PERMISSION_MODE}
-          onSelectModel={onSelectModel}
-          onSelectThinkingLevel={onSelectThinkingLevel}
-          onSelectMode={onSelectMode}
-          onSelectPermissionMode={onSelectPermissionMode}
-          onBuiltin={onBuiltin}
-        />
+        // 决策面板要盖住输入区，两者得在同一个定位上下文里
+        <div className="relative">
+          {/* 光盖住不够：焦点/键盘也得进不去，否则看不见的输入框照样收字符 */}
+          <div inert={Boolean(decision)}>
+            <Composer
+              sessionId={session?.id ?? null}
+              cwd={cwd}
+              cwdPath={session?.cwd ?? draft.cwd}
+              initialDoc={initialDoc}
+              initialAttachments={draft.attachments}
+              editorKey={draftKey}
+              onDocChange={(doc) =>
+                composer.update(draftKey, { doc, text: docToPayload(doc).text })
+              }
+              onAttachmentsChange={(attachments) => composer.update(draftKey, { attachments })}
+              onSend={submit}
+              streaming={chat.streaming}
+              onStop={() => void chat.stop()}
+              suggestions={shouldShowSuggestions(chat) ? suggestions : undefined}
+              providers={providers}
+              model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
+              thinkingLevel={
+                session?.thinkingLevel ?? draft.thinkingLevel ?? models?.thinkingLevel ?? "off"
+              }
+              mode={session?.mode ?? draft.mode ?? "build"}
+              permissionMode={session?.permissionMode ?? DEFAULT_PERMISSION_MODE}
+              onSelectModel={onSelectModel}
+              onSelectThinkingLevel={onSelectThinkingLevel}
+              onSelectMode={onSelectMode}
+              onSelectPermissionMode={onSelectPermissionMode}
+              onBuiltin={onBuiltin}
+            />
+          </div>
+          {decision ? <DecisionPanel>{decision}</DecisionPanel> : null}
+        </div>
       )}
-
-      <SubagentSessionDialog
-        sessionId={subagentSessionId}
-        onClose={() => setSubagentSessionId(null)}
-      />
     </main>
   );
 }

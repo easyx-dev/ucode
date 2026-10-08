@@ -13,6 +13,9 @@ type ActivityNode = Extract<ChatNode, { kind: "activity" }>;
 type QuestionNode = Extract<ChatNode, { kind: "question" }>;
 type PermissionNode = Extract<ChatNode, { kind: "permission" }>;
 type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
+type InjectedNode = Extract<ChatNode, { kind: "injected" }>;
+type GoalNode = Extract<ChatNode, { kind: "goal" }>;
+type ModeNode = Extract<ChatNode, { kind: "mode" }>;
 
 type ChatRowBase = {
   /** 虚拟列表稳定 key，跨流式增量必须不变 */
@@ -50,6 +53,15 @@ export type ChatPermissionRow = ChatRowBase & { kind: "permission"; node: Permis
 /** 压缩分隔行：标出「此前的历史已被摘要替代」，摘要可展开回看 */
 export type ChatCompactionRow = ChatRowBase & { kind: "compaction"; node: CompactionNode };
 
+/** 合成输入行：目标启动 / 续跑 / 恢复、计划批准，只占一条细线 */
+export type ChatInjectedRow = ChatRowBase & { kind: "injected"; node: InjectedNode };
+
+/** 模式 / 权限档位变更行：一条细线 */
+export type ChatModeRow = ChatRowBase & { kind: "mode"; node: ModeNode };
+
+/** 目标完成行：一条细线，展开看校验结论 */
+export type ChatGoalRow = ChatRowBase & { kind: "goal"; node: GoalNode };
+
 /** 尾部的生成中行：列表最后一道提示，带本轮的实时耗时，没有对应节点也不承载页脚 */
 export type ChatWorkingRow = Omit<ChatRowBase, "footer"> & {
   kind: "working";
@@ -64,6 +76,9 @@ export type ChatRow =
   | ChatQuestionRow
   | ChatPermissionRow
   | ChatCompactionRow
+  | ChatInjectedRow
+  | ChatGoalRow
+  | ChatModeRow
   | ChatWorkingRow;
 
 const WORKING_ROW_KEY = "working";
@@ -75,9 +90,18 @@ const rowOfNode = (
   /** 生成中的那一轮不报模型与耗时，由调用方置 false */
   withFooter: boolean,
 ): ChatRow => {
-  // 压缩分隔行不是回答，没有「这一轮的模型与耗时」可挂，也不参与轮末判定
+  // 压缩、合成输入、目标完成与模式切换都不是回答，没有「这一轮的模型与耗时」可挂，也不参与轮末判定
   if (node.kind === "compaction") {
     return { kind: "compaction", key: node.key, turnKey, isTurnStart, node };
+  }
+  if (node.kind === "injected") {
+    return { kind: "injected", key: node.key, turnKey, isTurnStart, node };
+  }
+  if (node.kind === "goal") {
+    return { kind: "goal", key: node.key, turnKey, isTurnStart, node };
+  }
+  if (node.kind === "mode") {
+    return { kind: "mode", key: node.key, turnKey, isTurnStart, node };
   }
   const base: ChatRowBase = {
     key: node.key,
