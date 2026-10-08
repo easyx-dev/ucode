@@ -3,6 +3,7 @@ import { brand } from "@ucode/brand";
 import { Settings2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Avatar, AvatarFallback } from "../base/avatar";
 import { Button } from "../base/button";
 import { confirmArchiveSession } from "../lib/session";
 import type { SessionSummary } from "../lib/types";
@@ -67,6 +68,8 @@ export function SessionSidebar({
   activeParentId,
 }: SessionSidebarProps) {
   const { t } = useTranslation();
+  /** 用户名的来源（登录态 / 配置项）尚未确定，本轮先固定展示；接入时只改这一处 */
+  const localUserName = t("本地用户");
   /** 展开子会话的父会话 id；展开即拉取（重复展开会重取，保证楼层刷新后不过期） */
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -130,10 +133,13 @@ export function SessionSidebar({
         searching={false}
       />
 
-      <div className="border-t border-sidebar-border p-2">
-        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onOpenSettings}>
+      <div className="flex items-center gap-2 p-2 shadow-edge">
+        <Avatar className="size-7">
+          <AvatarFallback className="text-xs">{localUserName.slice(0, 1)}</AvatarFallback>
+        </Avatar>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{localUserName}</span>
+        <Button variant="ghost" size="icon-sm" title={t("设置")} onClick={onOpenSettings}>
           <Settings2 className="size-4" />
-          {t("设置")}
         </Button>
       </div>
     </aside>

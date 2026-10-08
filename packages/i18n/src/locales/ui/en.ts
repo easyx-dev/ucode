@@ -397,6 +397,7 @@ export default {
   未读: "Unread",
   自动化功能即将推出: "Automation is coming soon",
   插件市场即将推出: "Marketplace is coming soon",
+  本地用户: "Local user",
 
   // Command palette
   全部: "All",
