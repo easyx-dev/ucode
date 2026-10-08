@@ -94,7 +94,7 @@ export function SessionListItem({
     <div>
       <div
         className={cn(
-          "group relative flex h-10 items-center rounded-lg pr-1 pl-2 transition-colors",
+          "group relative flex h-10 items-center rounded-lg pr-1 transition-colors",
           active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
           child && "ml-5",
         )}
@@ -118,7 +118,7 @@ export function SessionListItem({
         <button
           type="button"
           title={statusLabel ? `${title} · ${statusLabel}` : title}
-          className="flex min-w-0 flex-1 items-center text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex h-full min-w-0 flex-1 items-center rounded-lg pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => onSelect(session.id)}
           onDoubleClick={onRename}
         >
@@ -142,11 +142,11 @@ export function SessionListItem({
             )}
           </span>
           <span className={cn("truncate", child ? "text-xs" : "text-sm")}>{title}</span>
+          {/* 时间戳并入点击区：标题到时刻之间的空白原本点不动，整行都可点才与视觉一致 */}
+          <span className="ml-auto shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 [@media(pointer:coarse)]:hidden">
+            {relativeTimeLabel(session.updatedAt)}
+          </span>
         </button>
-
-        <span className="shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 [@media(pointer:coarse)]:hidden">
-          {relativeTimeLabel(session.updatedAt)}
-        </span>
 
         {hasActions ? (
           <div className="pointer-events-none absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100">
