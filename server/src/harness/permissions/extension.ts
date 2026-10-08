@@ -28,7 +28,7 @@ export type PermissionGate = {
   rules: () => readonly PermissionRule[];
   /** 会话级权限档位：命中 `ask` 时是否自动放行；只放宽 `ask`，不突破 `deny` */
   approvalMode: PermissionMode;
-  /** 子会话的父会话规则；提供时与 `rules` 的判定取较严者，保证能力只可收窄 */
+  /** 子会话的父会话模式规则（能力上限）；提供时与 `rules` 的判定取较严者，保证能力只可收窄 */
   parentRules?: () => readonly PermissionRule[];
   /** 记下本会话恒允：追加一条 allow 规则 */
   grant: (rule: PermissionRule) => void;
@@ -58,7 +58,8 @@ export const createPermissionExtension =
     pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult | undefined> => {
       const input = event.input as Record<string, unknown>;
       let verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
-      // 子会话再算一遍父会话的判定，取较严者，保证角色权限放宽不了父的限制
+      // 子会话再算一遍父会话模式规则的判定，取较严者，保证角色权限放宽不了父的限制；
+      // 默认规则与用户授权在两边一致地生效（都在子会话自己的 `rules` 里），不在这里重复施加
       const parentRules = gate.parentRules?.();
       if (parentRules) {
         const parentVerdict = decidePermission(parentRules, event.toolName, input, gate.cwd);

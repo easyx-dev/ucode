@@ -6,6 +6,7 @@
  */
 import { DEFAULT_SESSION_MODE } from "@ucode/contracts";
 
+import type { PermissionRule } from "../permissions";
 import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS } from "../tools/names";
 import type { AgentRegistry } from "./custom";
 import {
@@ -60,6 +61,17 @@ export const primaryToolNames = (slug: string, registry?: AgentRegistry): string
 /** 是否为「继承默认工具集」的能力：扩展工具（codemode / MCP）对它可见 */
 export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
   capability.toolSelection.kind === "defaultTools";
+
+/**
+ * 父会话施加到子会话上的规则：只取模式声明的那部分，即「父会话的能力上限」。
+ *
+ * 全局默认规则（含 `external_directory` 的 ask）不在这里重复施加：子会话自己的规则里已有一份，
+ * 重复施加会让用户已放行的范围（「本会话恒允」、技能目录）在子会话判定里重新落回审批。
+ */
+export const parentModeRules = (
+  slug: string,
+  registry?: AgentRegistry,
+): readonly PermissionRule[] => primaryProfile(slug, registry).capability.permissions;
 
 /**
  * 按 slug 取子角色；未知 slug 直接报错，避免静默退回默认角色。

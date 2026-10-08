@@ -3,6 +3,7 @@
 export {
   effectiveToolNames,
   hasPrimaryMode,
+  parentModeRules,
   primaryCapability,
   primaryProfile,
   primaryToolNames,

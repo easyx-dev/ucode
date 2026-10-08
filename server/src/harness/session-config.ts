@@ -95,7 +95,7 @@ export type SessionAssemblyInput = {
   profile?: AgentProfile;
   /** 已与父会话取交集的能力；缺省按角色声明解析（主会话路径） */
   capability?: ResolvedCapability;
-  /** 子会话的父会话规则；提供时权限判定取较严者，保证能力只可收窄 */
+  /** 子会话的父会话模式规则（能力上限）；提供时权限判定取较严者，保证能力只可收窄 */
   parentRules?: () => readonly PermissionRule[];
   /** 仅主会话提供：注册 `subagent` 工具；子会话不提供，天然禁递归 */
   subagents?: SubagentHooks;

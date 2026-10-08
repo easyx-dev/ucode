@@ -28,9 +28,9 @@ import { env } from "../../env";
 import {
   type AgentProfile,
   type AgentRegistry,
-  agentRules,
   loadAgentRegistry,
   PRIMARY_PROFILES,
+  parentModeRules,
   primaryCapability,
   primaryToolNames,
   type ResolvedCapability,
@@ -150,7 +150,7 @@ const sessionOf = async (
       ? {
           profile: subagent.profile,
           capability: subagent.capability,
-          parentRules: () => agentRules(PRIMARY_PROFILES[mode]),
+          parentRules: () => parentModeRules(mode),
         }
       : {}),
     ...(memory ? { memory } : {}),

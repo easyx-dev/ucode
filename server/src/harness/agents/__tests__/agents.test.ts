@@ -8,11 +8,13 @@ import { describe, it } from "node:test";
 
 import { SESSION_MODES } from "@ucode/contracts";
 
+import { DEFAULT_PERMISSION_RULES } from "../../permissions";
 import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../../tools/names";
 import {
   agentRules,
   effectiveToolNames,
   PRIMARY_PROFILES,
+  parentModeRules,
   primaryCapability,
   resolveSubagentCapability,
   SUBAGENT_PROFILES,
@@ -119,5 +121,24 @@ describe("能力交集", () => {
       false,
     );
     assert.equal(usesDefaultToolSet(primaryCapability("plan")), false);
+  });
+
+  it("父一侧施加的是模式规则：默认规则只留在子会话自己的规则里", () => {
+    // 子会话的规则表自带默认规则（装配层见 session-config 的 `agentRules(profile)`），
+    // 父一侧若照旧再带一份，用户在父会话放行的范围（「本会话恒允」、技能目录）会重新落回审批
+    const child = agentRules(subagentProfile("general"));
+    for (const rule of DEFAULT_PERMISSION_RULES) {
+      assert.ok(child.includes(rule), "子会话规则表应含默认规则");
+    }
+    for (const mode of SESSION_MODES) {
+      for (const rule of parentModeRules(mode)) {
+        assert.ok(!DEFAULT_PERMISSION_RULES.includes(rule), `${mode} 的父一侧规则不该含默认规则`);
+      }
+    }
+
+    const plan = parentModeRules("plan");
+    for (const tool of ["edit", "write", "bash"]) {
+      assert.ok(plan.some((rule) => rule.tool === tool && rule.action === "deny"));
+    }
   });
 });

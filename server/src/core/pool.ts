@@ -21,8 +21,8 @@ import { env } from "../env";
 import {
   type AgentProfile,
   type AgentRegistry,
-  agentRules,
   loadAgentRegistry,
+  parentModeRules,
   primaryCapability,
   primaryProfile,
   type ResolvedCapability,
@@ -386,7 +386,9 @@ export class SessionPool {
     return {
       profile,
       capability: resolveSubagentCapability(profile, primaryCapability(parentMode, registry)),
-      parentRules: () => agentRules(primaryProfile(parentMode, registry)),
+      // 父一侧只施加模式规则：默认规则与「本会话恒允」都在子会话自己的规则里，重复施加会让
+      // 用户已放行的范围在子会话里反复弹审批（见 `parentModeRules`）
+      parentRules: () => parentModeRules(parentMode, registry),
     };
   }
 

@@ -13,6 +13,8 @@ import type {
   ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 
+import { agentRules, parentModeRules, subagentProfile } from "../../agents";
+import { skillDirectoryRules } from "../defaults";
 import type { PermissionRule } from "../engine";
 import { createPermissionExtension, type PermissionGate } from "../extension";
 
@@ -243,5 +245,92 @@ describe("MCP annotations 兜底", () => {
     assert.deepEqual(granted, [
       { tool: "mcp__fs__create_dir", pattern: "*", action: "allow", note: undefined },
     ]);
+  });
+});
+
+/**
+ * 父子能力交集：父一侧只施加模式规则。这里按装配层的口径拼出两侧规则——
+ * 子会话 = 角色规则 + 技能目录放行 + 「本会话恒允」的授权，父会话 = 其模式的声明规则（见 `parentModeRules`）。
+ */
+describe("子会话与父会话的规则交集", () => {
+  const SKILL_DIR = "/Users/me/.agents/skills";
+
+  const childGate = (
+    grants: PermissionRule[],
+    request: PermissionGate["request"],
+  ): PermissionGate => ({
+    cwd: "/work",
+    // 顺序与装配层一致：角色规则 → 技能目录放行 → 已追加的会话授权（见 session-config 的 `rules`）
+    rules: () => [
+      ...agentRules(subagentProfile("explore")),
+      ...skillDirectoryRules([SKILL_DIR]),
+      ...grants,
+    ],
+    approvalMode: "default",
+    parentRules: () => parentModeRules("build"),
+    grant: (rule) => grants.push(rule),
+    request,
+  });
+
+  it("父会话放行过的范围，子会话不再重复审批", async () => {
+    const grants: PermissionRule[] = [];
+    let asked = 0;
+    const handler = mount(
+      childGate(grants, async () => {
+        asked += 1;
+        return "allow_session";
+      }),
+    );
+    // 工作目录之外的会话日志：第一次问，用户选「本会话恒允」
+    assert.equal(await call(handler, callEvent("read", { path: "/outside/log.jsonl" })), undefined);
+    assert.equal(asked, 1);
+    assert.deepEqual(grants, [
+      {
+        tool: "external_directory",
+        pattern: "/outside/**",
+        action: "allow",
+        note: "工作目录之外的路径",
+      },
+    ]);
+    // 同一范围的后续调用直接命中授权；父一侧的默认规则不得把它重新打回审批
+    assert.equal(
+      await call(handler, callEvent("read", { path: "/outside/other.jsonl" })),
+      undefined,
+    );
+    assert.equal(await call(handler, callEvent("grep", { path: "/outside/deep" })), undefined);
+    assert.equal(asked, 1);
+  });
+
+  it("技能目录的放行在子会话里同样生效，不再被父一侧的默认规则打回审批", async () => {
+    let asked = 0;
+    const handler = mount(
+      childGate([], async () => {
+        asked += 1;
+        return "allow_once";
+      }),
+    );
+    assert.equal(
+      await call(handler, callEvent("read", { path: `${SKILL_DIR}/foo/SKILL.md` })),
+      undefined,
+    );
+    assert.equal(asked, 0);
+  });
+
+  it("父会话模式的 deny 仍然拦住子会话", async () => {
+    const event = callEvent("edit", { path: "src/a.ts" });
+    const ask: PermissionGate["request"] = async () => "allow_once";
+    // 同一份子角色规则：build 父下放行，plan 父下被父的模式规则拦下
+    const allowed = mount({
+      ...childGate([], ask),
+      rules: () => agentRules(subagentProfile("general")),
+    });
+    assert.equal(await call(allowed, event), undefined);
+
+    const blocked = mount({
+      ...childGate([], ask),
+      rules: () => agentRules(subagentProfile("general")),
+      parentRules: () => parentModeRules("plan"),
+    });
+    assert.equal((await call(blocked, event))?.block, true);
   });
 });
