@@ -1,15 +1,20 @@
 /**
- * 用户消息的还原：前置展开块的剥离、正文里 `@` 标记的切分、技能 / 命令 / 附件 chip 的取出。
+ * 用户消息的还原：前置展开块的剥离、正文里标记的切分、技能 / 命令 / 附件 chip 的取出。
  *
  * 服务端把注入内容拼成前置块与正文一起落进会话条目（顺序见 `server/src/core/run.ts`）：
- *   <skill …>…</skill> / <command …>…</command> / <context …>…</context> / [附件: …] / 用户正文
- * 块内容只喂给模型，界面整体剥掉它们（不展开、不成段）：技能、命令、附件各自出 chip，
- * `@` 引用还原成正文里可点的标记。块内容已由服务端的 `neutralizeTags` 转义同名标签，
- * 因此匹配首个闭合标签是安全的。
+ *   <skill …>…</skill> / <command …>…</command> / <context …>…</context> / 用户正文
+ * 块内容只喂给模型，界面整体剥掉它们（不展开、不成段）：技能与命令各自出 chip 排在气泡上方，
+ * 正文里的 `@` 引用、图片标记与附件引用行是句子成分，就地还原成可点 chip（位置即用户当初放的位置）。
+ * 块内容已由服务端的 `neutralizeTags` 转义同名标签，因此匹配首个闭合标签是安全的。
  *
- * 解析是「段落化」的：一次扫完所有前置块，再用同一遍扫描把正文里的引用标记切出来。
+ * 解析是「段落化」的：一次扫完所有前置块，再用同一遍扫描把正文里的标记切出来。
  */
-import type { ContextRef } from "@ucode/contracts";
+import {
+  ATTACHMENT_REF_PATTERN,
+  ATTACHMENT_REF_PREFIX,
+  type ContextRef,
+  IMAGE_MARKER_PREFIX,
+} from "@ucode/contracts";
 
 import type { ComposerPayload } from "./composer-payload";
 import { toRelativePath } from "./path";
@@ -17,18 +22,29 @@ import { toRelativePath } from "./path";
 export type SkillChip = { name: string };
 /** 提示词命令：chip 显示 `/name`，用户写的参数跟在正文里 */
 export type CommandChip = { name: string; args: string };
+/** 非图片附件：正文里是展开后的引用行 `[附件: <显示名> (id: <sha256>)]` */
 export type AttachmentChip = { id: string; name: string };
 
-/** 正文的一段：普通文本，或一条引用标记（带引用时的行范围，供编辑重发时原样回传） */
-export type UserTextSegment = { type: "text"; text: string } | ({ type: "context" } & ContextRef);
+/**
+ * 正文的一段：普通文本、一条引用标记、一个非图片附件，或一张图片（按同类型附件的出现次序定位）。
+ * 附件与图片在正文里的位置是用户想表达的位置，因此界面按段落就地渲染，而不是抽出来排成一行。
+ */
+export type UserTextSegment =
+  | { type: "text"; text: string }
+  | ({ type: "context" } & ContextRef)
+  | ({ type: "attachment" } & AttachmentChip)
+  | {
+      type: "image";
+      /** 本条消息里的第几张图片，1 起（与正文标记 `图片 N` 同口径）；取 image block 时减一 */
+      index: number;
+    };
 
 export type ParsedUserMessage = {
   skill?: SkillChip;
   command?: CommandChip;
-  attachments: AttachmentChip[];
-  /** 正文分段（引用标记已切出来），`text` 是它们的原始拼接 */
+  /** 正文分段（标记已切出来），`text` 是它们的原始拼接 */
   segments: UserTextSegment[];
-  /** 用户正文：剥掉全部前置展开块，`@` 引用标记留在用户写的那句话里 */
+  /** 用户正文：剥掉全部前置展开块，各类标记留在用户写的那句话里 */
   text: string;
 };
 
@@ -36,9 +52,10 @@ const SKILL_PATTERN = /^<skill name="([^"]*)" location="[^"]*">\n[\s\S]*?\n<\/sk
 const COMMAND_PATTERN = /^<command name="([^"]*)" args="([^"]*)">\n[\s\S]*?\n<\/command>\n{0,2}/;
 const CONTEXT_PATTERN =
   /^<context path="([^"]*)"(?: lines="([^"]*)")?>\n[\s\S]*?\n<\/context>\n{0,2}/;
-/** 非图片附件的引用行（服务端前置进正文）：`[附件: name (id: <sha256>)]` */
-// i18n-ignore：协议字面量，与 server 的 run.ts 保持一致，不是界面文案
-const ATTACHMENT_PATTERN = /^\[附件: (.*?) \(id: ([0-9a-f]{64})\)\]\n{0,2}/;
+/** 图片标记里的序号：前缀之后紧跟着的数字 */
+const IMAGE_ORDINAL = /^\d+/;
+/** 早期消息把附件引用行前置在正文头部：连同其后的换行一起剥，免得气泡里多出空行 */
+const HEAD_ATTACHMENT_PATTERN = new RegExp(`^${ATTACHMENT_REF_PATTERN.source}\\n{0,2}`);
 
 /** `@` 引用的正文标记；标记与展开块一一对应，界面靠它还原引用在句子里的位置 */
 export const contextMarker = (path: string): string => `@${path}`;
@@ -67,20 +84,24 @@ const lineRangeOf = (raw: string | undefined): Pick<ContextRef, "startLine" | "e
 };
 
 /**
- * 把正文里的引用标记切成 `context` 段，只认**前置块里出现过**的引用——
- * 用户自己打的 `@张三` 不在其中，因此不会被误判成引用。
- * 最长匹配优先（`@a.ts` 与 `@a.ts.bak` 并存时不会切错）；一条引用只切一次，多出来的标记留在文本里。
+ * 把正文切成文本 / 引用 / 附件 / 图片四类分段，三类标记都就地切出：
+ *
+ * - `@` 引用只认**前置块里出现过**的那些——用户自己打的 `@张三` 不在其中；最长匹配优先，一条只切一次。
+ * - 附件引用行与图片标记的形状由服务端与编辑器保证，认到就是位置标记。
+ *
+ * 图片标记只切出序号，图片本体（id）由调用方按 `index` 去 image blocks 里取。
  */
 const splitSegments = (text: string, refs: readonly ContextRef[]): UserTextSegment[] => {
+  // 逐位置匹配用 sticky 正则：只在这里建，避免共享 `lastIndex`
+  const attachmentAt = new RegExp(ATTACHMENT_REF_PATTERN.source, "y");
   const remaining = [...refs];
   const segments: UserTextSegment[] = [];
-  let buffer = "";
+  /** 当前文本段的起点；命中标记时把 [cursor, index) 推成一段 */
+  let cursor = 0;
   let index = 0;
 
-  const flush = (): void => {
-    if (buffer === "") return;
-    segments.push({ type: "text", text: buffer });
-    buffer = "";
+  const flush = (end: number): void => {
+    if (end > cursor) segments.push({ type: "text", text: text.slice(cursor, end) });
   };
 
   while (index < text.length) {
@@ -91,18 +112,41 @@ const splitSegments = (text: string, refs: readonly ContextRef[]): UserTextSegme
         if (best === undefined || ref.path.length > best.path.length) best = ref;
       }
       if (best !== undefined) {
-        flush();
+        flush(index);
         segments.push({ type: "context", ...best });
         remaining.splice(remaining.indexOf(best), 1);
         index += best.path.length + 1;
+        cursor = index;
         continue;
       }
     }
-    buffer += text[index];
+    if (text.startsWith(ATTACHMENT_REF_PREFIX, index)) {
+      attachmentAt.lastIndex = index;
+      const match = attachmentAt.exec(text);
+      if (match) {
+        flush(index);
+        segments.push({ type: "attachment", name: match[1] ?? "", id: match[2] ?? "" });
+        index = attachmentAt.lastIndex;
+        cursor = index;
+        continue;
+      }
+    }
+    if (text.startsWith(IMAGE_MARKER_PREFIX, index)) {
+      const start = index + IMAGE_MARKER_PREFIX.length;
+      const digits = IMAGE_ORDINAL.exec(text.slice(start));
+      const count = digits ? Number.parseInt(digits[0], 10) : 0;
+      if (count > 0) {
+        flush(index);
+        segments.push({ type: "image", index: count });
+        index = start + (digits?.[0].length ?? 0);
+        cursor = index;
+        continue;
+      }
+    }
     index += 1;
   }
 
-  flush();
+  flush(text.length);
   return segments;
 };
 
@@ -111,7 +155,8 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
   let skill: SkillChip | undefined;
   let command: CommandChip | undefined;
   const contexts: ContextRef[] = [];
-  const attachments: AttachmentChip[] = [];
+  /** 头部剥出来的附件引用行（早期写法）：位置不在句子里，但仍是附件段 */
+  const leading: UserTextSegment[] = [];
 
   // 前置展开块：形状由服务端给出，逐个从头部剥离；只可能出现在最前面，剥完即止
   for (;;) {
@@ -139,49 +184,58 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
       text = text.slice(contextMatch[0].length);
       continue;
     }
-    const attachmentMatch = text.match(ATTACHMENT_PATTERN);
+    const attachmentMatch = text.match(HEAD_ATTACHMENT_PATTERN);
     if (attachmentMatch) {
-      attachments.push({ name: attachmentMatch[1] ?? "", id: attachmentMatch[2] ?? "" });
+      leading.push({
+        type: "attachment",
+        name: attachmentMatch[1] ?? "",
+        id: attachmentMatch[2] ?? "",
+      });
       text = text.slice(attachmentMatch[0].length);
       continue;
     }
     break;
   }
 
-  return { skill, command, attachments, segments: splitSegments(text, contexts), text };
+  return {
+    skill,
+    command,
+    segments: [...leading, ...splitSegments(text, contexts)],
+    text,
+  };
 };
 
 /**
- * 用户原文：命令与技能还原成 `/name args` / `/skill:name args`，其余照 `text`。
+ * 用户写下的正文：去掉只对模型有意义的位置标记（附件引用行、图片标记），其余照原样；
+ * 复制这条消息时要的是「用户当初写的那句」，不是把 id 也拷出去。
+ */
+export const visibleTextOf = (segments: readonly UserTextSegment[]): string =>
+  segments
+    .map((segment) =>
+      segment.type === "text"
+        ? segment.text
+        : segment.type === "context"
+          ? contextMarker(segment.path)
+          : "",
+    )
+    .join("");
+
+/**
+ * 用户原文：命令与技能还原成 `/name args` / `/skill:name args`，其余照正文（去掉位置标记）。
  * 复制与编辑回填都要「用户当初写的那句」——注入进去的技能正文与模板正文不是原话，而技能块之后的
- * 正文恰好就是 `parsed.text`（服务端展开时就是把参数接在块后的）。
+ * 正文恰好就是 `parsed.segments`（服务端展开时就是把参数接在块后的）。
  */
 export const userMessageText = (parsed: ParsedUserMessage): string => {
   if (parsed.command) {
     return [`/${parsed.command.name}`, parsed.command.args].filter(Boolean).join(" ");
   }
   if (parsed.skill) {
-    return [`/skill:${parsed.skill.name}`, parsed.text.trim()].filter(Boolean).join(" ");
+    return [`/skill:${parsed.skill.name}`, visibleTextOf(parsed.segments).trim()]
+      .filter(Boolean)
+      .join(" ");
   }
-  return parsed.text;
+  return visibleTextOf(parsed.segments);
 };
-
-/**
- * 编辑重发时要回传的引用：只带 `text` 里仍留着标记的那些——用户在编辑态删掉一条 `@` 标记，
- * 对应的展开块就不该再发给模型。行范围沿用原展开块。
- */
-export const contextRefsOf = (parsed: ParsedUserMessage, text: string): ContextRef[] =>
-  parsed.segments.flatMap((segment) =>
-    segment.type === "context" && text.includes(contextMarker(segment.path))
-      ? [
-          {
-            path: segment.path,
-            ...(segment.startLine !== undefined ? { startLine: segment.startLine } : {}),
-            ...(segment.endLine !== undefined ? { endLine: segment.endLine } : {}),
-          },
-        ]
-      : [],
-  );
 
 /**
  * 把正文里的引用标记换成本会话工作目录下的相对写法（与服务端展开块的 `path` 属性同口径）。

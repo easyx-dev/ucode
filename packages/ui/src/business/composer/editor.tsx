@@ -1,246 +1,88 @@
 /**
- * 输入区编辑器（Tiptap）：只装结构节点与两个 mention，无任何排版 marks。
+ * 消息编辑器（Tiptap）：只装结构节点与三个 mention，无任何排版 marks；输入区与消息编辑态共用。
  *
- * - `@`：`contextMention`（任意位置），发送时剥离为 `contexts[]`
- * - `/`：`commandMention`（仅文档开头），序列化为 `/name` 或 `/skill:name`；内置动作为空节点、立即执行
+ * - `@`：`contextMention`（任意位置），发送时落成正文里的 `@路径` 标记并收进 `contexts[]`
+ * - `/`：`commandMention`（仅文档开头），序列化为 `/name` 或 `/skill:name`；内置动作为空节点、立即执行。
+ *   不传 `commandItems` 时整个菜单停用（消息编辑态：命令节点只读，不能再造一个）
+ * - 附件：`attachmentMention` 原子节点，图片按缩略图预览、其余只显示文件名；正文里的位置标记由它生成
  * - 历史：`@tiptap/pm/history` 的插件包一层，`⌘Z` 撤销、`⌘⇧Z` 与 `⌘Y` 前进
+ *
+ * 扩展与 editorProps 在 `./extensions`，命令式句柄在 `./editor-handle`。
  */
-import { type Editor, Extension, type JSONContent } from "@tiptap/core";
-import Document from "@tiptap/extension-document";
-import HardBreak from "@tiptap/extension-hard-break";
-import Mention from "@tiptap/extension-mention";
-import Paragraph from "@tiptap/extension-paragraph";
-import Placeholder from "@tiptap/extension-placeholder";
-import Text from "@tiptap/extension-text";
-import { history, redo, undo } from "@tiptap/pm/history";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import type { ComposerNode } from "../../lib/composer-document";
-import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
-import { filesOf } from "./use-composer-attachments";
+import { type ComposerEditorHandle, createEditorHandle } from "./editor-handle";
+import { type ComposerCallbacks, createComposerExtensions, createEditorProps } from "./extensions";
+import type { SuggestionItem } from "./suggestion";
 
-const CHIP_CLASS = "rounded bg-muted px-1 py-0.5 text-foreground";
-
-/**
- * 撤销 / 重做：本轮没有引入 `@tiptap/extension-undo-redo`，直接用已装的 ProseMirror 历史插件包一层，
- * 与 Tiptap 自带扩展同一套命令（附件条在编辑器之外，不进这份历史）。
- */
-const History = Extension.create({
-  name: "history",
-  addProseMirrorPlugins() {
-    return [history()];
-  },
-  addKeyboardShortcuts() {
-    return {
-      "Mod-z": () => undo(this.editor.view.state, this.editor.view.dispatch),
-      "Mod-Shift-z": () => redo(this.editor.view.state, this.editor.view.dispatch),
-      "Mod-y": () => redo(this.editor.view.state, this.editor.view.dispatch),
-    };
-  },
-});
-
-const ContextMention = Mention.extend({
-  name: "contextMention",
-  addAttributes() {
-    return {
-      path: { default: null },
-      startLine: { default: null },
-      endLine: { default: null },
-      label: { default: null },
-    };
-  },
-});
-
-const CommandMention = Mention.extend({
-  name: "commandMention",
-  addAttributes() {
-    return {
-      kind: { default: "prompt" },
-      name: { default: null },
-      label: { default: null },
-    };
-  },
-  /**
-   * 默认实现会把触发符再拼一次（`char` + label），而这里的 label 本身就是 `/name`、`/skill:name`，
-   * 拼上去会在编辑器里显示成 `//review`。直接输出 label。
-   */
-  renderHTML({ node, HTMLAttributes }) {
-    return ["span", HTMLAttributes, node.attrs.label ?? ""];
-  },
-});
+export type { ComposerEditorHandle };
 
 export type ComposerEditorProps = {
-  /** 初始文档（挂载时读取一次；切换草稿由外层用 `key` 重挂载） */
+  /** 初始文档（挂载时读取一次；切换草稿 / 切换编辑对象由外层用 `key` 重挂载） */
   initialDoc?: ComposerNode;
   placeholder: string;
   onChange: (doc: ComposerNode) => void;
   onSend: () => void;
-  /** `@` 的文件候选（异步） */
-  contextItems: (query: string) => Promise<SuggestionItem[]>;
-  /** `/` 的内置动作 + 命令 + 技能候选 */
-  commandItems: (query: string) => SuggestionItem[];
+  /** `@` 的文件候选（异步）；不传则 `@` 菜单停用 */
+  contextItems?: (query: string) => Promise<SuggestionItem[]>;
+  /** `/` 的内置动作 + 命令 + 技能候选；不传则 `/` 菜单停用 */
+  commandItems?: (query: string) => SuggestionItem[];
   /** 选中内置动作时触发（不落节点） */
-  onBuiltin: (id: string) => void;
-  /** 粘贴 / 拖拽进来的文件（附件），由外层压缩入库 */
-  onFiles: (files: File[]) => void;
+  onBuiltin?: (id: string) => void;
+  /** 粘贴 / 拖拽进来的文件（附件），由外层上传入库 */
+  onFiles?: (files: File[]) => void;
+  /** Esc：消息编辑态用它退出（弹层开着时先由弹层处理） */
+  onEscape?: () => void;
 };
 
-/** 供外层把焦点收回输入区（发送之后、选择器关掉之后） */
-export type ComposerEditorHandle = {
-  focus: () => void;
-};
+type EditorProps = ComposerEditorProps & { ref?: Ref<ComposerEditorHandle> };
 
 /** 只在桌面指针环境下自动聚焦：触屏上抢焦点等于凭空唤起键盘 */
 const canAutoFocus = (): boolean => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-export function ComposerEditor({
-  ref,
-  initialDoc,
-  placeholder,
-  onChange,
-  onSend,
-  contextItems,
-  commandItems,
-  onBuiltin,
-  onFiles,
-}: ComposerEditorProps & { ref?: Ref<ComposerEditorHandle> }) {
-  // 回调放 ref：Tiptap 实例只在挂载时创建一次，用它拿最新实现
-  const onChangeRef = useRef(onChange);
-  const onSendRef = useRef(onSend);
-  const onBuiltinRef = useRef(onBuiltin);
-  const contextItemsRef = useRef(contextItems);
-  const commandItemsRef = useRef(commandItems);
-  const onFilesRef = useRef(onFiles);
-  onChangeRef.current = onChange;
-  onSendRef.current = onSend;
-  onBuiltinRef.current = onBuiltin;
-  contextItemsRef.current = contextItems;
-  commandItemsRef.current = commandItems;
-  onFilesRef.current = onFiles;
+/**
+ * 创建编辑器实例并把句柄交给外层。
+ *
+ * Tiptap 实例只在挂载时创建一次：回调一律经 ref 取最新实现（`extensions` 里读 `.current`）；
+ * 扩展与 editorProps 也只算一次——建议插件在挂载时就抓住了它们，之后重算既不会生效，
+ * 还会让 `useEditor` 每次渲染都以为「选项变了」而调 `setOptions`。菜单开关同理取挂载时的值
+ * （挂载后不会变，变也由外层用 `key` 重挂载）。
+ */
+const useComposerEditor = ({ ref, initialDoc, placeholder, ...props }: EditorProps) => {
+  const callbacks: ComposerCallbacks = {
+    contextItems: useRef(props.contextItems),
+    commandItems: useRef(props.commandItems),
+    onBuiltin: useRef(props.onBuiltin),
+    onFiles: useRef(props.onFiles),
+    onEscape: useRef(props.onEscape),
+    onSend: useRef(props.onSend),
+    suggestionOpen: useRef(false),
+  };
+  callbacks.contextItems.current = props.contextItems;
+  callbacks.commandItems.current = props.commandItems;
+  callbacks.onBuiltin.current = props.onBuiltin;
+  callbacks.onFiles.current = props.onFiles;
+  callbacks.onEscape.current = props.onEscape;
+  callbacks.onSend.current = props.onSend;
+
+  const onChangeRef = useRef(props.onChange);
+  onChangeRef.current = props.onChange;
 
   const editorRef = useRef<Editor | null>(null);
-
-  // 弹层是否有候选：有则把 Enter / 方向键让给弹层，避免被发送逻辑抢走
-  const suggestionOpen = useRef(false);
-  const renderContext = useRef(
-    createSuggestionRenderer((active) => {
-      suggestionOpen.current = active;
+  const options = useRef({
+    extensions: createComposerExtensions(callbacks, {
+      context: props.contextItems !== undefined,
+      command: props.commandItems !== undefined,
+      placeholder,
     }),
-  ).current;
-  const renderCommand = useRef(
-    createSuggestionRenderer((active) => {
-      suggestionOpen.current = active;
-    }),
-  ).current;
+    content: (initialDoc ?? { type: "doc", content: [{ type: "paragraph" }] }) as JSONContent,
+    editorProps: createEditorProps(callbacks),
+  }).current;
 
   const editor = useEditor({
-    extensions: [
-      Document,
-      Paragraph,
-      Text,
-      HardBreak,
-      History,
-      ContextMention.configure({
-        HTMLAttributes: { class: CHIP_CLASS },
-        renderText: () => "",
-        suggestion: {
-          char: "@",
-          items: ({ query }) => contextItemsRef.current(query),
-          render: renderContext,
-          command: ({ editor: target, range, props }) => {
-            const item = props as SuggestionItem;
-            target
-              .chain()
-              .focus()
-              .insertContentAt(range, [
-                {
-                  type: "contextMention",
-                  attrs: {
-                    path: item.path,
-                    startLine: item.startLine ?? null,
-                    endLine: item.endLine ?? null,
-                    label: item.label,
-                  },
-                },
-                { type: "text", text: " " },
-              ])
-              .run();
-          },
-        },
-      }),
-      CommandMention.configure({
-        HTMLAttributes: { class: CHIP_CLASS },
-        renderText: ({ node }) =>
-          node.attrs.kind === "skill" ? `/skill:${node.attrs.name}` : `/${node.attrs.name}`,
-        suggestion: {
-          char: "/",
-          allow: ({ range }) => range.from === 1,
-          items: ({ query }) => commandItemsRef.current(query),
-          render: renderCommand,
-          command: ({ editor: target, range, props }) => {
-            const item = props as SuggestionItem;
-            if (typeof item.builtin === "string") {
-              // 参数型命令（如 `/goal`）只把命令名填进去，等用户在正文里补参数，不立即执行
-              if (item.takesArgument === true) {
-                target.chain().insertContentAt(range, `${item.label} `).focus("end").run();
-                return;
-              }
-              target.chain().focus().deleteRange(range).run();
-              onBuiltinRef.current(item.builtin);
-              return;
-            }
-            target
-              .chain()
-              .focus()
-              .insertContentAt(range, [
-                {
-                  type: "commandMention",
-                  attrs: { kind: item.kind, name: item.name, label: item.label },
-                },
-                { type: "text", text: " " },
-              ])
-              .run();
-          },
-        },
-      }),
-      Placeholder.configure({ placeholder }),
-    ],
-    content: (initialDoc ?? { type: "doc", content: [{ type: "paragraph" }] }) as JSONContent,
-    editorProps: {
-      attributes: {
-        class:
-          "max-h-[220px] min-h-11 overflow-y-auto px-3 py-2.5 text-sm outline-none [&_.is-editor-empty]:before:pointer-events-none [&_.is-editor-empty]:before:float-left [&_.is-editor-empty]:before:h-0 [&_.is-editor-empty]:before:text-muted-foreground [&_.is-editor-empty]:before:content-[attr(data-placeholder)]",
-      },
-      handlePaste: (_view, event) => {
-        const files = filesOf(event.clipboardData);
-        if (files.length === 0) return false;
-        event.preventDefault();
-        onFilesRef.current(files);
-        return true;
-      },
-      handleDrop: (_view, event) => {
-        const files = filesOf(event.dataTransfer);
-        if (files.length === 0) return false;
-        event.preventDefault();
-        onFilesRef.current(files);
-        return true;
-      },
-      handleKeyDown: (_view, event) => {
-        // 弹层有候选时，导航键让给弹层：Enter 选中当前项，而不是把消息发出去
-        if (
-          suggestionOpen.current &&
-          ["Enter", "ArrowDown", "ArrowUp", "Escape", "Tab"].includes(event.key)
-        ) {
-          return false;
-        }
-        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-          event.preventDefault();
-          onSendRef.current();
-          return true;
-        }
-        return false;
-      },
-    },
+    ...options,
     onUpdate: ({ editor: target }) => {
       onChangeRef.current(target.getJSON() as ComposerNode);
     },
@@ -251,16 +93,7 @@ export function ComposerEditor({
   });
 
   editorRef.current = editor;
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focus: () => {
-        editorRef.current?.commands.focus("end");
-      },
-    }),
-    [],
-  );
+  useImperativeHandle(ref, () => createEditorHandle(() => editorRef.current), []);
 
   useEffect(
     () => () => {
@@ -270,5 +103,9 @@ export function ComposerEditor({
     [],
   );
 
-  return <EditorContent editor={editor} />;
+  return editor;
+};
+
+export function ComposerEditor(props: EditorProps) {
+  return <EditorContent editor={useComposerEditor(props)} />;
 }

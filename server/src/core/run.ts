@@ -1,6 +1,7 @@
 /** 会话运行：把一条输入投递给会话，生成在服务端后台推进，结果走事件总线 */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
+  attachmentRefLine,
   ERROR_CODES,
   GOAL_PROMPT_CUSTOM_TYPE,
   type GoalPromptKind,
@@ -12,6 +13,7 @@ import {
 import type { Services } from "../app";
 import { expandCommand, expandSkillCommand } from "../harness/assets/expand";
 import { resolveAttachment } from "../harness/attachment";
+import { inlineAttachmentText } from "../harness/attachment/inline";
 import { expandContexts } from "../harness/context";
 import { resolveEditableUserEntry } from "../harness/edit";
 import { buildPlanApproval } from "../harness/goal/prompt";
@@ -52,9 +54,9 @@ const startRun = (
 
 /** 投递内容里与会话无关的那部分：前置展开块与 vision 数组都已备好，正文还没动 */
 type PreparedPrompt = {
-  /** 前置展开块（`@` 引用 + 非图片附件的引用行），无内容时为空串 */
+  /** 前置展开块（`@` 引用 + 退回老路径时的附件引用行），无内容时为空串 */
   prefix: string;
-  /** 用户正文，此时还没展开命令 */
+  /** 用户正文：附件内联成功时已把非图片标记换成引用行，否则原样 */
   text: string;
   images: PromptImage[];
 };
@@ -70,25 +72,28 @@ const preparePrompt = (
   input: Pick<PromptInput, "text" | "contexts" | "attachments">,
 ): PreparedPrompt => {
   const expanded = expandContexts(cwd, input.contexts ?? []);
-  const images: PromptImage[] = [];
-  const refLines: string[] = [];
-
-  for (const ref of input.attachments ?? []) {
+  const resolved = (input.attachments ?? []).map((ref) => {
     const found = resolveAttachment(ref.id, { repo });
     if (!found) {
       throw new AppError(ERROR_CODES.invalidRequest, `附件不存在：${ref.id}`, 400, undefined, {
         path: ref.id,
       });
     }
-    // 图片走 vision；其余本期只做引用（解析留给后续 read_attachment / MCP）
-    if (found.mimeType.startsWith("image/")) images.push(toPromptImage(found));
-    else refLines.push(`[附件: ${found.name ?? found.id} (id: ${found.id})]`);
-  }
+    return found;
+  });
+
+  // 图片走 vision；其余本期只做引用（解析留给后续 read_attachment / MCP）
+  const images = resolved.filter((found) => found.mimeType.startsWith("image/"));
+  const files = resolved.filter((found) => !found.mimeType.startsWith("image/"));
+  const inline = inlineAttachmentText(input.text, { imageCount: images.length, files });
+  // 内联成功时引用行已经在正文里了，不再前置一份
+  const refLines =
+    inline === null ? files.map((file) => attachmentRefLine(file.name ?? file.id, file.id)) : [];
 
   return {
     prefix: [expanded, refLines.join("\n")].filter((part) => part.length > 0).join("\n\n"),
-    text: input.text,
-    images,
+    text: inline ?? input.text,
+    images: images.map(toPromptImage),
   };
 };
 

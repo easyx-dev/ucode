@@ -193,11 +193,12 @@ export default {
     "Type a message. Enter to send, Shift+Enter for a new line.",
   停止生成: "Stop generating",
   发送: "Send",
-  移除附件: "Remove attachment",
   图片预览: "Image preview",
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
-  "附件过大：{{names}}": "Attachment too large: {{names}}",
+  "无法添加附件：{{names}}": "Could not add attachments: {{names}}",
+  "改写这条消息，Enter 发送，Shift+Enter 换行":
+    "Edit this message. Enter to send, Shift+Enter for a new line.",
 
   // 内置命令说明（`/` 菜单提示与 /help 清单）
   重命名当前会话: "Rename the current session",

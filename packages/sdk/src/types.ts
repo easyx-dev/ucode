@@ -1,5 +1,5 @@
 /** 会话流在界面上消费的类型：消息条目与子智能体进度（供各端复用） */
-import type { AttachmentRef, AttachmentView, ContextRef, MessageDTO } from "@ucode/contracts";
+import type { AttachmentRef, ContextRef, MessageDTO } from "@ucode/contracts";
 
 /** 单条 assistant 消息的思考耗时；由客户端按事件到达时间测得，不落盘、快照重建后不再有 */
 export type ChatItemTiming = {
@@ -42,11 +42,14 @@ export type SubagentStream = {
 /** 按父会话里的 `toolCallId` 索引的进行中子智能体 */
 export type SubagentStreams = Record<string, SubagentStream>;
 
-/** 一条 prompt 的结构化载荷：正文 + `@` 上下文引用 + 附件 */
+/**
+ * 一条 prompt 的结构化载荷：正文 + `@` 上下文引用 + 附件引用。
+ * 附件只带 id：引用按内容寻址，正文里的位置由 `图片 N` / `附件 N.<ext>` 标记表达。
+ */
 export type PromptPayload = {
   text: string;
   contexts: ContextRef[];
-  attachments: AttachmentView[];
+  attachments: AttachmentRef[];
 };
 
 /**

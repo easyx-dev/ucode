@@ -8,7 +8,7 @@ import type { ChatController } from "../hooks/use-chat";
 import type { ComposerDraftsController } from "../hooks/use-composer-drafts";
 import type { BuiltinCommandId } from "../lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-document";
-import { type ComposerDraft, composerKeyOf, emptyDraft } from "../lib/composer-draft";
+import { composerKeyOf, emptyDraft } from "../lib/composer-draft";
 import type { ComposerPayload } from "../lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
 import { relativizeContextRefs } from "../lib/message-chips";
@@ -158,11 +158,12 @@ export function ChatPanel({
 
   /**
    * 发送：清空草稿（即时反馈 + 挡重复提交），把初始设置交给 useChat——还没有会话时先建会话；
-   * 没发出去就把正文还回输入框（会话可能已经建好，按返回的会话 id 定位上下文）。
+   * 没发出去就把那份文档（引用与附件都在节点里）还回输入框
+   * （会话可能已经建好，按返回的会话 id 定位上下文）。
    * `/goal` 只在纯文本时才当命令解析，带引用 / 图片的消息按普通消息发。
    */
   const submit = useCallback(
-    (payload: ComposerPayload) => {
+    (payload: ComposerPayload, doc: ComposerNode) => {
       const seed = {
         cwd: draft.cwd,
         model: draft.model,
@@ -186,15 +187,12 @@ export function ChatPanel({
           setSentTick((tick) => tick + 1);
           return;
         }
-        // 回填用换算前的载荷（标记是绝对路径），再次发送时重新换算
-        const restored: Partial<ComposerDraft> = {
-          text: payload.text,
-          doc: textToDoc(payload.text),
+        // 回填原样用发送时那份文档：附件节点与引用都在里面，再次发送时重新换算标记
+        composer.update(composerKeyOf(target), {
+          doc,
+          text: docToPayload(doc).text,
           ...seed,
-        };
-        // 附件视图也还回输入框：字节已在服务端，草稿只存引用
-        if (payload.attachments.length > 0) restored.attachments = payload.attachments;
-        composer.update(composerKeyOf(target), restored);
+        });
       });
     },
     [chat, composer, draft, draftKey, onGoalCommand, session?.cwd],
@@ -331,12 +329,10 @@ export function ChatPanel({
               cwd={cwd}
               cwdPath={session?.cwd ?? draft.cwd}
               initialDoc={initialDoc}
-              initialAttachments={draft.attachments}
               editorKey={draftKey}
               onDocChange={(doc) =>
                 composer.update(draftKey, { doc, text: docToPayload(doc).text })
               }
-              onAttachmentsChange={(attachments) => composer.update(draftKey, { attachments })}
               onSend={submit}
               streaming={chat.streaming}
               onStop={() => void chat.stop()}

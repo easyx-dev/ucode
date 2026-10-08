@@ -5,7 +5,6 @@ import { describe, it } from "node:test";
 import type { ComposerPayload } from "../composer-payload";
 import {
   contextMarker,
-  contextRefsOf,
   parseUserMessage,
   relativizeContextRefs,
   userMessageText,
@@ -26,11 +25,10 @@ describe("parseUserMessage", () => {
     const parsed = parseUserMessage(raw);
 
     assert.equal(parsed.text, "把这个计划落到 @plans/a.md 中，然后记个 todo");
-    assert.deepEqual(parsed.attachments, []);
     assert.equal(parsed.skill, undefined);
   });
 
-  it("技能与附件仍各自成 chip，正文只留用户原文", () => {
+  it("技能自成 chip，附件引用行留在句子里", () => {
     const raw =
       '<skill name="review" location="/skills/review.md">\n技能正文\n</skill>\n\n' +
       '<context path="a.ts">\n内容\n</context>\n\n' +
@@ -40,8 +38,14 @@ describe("parseUserMessage", () => {
     const parsed = parseUserMessage(raw);
 
     assert.deepEqual(parsed.skill, { name: "review" });
-    assert.deepEqual(parsed.attachments, [{ name: "报告.pdf", id: "a".repeat(64) }]);
-    assert.equal(parsed.text, "看看 @a.ts");
+    // 引用行在头部（早期写法）时连同其后换行一起剥，气泡里不会多出空行
+    assert.deepEqual(parsed.segments, [
+      { type: "attachment", name: "报告.pdf", id: "a".repeat(64) },
+      { type: "text", text: "看看 " },
+      { type: "context", path: "a.ts" },
+    ]);
+    // 复制出去的是用户写的那句，不带引用行里的 id
+    assert.equal(userMessageText(parsed), "/skill:review 看看 @a.ts");
   });
 
   it("没有前置块的消息原样返回", () => {
@@ -170,19 +174,35 @@ describe("parseUserMessage 的正文分段", () => {
   });
 });
 
-describe("contextRefsOf", () => {
-  const parsed = parseUserMessage(
-    '<context path="a.ts" lines="3-4">\n内容\n</context>\n\n看 @a.ts 与 @b.ts',
-  );
+describe("正文里的附件与图片标记", () => {
+  it("附件引用行就地成段，前后文本照旧", () => {
+    const raw = `看下 [附件: 报告.pdf (id: ${"b".repeat(64)})] 的结论`;
 
-  it("回传正文里留着的引用，行范围沿用展开块", () => {
-    assert.deepEqual(contextRefsOf(parsed, "看 @a.ts 与 @b.ts"), [
-      { path: "a.ts", startLine: 3, endLine: 4 },
+    assert.deepEqual(parseUserMessage(raw).segments, [
+      { type: "text", text: "看下 " },
+      { type: "attachment", name: "报告.pdf", id: "b".repeat(64) },
+      { type: "text", text: " 的结论" },
     ]);
   });
 
-  it("编辑态删掉的标记不再回传", () => {
-    assert.deepEqual(contextRefsOf(parsed, "看这份文件"), []);
+  it("图片标记切出序号，位置即用户放的位置", () => {
+    const parsed = parseUserMessage("看下 图片 1 的配色，再看 图片 2");
+
+    assert.deepEqual(parsed.segments, [
+      { type: "text", text: "看下 " },
+      { type: "image", index: 1 },
+      { type: "text", text: " 的配色，再看 " },
+      { type: "image", index: 2 },
+    ]);
+  });
+
+  it("`图片` 后面不是序号时留在文本里", () => {
+    assert.deepEqual(parseUserMessage("图片集").segments, [{ type: "text", text: "图片集" }]);
+  });
+
+  it("引用行残留的 id 不进复制文本，图片标记也不进", () => {
+    const parsed = parseUserMessage(`前 [附件: a.pdf (id: ${"c".repeat(64)})] 后 图片 1`);
+    assert.equal(userMessageText(parsed), "前  后 ");
   });
 });
 

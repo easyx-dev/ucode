@@ -12,11 +12,10 @@ import {
   type BuiltinCommandId,
   builtinCommandIdOf,
 } from "../lib/builtin-commands";
-import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-document";
+import { type ComposerNode, docToPayload, isDocEmpty, textToDoc } from "../lib/composer-document";
 import type { ComposerPayload } from "../lib/composer-payload";
-import type { AttachmentView, CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
-import { useClient } from "../provider";
-import { AttachmentStrip } from "./composer/attachment-strip";
+import type { CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
+import { useContextItems } from "./composer/context-items";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer/editor";
 import type { SuggestionItem } from "./composer/suggestion";
 import { filesOf, useComposerAttachments } from "./composer/use-composer-attachments";
@@ -31,16 +30,13 @@ type ComposerProps = {
   cwd?: string;
   /** 真实工作目录，`@` 检索用它 */
   cwdPath?: string;
-  /** 草稿里恢复的初始文档 */
+  /** 草稿里恢复的初始文档（附件与引用都在文档的节点里） */
   initialDoc?: ComposerNode;
-  /** 草稿里恢复的附件视图 */
-  initialAttachments?: readonly AttachmentView[];
   /** 编辑器重挂载键：上下文 + 外部填充版本 */
   editorKey: string;
   onDocChange: (doc: ComposerNode) => void;
-  /** 附件集合变化（增删）时回写草稿 */
-  onAttachmentsChange: (attachments: AttachmentView[]) => void;
-  onSend: (payload: ComposerPayload) => void;
+  /** 发送：带上当时那份文档，投递被拒时外层用它原样填回输入框 */
+  onSend: (payload: ComposerPayload, doc: ComposerNode) => void;
   onStop: () => void;
   streaming: boolean;
   suggestions?: readonly string[];
@@ -57,8 +53,6 @@ type ComposerProps = {
   onBuiltin: (id: BuiltinCommandId) => void;
 };
 
-const MAX_CONTEXT_ITEMS = 20;
-
 /** 空文档常量：多处重置编辑器共用，保持引用稳定 */
 const EMPTY_DOC: ComposerNode = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -67,10 +61,8 @@ export function Composer({
   cwd,
   cwdPath,
   initialDoc,
-  initialAttachments,
   editorKey,
   onDocChange,
-  onAttachmentsChange,
   onSend,
   onStop,
   streaming,
@@ -87,19 +79,16 @@ export function Composer({
   onBuiltin,
 }: ComposerProps) {
   const { t } = useTranslation();
-  const client = useClient();
   const commands = useCommands(sessionId, cwdPath);
+  const contextItems = useContextItems(cwdPath);
+  /** 焦点收回输入区的入口：发送之后、选择器关掉之后 */
+  const editorHandle = useRef<ComposerEditorHandle | null>(null);
   const {
-    items: attachmentItems,
     error: attachmentError,
     uploading,
     hasPendingUploads,
     addFiles,
-    remove: removeAttachment,
-  } = useComposerAttachments({
-    initialAttachments: initialAttachments ?? [],
-    onChange: onAttachmentsChange,
-  });
+  } = useComposerAttachments({ editor: editorHandle });
 
   const docRef = useRef<ComposerNode>(initialDoc ?? EMPTY_DOC);
   /**
@@ -115,8 +104,6 @@ export function Composer({
   const [openPicker, setOpenPicker] = useState<"model" | "thinking" | "mode" | "permission" | null>(
     null,
   );
-  /** 焦点收回输入区的入口：发送之后、选择器关掉之后 */
-  const editorHandle = useRef<ComposerEditorHandle | null>(null);
   /**
    * 编辑器最后一次拿到的文档（JSON 快照）。Tiptap 不受控，只有重挂载才会换内容；
    * 用它区分「外部草稿变化」（清空 / 回填）与「自己刚写出去的那份」，避免每次按键都重挂载。
@@ -190,16 +177,14 @@ export function Composer({
   );
 
   const submit = useCallback(() => {
-    // 附件还在上传时不发：否则会把没背上的附件漏掉，上传完成后又回填进草稿
+    // 附件还在上传时不发：否则会把还没拿到 id 的占位漏掉，上传完成后又留在草稿里
     if (streaming || hasPendingUploads()) return;
-    const doc = docToPayload(docRef.current);
-    const attachments = attachmentItems;
-    if (doc.text.trim() === "" && doc.contexts.length === 0 && attachments.length === 0) {
-      return;
-    }
+    const doc = docRef.current;
+    if (isDocEmpty(doc)) return;
+    const payload = docToPayload(doc);
     // 手动输入的整条内置命令（如 `/new`）：直接执行，不当作消息发出去
-    if (doc.contexts.length === 0 && attachments.length === 0) {
-      const builtin = builtinCommandIdOf(doc.text);
+    if (payload.contexts.length === 0 && payload.attachments.length === 0) {
+      const builtin = builtinCommandIdOf(payload.text);
       if (builtin) {
         resetEditor(EMPTY_DOC);
         handleBuiltin(builtin);
@@ -207,13 +192,13 @@ export function Composer({
         return;
       }
     }
-    onSend({ ...doc, attachments });
+    onSend(payload, doc);
     editorHandle.current?.focus();
-  }, [attachmentItems, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
+  }, [handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
-      void addFiles(files);
+      addFiles(files);
     },
     [addFiles],
   );
@@ -264,29 +249,6 @@ export function Composer({
       return [...builtin, ...prompts, ...skills];
     },
     [commands.prompts, commands.skills, sessionId, t],
-  );
-
-  const contextItems = useCallback(
-    async (query: string): Promise<SuggestionItem[]> => {
-      if (!cwdPath) return [];
-      try {
-        const result = await client.apis.fs.search({
-          path: cwdPath,
-          q: query,
-          limit: MAX_CONTEXT_ITEMS,
-        });
-        return result.entries.map((entry) => ({
-          id: entry.path,
-          label: entry.type === "directory" ? `${entry.name}/` : entry.name,
-          hint: entry.path,
-          group: t("文件"),
-          path: entry.path,
-        }));
-      } catch {
-        return [];
-      }
-    },
-    [client, cwdPath, t],
   );
 
   return (
@@ -340,11 +302,9 @@ export function Composer({
             </div>
           ) : null}
 
-          <AttachmentStrip attachments={attachmentItems} onRemove={removeAttachment} />
-
           {attachmentError ? (
             <p className="px-3 pt-2 text-xs text-destructive">
-              {t("附件过大：{{names}}", { names: attachmentError })}
+              {t("无法添加附件：{{names}}", { names: attachmentError })}
             </p>
           ) : null}
 

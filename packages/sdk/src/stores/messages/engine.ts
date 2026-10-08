@@ -2,7 +2,7 @@
  * 单个会话流的引擎：消息列表、生成态与子智能体进度的 store，以及事件归并。
  * 由 `createSessionStreams` 按 sessionId 复用。
  */
-import { API_BASE_PATH, type CompactionNotice, type ServerEventPayload } from "@ucode/contracts";
+import type { CompactionNotice, ServerEventPayload } from "@ucode/contracts";
 
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
@@ -104,29 +104,15 @@ export const patch = (engine: Engine, next: Partial<SessionStreamState>): void =
   });
 };
 
-/** 载荷 → 乐观区块：正文 + 附件（图片用附件路由地址，与权威消息同形，到达后替换） */
-export const optimisticBlocks = (payload: PromptPayload) => [
-  ...(payload.text ? [{ type: "text", text: payload.text } as const] : []),
-  ...payload.attachments.map((attachment) => {
-    const url = `${API_BASE_PATH}/attachments/${attachment.id}`;
-    if (attachment.kind === "image") {
-      return {
-        type: "image" as const,
-        id: attachment.id,
-        mimeType: attachment.mimeType,
-        url,
-      };
-    }
-    return {
-      type: "file" as const,
-      id: attachment.id,
-      mimeType: attachment.mimeType,
-      name: attachment.name ?? attachment.id,
-      size: attachment.size,
-      url,
-    };
-  }),
-];
+/**
+ * 载荷 → 乐观区块：只放正文。
+ *
+ * 附件与引用在正文里都是位置标记（`图片 N` / `附件 N.<ext>` / `@路径`），真实内容要等服务端
+ * 展开——而载荷只带附件 id，这里造不出名称与类型。与其编一个假的，不如先按标记原样显示，
+ * 权威消息（几十毫秒后到达）会把同一条消息换成带 chip 的样子。
+ */
+export const optimisticBlocks = (payload: PromptPayload) =>
+  payload.text ? [{ type: "text", text: payload.text } as const] : [];
 
 /** 就地更新某个子智能体的进度；没有对应条目时忽略 */
 const updateSubagent = (

@@ -1,35 +1,29 @@
 /**
- * 用户消息：句子外的 chip（技能 / 命令 / 附件）+ 正文里的引用 chip + 气泡与底部操作行。
+ * 用户消息：句子里的引用 / 图片 / 附件 chip + 句子外的技能与命令 chip + 气泡与底部操作行。
  *
- * 引用在正文里是句子成分，所以在用户写的那句里就地渲染成可点 chip（点开右侧工作台预览）；
- * 技能、命令与附件不属于任何句子，统一排在气泡上方。时刻与操作（分叉 / 编辑 / 复制）落在气泡下方，
- * 常驻占位、悬停才现，出现时不顶动内容。
+ * 引用、图片与附件是句子成分，因此在用户写的那句里就地渲染（引用点开右侧工作台预览，
+ * 图片开弹层看原图，附件下载），位置就是用户当初放的位置；技能与命令不属于任何句子，排在气泡上方。
+ * 时刻与操作（分叉 / 编辑 / 复制）落在气泡下方，常驻占位、悬停才现，出现时不顶动内容。
  *
  * 正文超过一段高度就折叠（底部渐隐 + 展开入口）：用户贴整段日志时不该把屏幕占满。
- * 编辑态是一块行内输入区，改写后重发（旧分支留在会话文件里）。
+ * 编辑态复用输入区的编辑器（见 `message-edit-form`），改写后重发，旧分支留在会话文件里。
  */
 
-import type { EditMessagePayload } from "@ucode/sdk";
 import { cn } from "cn";
 import { Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../base/button";
-import {
-  contextMarker,
-  contextRefsOf,
-  type ParsedUserMessage,
-  parseUserMessage,
-  userMessageText,
-} from "../lib/message-chips";
+import { contextMarker, parseUserMessage, userMessageText } from "../lib/message-chips";
 import { resolveFromCwd } from "../lib/path";
 import { clockLabel } from "../lib/time";
-import type { ChatItem, MessageBlock } from "../lib/types";
+import type { ChatItem, EditMessagePayload, MessageBlock } from "../lib/types";
 import { useWorkbench } from "../provider/workbench";
+import { AttachmentThumb, useAttachmentPreview } from "./attachment-preview";
 import { AttachmentLink, BlockView } from "./message-blocks";
+import { MessageEditForm } from "./message-edit-form";
 import { CopyAction, ForkAction } from "./message-footer";
 
-/** 四类 chip 共用一套外观：句子外的技能 / 命令 / 附件与句子里的引用都长这样 */
+/** chip 共用一套外观：句子外的技能 / 命令与句子里的引用都长这样 */
 const CHIP_CLASS =
   "inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground";
 
@@ -72,57 +66,59 @@ function ContextChip({ path }: { path: string }) {
   );
 }
 
-/**
- * 编辑重发的载荷：正文 + 正文里仍留着的引用 + 原消息带过的附件。
- * 附件来自两处——非图片附件的引用行与图片块，都只需要 id（引用按内容寻址，重建不需要其余信息）。
- */
-const editPayloadOf = (
-  parsed: ParsedUserMessage,
-  text: string,
-  blocks: readonly MessageBlock[],
-): EditMessagePayload => {
-  const contexts = contextRefsOf(parsed, text);
-  const ids = [
-    ...blocks.filter((block) => block.type === "image").map((block) => block.id),
-    ...parsed.attachments.map((attachment) => attachment.id),
-  ];
-  const attachments = [...new Set(ids)].map((id) => ({ id }));
-  return {
-    text,
-    ...(contexts.length > 0 ? { contexts } : {}),
-    ...(attachments.length > 0 ? { attachments } : {}),
-  };
-};
+/** 正文里的图片：缩略图点击开弹层看原图，与编辑器里的附件 chip 共用预览 */
+function InlineImage({ id, onOpen }: { id: string; onOpen: (target: { id: string }) => void }) {
+  return (
+    <button
+      type="button"
+      className="mx-0.5 inline-block align-middle"
+      onClick={() => onOpen({ id })}
+    >
+      <AttachmentThumb id={id} className="max-h-40 rounded-md border border-border align-middle" />
+    </button>
+  );
+}
 
 export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMessageProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const preview = useAttachmentPreview();
+  const canFork = Boolean(onFork) && !item.live;
+  const canEdit = Boolean(onEdit) && !item.live;
 
   const raw = blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
   const parsed = parseUserMessage(raw);
   // 编辑回填与复制都要「用户当初写的那句」，而不是注入进去的模板正文
   const original = userMessageText(parsed);
-  const media = blocks.filter((block) => block.type === "image" || block.type === "file");
-  const canFork = Boolean(onFork) && !item.live;
-  const canEdit = Boolean(onEdit) && !item.live;
   /**
    * 命令被服务端整条换成了模板正文，用户写的东西只剩参数，因此把参数当正文显示；
-   * 其余消息正文就是 `@` 引用标记切分后的分段。
+   * 其余消息正文就是各类标记切分后的分段（只有附件的消息分段非空、正文为空）。
    */
   const args = parsed.command?.args ?? "";
   const segments =
-    parsed.text.length > 0
+    parsed.segments.length > 0
       ? parsed.segments
       : args.length > 0
         ? [{ type: "text" as const, text: args }]
         : [];
-  const hasChips =
-    Boolean(parsed.skill) || Boolean(parsed.command) || parsed.attachments.length > 0;
+  const hasChips = Boolean(parsed.skill) || Boolean(parsed.command);
+
+  /** 图片块按出现顺序：正文里的 `图片 N` 就是这个次序里的第 N 张 */
+  const imageBlocks = blocks.filter(
+    (block): block is Extract<MessageBlock, { type: "image" }> => block.type === "image",
+  );
+  const inlineImages = new Set(
+    segments.filter((segment) => segment.type === "image").map((segment) => segment.index),
+  );
+  /** 媒体行只兜底正文里没有标记的图片（早期消息）与文件块 */
+  const mediaBlocks = blocks.filter((block) => {
+    if (block.type === "file") return true;
+    if (block.type !== "image") return false;
+    return !inlineImages.has(imageBlocks.indexOf(block) + 1);
+  });
 
   /**
    * 溢出只在收起状态下量：展开后高度就是内容高度，`scrollHeight` 与 `clientHeight` 永远相等。
@@ -140,57 +136,18 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [expanded, parsed.text]);
+  }, [expanded, raw]);
 
-  const startEdit = (): void => {
-    setDraft(original);
-    setEditing(true);
-  };
-
-  const submitEdit = async (): Promise<void> => {
-    const text = draft.trim();
-    if (!text || !onEdit || saving) return;
-    setSaving(true);
-    const ok = await onEdit(item, editPayloadOf(parsed, text, blocks));
-    setSaving(false);
-    if (ok) setEditing(false);
-  };
-
-  if (editing) {
+  if (editing && onEdit) {
     return (
-      <div className="flex justify-end">
-        <div className="w-full max-w-[85%] space-y-1.5">
-          <textarea
-            // biome-ignore lint/a11y/noAutofocus: 点击编辑后焦点应直接落在待改写的输入区
-            autoFocus
-            rows={3}
-            className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setEditing(false);
-              // 与输入区一致：Enter 换行，Cmd/Ctrl+Enter 发送
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                void submitEdit();
-              }
-            }}
-          />
-          {isLastUser === false ? (
-            <p className="text-[11px] text-muted-foreground">
-              {t("发送后将移除这条消息之后的内容（仍保留在会话记录中）。")}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              {t("取消")}
-            </Button>
-            <Button size="sm" disabled={!draft.trim() || saving} onClick={() => void submitEdit()}>
-              {t("发送")}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <MessageEditForm
+        item={item}
+        parsed={parsed}
+        images={imageBlocks.map((block) => block.id)}
+        warning={isLastUser === false}
+        onEdit={onEdit}
+        onCancel={() => setEditing(false)}
+      />
     );
   }
 
@@ -205,22 +162,12 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
             </span>
           ) : null}
           {parsed.command ? <span className={CHIP_CLASS}>{`/${parsed.command.name}`}</span> : null}
-          {parsed.attachments.map((attachment, index) => (
-            <AttachmentLink
-              // biome-ignore lint/suspicious/noArrayIndexKey: 同一文件可被引用多次，位置即身份
-              key={`${item.id}-att-${index}`}
-              id={attachment.id}
-              name={attachment.name}
-              withIcon
-              className={CHIP_CLASS}
-            />
-          ))}
         </div>
       ) : null}
 
-      {media.length > 0 ? (
+      {mediaBlocks.length > 0 ? (
         <div className="flex flex-wrap justify-end gap-2">
-          {media.map((block, index) => (
+          {mediaBlocks.map((block, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: 附件块按顺序排列，位置即身份
             <BlockView key={`${item.id}-media-${index}`} block={block} />
           ))}
@@ -242,13 +189,29 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
               segment.type === "text" ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: 分段由文本顺序决定，没有自然 id
                 <span key={`${item.id}-seg-${index}`}>{segment.text}</span>
-              ) : (
+              ) : segment.type === "context" ? (
                 <ContextChip
                   // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
                   key={`${item.id}-seg-${index}`}
                   path={segment.path}
                 />
-              ),
+              ) : segment.type === "attachment" ? (
+                <AttachmentLink
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
+                  key={`${item.id}-seg-${index}`}
+                  id={segment.id}
+                  name={segment.name}
+                  withIcon
+                  className={CHIP_CLASS}
+                />
+              ) : imageBlocks[segment.index - 1] ? (
+                <InlineImage
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
+                  key={`${item.id}-seg-${index}`}
+                  id={imageBlocks[segment.index - 1]?.id ?? ""}
+                  onOpen={preview.open}
+                />
+              ) : null,
             )}
           </div>
         </div>
@@ -267,9 +230,11 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
       <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
         <span className="text-xs text-muted-foreground">{clockLabel(item.createdAt)}</span>
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
-        {canEdit ? <EditAction onClick={startEdit} /> : null}
+        {canEdit ? <EditAction onClick={() => setEditing(true)} /> : null}
         <CopyAction text={original} />
       </div>
+
+      {preview.dialog}
     </div>
   );
 }

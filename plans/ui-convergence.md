@@ -131,36 +131,40 @@
 
 ## 四、批次二方案（附件内联 + 编辑态复用编辑器）
 
-**编辑器与文档模型**
+**编辑器与文档模型**（✓ 全部落地）
 
-- 新增原子节点 `attachmentMention`，attrs `{ id, name, kind }`；粘贴 / 拖拽上传中先插占位 chip，
-  拿到 id 后替换 attrs，`submit` 的 `hasPendingUploads` 守卫保留。
+- 新增原子节点 `attachmentMention`，attrs `{ id, name, kind, tempId }`；粘贴 / 拖拽先插占位 chip（Tiptap
+  React 节点视图：图片显缩略图、点缩略图开预览，其余显图标 + 文件名），拿到 id 后按 `tempId` 就地补上；
+  `submit` 的 `hasPendingUploads` 守卫保留。
 - `lib/composer-document.ts` 的 `docToPayload`：按节点出现顺序收集 `attachments`（id 列表）并在正文原位写标记。
-- 去掉 `business/composer/attachment-strip.tsx`；预览弹层抽成共享组件 + `useAttachmentPreview()`，
-  编辑器内的 chip 与历史消息里的 chip 共用（图片 chip 点缩略图开弹层、非图片 chip 下载、`@路径` chip 开工作台；
-  编辑器内只有缩略图那一截是预览命中区，其余区域仍是原子节点，落光标 / Backspace 删除）。
-- `useComposerAttachments` 保留为上传入口与 `id → AttachmentView` 缓存；草稿恢复靠 doc 里的节点 attrs。
+- 去掉 `business/composer/attachment-strip.tsx`；预览抽成 `business/attachment-preview.tsx`（`useAttachmentPreview()`
+  + `AttachmentThumb`），编辑器 chip 与历史消息 chip 共用。
+- `useComposerAttachments` 保留为上传入口（只是改成驱动编辑器句柄）；草稿不再单存附件视图，靠 doc 里的节点 attrs。
 
-**协议（要写进 `docs/session-entries.md` 与 `message-chips.ts` 注释）**
+**协议**（✓ 落地，写进 `docs/session-entries.md`「正文里的位置标记」）
 
-- 正文标记：图片 `图片 N`、非图片 `附件 N.<ext>`（N 按各自类型在本条消息内的出现顺序，统一命名不含空格）。
-- 服务端按标记顺序消费 `payload.attachments`：非图片在标记位置替换为 `[附件: <显示名> (id: <sha256>)]`，
-  图片保留正文标记并按同一顺序进 vision 数组；标记与顺序不一致、或附件未出现在正文里时，整段退回现状的前置引用。
+- 常量与扫描器收进 `packages/contracts/src/messages/markers.ts`，两端共用一份：图片 `图片 N`、
+  非图片 `附件 N.<ext>`（N 按各自类型在本条消息内的出现顺序）；展开后的引用行构造函数也在那里。
+- 服务端（`harness/attachment/inline.ts`）按标记顺序就地展开：非图片换成引用行、图片标记留着（本体按标记顺序
+  进 vision 数组）。对得上的条件是「数量一致 + 各自 1..N 连续升序 + 非图片写出的扩展名与该附件相同」；
+  对不上（用户手打了同名标记、附件被删了一个）整段退回「引用行前置 + 图片按原顺序」的老路径。
 
-**回放**
+**回放**（✓ 落地）
 
-- 历史消息按段落化结果渲染：图片按「标记序号 ↔ 第 N 个 `image` block」插回句子中间，原本下方的 media 区去重；
-  没有标记的旧消息保持现状（图片仍显示在正文下方）。
+- 历史消息按段落化结果渲染：图片按「标记序号 ↔ 第 N 个 `image` block」插回句子中间，media 区只兜底没有标记的
+  图片（早期消息）与文件块；非图片的引用行（含早期消息的前置写法）就地还原成可下载 chip。
 
-**编辑态**
+**编辑态**（✓ 全部落地）
 
-- ✓ 已落地（不再等批次二）：契约 `messageEditInputSchema` 加 `contexts` / `attachments`（与 `promptInputSchema` 同形）；
+- 契约 `messageEditInputSchema` 加 `contexts` / `attachments`（与 `promptInputSchema` 同形）；
   SDK 的 `messages.edit` 与 `packages/ui` 的 `chat.edit` 签名跟改；`admitEdit` 改走 `preparePrompt` / `assemblePrompt`
-  并 `markReferenced`；客户端由 `parseUserMessage` 的分段与 `contextRefsOf` 还原引用与附件。
-  `@` 引用的 `path` 同时放宽到「绝对或会话工作目录相对」——编辑重发回传的是相对写法。
-- 新增 `lib/message-document.ts` 的 `messageTextToDoc(text, views)`：把「前置展开块 + 正文标记」还原成 Tiptap 文档
-  （`contextMention` / `commandMention` / `attachmentMention`），与批次一的段落解析共用同一条扫描。
-- 编辑器抽成可复用组件（编辑态：命令节点只读、不挂内置动作、`@` 检索用会话 cwd），替换 `message-item.tsx` 里的 textarea。
+  并 `markReferenced`；`@` 引用的 `path` 放宽到「绝对或会话工作目录相对」——编辑重发回传的是相对写法。
+- 新增 `lib/message-document.ts` 的 `messageTextToDoc(parsed, images)`：把「前置展开块 + 正文标记」还原成 Tiptap
+  文档（`contextMention` / `commandMention` / `attachmentMention`），与回放的段落解析共用同一条扫描；
+  命令 / 技能还原成 mention 节点，参数跟在后面。
+- 编辑器抽成可复用组件（编辑态：`/` 菜单停用、命令节点只读、`@` 检索用会话 cwd、可继续贴图，
+  Enter 发送 / Esc 取消），`business/message-edit-form.tsx` 替换原来的 textarea。
+- 编辑走「文档 → `docToPayload` → 与首次发送同一套换算（`relativizeContextRefs`）」，附件与引用不再因为改写走样。
 
 ## 五、进度
 
@@ -180,10 +184,18 @@
   `packages/contracts/src/constants.ts`、`assets/__tests__/assets.test.ts`、`docs/api-reference.md`（重跑 `pnpm api:docs`）。
 - 文档与文案：`DESIGN.md`（分栏 / 消息区 / 滚动条）、`packages/i18n`（`复制` / `已复制`）、`CHANGELOG.md`、`TODO.md`。
 
+- 批次二（全部落地）：`packages/contracts/src/messages/markers.ts`（新）、`server/src/harness/attachment/inline.ts`（新）
+  + `__tests__/inline.test.ts`（新）、`server/src/core/run.ts`（按标记内联）、`packages/ui/src/lib/composer-document.ts`、
+  `lib/message-chips.ts`、`lib/message-document.ts`（新）+ `__tests__/message-document.test.ts`（新）、
+  `business/attachment-preview.tsx`（新）、`business/composer/attachment-chip.tsx`（新）、`composer/editor.tsx`
+  （可复用 + 附件节点）、`composer/use-composer-attachments.ts`、`composer.tsx`、`business/message-edit-form.tsx`（新）、
+  `business/user-message.tsx`、`business/chat-panel.tsx`、`lib/composer-draft.ts`、`docs/session-entries.md`。
+- 顺带修掉两个真问题（都在本批次的编辑路径上）：`message_end` 实时帧的临时 id 让「发完立刻改 / 分叉」必失败
+  （`server/src/core/event-bus.ts` + `events.ts` 推迟一帧补真实条目 id）、编辑态新加的 `@` 引用没换算相对写法导致回放认不出。
+
 **未落地**
 
-- 批次二：附件在编辑器里内联成 chip、编辑态复用输入区编辑器（两个都不影响「编辑重发不丢引用与附件」——
-  那条已随协议一起落地）。
+- 无（两个批次全部落地）。
 
 ## 六、验证
 
@@ -215,7 +227,27 @@
 - 工作台：展开后 `localStorage` 为 `1`，刷新仍展开且宽度保留（505px）；拖拽时对话区卡在下限 **400**。
 - 滚动条：`scrollbar-width: thin`、thumb 8px 圆头；浅色 `--border` 解析为 `oklch(0.922 0 0)`、
   深色为 `oklch(1 0 0 / 0.12)`，两套主题都跟随语义 token。
-- **未实测**：`runBuiltin("goal")` 的 `!activeId` 守卫（按设计不可达：⌘K 与 `/` 菜单都会先按 `needsSession` 过滤）。
+**批次二实测确认**（同一个临时实例，改用「粘贴事件注入 + 真实鼠标/键盘事件」驱动）：
+
+- 输入区里粘贴「一张图 + 一个文本文件」：正文中间就地出现缩略图 chip 与 `c.txt` chip（截图确认），
+  编辑器上方不再有附件行。
+- 投递后会话条目是 `C组 图片 1 [附件: c.txt (id: <sha256>)]  结束` + 一个 image 块——非图片标记就地换成引用行、
+  图片标记留着且本体进 vision 数组 ✓；界面里同一条消息渲染成「内联缩略图 + 可下载的 c.txt chip + 文字」，
+  气泡下没有独立 media 行。
+- 点内联缩略图（真实 mousedown）弹出「图片预览」；编辑器里 chip 的缩略图同样弹层（其余区域仍是原子节点）。
+- 编辑态：点「编辑并重新发送」后，编辑器把图片与文件都还原成 chip，正文原样；Backspace 删掉文件 chip
+  （2 → 1）后重发，新条目是 `C组 图片 1   结束` + 一个 image 块（引用行消失，图片保留）。
+- 编辑态 `/` 菜单停用（在文档开头敲 `/` 不弹层）；Esc 取消编辑（编辑器与按钮一起收回）。
+- 编辑态 `@` 检索用会话 cwd：敲 `@note` 列出工作目录里的 `note-md.txt`，选中后重发的条目带
+  `<context path="note-md.txt">`，正文标记也是相对写法，回放能认出 `@note-md.txt` chip。
+- 兜底回放（curl 直接投递）：正文写 `附件 1.md` 而附件是 `c.txt` 时判为对不上 → 引用行前置、
+  用户的话一字未改；写 `附件 1.txt`（扩展名撞上）才会就地展开。
+- 拒绝提示：粘贴 0 字节与 40MB 两个文件 → 一条「无法添加附件：empty.txt、big.bin」，两个都不入库。
+- 草稿：输入区带一个图片 chip 时刷新页面，chip 与缩略图原样恢复（文档即草稿）。
+- **发完立刻改**（修复前必 400）：投递 `新消息 B1` 后用编辑态改成 `新消息 B1 改过了`，`messages/edit` 的
+  `entryId` 是真实条目 id（`d5a32796`）、响应 200，新条目落盘 ✓。
+- **未实测**：`runBuiltin("goal")` 的 `!activeId` 守卫（按设计不可达：⌘K 与 `/` 菜单都会先按 `needsSession` 过滤）；
+  上传中（占位 chip 还没拿到 id）按发送被 `hasPendingUploads` 挡住这条路径（要卡住本地上传才能复现）。
   必查：分组顺序不跳动、分隔条可拖且不压住行内按钮、状态图标与文件夹图标对齐、标题溢出 tooltip 与双击改名、
   `⌘Z` / `⌘⇧Z` / `⌘Y`、输入区上方无横线、引用 chip 点击开预览、命令 chip、用户消息折叠与展开、
   底部操作行（时间 / 分叉 / 编辑 / 复制）、复制成功态、工作台展开状态刷新后保持、工作台上限 1200 与对话区下限 400、
