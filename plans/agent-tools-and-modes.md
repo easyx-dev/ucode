@@ -429,7 +429,7 @@ server/src/agent/
 
 仓库当前没有测试运行器（`pnpm check` = biome + typecheck + verify；`pnpm smoke` 只做 SDK 冒烟）。
 
-**采用 Node 内置测试运行器**，契合仓库「最小依赖」原则，且 Node 24 可直接运行 TS：
+**采用 Node 内置测试运行器**，符合仓库的依赖口径（成熟、维护活跃、够用即不必自建），且 Node 24 可直接运行 TS：
 
 ```bash
 node --import tsx --test "src/**/__tests__/**/*.test.ts"

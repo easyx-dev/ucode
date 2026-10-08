@@ -11,12 +11,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
+import { ERROR_CODES } from "@ucode/contracts";
+
+import { AppError } from "../../response";
 import {
   findRepositoryRoot,
   isTracked,
   repositoryRootOf,
   requireRepositoryRoot,
   resolveRepoPath,
+  runGit,
 } from "..";
 import { parseFileDiff } from "../diff";
 import { readCommit, readLog } from "../log";
@@ -207,5 +211,24 @@ describe("git 底座与解析", { skip: !GIT_AVAILABLE }, () => {
       show.files.map((file) => [file.path, file.status]),
       [["sub/b.txt", "modified"]],
     );
+  });
+});
+
+/**
+ * 未装 git 时的口径：不依赖机器上有 git，反而要把它从 PATH 里藏起来。
+ * execa 的 `reject: false` 会把「命令不存在」也落成 result，判定错就会退化成 `git_failed`。
+ */
+describe("git 底座 · 找不到 git", () => {
+  it("报 git_unavailable 而不是 git_failed", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = join(tmpdir(), "no-git-bin");
+    try {
+      await assert.rejects(
+        () => runGit(tmpdir(), ["status", "--porcelain"]),
+        (error: unknown) => error instanceof AppError && error.code === ERROR_CODES.gitUnavailable,
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 });

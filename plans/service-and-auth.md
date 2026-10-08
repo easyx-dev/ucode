@@ -153,7 +153,7 @@
 - `/api/v1/info` 返回 `{ version, apiVersion, compatRange }`，字段口径：
   - `version`：服务端版本，取根 `package.json` 的 `version`（启动时读一次）。
   - `apiVersion`：接口契约版本，沿用现有 `API_VERSION`（`packages/contracts`）。
-  - `compatRange`：本服务可被哪些**客户端版本**使用，semver range 字符串（如 `^0.2.0`）。判定用最小实现：只比主次版本，不引入 semver 依赖；`apiVersion` 不一致直接判为不兼容。
+  - `compatRange`：本服务可被哪些**客户端版本**使用，semver range 字符串（如 `^0.2.0`）。判定用 `semver` 的 `satisfies`（不自研版本比较，依赖待实现时随代码一并加）；`apiVersion` 不一致直接判为不兼容。
 - 客户端据此决定「用现有服务 / 自己拉起 / 提示升级」。
 - 客户端导航状态（当前选中会话等）留在客户端（沿用 URL 方案），服务端只持有会话本身。
 - 多客户端交互归属：权限审批 / `question` 广播到会话事件流，**任一客户端可答、首个响应生效**（沿用 `InteractionBroker` 结算方式），需写入文档。

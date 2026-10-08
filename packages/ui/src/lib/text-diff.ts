@@ -1,7 +1,11 @@
 /**
  * 行级 diff：把改前 / 改后文本折成带类型的行序列，供编辑与写入的差异展示使用。
- * 纯函数、不依赖 React；规模过大时退化为「全删 + 全增」，避免 LCS 表撑爆内存。
+ *
+ * 比对交给 jsdiff（Myers 算法）；界面只认「新增 / 删除 / 未变」三态，故这里把它压成逐行的扁平序列，
+ * 改动量过大时整块退化为「全删 + 全增」。
  */
+import { diffLines as computeLineDiff } from "diff";
+
 export type DiffLine = {
   /** 新增 / 删除 / 未变 */
   type: "add" | "del" | "ctx";
@@ -9,72 +13,44 @@ export type DiffLine = {
   text: string;
 };
 
-/** LCS 单元格上限；超过后不再逐行比对，直接全删全增 */
-const MAX_CELLS = 250_000;
+/**
+ * 允许的最大编辑距离，超过即整块替换。
+ * 闸门取编辑距离而非文本规模：大文件里改几行仍能逐行展示，只有改动量本身大时才退化；
+ * 耗时按 O(行数 × 编辑距离) 增长，行数一侧不必再设闸门（实测 30 万行的文本里改几百行仍在百毫秒量级）。
+ */
+const MAX_EDIT_LENGTH = 1000;
 
+/**
+ * 比对前统一补上末尾换行：行级 diff 表达不了「末行有没有换行」，不归一化的话 jsdiff 会把这种差异
+ * 报成内容相同的「删一行 + 增一行」，界面上凭空多出一对红绿行。
+ */
+const ensureTrailingNewline = (text: string): string =>
+  text === "" || text.endsWith("\n") ? text : `${text}\n`;
+
+/** 折成行；文本通常以换行结尾，末尾空行不该多出一条 */
 const toLines = (text: string): string[] => {
   if (text === "") return [];
   const lines = text.split("\n");
-  // 文本通常以换行结尾，去掉末尾空行以免 diff 多出一条空行
   if (lines[lines.length - 1] === "") lines.pop();
   return lines;
 };
 
-const sameLines = (left: string[], right: string[]): boolean =>
-  left.length === right.length && left.every((line, index) => line === right[index]);
+/** 改动量大到不比了：整块当成「先全删、再全增」 */
+const wholeReplacement = (oldText: string, newText: string): DiffLine[] => [
+  ...toLines(oldText).map((text): DiffLine => ({ type: "del", text })),
+  ...toLines(newText).map((text): DiffLine => ({ type: "add", text })),
+];
 
 export const diffLines = (oldText: string, newText: string): DiffLine[] => {
-  const oldLines = toLines(oldText);
-  const newLines = toLines(newText);
-  if (sameLines(oldLines, newLines)) return oldLines.map((text) => ({ type: "ctx", text }));
+  const before = ensureTrailingNewline(oldText);
+  const after = ensureTrailingNewline(newText);
+  const changes = computeLineDiff(before, after, { maxEditLength: MAX_EDIT_LENGTH });
+  if (!changes) return wholeReplacement(before, after);
 
-  if (oldLines.length * newLines.length > MAX_CELLS) {
-    return [
-      ...oldLines.map((text): DiffLine => ({ type: "del", text })),
-      ...newLines.map((text): DiffLine => ({ type: "add", text })),
-    ];
+  const lines: DiffLine[] = [];
+  for (const change of changes) {
+    const type: DiffLine["type"] = change.added ? "add" : change.removed ? "del" : "ctx";
+    for (const text of toLines(change.value)) lines.push({ type, text });
   }
-
-  // 扁平 LCS 长度表：dp[i][j] 表示 oldLines[i..] 与 newLines[j..] 的最长公共子序列长度
-  const rows = oldLines.length;
-  const cols = newLines.length;
-  const stride = cols + 1;
-  const dp = new Array<number>((rows + 1) * stride).fill(0);
-  const get = (i: number, j: number): number => dp[i * stride + j] ?? 0;
-
-  for (let i = rows - 1; i >= 0; i -= 1) {
-    for (let j = cols - 1; j >= 0; j -= 1) {
-      dp[i * stride + j] =
-        oldLines[i] === newLines[j]
-          ? get(i + 1, j + 1) + 1
-          : Math.max(get(i + 1, j), get(i, j + 1));
-    }
-  }
-
-  // 从右下角回溯，公共子序列即未变行
-  const result: DiffLine[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < rows && j < cols) {
-    if (oldLines[i] === newLines[j]) {
-      result.push({ type: "ctx", text: oldLines[i] ?? "" });
-      i += 1;
-      j += 1;
-    } else if (get(i + 1, j) >= get(i, j + 1)) {
-      result.push({ type: "del", text: oldLines[i] ?? "" });
-      i += 1;
-    } else {
-      result.push({ type: "add", text: newLines[j] ?? "" });
-      j += 1;
-    }
-  }
-  while (i < rows) {
-    result.push({ type: "del", text: oldLines[i] ?? "" });
-    i += 1;
-  }
-  while (j < cols) {
-    result.push({ type: "add", text: newLines[j] ?? "" });
-    j += 1;
-  }
-  return result;
+  return lines;
 };

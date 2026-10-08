@@ -20,7 +20,7 @@ const readVersion = (): string => {
 export const serviceVersion = readVersion();
 
 /**
- * 兼容客户端版本范围（semver range 字符串）。
- * 判定只需主次版本（见 plans/service-and-auth.md §4），故范围取服务端自身的主次版本。
+ * 兼容客户端版本范围（semver range 字符串）：只出范围，取自身的主次版本。
+ * 判定在客户端（`semver.satisfies`），见 plans/service-and-auth.md §4。
  */
 export const compatRange = `^${serviceVersion.split(".").slice(0, 2).join(".")}.0`;

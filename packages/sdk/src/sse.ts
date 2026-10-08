@@ -1,50 +1,53 @@
-/** 解析 Hono streamSSE 输出：`event: x\ndata: y\n\n` */
+/**
+ * 事件流的读与拆帧：分帧与字段解析按 SSE 规范交给 eventsource-parser，这里只负责读流、报活与回落。
+ *
+ * 心跳（`: ...` 注释行）不进业务回调，但每读到一段数据都会调 `onActivity`——连接看门狗靠它判活，
+ * 所以拆帧交给库、报活留在这一层（见 `events.ts` 的退避重连）。
+ */
+import { createParser } from "eventsource-parser";
+
+/** 单条事件的缓冲上限：畸形或恶意流不该把内存吃满（库默认不设上限） */
+const MAX_FRAME_BYTES = 1024 * 1024;
+
 export const readSseStream = async (
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: unknown) => void,
   signal?: AbortSignal,
-  /** 每读到一段数据（含注释行心跳）时回调：调用方的连接看门狗靠它判活 */
   onActivity?: () => void,
 ): Promise<void> => {
+  // 超限时库只回调 `onError` 并把自己置为终止态（要等下一次 feed 才抛）：这里当场记下、读完这一段就结束，
+  // 否则被丢掉的那条事件既不报错，也要等下一段数据才暴露
+  let parseError: Error | undefined;
+  const parser = createParser({
+    maxBufferSize: MAX_FRAME_BYTES,
+    onError: (error) => {
+      parseError = error;
+    },
+    onEvent: (message) => {
+      const event = message.event ?? "message";
+      try {
+        onEvent(event, JSON.parse(message.data) as unknown);
+      } catch {
+        // 不是 JSON 就按原文交给调用方（错误帧的 message 等场景）
+        onEvent(event, message.data);
+      }
+    },
+  });
+
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
 
   try {
     while (!signal?.aborted) {
       const { value, done } = await reader.read();
       if (done) break;
       onActivity?.();
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-
-      let separator = buffer.indexOf("\n\n");
-      while (separator >= 0) {
-        const frame = buffer.slice(0, separator);
-        buffer = buffer.slice(separator + 2);
-        dispatchFrame(frame, onEvent);
-        separator = buffer.indexOf("\n\n");
-      }
+      parser.feed(decoder.decode(value, { stream: true }));
+      const failure = parseError;
+      if (failure) throw failure;
     }
   } finally {
-    reader.releaseLock();
-  }
-};
-
-const dispatchFrame = (frame: string, onEvent: (event: string, data: unknown) => void): void => {
-  let event = "message";
-  const dataLines: string[] = [];
-
-  for (const line of frame.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
-  }
-
-  if (dataLines.length === 0) return;
-  const raw = dataLines.join("\n");
-
-  try {
-    onEvent(event, JSON.parse(raw) as unknown);
-  } catch {
-    onEvent(event, raw);
+    // 提前退出（中止或拆帧失败）时主动关流：只 releaseLock 会把响应体与它占着的连接一直挂着
+    await reader.cancel().catch(() => {});
   }
 };

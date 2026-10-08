@@ -9,14 +9,17 @@
   },
   "types": "./src/index.ts",
   "scripts": {
+    "test": "node --import tsx --test \"src/**/__tests__/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ucode/contracts": "workspace:*",
-    "@ucode/i18n": "workspace:*"
+    "@ucode/i18n": "workspace:*",
+    "eventsource-parser": "^4.1.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }
