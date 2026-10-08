@@ -12,9 +12,10 @@ import { Skeleton } from "../base/skeleton";
 import { useShowThinking } from "../hooks/use-show-thinking";
 import type { ToolEntry } from "../lib/chat-nodes";
 import { buildChatRows, type ChatRow, withoutThinking } from "../lib/chat-rows";
+import { subagentSessionIdOf } from "../lib/tool-view";
 import type { ChatItem, SubagentStreams } from "../lib/types";
 import { MessageRow, type MessageRowContext } from "./message-row";
-import { SubagentProgress } from "./subagent-progress";
+import { SubagentProgress, SubagentSessionLink } from "./subagent-progress";
 
 /** 首屏尚未测量时的行高估计；实测后由 ResizeObserver 校正，只影响未渲染行的滚动条长度 */
 const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
@@ -102,7 +103,13 @@ export function MessageList({
   const renderExtra = useCallback(
     (entry: ToolEntry) => {
       const stream = subagents?.[entry.id];
-      return stream ? <SubagentProgress stream={stream} onOpenSession={onOpenSession} /> : null;
+      if (stream) return <SubagentProgress stream={stream} onOpenSession={onOpenSession} />;
+      // 跑完的子智能体不在进度快照里了，但结果留着 task_id：事后回看也走同一个详情小窗
+      if (!onOpenSession) return null;
+      const sessionId = subagentSessionIdOf(entry);
+      return sessionId ? (
+        <SubagentSessionLink sessionId={sessionId} onOpenSession={onOpenSession} />
+      ) : null;
     },
     [subagents, onOpenSession],
   );

@@ -1,5 +1,5 @@
 /**
- * 子智能体的内联进度：把子会话的消息按同一套扁平行折在父会话的工具条目里。
+ * 子智能体的内联内容：进行中时是它的实时进度，结束后是回看入口。
  *
  * 子会话不能再派子智能体，嵌套视图不再下传 subagents / onFork / onEdit；也不做虚拟滚动——它折在一行里，
  * 高度由父行的测量统一覆盖。
@@ -46,6 +46,32 @@ export function SubagentProgress({
           <MessageRow key={row.key} row={row} context={{}} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 子会话结束后的回看入口：进度快照里已经没有它，只有工具结果留着 `task_id`。
+ * 与进行中的「打开子会话」同一个去向（详情小窗），所以口径保持一致。
+ */
+export function SubagentSessionLink({
+  sessionId,
+  onOpenSession,
+}: {
+  sessionId: string;
+  onOpenSession: (sessionId: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="border-t border-border pt-2">
+      <button
+        type="button"
+        className="rounded text-xs text-foreground/70 underline-offset-2 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        onClick={() => onOpenSession(sessionId)}
+      >
+        {t("查看子会话")}
+      </button>
     </div>
   );
 }

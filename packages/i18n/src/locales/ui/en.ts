@@ -231,7 +231,6 @@ export default {
 
   // Interaction request (permission / question)
   交互请求: "Interaction request",
-  需要授权: "Approval required",
   "agent 想调用「{{tool}}」，操作对象：": 'The agent wants to call "{{tool}}", target:',
   "授权范围：{{scope}}": "Grant scope: {{scope}}",
   "来自子智能体「{{description}}」的请求：": 'Request from subagent "{{description}}":',
@@ -240,7 +239,6 @@ export default {
   拒绝: "Deny",
 
   // Question (question tool)
-  需要你回答: "Your input is needed",
   "agent 需要你的输入才能继续；选择一个选项，或自行填写答案。":
     "The agent needs your input to continue. Pick an option, or type your own answer.",
   可多选: "Multiple choice",
@@ -329,6 +327,7 @@ export default {
   子会话: "Sub-session",
   返回父会话: "Back to parent",
   打开子会话: "Open sub-session",
+  查看子会话: "View sub-session",
   展开子会话: "Expand sub-sessions",
   收起子会话: "Collapse sub-sessions",
   无子会话: "No sub-sessions",

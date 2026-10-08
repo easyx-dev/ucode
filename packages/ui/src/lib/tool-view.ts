@@ -156,3 +156,13 @@ export const summarizeToolNames = (
   for (const entry of entries) counts.set(entry.name, (counts.get(entry.name) ?? 0) + 1);
   return [...counts].map(([name, count]) => ({ name, count }));
 };
+
+/**
+ * 子智能体开的子会话 id：`subagent` 工具的结果首行就是 `task_id: <id>（需要时可带 task_id 续跑）`。
+ * 子会话跑完之后进度快照里已经没有它了，事后回看只能靠这一行——输出模板在
+ * `server/src/harness/subagents/tool.ts`，两处要一起改。
+ */
+const TASK_ID_LINE = /^task_id:\s*([0-9a-f-]{36})\b/m;
+
+export const subagentSessionIdOf = (entry: ToolEntry): string | null =>
+  entry.result ? (TASK_ID_LINE.exec(entry.result)?.[1] ?? null) : null;
