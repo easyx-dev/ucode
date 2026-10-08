@@ -19,10 +19,11 @@ import { type SessionMessage, textOf } from "../transcript";
 
 type AssistantMessage = Awaited<ReturnType<ModelRuntime["completeSimple"]>>;
 
-/** 用于起标题的首条交流：首条用户消息与它之后的第一条助手回复 */
+/** 用于起标题的首条交流：首条用户消息，以及（若已有）它之后的第一条助手回复 */
 export type TitleExchange = {
   userText: string;
-  assistantText: string;
+  /** 并行路径上回复还没产生；落定兜底时才有 */
+  assistantText?: string;
 };
 
 const TITLE_SYSTEM_PROMPT = [
@@ -44,12 +45,14 @@ type ExchangeMessage = Extract<SessionMessage, { role: "user" | "assistant" }>;
 
 const textOrEmpty = (message: ExchangeMessage): string => textOf(message).trim();
 
+const TEXT_BUDGET = Math.floor(TITLE_INPUT_MAX_CHARS / 2);
+
 /**
  * 取首条交流；助手还没回复（拿不到概括依据）或会话已经聊过 `TITLE_MAX_USER_TURNS` 轮以上时返回 null。
- * 轮数限制让「首条消息得到回复的那次落定」成为唯一的生成时机，也避免重启后拿旧会话补名。
+ * 它服务落定兜底这条路：并行起标题失败后用完整交流再试一次，为避免重启后给旧会话补名，只认首轮。
  */
 export const firstExchange = (messages: readonly SessionMessage[]): TitleExchange | null => {
-  const budget = Math.floor(TITLE_INPUT_MAX_CHARS / 2);
+  const budget = TEXT_BUDGET;
   let userText = "";
   let assistantText = "";
   let userTurns = 0;
@@ -72,8 +75,25 @@ export const firstExchange = (messages: readonly SessionMessage[]): TitleExchang
   return userTurns > TITLE_MAX_USER_TURNS ? null : { userText, assistantText };
 };
 
+/**
+ * 首轮输入的取料：只有用户提问——投递时回复还没产生，标题先出来。
+ * 与 `firstExchange` 共用同一份截断预算，两条路径喂给模型的料长度一致。
+ */
+export const firstPromptExchange = (userText: string): TitleExchange => ({
+  userText: clip(userText, TEXT_BUDGET),
+});
+
+/**
+ * 会话里还没有带正文的用户消息：即将投递的这条就是首轮。
+ * 没有正文的用户消息（纯附件）不占这一轮，否则标题永远没有可概括的料。
+ */
+export const isFirstTurn = (messages: readonly SessionMessage[]): boolean =>
+  !messages.some((message) => message.role === "user" && textOf(message).trim().length > 0);
+
 const buildTitleMessage = (exchange: TitleExchange): string =>
-  `第一条用户消息：\n${exchange.userText}\n\n助手的回复：\n${exchange.assistantText}`;
+  exchange.assistantText
+    ? `第一条用户消息：\n${exchange.userText}\n\n助手的回复：\n${exchange.assistantText}`
+    : `第一条用户消息：\n${exchange.userText}`;
 
 /** 包裹的引号与收尾标点会交替出现（如 `"…".`），反复剥到稳定为止 */
 const stripWrapping = (text: string): string => {

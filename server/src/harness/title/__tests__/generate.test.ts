@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { TITLE_MAX_LENGTH, TITLE_MAX_USER_TURNS } from "../../../constants";
-import { firstExchange, parseSessionTitle } from "../generate";
+import { TITLE_INPUT_MAX_CHARS, TITLE_MAX_LENGTH, TITLE_MAX_USER_TURNS } from "../../../constants";
+import { firstExchange, firstPromptExchange, isFirstTurn, parseSessionTitle } from "../generate";
 
 type SessionMessage = AgentSession["messages"][number];
 
@@ -48,6 +48,37 @@ describe("firstExchange", () => {
 
   it("没有用户消息时取不到料", () => {
     assert.equal(firstExchange([assistant("在的")]), null);
+  });
+});
+
+describe("isFirstTurn", () => {
+  it("空会话与只有助手消息时都算首轮", () => {
+    assert.equal(isFirstTurn([]), true);
+    assert.equal(isFirstTurn([assistant("在的")]), true);
+  });
+
+  it("已有带正文的用户消息时不算首轮", () => {
+    assert.equal(isFirstTurn([user("帮我修登录")]), false);
+    assert.equal(isFirstTurn([user("帮我修登录"), assistant("先看下入口")]), false);
+  });
+
+  it("没有正文的用户消息（纯附件）不占首轮", () => {
+    const attachment = {
+      role: "user",
+      content: [{ type: "image", data: "..." }],
+    } as unknown as SessionMessage;
+    assert.equal(isFirstTurn([attachment]), true);
+  });
+});
+
+describe("firstPromptExchange", () => {
+  it("只带用户提问，不要求已有回复", () => {
+    assert.deepEqual(firstPromptExchange("帮我修登录"), { userText: "帮我修登录" });
+  });
+
+  it("超预算按码点截断", () => {
+    const exchange = firstPromptExchange("🙂".repeat(TITLE_INPUT_MAX_CHARS));
+    assert.equal([...exchange.userText].length, Math.floor(TITLE_INPUT_MAX_CHARS / 2));
   });
 });
 

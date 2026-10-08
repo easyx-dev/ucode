@@ -1,16 +1,16 @@
 /**
- * 会话标题服务：首条消息得到回复后异步生成一条标题并写回会话名。
+ * 会话标题服务：投递首轮输入时并行生成标题，失败时在落定边界用完整交流补一次。
  *
- * 触发点在事件总线的 `agent_settled`（与池里的落定钩子同一个 pi 事件）——订阅事件让标题生成
- * 与会话池解耦，池不必认识它。生成是纯后台动作：不阻塞对话、失败只记日志，
- * 列表始终留着派生的标题口径可回落。
+ * 并行那条路只喂用户提问，与这一轮对话同时跑，新会话在侧栏里尽早有名字（原先要等整轮跑完才出现）。
+ * 落定兜底只在并行那次没有产出时启用——标题是纯后台动作，失败只记日志，
+ * 列表始终留着派生的标题口径可回落，不值得每次落定都白跑一次模型。
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 
 import type { SessionEventBus } from "../../core/event-bus";
 import type { SessionRepository } from "../../db/session-repository";
 import { logger } from "../../lib/logger";
-import { firstExchange, generateSessionTitle } from "./generate";
+import { firstExchange, firstPromptExchange, generateSessionTitle, isFirstTurn } from "./generate";
 
 export type TitleServiceDeps = {
   sessions: SessionRepository;
@@ -22,32 +22,67 @@ export type TitleServiceDeps = {
 };
 
 export class TitleService {
-  /** 在途生成：同一次落定边界上的重复触发不重复调用模型 */
+  /** 在途生成：同一次边界上的重复触发不重复调用模型 */
   private readonly generating = new Set<string>();
+  /** 并行那次没产出标题的会话：落定后再用完整交流兜底一次 */
+  private readonly retryable = new Set<string>();
 
   constructor(private readonly deps: TitleServiceDeps) {
     this.deps.events.subscribe((frame) => {
       if (frame.type !== "agent_settled") return;
+      // 并行那次还在跑就让它自己收尾，它成功后会清掉待补标记
+      if (!this.retryable.has(frame.sessionId) || this.generating.has(frame.sessionId)) return;
       const session = this.deps.liveOf(frame.sessionId);
       if (session) this.generate(frame.sessionId, session);
     });
   }
 
-  /** 异步生成：不 await 调用方 */
+  /**
+   * 投递首轮输入时并行起标题：只喂用户提问，与这一轮同时跑。
+   * 由投递路径在本轮开始前调用；是否首轮、是否该由我们命名都由这里判断。
+   */
+  generateForPrompt(sessionId: string, session: AgentSession, userText: string): void {
+    if (!this.canGenerate(sessionId) || !isFirstTurn(session.messages)) return;
+    const model = session.model;
+    if (!model) return;
+
+    this.retryable.add(sessionId);
+    this.run(sessionId, session, model, firstPromptExchange(userText));
+  }
+
+  /** 落定兜底：并行那次失败或没产出时，用完整的首条交流再试一次 */
   private generate(sessionId: string, session: AgentSession): void {
-    if (this.generating.has(sessionId)) return;
-    const record = this.deps.sessions.find(sessionId);
-    // 子会话的名字是任务简称、用户命名优先，都不覆盖
-    if (!record || record.deletedAt || record.parentSessionId || record.name) return;
+    if (!this.canGenerate(sessionId)) return;
     const model = session.model;
     if (!model) return;
     const exchange = firstExchange(session.messages);
     if (!exchange) return;
 
+    // 只补一次：不论这次成败都不再重试
+    this.retryable.delete(sessionId);
+    this.run(sessionId, session, model, exchange);
+  }
+
+  /** 前置条件：不在途、会话仍存在且未被删除、不是子会话、用户还没自己命名 */
+  private canGenerate(sessionId: string): boolean {
+    if (this.generating.has(sessionId)) return false;
+    const record = this.deps.sessions.find(sessionId);
+    return Boolean(record && !record.deletedAt && !record.parentSessionId && !record.name);
+  }
+
+  /** 异步生成：不 await 调用方 */
+  private run(
+    sessionId: string,
+    session: AgentSession,
+    model: NonNullable<AgentSession["model"]>,
+    exchange: Parameters<typeof generateSessionTitle>[0]["exchange"],
+  ): void {
     this.generating.add(sessionId);
     void generateSessionTitle({ runtime: session.modelRuntime, model, exchange })
       .then((title) => {
-        if (title) this.apply(sessionId, session, title);
+        if (!title) return;
+        this.retryable.delete(sessionId);
+        this.apply(sessionId, session, title);
       })
       .catch((error: unknown) => logger.warn({ sessionId, error }, "会话标题生成失败"))
       .finally(() => this.generating.delete(sessionId));

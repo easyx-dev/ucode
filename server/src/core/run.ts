@@ -46,6 +46,37 @@ const startRun = (
 };
 
 /**
+ * 组装投递内容：展开引用、按附件 id 取回内容，拼成模型要读的正文。
+ * 越界路径与查不到的附件在这里就报错，不必先把会话实例建出来。
+ */
+const buildPrompt = (
+  repo: Services["attachments"],
+  cwd: string,
+  input: PromptInput,
+): { body: string; images: PromptImage[] } => {
+  const expanded = expandContexts(cwd, input.contexts ?? []);
+  const images: PromptImage[] = [];
+  const refLines: string[] = [];
+
+  for (const ref of input.attachments ?? []) {
+    const found = resolveAttachment(ref.id, { repo });
+    if (!found) {
+      throw new AppError(ERROR_CODES.invalidRequest, `附件不存在：${ref.id}`, 400, undefined, {
+        path: ref.id,
+      });
+    }
+    // 图片走 vision；其余本期只做引用（解析留给后续 read_attachment / MCP）
+    if (found.mimeType.startsWith("image/")) images.push(toPromptImage(found));
+    else refLines.push(`[附件: ${found.name ?? found.id} (id: ${found.id})]`);
+  }
+
+  const body = [expanded, refLines.join("\n"), input.text]
+    .filter((part) => part.length > 0)
+    .join("\n\n");
+  return { body, images };
+};
+
+/**
  * 受理一条输入：空闲则开新一轮并立即返回，生成中则按 behavior 排队。
  * 只 await「取会话」与「入队」这类短操作，不 await 整轮生成。
  */
@@ -66,22 +97,11 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
     throw new AppError(ERROR_CODES.invalidRequest, "消息不能为空", 400);
   }
 
-  // 展开引用、按附件 id 取回内容：越界路径、查不到的附件在这里就报错，不必先建出会话实例
-  const expanded = expandContexts(resolveSessionCwd(record), contexts);
-  const content: PromptImage[] = [];
-  const refLines: string[] = [];
-  for (const ref of attachments) {
-    const found = resolveAttachment(ref.id, { repo: services.attachments });
-    if (!found) {
-      throw new AppError(ERROR_CODES.invalidRequest, `附件不存在：${ref.id}`, 400, undefined, {
-        path: ref.id,
-      });
-    }
-    // 图片走 vision；其余本期只做引用（解析留给后续 read_attachment / MCP）
-    if (found.mimeType.startsWith("image/")) content.push(toPromptImage(found));
-    else refLines.push(`[附件: ${found.name ?? found.id} (id: ${found.id})]`);
-  }
-  const body = [expanded, refLines.join("\n"), text].filter((part) => part.length > 0).join("\n\n");
+  const { body, images: content } = buildPrompt(
+    services.attachments,
+    resolveSessionCwd(record),
+    input,
+  );
 
   // 只在「创建/取回 AgentSession」这段加锁；run 本身不占锁，
   // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效
@@ -93,8 +113,17 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
     new Date().toISOString(),
   );
 
-  if (!services.pool.isRunning(sessionId) && !session.isStreaming) {
+  /**
+   * 开新一轮：先让标题服务看一眼是不是首轮（是就与这一轮同时起一次标题），再投递。
+   * 排队（steer / follow-up）不算新一轮，也走不到这里。
+   */
+  const beginTurn = (): void => {
+    services.titles.generateForPrompt(sessionId, session, body);
     startRun(services, sessionId, session, body, content);
+  };
+
+  if (!services.pool.isRunning(sessionId) && !session.isStreaming) {
+    beginTurn();
     return;
   }
 
@@ -106,7 +135,7 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   }
 
   // 占位者已经结束（可能失败）：退化成新的一轮
-  startRun(services, sessionId, session, body, content);
+  beginTurn();
 };
 
 /**
