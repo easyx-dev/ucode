@@ -7,6 +7,7 @@ import type {
   AuthLoginRequest,
   AuthLoginResponse,
   AuthLogoutResponse,
+  AuthPairingRedeemResponse,
   AuthPasswordRequest,
   AuthPasswordResponse,
   AuthSessionListResponse,
@@ -76,19 +77,29 @@ import type {
 import { readSseStream } from "./sse";
 import { createTransport, type TransportOptions } from "./transport";
 
-export type ApisOptions = TransportOptions;
+export type ApisOptions = TransportOptions & {
+  /**
+   * 会话 token 的落点：登录 / 配对兑换成功时给出明文 token，登出、改密码与凭证失效时给 `null`。
+   * 存储形式由宿主决定（浏览器落 localStorage；原生端不设——它用 `serviceToken`）。
+   */
+  onToken?: (token: string | null) => void;
+};
 
 /**
  * 无状态接口层：一条方法对应一个接口，不做任何缓存与事件归并。
  * 需要「与 server 同步的状态」时用 `createClient`（在其上装配 events 与各域 store）。
  */
 export const createApis = (options: ApisOptions = {}) => {
-  const transport = createTransport(options);
+  const transport = createTransport({
+    ...options,
+    // 「凭证失效就清掉 token」在这一处收口，不必让每个调用方自己记着清
+    onUnauthorized: () => {
+      options.onToken?.(null);
+      options.onUnauthorized?.();
+    },
+  });
 
   return {
-    /** 附属资源直链（图片预览等）；baseUrl 为空时返回同源相对地址 */
-    attachmentUrl: (id: string): string => transport.absoluteUrl(`attachments/${id}`),
-
     /** 服务发现与版本兼容（未认证） */
     async info(): Promise<ServerInfoResponse> {
       return transport.get<ServerInfoResponse>("info");
@@ -98,17 +109,38 @@ export const createApis = (options: ApisOptions = {}) => {
       return transport.get<StatusResponse>("status");
     },
     auth: {
-      login: (body: AuthLoginRequest) => transport.post<AuthLoginResponse>("auth/login", body),
-      logout: () => transport.post<AuthLogoutResponse>("auth/logout", {}),
+      /** 密码登录；成功后把会话 token 交给宿主保存 */
+      async login(body: AuthLoginRequest) {
+        const result = await transport.post<AuthLoginResponse>("auth/login", body);
+        options.onToken?.(result.token);
+        return result;
+      },
+      async logout() {
+        const result = await transport.post<AuthLogoutResponse>("auth/logout", {});
+        options.onToken?.(null);
+        return result;
+      },
       session: () => transport.get<WhoamiResponse>("auth/session"),
       sessions: () => transport.get<AuthSessionListResponse>("auth/sessions"),
       revokeSession: (sessionId: string) =>
         transport.post<AuthSessionRevokeResponse>("auth/sessions/revoke", {
           authSessionId: sessionId,
         }),
-      changePassword: (body: AuthPasswordRequest) =>
-        transport.post<AuthPasswordResponse>("auth/password", body),
+      /** 改密码撤销全部会话（含本端），token 随即失效 */
+      async changePassword(body: AuthPasswordRequest) {
+        const result = await transport.post<AuthPasswordResponse>("auth/password", body);
+        options.onToken?.(null);
+        return result;
+      },
       createPairing: () => transport.post<PairingCreateOutput>("auth/pairing/create", {}),
+      /** 兑换一次性配对码；成功后同样把 token 交给宿主保存 */
+      async redeemPairing(code: string) {
+        const result = await transport.post<AuthPairingRedeemResponse>("auth/pairing/redeem", {
+          code,
+        });
+        options.onToken?.(result.token);
+        return result;
+      },
     },
     service: {
       info: () => transport.get<ServiceInfoResponse>("service/info"),
@@ -206,6 +238,10 @@ export const createApis = (options: ApisOptions = {}) => {
           // 附件可达 32MB，别按普通接口的 30s 卡它
           { timeoutMs: 120_000 },
         ),
+      /** 取附件字节：浏览器没法给 `<img src>` 附凭证，故由客户端取回再转 blob URL */
+      download: (id: string) =>
+        // 与上传对称：附件可达 32MB，别按普通接口的 30s 卡它
+        transport.getBlob(`attachments/${id}`, { timeoutMs: 120_000 }),
     },
     agents: {
       /** 列出可选的 primary / subagent 角色 */

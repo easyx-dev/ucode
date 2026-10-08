@@ -1,5 +1,5 @@
 /**
- * 登录会话仓储：浏览器 Cookie 对应的可撤销会话。
+ * 登录会话仓储：浏览器会话 token 对应的可撤销会话。
  *
  * 库内只存 token 的 sha256（`token_hash`），明文只回客户端；`id` 是随机 uuid，
  * 可安全展示与用于撤销。schema v7，见 `docs/database.md`。

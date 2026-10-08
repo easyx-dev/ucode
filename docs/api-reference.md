@@ -17,13 +17,14 @@
 | GET | `/api/v1/health` | 存活探针（最小载荷，未认证可访问） |
 | GET | `/api/v1/info` | 服务发现与版本兼容（未认证可访问） |
 | GET | `/api/v1/status` | 认证后的运行时状态（原 health 富载荷） |
-| POST | `/api/v1/auth/login` | 密码登录，成功签发会话 Cookie |
-| POST | `/api/v1/auth/logout` | 注销当前会话并清除 Cookie |
+| POST | `/api/v1/auth/login` | 密码登录，成功返回会话与 token |
+| POST | `/api/v1/auth/logout` | 注销当前会话 |
 | GET | `/api/v1/auth/session` | 当前主体身份（whoami） |
 | GET | `/api/v1/auth/sessions` | 列出活动会话 |
 | POST | `/api/v1/auth/sessions/revoke` | 按会话 id 撤销指定会话 |
 | POST | `/api/v1/auth/password` | 修改超管密码并撤销全部会话 |
 | POST | `/api/v1/auth/pairing/create` | 签发一次性配对链接（5 分钟、单次使用） |
+| POST | `/api/v1/auth/pairing/redeem` | 兑换一次性配对码，成功返回会话与 token |
 | GET | `/api/v1/service/info` | 当前监听地址配置与是否需重启生效 |
 | POST | `/api/v1/service/host` | 修改监听地址（127.0.0.1 仅本机 / 0.0.0.0 局域网，需重启生效） |
 | POST | `/api/v1/models/list` | 供应商目录（内置 + 自定义）与各自的模型、接入状态 |
@@ -131,7 +132,7 @@
 
 ### POST /api/v1/auth/login
 
-密码登录，成功签发会话 Cookie
+密码登录，成功返回会话与 token
 
 **请求参数**
 
@@ -145,10 +146,11 @@
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `session` | [AuthSessionView](#authsessionview) | 是 | — |
+| `token` | string | 是 | — |
 
 ### POST /api/v1/auth/logout
 
-注销当前会话并清除 Cookie
+注销当前会话
 
 **请求参数**
 
@@ -236,9 +238,26 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `url` | string | 是 | 完整可访问地址，形如 http://<lan-ip>:<port>/auth/connect/<code> |
+| `url` | string | 是 | 完整可访问地址，形如 http://<lan-ip>:<port>/?connect=<code> |
 | `code` | string | 是 | 一次性码 |
 | `expiresAt` | string | 是 | 过期时间（ISO 8601 UTC） |
+
+### POST /api/v1/auth/pairing/redeem
+
+兑换一次性配对码，成功返回会话与 token
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `code` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`AuthPairingRedeemResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `session` | [AuthSessionView](#authsessionview) | 是 | — |
+| `token` | string | 是 | — |
 
 ## 服务（`service`）
 

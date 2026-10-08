@@ -2,9 +2,8 @@
  * 单个会话流的引擎：消息列表、生成态与子智能体进度的 store，以及事件归并。
  * 由 `createSessionStreams` 按 sessionId 复用。
  */
-import type { CompactionNotice, ServerEventPayload } from "@ucode/contracts";
+import { API_BASE_PATH, type CompactionNotice, type ServerEventPayload } from "@ucode/contracts";
 
-import type { Apis } from "../../apis";
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
 import type { ChatItem, PromptPayload, SubagentStreams } from "../../types";
@@ -105,11 +104,11 @@ export const patch = (engine: Engine, next: Partial<SessionStreamState>): void =
   });
 };
 
-/** 载荷 → 乐观区块：正文 + 附件（图片直接用附件路由的地址预览，权威消息到达后替换） */
-export const optimisticBlocks = (apis: Apis, payload: PromptPayload) => [
+/** 载荷 → 乐观区块：正文 + 附件（图片用附件路由地址，与权威消息同形，到达后替换） */
+export const optimisticBlocks = (payload: PromptPayload) => [
   ...(payload.text ? [{ type: "text", text: payload.text } as const] : []),
   ...payload.attachments.map((attachment) => {
-    const url = apis.attachmentUrl(attachment.id);
+    const url = `${API_BASE_PATH}/attachments/${attachment.id}`;
     if (attachment.kind === "image") {
       return {
         type: "image" as const,

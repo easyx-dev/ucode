@@ -10,6 +10,14 @@ export const authLoginInputSchema = z.object({
 export type AuthLoginInput = z.infer<typeof authLoginInputSchema>;
 export type AuthLoginRequest = z.input<typeof authLoginInputSchema>;
 
+/** 兑换一次性配对码；码即凭证，故该接口在放行清单里 */
+export const authPairingRedeemInputSchema = z.object({
+  code: z.string().min(1),
+});
+
+export type AuthPairingRedeemInput = z.infer<typeof authPairingRedeemInputSchema>;
+export type AuthPairingRedeemRequest = z.input<typeof authPairingRedeemInputSchema>;
+
 /** 修改超管密码；成功后撤销全部会话 */
 export const authPasswordInputSchema = z.object({
   currentPassword: z.string().min(1),

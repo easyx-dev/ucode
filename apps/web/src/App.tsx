@@ -1,18 +1,24 @@
 /**
- * 应用外壳：登录闸门 + 把 URL 与工作区导航状态对齐。
+ * 应用外壳：配对落地 + 登录闸门 + 把 URL 与工作区导航状态对齐。
  *
  * 登录态由 `client.auth` 探知；未登录先跳 `/login`，已登录停在登录页则回应用。
+ * 配对链接（`?connect=<code>`）先把码换成 token 再探知，避免无凭证时先跳一次登录页。
  * web 专属的适配就是这层——会话与设置写进查询串，刷新 / 前进后退都能恢复。
  */
+import { sessionTokenStorageKey } from "@ucode/brand";
 import { errorMessageKey } from "@ucode/i18n";
+import { Button } from "@ucode/ui/base/button";
 import { LoginPage } from "@ucode/ui/business/login-page";
 import { useAuth } from "@ucode/ui/hooks/use-auth";
 import { useSessions } from "@ucode/ui/hooks/use-sessions";
+import { useErrorText } from "@ucode/ui/lib/error";
 import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/lib/settings-section";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useClient } from "@ucode/ui/provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { redeemConnectCode } from "./lib/pairing";
 
 const SESSION_KEY = "session";
 const SETTINGS_KEY = "settings";
@@ -61,9 +67,28 @@ export default function App() {
   const { t } = useTranslation();
   const loginRoute = window.location.pathname === LOGIN_PATH;
 
-  useEffect(() => {
-    void client.auth.load();
+  // 首屏：先兑换配对码（若有）再探知登录态；码作废时带原因去登录页展示
+  const boot = useCallback(async (): Promise<void> => {
+    const result = await redeemConnectCode(client);
+    if (result.status === "invalid") {
+      window.location.replace(`${LOGIN_PATH}?error=${encodeURIComponent(result.errorCode)}`);
+      return;
+    }
+    await client.auth.load();
   }, [client]);
+
+  useEffect(() => {
+    void boot();
+  }, [boot]);
+
+  // 另一个标签登录 / 登出 / 改密码后本标签手里已是旧凭证：整页重载让事件流与各 store 重新装配
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key === sessionTokenStorageKey) window.location.reload();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   // 未登录 → 去登录页；已登录停在登录页 → 回应用（整页跳转重新装配各 store）
   useEffect(() => {
@@ -86,10 +111,31 @@ export default function App() {
   }
 
   if (auth.status !== "authenticated") {
+    // 探知失败（网络不通 / 服务未启动）不是「未登录」，给一次重试，别把用户甩到登录页
+    if (auth.status === "unknown" && auth.error) {
+      return <ServiceUnreachable onRetry={() => void boot()} />;
+    }
     return <div className="min-h-dvh bg-background" />;
   }
 
   return <AuthenticatedApp />;
+}
+
+/** 首屏探知失败的重试入口：错误文案取服务端封套里的原因；重试会连同待兑换的配对码一起重跑 */
+function ServiceUnreachable({ onRetry }: { onRetry: () => void }) {
+  const auth = useAuth();
+  const { t } = useTranslation();
+  const reason = useErrorText(auth.error);
+
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-4 text-center">
+      <p className="text-sm text-muted-foreground">{t("连接服务失败，请确认服务已启动。")}</p>
+      {reason ? <p className="text-xs text-muted-foreground">{reason}</p> : null}
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        {t("重试")}
+      </Button>
+    </div>
+  );
 }
 
 function AuthenticatedApp() {

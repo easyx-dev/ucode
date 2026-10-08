@@ -6,13 +6,11 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { API_BASE_PATH, ERROR_CODES } from "@ucode/contracts";
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { createServices } from "./app";
 import { env } from "./env";
-import { isSecureRequest, SESSION_COOKIE_NAME, sessionCookieOptions } from "./lib/auth/cookies";
 import { type AuthVariables, createAuthMiddleware } from "./lib/auth/middleware";
 import { logger, requestLogger } from "./lib/logger";
 import { AppError, fail } from "./lib/response";
@@ -57,13 +55,13 @@ const services = await createServices(registration);
 
 const app = new Hono<AuthVariables>();
 
-// CORS 只对白名单来源开放并允许携带 Cookie；同源与原生客户端不经 CORS
-// 不能再用 `origin: "*"`——带凭证时通配来源本身就不合法，也会放行任意网页
+// CORS 只对白名单来源开放；凭证走 `Authorization` 头而非 Cookie，故带凭证的跨域请求也不需要 Cookie 语义
+// 预检必须放行 `authorization`，否则桌面端渲染层（独立端口）连不上本机服务
 const allowedOrigins = env.corsOrigin
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
-app.use("*", cors({ origin: allowedOrigins, credentials: true }));
+app.use("*", cors({ origin: allowedOrigins, allowHeaders: ["content-type", "authorization"] }));
 app.use("*", requestLogger());
 app.use(
   `${API_BASE_PATH}/*`,
@@ -95,19 +93,6 @@ v1.route("/attachments", createAttachmentsRoute(services));
 v1.route("/agents", createAgentsRoute(services));
 
 app.route(API_BASE_PATH, v1);
-
-// 一次性配对链接：API 前缀之外，兑换成功后种会话 Cookie 并跳进应用
-app.get("/auth/connect/:code", (c) => {
-  const result = services.auth.pairing.redeem(c.req.param("code"));
-  if (result !== "ok") {
-    const error = result === "expired" ? ERROR_CODES.pairingExpired : ERROR_CODES.pairingInvalid;
-    return c.redirect(`/login?error=${error}`, 302);
-  }
-  const { token } = services.auth.sessions.create("配对设备");
-  setCookie(c, SESSION_COOKIE_NAME, token, sessionCookieOptions(isSecureRequest(c)));
-  c.header("Referrer-Policy", "no-referrer");
-  return c.redirect("/", 302);
-});
 
 // 生产模式：同源托管 web 构建产物
 // 注册在 API 路由之后；dist 不存在时 serveStatic 会直接放行走 notFound，

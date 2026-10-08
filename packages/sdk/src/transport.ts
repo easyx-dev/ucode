@@ -12,8 +12,8 @@ export type TransportOptions = {
   fetch?: FetchLike;
   /** 附加到每个请求的头 */
   headers?: Record<string, string>;
-  /** 鉴权令牌读取器：供原生客户端注入 `serviceToken`（浏览器走会话 Cookie，不必设） */
-  getToken?: () => string | Promise<string | null>;
+  /** 鉴权令牌读取器：`serviceToken`（原生客户端）与会话 token（浏览器）都经它进 `Authorization: Bearer`；可同步可异步 */
+  getToken?: () => string | null | Promise<string | null>;
   /** 收到 401 时的回调：客户端据此切换为未登录态并跳登录页 */
   onUnauthorized?: () => void;
   /** 错误兜底文案的翻译函数；未注入时用中文模板插值 */
@@ -46,8 +46,8 @@ export type Transport = {
   ) => Promise<ReadableStream<Uint8Array>>;
   /** GET 并拆封套 */
   get: <T>(action: string, request?: RequestOptions) => Promise<T>;
-  /** 拼接绝对（或同源相对）地址，用于附件等直链 */
-  absoluteUrl: (action: string) => string;
+  /** GET 原始字节（附件读取）；响应非 JSON，不走封套 */
+  getBlob: (action: string, request?: RequestOptions) => Promise<Blob>;
 };
 
 /**
@@ -159,7 +159,6 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
           method: "POST",
           headers: await requestHeaders("application/json"),
           body: JSON.stringify(body),
-          credentials: "include",
         },
         request?.timeoutMs,
       );
@@ -178,7 +177,6 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
           method: "POST",
           headers: await requestHeaders(body.type || "application/octet-stream"),
           body,
-          credentials: "include",
         },
         request?.timeoutMs,
       );
@@ -194,7 +192,6 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
         headers: await requestHeaders("application/json"),
         body: JSON.stringify(body ?? {}),
         signal,
-        credentials: "include",
       });
       if (!response.ok) {
         const failure = await readStreamError(response);
@@ -213,11 +210,27 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
     async get<T>(action: string, request?: RequestOptions): Promise<T> {
       const response = await send(
         `${base}/${action}`,
-        { headers: await requestHeaders(), credentials: "include" },
+        { headers: await requestHeaders() },
         request?.timeoutMs,
       );
       return unwrap<T>(response);
     },
-    absoluteUrl: (action) => `${base}/${action}`,
+    async getBlob(action: string, request?: RequestOptions): Promise<Blob> {
+      const response = await send(
+        `${base}/${action}`,
+        { headers: await requestHeaders() },
+        request?.timeoutMs,
+      );
+      if (!response.ok) {
+        // 二进制接口的失败体形不成封套（404 是空体），只按状态处理，不另造一套拆解
+        if (response.status === 401) options.onUnauthorized?.();
+        throw new ApiError(
+          "attachment_failed",
+          message("附件读取失败（HTTP {{status}}）", { status: String(response.status) }),
+          { httpStatus: response.status },
+        );
+      }
+      return response.blob();
+    },
   };
 };

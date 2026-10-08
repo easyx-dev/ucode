@@ -109,6 +109,16 @@
 - **对话区 markdown 的表格改为自身横向滚动**：原先只给 `w-full`、外层没有溢出容器，宽表会撑破列宽
   并把整段对话变成横向滚动区；同时调整了正文行高、标题层级、列表标记与任务列表。口径记进 `DESIGN.md`
   新增的「Markdown 渲染」一节。
+- **鉴权改为单一 Bearer 管线，会话不再走 Cookie**：`Authorization: Bearer` 同时承载原生客户端的
+  `serviceToken` 与浏览器登录 / 配对换来的会话 token（先常量时间比对，不中再按 sha256 查 `auth_session`），
+  登录与兑换的响应直接回明文 token；Cookie 相关代码（中间件分支、`/auth/connect/:code`、CORS `credentials`、
+  `HttpOnly` 选项）一并删除。原因是 Cookie 不区分端口——同一 host 上并存的开发 / 生产两个实例会为同一个
+  `<slug>_session` 互相顶掉会话，切过去就是 401 跳登录页。配套：新增放行接口 `POST /api/v1/auth/pairing/redeem`，
+  配对链接改为 `…/?connect=<code>` 由页面兑换（码仍单次消费）；web 把 token 存 `localStorage`
+  （`sessionTokenStorageKey`，由品牌 slug 派生，按 origin 隔离），跨标签页用 `storage` 事件同步；
+  附件这类浏览器直链改由客户端调 `attachments/{id}` 取回字节再转 blob URL（`apis.attachmentUrl` 与
+  `transport.absoluteUrl` 随之移除）；CORS 预检显式放行 `content-type` / `authorization`，不再需要 `credentials`。
+  `auth/session` 首屏探知只在 401 时判为未登录，网络不通改为原地给重试入口。代价：会话 token 对页面 JS 可读。
 
 ### 变更
 

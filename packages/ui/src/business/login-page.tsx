@@ -1,4 +1,4 @@
-/** 登录页：用服务密码换取会话 Cookie；`notice` 用于携带配对链接失败等已翻译提示 */
+/** 登录页：用服务密码换取会话 token（由宿主存下并放进请求头）；`notice` 用于携带配对链接失败等已翻译提示 */
 
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";

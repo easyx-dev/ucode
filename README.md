@@ -576,6 +576,6 @@ pnpm -F @ucode/server eval -- --base-url http://localhost:8317/v1 --api-key devt
 - **`sessionId` 报 400**：id 只接受 `^[A-Za-z0-9][A-Za-z0-9._-]*$`（与 pi 的会话 id 规则一致），新建会话用返回的 UUID。
 - **调用上游报 400 `invalid_request`**：多为网关兼容性差异。先用 `config/test` 二分定位，必要时通过模型的 `compat` 关掉 `supportsDeveloperRole`、`supportsStore`、`supportsReasoningEffort` 等开关。
 - **端口被占用**：改 `.env`（开发）或 `.env.prod`（生产）的 `APP_PORT`；web 开发代理会自动读取同一值。
-- **⚠️ 安全**：`/api/v1` 已全量鉴权（会话 Cookie / `serviceToken` / 一次性配对），服务默认只监听回环地址，
+- **⚠️ 安全**：`/api/v1` 已全量鉴权（会话 token / `serviceToken` / 一次性配对，统一走 `Authorization: Bearer`），服务默认只监听回环地址，
   `APP_HOST=0.0.0.0` 需显式开启。但通过鉴权等同本机 owner，背后的 agent 有 `bash` 权限 ——
   **不要把服务暴露到公网或不可信网络**。约定见 [`docs/api.md`](./docs/api.md)「鉴权」。

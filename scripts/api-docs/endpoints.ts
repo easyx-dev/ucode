@@ -62,7 +62,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: "authLoginInputSchema",
     requestType: "AuthLoginInput",
     output: "AuthLoginResponse",
-    summary: "密码登录，成功签发会话 Cookie",
+    summary: "密码登录，成功返回会话与 token",
   },
   {
     domain: "auth",
@@ -71,7 +71,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: null,
     requestType: null,
     output: "AuthLogoutResponse",
-    summary: "注销当前会话并清除 Cookie",
+    summary: "注销当前会话",
   },
   {
     domain: "auth",
@@ -117,6 +117,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     requestType: null,
     output: "PairingCreateOutput",
     summary: "签发一次性配对链接（5 分钟、单次使用）",
+  },
+  {
+    domain: "auth",
+    action: "pairing/redeem",
+    method: "POST",
+    input: "authPairingRedeemInputSchema",
+    requestType: "AuthPairingRedeemInput",
+    output: "AuthPairingRedeemResponse",
+    summary: "兑换一次性配对码，成功返回会话与 token",
   },
 
   {

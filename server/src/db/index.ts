@@ -64,8 +64,8 @@ const migrations: Record<number, string> = {
   6: `
     ALTER TABLE session ADD COLUMN permission_mode TEXT;
   `,
-  // 登录会话：浏览器 Cookie 对应的可撤销会话（见 plans/service-and-auth.md §3.4）
-  // 库内只存 token 的 sha256，明文只回客户端 Cookie；id 是可展示 / 可撤销的 uuid
+  // 登录会话：浏览器会话 token 对应的可撤销会话（见 plans/service-and-auth.md §3.4）
+  // 库内只存 token 的 sha256，明文只在签发时回一次；id 是可展示 / 可撤销的 uuid
   7: `
     CREATE TABLE auth_session (
       id            TEXT PRIMARY KEY,

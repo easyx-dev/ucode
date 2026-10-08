@@ -26,5 +26,8 @@ export const themeStorageKey = `${brand.slug}-theme`;
 /** 语言存储键：与主题同理，首屏内联脚本（设 `<html lang>`）与运行时切换共用 */
 export const localeStorageKey = `${brand.slug}-locale`;
 
+/** 会话 token 存储键：浏览器端凭证落 localStorage，与主题 / 语言同属品牌命名空间 */
+export const sessionTokenStorageKey = `${brand.slug}-session-token`;
+
 /** 应用主目录名：默认落在用户主目录下（`~/<appHomeDirname>`），随品牌 slug 变化 */
 export const appHomeDirname = `.${brand.slug}`;

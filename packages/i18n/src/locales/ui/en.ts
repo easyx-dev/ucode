@@ -193,6 +193,8 @@ export default {
   发送: "Send",
   移除附件: "Remove attachment",
   图片预览: "Image preview",
+  图片不可用: "Image unavailable",
+  附件不可用: "Attachment unavailable",
   "附件过大：{{names}}": "Attachment too large: {{names}}",
 
   // 内置命令说明（`/` 菜单提示与 /help 清单）
@@ -429,6 +431,8 @@ export default {
   "先填写 baseUrl 和至少一个模型 id": "Fill in baseUrl and at least one model id first",
   "连接成功 · {{latency}}ms · {{model}}": "Connected · {{latency}}ms · {{model}}",
   连接失败: "Connection failed",
+  "连接服务失败，请确认服务已启动。": "Failed to reach the service. Check that it is running.",
+  重试: "Retry",
   配置加载失败: "Failed to load configuration",
   新建会话失败: "Failed to create session",
   重命名失败: "Rename failed",

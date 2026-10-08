@@ -230,10 +230,7 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
     async send(sessionId, payload) {
       const engine = ensure(sessionId);
       patch(engine, { error: null });
-      const optimistic = appendUserItem(
-        engine.store.getState().items,
-        optimisticBlocks(deps.apis, payload),
-      );
+      const optimistic = appendUserItem(engine.store.getState().items, optimisticBlocks(payload));
       // 立刻给出反馈：首个 token 都算在这段等待里
       patch(engine, { items: optimistic.items, pending: true });
 

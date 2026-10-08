@@ -76,7 +76,7 @@
 | `refresh` | 按当前配置重建运行时 | 与 `list` 同形 |
 | `test` | 连通性测试 | 测试结果 |
 | `respond` | 回答挂起的交互请求 | 动作回执 |
-| `login` | 登录并签发会话 | 会话信息 |
+| `login` | 登录并签发会话 | 会话与 token |
 | `logout` | 注销当前会话 | 动作回执 |
 | `session` | 当前主体身份（whoami） | 主体信息 |
 | `sessions` | 活动会话列表 | 列表结构 |
@@ -292,33 +292,34 @@
 
 ## 鉴权
 
-服务本质是一个 web 服务，鉴权复用标准 web 模型：**单一鉴权管线**把 Cookie / Bearer 统一解析为同一「主体（principal）」，通过鉴权后仍受内层权限引擎约束（鉴权是外层门）。完整方案见 [`plans/service-and-auth.md`](../plans/service-and-auth.md)。
+服务本质是一个 web 服务，鉴权复用标准 web 模型：**单一鉴权管线**把 `Authorization: Bearer` 解析为同一「主体（principal）」，通过鉴权后仍受内层权限引擎约束（鉴权是外层门）。头里既可能是原生客户端的 `serviceToken`，也可能是浏览器登录 / 配对换来的会话 token。**不放 Cookie**：Cookie 不区分端口，同 host 上并存的两个实例会互相顶掉会话。完整方案见 [`plans/service-and-auth.md`](../plans/service-and-auth.md)。
 
 ### 放行清单
 
-未认证可访问的只有：`GET /api/v1/health`、`GET /api/v1/info`、`POST /api/v1/auth/login`、`GET /auth/connect/:code`（配对兑换，在 API 前缀之外）、登录页静态资源与 `OPTIONS` 预检。其余接口一律需要鉴权，未认证返回 `401 unauthorized`；浏览器导航类请求（`Accept` 带 `text/html`）302 到 `/login`。
+未认证可访问的只有：`GET /api/v1/health`、`GET /api/v1/info`、`POST /api/v1/auth/login`、`POST /api/v1/auth/pairing/redeem`（一次性码本身就是凭证）与 `OPTIONS` 预检。其余接口一律需要鉴权，未认证返回 `401 unauthorized`；导航类请求不再 302 到 `/login`，由前端闸门自己跳。
 
 ### 三种接入路径
 
 | 路径 | 谁用 | 凭证 |
 | --- | --- | --- |
 | 本机原生客户端 | TUI / CLI / 桌面壳 | `serviceToken`，`Authorization: Bearer <token>`，免交互 |
-| 密码登录 | 浏览器（本机 / 局域网 / 远程） | `password` 换取会话 Cookie |
-| 一次性配对 | 局域网 / 远程 | `POST /api/v1/auth/pairing/create` 生成短 TTL 单次链接，`GET /auth/connect/:code` 兑换为 Cookie |
+| 密码登录 | 浏览器（本机 / 局域网 / 远程） | `password` 换取会话 token，由客户端保管并放进请求头 |
+| 一次性配对 | 局域网 / 远程 | `POST /api/v1/auth/pairing/create` 生成短 TTL 单次链接（`…/?connect=<code>`），页面调 `POST /api/v1/auth/pairing/redeem` 兑换成会话 token |
 
-解析顺序：`Authorization: Bearer` → 会话 Cookie；任一命中即通过。
+解析顺序：先与 `serviceToken` 做常量时间比较，不中再按 sha256 查 `auth_session`。前者不是会话，故 `sessionId` 为 `null`、没有可登出的对象。
 
 ### 凭证与会话
 
 - `serviceToken` 与 `password` 明文存 `$APP_HOME/app/service.json`（权限 `0600`，服务独占写）；「读得到文件」即本机身份证明。密码首次启动自动生成，忘记可直接查看该文件。
 - 比较一律常量时间；登录接口按来源 IP 限流（`rate_limited`）。
-- 会话落 SQLite `auth_session`：库内只存 token 的 sha256，明文只回客户端 Cookie；默认 30 天，可列举、可逐个撤销，改密码撤销全部。
-- Cookie 名由品牌 slug 派生（`<slug>_session`），`HttpOnly` + `SameSite=Strict` + `Path=/`；有 TLS 时才加 `Secure`。
+- 会话落 SQLite `auth_session`：库内只存 token 的 sha256，明文只在登录 / 兑换响应里回一次；默认 30 天，可列举、可逐个撤销，改密码撤销全部。
+- **凭证由客户端持有**：浏览器把 token 存 `localStorage`（键由品牌 slug 派生，按 origin 隔离，故同 host 不同端口的两个实例各存各的），刷新不掉登录、不用为每个实例换 Cookie 名。代价是 token 对页面 JS 可读 —— XSS 即等于会话泄露，这是不用 `HttpOnly` Cookie 换来的取舍。
+- 凭证固定走请求头，故浏览器直链（`<img src>` / `<a href>`）不能直接指向附件接口：客户端先从 `attachments/{id}` 取回字节再转 blob URL。桌面壳在 webview 层注入同一个头，走的也是同一条路。
 
 ### 边界
 
 - **不做 IP 信任**：loopback 不自动放行（DNS rebinding 下任意网页都能请求 `127.0.0.1`）。
-- CORS 由白名单开放并允许携带 Cookie（`credentials: true`），不再用 `origin: "*"`；`APP_CORS_ORIGIN` 逗号分隔，缺省不放行跨域来源。
+- CORS 由白名单开放（`APP_CORS_ORIGIN` 逗号分隔，缺省不放行跨域来源），预检放行 `content-type` 与 `authorization`；凭证不走 Cookie，因此不需要 `credentials`，也不再存在 CSRF 面。
 - 服务默认监听 `127.0.0.1`；`APP_HOST=0.0.0.0`（或设置里开启局域网访问）才允许同网段访问，且启动会告警。
 - **通过鉴权 = owner = 本机 `bash`**：远程接入的提示必须在界面上显式给出；角色 / 权限分级暂缓，principal 预留 `scopes`（当前恒为 `["*"]`）。
 

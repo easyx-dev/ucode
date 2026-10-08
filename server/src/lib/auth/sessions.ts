@@ -1,7 +1,7 @@
 /**
  * 登录会话：签发 / 校验 / 撤销 / 列举。
  *
- * 明文 token 只回客户端 Cookie，库内只存 sha256；来源不可信时也无法反推 token。
+ * 明文 token 只在签发响应里回一次（登录 / 配对兑换），库内只存 sha256；来源不可信时也无法反推 token。
  * 会话可撤销（改密码撤销全部），默认 30 天有效期。
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";

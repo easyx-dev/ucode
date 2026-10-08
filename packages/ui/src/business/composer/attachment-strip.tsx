@@ -1,17 +1,42 @@
 /** 编辑器上方的附件行：图片缩略图（点开预览）、其它类型文件 chip，均可移除 */
-import { API_BASE_PATH, type AttachmentView } from "@ucode/contracts";
-import { FileText, X } from "lucide-react";
+import type { AttachmentView } from "@ucode/contracts";
+import { FileText, ImageOff, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog, DialogContent, DialogTitle } from "../../base/dialog";
+import { useAttachmentUrl } from "../../hooks/use-attachment-url";
 
 type AttachmentStripProps = {
   attachments: AttachmentView[];
   onRemove: (id: string) => void;
 };
 
-const urlOf = (id: string): string => `${API_BASE_PATH}/attachments/${id}`;
+/** 缩略图：字节得经客户端取回（浏览器不会给 `<img src>` 附凭证） */
+function AttachmentThumb({ id, name }: { id: string; name: string }) {
+  const { url: source, failed } = useAttachmentUrl(id);
+  if (!source) {
+    return (
+      <div className="flex size-full items-center justify-center bg-muted/40">
+        {failed ? <ImageOff className="size-4 text-muted-foreground" /> : null}
+      </div>
+    );
+  }
+  return <img src={source} alt={name} className="size-full object-cover" />;
+}
+
+function AttachmentPreview({ id, name }: { id: string; name: string }) {
+  const { t } = useTranslation();
+  const { url: source, failed } = useAttachmentUrl(id);
+  if (!source) {
+    return failed ? (
+      <p className="py-10 text-center text-sm text-muted-foreground">{t("图片不可用")}</p>
+    ) : (
+      <div className="h-[60vh] w-full animate-pulse rounded-md bg-muted/40" />
+    );
+  }
+  return <img src={source} alt={name} className="max-h-[70vh] w-full rounded-md object-contain" />;
+}
 
 export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps) {
   const { t } = useTranslation();
@@ -30,7 +55,7 @@ export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps)
               title={item.name ?? item.id}
               className="block size-14 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <img src={urlOf(item.id)} alt={item.name ?? ""} className="size-full object-cover" />
+              <AttachmentThumb id={item.id} name={item.name ?? ""} />
             </button>
           ) : (
             <div className="flex h-14 max-w-40 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground">
@@ -59,13 +84,7 @@ export function AttachmentStrip({ attachments, onRemove }: AttachmentStripProps)
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogTitle>{t("图片预览")}</DialogTitle>
-          {preview ? (
-            <img
-              src={urlOf(preview.id)}
-              alt={preview.name ?? ""}
-              className="max-h-[70vh] w-full rounded-md object-contain"
-            />
-          ) : null}
+          {preview ? <AttachmentPreview id={preview.id} name={preview.name ?? ""} /> : null}
         </DialogContent>
       </Dialog>
     </div>

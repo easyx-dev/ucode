@@ -19,7 +19,7 @@ export type AuthState = {
   /** unknown 表示尚未探知；首屏据此避免「先闪应用再跳登录」 */
   status: "unknown" | "authenticated" | "anonymous";
   session: AuthSessionView | null;
-  /** 最近一次密码类动作的错误 */
+  /** 最近一次失败：密码类动作，或首屏探知失败（网络不通 / 服务未启动） */
   error: ApiError | null;
   /** 密码类动作进行中 */
   busy: boolean;
@@ -66,7 +66,13 @@ export const createAuthStore = (deps: { apis: Apis }): AuthStore => {
         error: null,
         busy: false,
       });
-    } catch {
+    } catch (error) {
+      const failure = asApiError(error);
+      // 只有 401 才是「登录态无效」；网络不通 / 服务未启动不能把用户甩到登录页
+      if (failure.httpStatus !== 401) {
+        store.setState((prev) => ({ ...prev, error: failure, busy: false }));
+        return;
+      }
       store.setState(anonymous(null));
     }
   };

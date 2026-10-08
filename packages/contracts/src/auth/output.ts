@@ -14,7 +14,7 @@ export type AuthSessionView = {
   label: string;
 };
 
-/** 当前主体身份：Cookie 会话带 session，Bearer（本机原生客户端）无会话 */
+/** 当前主体身份：会话 token（浏览器）带 session，serviceToken（本机原生客户端）无会话 */
 export type WhoamiResponse = {
   kind: "owner";
   /** 角色 / 权限分级暂缓，当前恒为 ["*"]（见 plans/service-and-auth.md §3.8） */
@@ -27,12 +27,19 @@ export type AuthSessionListResponse = ListResult & {
   sessions: AuthSessionView[];
 };
 
-/** 登录成功：返回签发的会话（Cookie 由响应头种下） */
+/** 登录成功：返回签发的会话与明文 token（仅此一次下发，客户端自行保管并放进 `Authorization`） */
 export type AuthLoginResponse = {
   session: AuthSessionView;
+  token: string;
 };
 
-/** 登出回执；Bearer 主体没有会话可撤销时为 false */
+/** 一次性配对码兑换：与登录同形，码消费后不可再用 */
+export type AuthPairingRedeemResponse = {
+  session: AuthSessionView;
+  token: string;
+};
+
+/** 登出回执；serviceToken 主体没有会话可撤销时为 false */
 export type AuthLogoutResponse = {
   revoked: boolean;
 };
@@ -49,7 +56,7 @@ export type AuthSessionRevokeResponse = {
 
 /** 一次性配对链接：短 TTL、单次使用、高熵 */
 export type PairingCreateOutput = {
-  /** 完整可访问地址，形如 http://<lan-ip>:<port>/auth/connect/<code> */
+  /** 完整可访问地址，形如 http://<lan-ip>:<port>/?connect=<code> */
   url: string;
   /** 一次性码 */
   code: string;
