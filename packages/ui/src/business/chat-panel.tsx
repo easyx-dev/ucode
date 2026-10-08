@@ -36,6 +36,7 @@ import { MessageList } from "./message-list";
 import { PermissionRequest } from "./permission-request";
 import { PlanDecisionForm } from "./plan-decision-form";
 import { QuestionRequest } from "./question-request";
+import { SubagentSessionDialog } from "./subagent-session-dialog";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
 const shouldShowSuggestions = (chat: ChatController): boolean =>
@@ -138,6 +139,8 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { t } = useTranslation();
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  /** 详情小窗里查看的子会话 id；子智能体工具卡的入口就落在这里，不再切走整个对话区 */
+  const [subagentSessionId, setSubagentSessionId] = useState<string | null>(null);
   /** 发送 / 编辑重发被受理后自增，交给消息列表把视口拉回最新一行 */
   const [sentTick, setSentTick] = useState(0);
   const draftKey = composerKeyOf(session?.id ?? null);
@@ -269,7 +272,7 @@ export function ChatPanel({
         empty={empty}
         resetKey={session?.id ?? ""}
         sentTick={sentTick}
-        onOpenSession={onOpenSession}
+        onOpenSession={setSubagentSessionId}
         onFork={isChild ? undefined : onFork}
         onEdit={isChild || chat.streaming ? undefined : handleEdit}
       />
@@ -343,6 +346,11 @@ export function ChatPanel({
           onBuiltin={onBuiltin}
         />
       )}
+
+      <SubagentSessionDialog
+        sessionId={subagentSessionId}
+        onClose={() => setSubagentSessionId(null)}
+      />
     </main>
   );
 }
