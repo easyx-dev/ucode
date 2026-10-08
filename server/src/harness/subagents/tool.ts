@@ -10,16 +10,29 @@ import { THINKING_LEVELS } from "@ucode/contracts";
 import { Type } from "typebox";
 
 import { type AgentProfile, SUBAGENT_PROFILES } from "../agents";
-import type { SubagentHooks } from "./types";
+import type { SubagentHooks, SubagentResult } from "./types";
 
-const formatResult = (sessionId: string, text: string): string =>
-  [
-    `task_id: ${sessionId}（需要时可带 task_id 续跑）`,
+/**
+ * 工具结果：成功与被中止共用同一个外形。被中止时把半成品 + 续跑入口一并给出，
+ * 否则父会话只能从头重派，白白再烧一遍。
+ */
+const formatResult = (result: SubagentResult): string => {
+  const lines = [
+    `task_id: ${result.sessionId}（需要时可带 task_id 续跑）`,
     "",
     "<task_result>",
-    text.trim() || "（子智能体没有产出文本）",
+    result.text.trim() || "（子智能体没有产出文本）",
     "</task_result>",
-  ].join("\n");
+  ];
+  if (result.aborted) {
+    lines.push(
+      "",
+      `[已提前中止：${result.reason ?? "未知原因"}] 以上是它中止前已产出的最后一段正文，可直接当作部分结论使用；` +
+        "需要它把剩下的做完就带上面的 task_id 续跑，不要从零重派。",
+    );
+  }
+  return lines.join("\n");
+};
 
 /** 角色清单：缺省回落内置角色，保证注册表为空时工具仍可用且能识别 general / explore */
 const resolveProfiles = (profiles: readonly AgentProfile[]): AgentProfile[] =>
@@ -60,6 +73,7 @@ export const createSubagentTool = (
       "task 必须自包含：把背景、目标、约束、期望产出写全，子智能体看不到当前对话。",
       "需要只读调研 / 评审用 explore，需要它动手就用 general。",
       "需要让之前的子智能体接着做时，带上它返回的 task_id 续跑，而不是重新新建。",
+      "任务要切成「十分钟内能做完、并且能自证完成」的单位：子智能体连续无进展会被中止，交出去的目标越具体越省事。",
       "子会话会消耗额外模型调用，不要为琐碎问题分派。",
     ],
     parameters: Type.Object({
@@ -103,8 +117,8 @@ export const createSubagentTool = (
         signal,
       );
       return {
-        content: [{ type: "text", text: formatResult(result.sessionId, result.text) }],
-        details: { sessionId: result.sessionId },
+        content: [{ type: "text", text: formatResult(result) }],
+        details: { sessionId: result.sessionId, aborted: result.aborted === true },
       };
     },
   });

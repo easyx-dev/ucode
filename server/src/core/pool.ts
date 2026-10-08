@@ -15,7 +15,7 @@ import {
   type SubagentSnapshot,
   type WebsearchConfig,
 } from "@ucode/contracts";
-import { SUBAGENT_MAX_CONCURRENCY } from "../constants";
+import { SUBAGENT_MAX_CONCURRENCY, SUBAGENT_QUEUE_MAX, SUBAGENT_QUEUE_WAIT_MS } from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import {
@@ -40,7 +40,8 @@ import {
   contextBudgetFor,
   resolveSessionCwd,
 } from "../harness/session-config";
-import { type SubagentHooks, spawnSubagent } from "../harness/subagents";
+import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/subagents";
+import { StepTelemetry } from "../harness/telemetry";
 import type { UsageService } from "../harness/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
 import { logger } from "../lib/logger";
@@ -94,6 +95,8 @@ export class SessionPool {
   private readonly subagents = new Map<string, Map<string, SubagentSnapshot>>();
   /** 配置代次：每换一次运行时自增，用来识别「装配跨过了配置变更」的实例 */
   private generation = 0;
+  /** 每步耗时归因：把模型往返拆成首 token / 解码 / 工具三段，写进会话条目 */
+  private readonly telemetry = new StepTelemetry();
   private sweeper: NodeJS.Timeout | null = null;
 
   constructor(
@@ -122,8 +125,17 @@ export class SessionPool {
         this.trackSubagent(frame);
         return;
       }
-      if (frame.type !== "interaction_request" && frame.type !== "interaction_resolved") return;
-      this.emitUpdated(frame.sessionId);
+      // 等用户的时间单独记账：审批 / 提问挂起多久就记多久，不从「工具耗时」里混过去
+      if (frame.type === "interaction_request") {
+        this.telemetry.beginUserWait(frame.sessionId, Date.now());
+        this.emitUpdated(frame.sessionId);
+        return;
+      }
+      if (frame.type === "interaction_resolved") {
+        this.telemetry.endUserWait(frame.sessionId, Date.now());
+        this.emitUpdated(frame.sessionId);
+        return;
+      }
     });
   }
 
@@ -395,25 +407,24 @@ export class SessionPool {
     }
   }
 
-  /** 主会话的委派钩子：并发上限按父会话计数，超限立即报错而非排队 */
+  /** 主会话的委派钩子：并发上限按父会话计数，满了排队等空位（见 `SubagentSlots`） */
   private subagentHooks(
     record: SessionRecord,
     cwd: string,
     registry: AgentRegistry,
   ): SubagentHooks {
-    let active = 0;
+    const slots = new SubagentSlots(
+      SUBAGENT_MAX_CONCURRENCY,
+      SUBAGENT_QUEUE_MAX,
+      SUBAGENT_QUEUE_WAIT_MS,
+    );
     return {
       spawn: async (toolCallId, request, signal) => {
         // 模型覆盖先校验：拼错的 provider/model 应显式报错，而不是静默回落默认模型
         if (request.model && !this.runtime.resolveModelRef(request.model)) {
           throw new Error(`子智能体指定的模型不可用：${request.model}`);
         }
-        if (active >= SUBAGENT_MAX_CONCURRENCY) {
-          throw new Error(
-            `同时运行的子智能体已达上限（${SUBAGENT_MAX_CONCURRENCY}），请等其中一个完成后再派。`,
-          );
-        }
-        active += 1;
+        const slot = await slots.acquire(signal);
         try {
           return await spawnSubagent(
             {
@@ -439,7 +450,7 @@ export class SessionPool {
             },
           );
         } finally {
-          active -= 1;
+          slot.release();
         }
       },
     };
@@ -570,6 +581,8 @@ export class SessionPool {
       if (mode === "build" && usesDefaultToolSet(capability)) await session.bindExtensions({});
 
       const unsubscribe = session.subscribe((event) => {
+        // 每步耗时归因：只看 turn_start / 首个 token / message_end / turn_end 四个锚点
+        this.telemetry.observe(sessionId, event, session.sessionManager);
         // 文件一落盘就把索引写进库，不等本轮落定：中间被回收或服务重启时才有文件可续接
         if (event.type === "message_end" || event.type === "entry_appended") {
           if (!this.indexedSources.has(sessionId)) this.writeIndex(sessionId);
@@ -626,9 +639,10 @@ export class SessionPool {
         // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
         stale: generation !== this.generation,
       };
-      // 压缩触发点在这里算一次并交给用量服务：口径与注入 pi 的阈值一致，
-      // 界面上的「预算」不会与实际压缩点对不上（角色声明的模型与记录覆盖不一致时尤其明显）
+      // 压缩触发点在这里算一次，同时喂给每步耗时记录与用量服务：
+      // 口径与注入 pi 的阈值完全一致，界面上的「预算」不会与实际压缩点对不上
       const budget = contextBudgetFor({ record, capability, runtime: this.runtime });
+      this.telemetry.attach(sessionId, budget?.triggerTokens ?? null);
       if (budget) this.usage.rememberBudget(sessionId, budget.triggerTokens);
       this.entries.set(sessionId, entry);
       // 事件订阅常驻：会话池回收前，/events 的在线订阅者要靠它拿到实时事件；
@@ -737,6 +751,7 @@ export class SessionPool {
     this.subagents.delete(sessionId);
     this.events.detach(sessionId);
     this.usage.forget(sessionId);
+    this.telemetry.detach(sessionId);
     this.memory.discardReview(sessionId);
     this.goals.forget(sessionId);
     // 挂起审批 / 提问按失败结算，避免回答打到已释放的实例：子会话的请求挂在父会话下

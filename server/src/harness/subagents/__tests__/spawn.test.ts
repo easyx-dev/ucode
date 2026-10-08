@@ -59,6 +59,8 @@ const fakeChild = (
   const session = {
     sessionManager: { getEntries: () => behavior.entries ?? [] },
     prompt: behavior.prompt ?? (async () => {}),
+    // 看门狗订阅：测试里不需要真的触发事件，只要求订阅接口存在
+    subscribe: () => () => {},
     abort: async () => {
       aborted = true;
     },
@@ -178,6 +180,28 @@ describe("spawnSubagent", () => {
     await assert.rejects(pending, /中止/);
     assert.equal(aborted(), true, "中止时应调用 AgentSession.abort");
     assert.deepEqual(events, ["refresh", "settle"], "失败路径也要回写与结算");
+  });
+
+  it("看门狗判定无进展：中止子会话，但把已产出的正文带回去", async () => {
+    const { session, aborted } = fakeChild({
+      entries: [assistantEntry("半成品结论")],
+      prompt: () => new Promise<void>(() => {}),
+    });
+
+    const result = await spawnSubagent(
+      {
+        parent: parentRecord,
+        toolCallId: "call-test",
+        cwd: "/tmp/project",
+        request: { description: "长任务", task: "慢慢做" },
+      },
+      depsOf({ ensure: async () => session, timeouts: { idleMs: 10, maxDurationMs: 1_000 } }),
+    );
+
+    assert.equal(aborted(), true, "超时也要中止子会话，不让它继续烧 token");
+    assert.equal(result.aborted, true);
+    assert.match(result.reason ?? "", /没有新进展/);
+    assert.equal(result.text, "半成品结论");
   });
 
   it("子会话内部报错归一为可读文案", async () => {

@@ -25,8 +25,12 @@ export type SubagentRequest = {
 export type SubagentResult = {
   /** 子会话 id（回传给父会话作 `task_id`） */
   sessionId: string;
-  /** 子会话最后一条 assistant 文本 */
+  /** 子会话最后一条 assistant 文本；被中止时是它已产出的最后一段 */
   text: string;
+  /** 是否因超时 / 中止而提前结束：此时 `text` 是半成品，带 `taskId` 可续跑 */
+  aborted?: boolean;
+  /** 提前结束的原因（已归一的可读文案） */
+  reason?: string;
 };
 
 export type SubagentHooks = {

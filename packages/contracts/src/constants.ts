@@ -82,6 +82,16 @@ export const PLAN_IGNORED_CUSTOM_TYPE = "ucode.plan-ignored";
 export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
 
 /**
+ * 每步耗时记录：每次模型往返结束后，服务端往会话文件追加的 pi `custom` 条目。
+ * `data` 为 `{turn, startedAt, firstTokenAt, respondedAt, endedAt, ttftMs, streamMs, toolMs,
+ * userWaitMs, toolCalls, inputTokens, cacheReadTokens, outputTokens, reasoningTokens,
+ * contextTokens, contextBudget, attachments}`——把「一次往返」拆成首 token / 解码 / 工具三段，
+ * 外加等用户的时间，供事后算账。它只作服务端观测：既不进模型上下文，也不下发给客户端
+ * （见 `core/serialize` 的 customType 白名单）。
+ */
+export const STEP_RECORD_CUSTOM_TYPE = "ucode.step";
+
+/**
  * 手动压缩被**正常拒绝**（不是失败）的原因：
  * - `too_small`：上下文里没有可总结的跨度（pi 的保留预算里装得下全部内容）；
  * - `already_compacted`：路径上已经是压缩后的状态，没有新内容可压。

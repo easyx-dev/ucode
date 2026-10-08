@@ -8,7 +8,11 @@ import { randomUUID } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { PermissionMode, ThinkingLevel } from "@ucode/contracts";
 
-import { SUBAGENT_DESCRIPTION_MAX_LENGTH, SUBAGENT_TIMEOUT_MS } from "../../constants";
+import {
+  SUBAGENT_DESCRIPTION_MAX_LENGTH,
+  SUBAGENT_IDLE_TIMEOUT_MS,
+  SUBAGENT_MAX_DURATION_MS,
+} from "../../constants";
 import { overrideOf, type SessionRecord } from "../../db/session-repository";
 import { isRecord } from "../../utils/object";
 import { type AgentRegistry, subagentProfile } from "../agents";
@@ -44,16 +48,30 @@ export type SubagentSpawnDeps = {
   dispose: (sessionId: string) => void;
   /** 只发关联帧（`toolCallId ↔ 子会话 id`），子会话进度帧仍由它自身的广播承载 */
   emit: (type: "subagent_start" | "subagent_end", data: Record<string, unknown>) => void;
+  /** 看门狗时限；缺省取 constants（测试用小值注入，不必真等十分钟） */
+  timeouts?: { idleMs: number; maxDurationMs: number };
+};
+
+const DEFAULT_TIMEOUTS = {
+  idleMs: SUBAGENT_IDLE_TIMEOUT_MS,
+  maxDurationMs: SUBAGENT_MAX_DURATION_MS,
 };
 
 /**
  * 子智能体自身的失败：用来区分「子会话内部报错」与「超时 / 中止」。
  * 后者已是可读文案，前者由 `toReadableError` 归一。
+ * `partial` 为真表示「半成品而非无产出」：看门狗自己的判断，调用方应把已有正文带回去；
+ * 用户中止时不带半成品，按中止向上传播，否则会把一次主动打断变成一条工具结果。
  */
 class SubagentError extends Error {
-  constructor(message: string) {
+  readonly aborted: boolean;
+  readonly partial: boolean;
+
+  constructor(message: string, options?: { aborted?: boolean; partial?: boolean }) {
     super(message);
     this.name = "SubagentError";
+    this.aborted = options?.aborted === true;
+    this.partial = options?.partial === true;
   }
 }
 
@@ -91,33 +109,67 @@ const toReadableError = (error: unknown): SubagentError => {
 };
 
 /**
- * 前台跑一条 prompt，带超时与中止；两者都 abort 子会话，避免它继续烧 token。
- * 只结算一次（超时 / 中止 / 正常结束三者竞争）。
+ * 前台跑一条 prompt，带「无进展看门狗」与总时长上限；两者都 abort 子会话，避免它继续烧 token。
+ *
+ * 为什么不是一刀切的 10 分钟：实测子会话跑完一次自包含任务常需 80–100 步，按 6–7s/步
+ * 早已越过 10 分钟，于是大量任务卡在八九成处被砍（见 `plans` 里的会话剖析）。
+ * 现在改成：只要还在产消息 / 工具结果就续命，连续无进展才判为卡住；总时长仍留一个上限。
+ * 只结算一次（空闲 / 总时长 / 中止 / 正常结束四者竞争）。
  */
-const promptChild = (child: AgentSession, task: string, signal?: AbortSignal): Promise<void> =>
+const promptChild = (
+  child: AgentSession,
+  task: string,
+  signal: AbortSignal | undefined,
+  timeouts: { idleMs: number; maxDurationMs: number },
+): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     let settled = false;
+    let idleTimer: NodeJS.Timeout | undefined;
     const cleanup = (): void => {
-      clearTimeout(timer);
+      if (idleTimer) clearTimeout(idleTimer);
+      clearTimeout(hardTimer);
+      unsubscribe();
       signal?.removeEventListener("abort", onAbort);
     };
-    const fail = (message: string): void => {
+    /** `partial` 为真表示看门狗判定的超时（带半成品回去）；用户中止不带 */
+    const fail = (message: string, options?: { partial?: boolean }): void => {
       if (settled) return;
       settled = true;
       cleanup();
       void child.abort();
-      reject(new SubagentError(message));
+      reject(new SubagentError(message, { aborted: true, ...options }));
     };
     const onAbort = (): void => fail("子智能体已中止。");
-    const timer = setTimeout(
-      () => fail("子智能体执行超时，已中止；请缩小任务范围后重试。"),
-      SUBAGENT_TIMEOUT_MS,
+    // 进展即续命：任何事件都说明它还在动
+    const bump = (): void => {
+      if (settled) return;
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(
+        () =>
+          fail(
+            `子智能体已 ${Math.round(timeouts.idleMs / 60_000)} 分钟没有新进展（可能卡在等待输入），已中止；请缩小任务范围后重试。`,
+            { partial: true },
+          ),
+        timeouts.idleMs,
+      );
+      idleTimer.unref?.();
+    };
+    const unsubscribe = child.subscribe(() => bump());
+    const hardTimer = setTimeout(
+      () =>
+        fail(
+          `子智能体已超过总时长上限（${Math.round(timeouts.maxDurationMs / 60_000)} 分钟），已中止；请把任务切小后重试。`,
+          { partial: true },
+        ),
+      timeouts.maxDurationMs,
     );
+    hardTimer.unref?.();
     if (signal?.aborted) {
       fail("子智能体已中止。");
       return;
     }
     signal?.addEventListener("abort", onAbort, { once: true });
+    bump();
     child.prompt(task).then(
       () => {
         if (settled) return;
@@ -217,14 +269,33 @@ export const spawnSubagent = async (
   });
 
   let isError = false;
+  let aborted = false;
   try {
-    await promptChild(child, input.request.task, input.signal);
+    await promptChild(child, input.request.task, input.signal, deps.timeouts ?? DEFAULT_TIMEOUTS);
     return { sessionId: childId, text: lastAssistantText(child) };
   } catch (error) {
     isError = true;
+    aborted = error instanceof SubagentError && error.aborted;
+    // 看门狗判定的超时把半成品带回去：子会话可能已跑了上百步，直接丢弃等于让它从零重来。
+    // 用户主动中止不带，仍按中止向上传播。
+    // 口径有意分开：工具结果按「部分成功」给模型（它要接着用），而 subagent_end 帧仍标 isError，
+    // 让界面上的子会话卡片照实显示「这个子会话没跑完」。
+    if (error instanceof SubagentError && error.aborted && error.partial) {
+      return {
+        sessionId: childId,
+        text: lastAssistantText(child),
+        aborted: true,
+        reason: error.message,
+      };
+    }
     throw error;
   } finally {
-    deps.emit("subagent_end", { toolCallId: input.toolCallId, sessionId: childId, isError });
+    deps.emit("subagent_end", {
+      toolCallId: input.toolCallId,
+      sessionId: childId,
+      isError,
+      aborted,
+    });
     // 失败（超时 / 中止）也要回写：子会话可能已写出 JSONL，不回写会永远停在「未落盘」的草稿口径
     deps.refresh(childId);
     // 子会话挂起的审批 / 提问归属父会话，结束时一并结算，避免子会话已结束而请求仍挂在前端
