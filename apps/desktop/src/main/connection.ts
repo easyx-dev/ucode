@@ -32,11 +32,18 @@ if (repoRoot) {
   }
 }
 
-/** 与 server 同口径：`APP_HOME` 相对路径按仓库根解析，缺省落在 `~/<appHomeDirname>` */
+/**
+ * 与 server 同口径：`APP_HOME` 支持 `~`，相对路径按仓库根解析，缺省落在 `~/<appHomeDirname>`。
+ *
+ * `~` 这一支不能少：`.env.prod` 里写的就是 `APP_HOME=~/<默认目录名>` 这种形式，不展开会把它当成普通
+ * 目录名、拼出 `<仓库根>/~/…`，表现为「未找到服务注册文件」而连不上服务。
+ */
 export const resolveHomeDir = (value = process.env.APP_HOME): string => {
   const raw = value?.trim();
   if (!raw) return resolve(homedir(), appHomeDirname);
-  return isAbsolute(raw) ? raw : resolve(repoRoot ?? process.cwd(), raw);
+  const expanded = raw.startsWith("~/") ? resolve(homedir(), raw.slice(2)) : raw;
+  const withTilde = raw === "~" ? homedir() : expanded;
+  return isAbsolute(withTilde) ? withTilde : resolve(repoRoot ?? process.cwd(), withTilde);
 };
 
 /** 服务注册文件：`<APP_HOME>/app/service.json`（目录名与文件名与 server 常量对齐） */
