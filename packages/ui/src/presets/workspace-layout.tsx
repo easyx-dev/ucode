@@ -428,10 +428,6 @@ export function WorkspaceLayout({
     onOpenAutomation: () => toast.info(t("自动化功能即将推出")),
     onOpenMarketplace: () => toast.info(t("插件市场即将推出")),
     onOpenSettings: openSettings,
-    childrenByParent: sessions.childrenByParent,
-    childrenLoading: sessions.childrenLoading,
-    onLoadChildren: sessions.loadChildren,
-    activeParentId: activeSession?.parentSessionId ?? null,
   };
 
   return (

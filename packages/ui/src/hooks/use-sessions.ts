@@ -15,10 +15,6 @@ export type SessionsController = {
   loading: boolean;
   /** 当前语言渲染的错误文案 */
   error: string | null;
-  /** 已加载的子会话，按父会话 id 索引 */
-  childrenByParent: Record<string, SessionSummary[]>;
-  childrenLoading: Record<string, boolean>;
-  loadChildren: (parentId: string) => Promise<void>;
   refresh: () => Promise<void>;
   create: (seed?: SessionCreateRequest) => Promise<SessionSummary | null>;
   fork: (sessionId: string, fromEntryId?: string) => Promise<SessionSummary | null>;
@@ -43,9 +39,6 @@ export function useSessions(): SessionsController {
     sessions: state.list,
     loading: state.loading,
     error,
-    childrenByParent: state.childrenByParent,
-    childrenLoading: state.childrenLoading,
-    loadChildren: client.sessions.loadChildren,
     refresh: client.sessions.refresh,
     create: client.sessions.create,
     fork: client.sessions.fork,

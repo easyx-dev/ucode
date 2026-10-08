@@ -1,7 +1,6 @@
-/** 会话侧栏：品牌头、顶部功能菜单、项目 / 助理分类列表与底部设置入口 */
+/** 会话侧栏：品牌头、顶部功能菜单、项目 / 助理分类列表与底部身份区 */
 import { brand } from "@ucode/brand";
 import { Settings2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "../base/avatar";
 import { Button } from "../base/button";
@@ -35,13 +34,6 @@ type SessionSidebarProps = {
   onOpenAutomation: () => void;
   onOpenMarketplace: () => void;
   onOpenSettings: () => void;
-  /** 已加载的子会话，按父会话 id 索引 */
-  childrenByParent: Record<string, SessionSummary[]>;
-  childrenLoading: Record<string, boolean>;
-  /** 展开某个父会话时拉取其子会话 */
-  onLoadChildren: (sessionId: string) => void;
-  /** 当前会话若是子会话，这里是它的父会话 id；用于自动展开并高亮 */
-  activeParentId: string | null;
 };
 
 export function SessionSidebar({
@@ -62,39 +54,10 @@ export function SessionSidebar({
   onOpenAutomation,
   onOpenMarketplace,
   onOpenSettings,
-  childrenByParent,
-  childrenLoading,
-  onLoadChildren,
-  activeParentId,
 }: SessionSidebarProps) {
   const { t } = useTranslation();
   /** 用户名的来源（登录态 / 配置项）尚未确定，本轮先固定展示；接入时只改这一处 */
   const localUserName = t("本地用户");
-  /** 展开子会话的父会话 id；展开即拉取（重复展开会重取，保证楼层刷新后不过期） */
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const toggleChildren = useCallback(
-    (sessionId: string) => {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(sessionId)) {
-          next.delete(sessionId);
-        } else {
-          next.add(sessionId);
-          onLoadChildren(sessionId);
-        }
-        return next;
-      });
-    },
-    [onLoadChildren],
-  );
-
-  // 直接打开 / 刷新子会话时自动展开其父会话，让当前项在侧栏可见
-  useEffect(() => {
-    if (!activeParentId) return;
-    setExpanded((prev) => (prev.has(activeParentId) ? prev : new Set(prev).add(activeParentId)));
-    onLoadChildren(activeParentId);
-  }, [activeParentId, onLoadChildren]);
 
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
@@ -126,11 +89,6 @@ export function SessionSidebar({
         }}
         onTogglePin={onTogglePin}
         onOpenWorkspace={onOpenWorkspace}
-        childrenByParent={childrenByParent}
-        childrenLoading={childrenLoading}
-        expanded={expanded}
-        onToggleChildren={toggleChildren}
-        searching={false}
       />
 
       <div className="flex items-center gap-2 p-2 shadow-edge">
