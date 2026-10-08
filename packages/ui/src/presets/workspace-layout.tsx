@@ -38,10 +38,12 @@ import { useSessions } from "../hooks/use-sessions";
 import { useStatus } from "../hooks/use-status";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
 import { compactionNoticeMessage } from "../lib/compaction";
+import { textToDoc } from "../lib/composer-document";
 import { composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
 import type { GoalCommand } from "../lib/goal-command";
 import {
+  CHAT_MIN_WIDTH,
   HANDLE_IDS,
   PANEL_IDS,
   SIDEBAR_PANEL,
@@ -53,6 +55,7 @@ import { isWorkspaceSession } from "../lib/session-groups";
 import { DEFAULT_SETTINGS_SECTION, type SettingsSectionId } from "../lib/settings-section";
 import type {
   ChatItem,
+  EditMessagePayload,
   PermissionMode,
   SessionCreateRequest,
   SessionSummary,
@@ -74,10 +77,22 @@ export type WorkspaceLayoutProps = {
 /** 侧栏收起状态的持久化键 */
 const SIDEBAR_COLLAPSED_KEY = `${brand.slug}-sidebar-collapsed`;
 
+/** 工作台展开状态的持久化键 */
+const WORKBENCH_OPEN_KEY = `${brand.slug}-workbench-open`;
+
 /** 读出上次的侧栏收起状态；读不到时默认展开 */
 const readSidebarCollapsed = (): boolean => {
   try {
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+/** 读出上次的工作台展开状态；读不到时默认收起 */
+const readWorkbenchOpen = (): boolean => {
+  try {
+    return window.localStorage.getItem(WORKBENCH_OPEN_KEY) === "1";
   } catch {
     return false;
   }
@@ -104,8 +119,8 @@ export function WorkspaceLayout({
   useSessionNotices({ onSelectSession: setActiveId });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
-  // 工作台：默认收起（用 open 表示）；标签、树列可见性与预览目标一并受控
-  const [workbenchOpen, setWorkbenchOpen] = useState(false);
+  // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
+  const [workbenchOpen, setWorkbenchOpen] = useState(readWorkbenchOpen);
   const [workbenchTab, setWorkbenchTab] = useState<WorkbenchTab>("changes");
   const [treeVisible, setTreeVisible] = useState(true);
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -159,11 +174,21 @@ export function WorkspaceLayout({
     });
   }, []);
 
+  /** 展开 / 收起工作台并落盘；移动端抽屉由 workbenchSheetOpen 单独管 */
+  const applyWorkbenchOpen = useCallback((open: boolean) => {
+    setWorkbenchOpen(open);
+    try {
+      window.localStorage.setItem(WORKBENCH_OPEN_KEY, open ? "1" : "0");
+    } catch {
+      // 写不进去（隐私模式）不影响使用
+    }
+  }, []);
+
   /** 展开工作台；窄屏下同时唤出抽屉 */
   const showWorkbench = useCallback(() => {
-    setWorkbenchOpen(true);
+    applyWorkbenchOpen(true);
     if (!isDesktop) setWorkbenchSheetOpen(true);
-  }, [isDesktop]);
+  }, [applyWorkbenchOpen, isDesktop]);
 
   /** 打开某个文件的预览：展开面板、切到「文件」标签 */
   const openPreview = useCallback(
@@ -184,10 +209,18 @@ export function WorkspaceLayout({
       toggleTree: () => setTreeVisible((prev) => !prev),
       activeFile,
       openPreview,
-      collapse: () => setWorkbenchOpen(false),
+      collapse: () => applyWorkbenchOpen(false),
       cwd: activeSession?.cwd ?? workspacesDir,
     }),
-    [activeFile, activeSession?.cwd, openPreview, treeVisible, workbenchTab, workspacesDir],
+    [
+      activeFile,
+      activeSession?.cwd,
+      applyWorkbenchOpen,
+      openPreview,
+      treeVisible,
+      workbenchTab,
+      workspacesDir,
+    ],
   );
 
   // 打开会话即标记已读：内容新于上次已读、且不在生成中时才提交，避免自我循环
@@ -338,7 +371,8 @@ export function WorkspaceLayout({
     })();
   };
 
-  const editMessage = (item: ChatItem, text: string): Promise<boolean> => chat.edit(item.id, text);
+  const editMessage = (item: ChatItem, payload: EditMessagePayload): Promise<boolean> =>
+    chat.edit(item.id, payload);
 
   /** 内置命令（`/` 菜单第一组）：执行界面动作，不进消息流 */
   const runBuiltin = (id: BuiltinCommandId): void => {
@@ -370,12 +404,24 @@ export function WorkspaceLayout({
         if (!activeId) return;
         void chat.compact();
         break;
-      case "goal":
-        toast.info(t("在输入框以 /goal 开头设定或查看目标"));
+      case "goal": {
+        // 目标要用户自己写：把命令名放到正文最前面，已有内容原样留在后面当目标文本
+        // （编辑器里选中 `/goal` 是同一个效果：只替换命令名那一段，不碰文档其余部分）
+        if (!activeId) return;
+        const key = composerKeyOf(activeId);
+        const current = composer.drafts[key]?.text.trim() ?? "";
+        if (current.startsWith("/goal")) break;
+        const command = current ? `/goal ${current}` : "/goal ";
+        composer.update(key, { text: command, doc: textToDoc(command) });
         break;
+      }
       case "help":
         toast.info(t("可用内置命令见输入框的 / 菜单"), {
-          description: BUILTIN_COMMANDS.map((command) => `/${command.name}`).join("  "),
+          description: BUILTIN_COMMANDS.map((command) =>
+            command.argumentHint
+              ? `/${command.name} <${command.argumentHint}>`
+              : `/${command.name}`,
+          ).join("  "),
         });
         break;
     }
@@ -471,11 +517,11 @@ export function WorkspaceLayout({
                     <SessionSidebar {...sidebarProps} />
                   </div>
                 </ResizablePanel>
-                <ResizableHandle id={HANDLE_IDS.sidebar} />
+                <ResizableHandle id={HANDLE_IDS.sidebar} className="-ml-3" />
               </>
             ) : null}
 
-            <ResizablePanel id={PANEL_IDS.chat} className="min-w-0">
+            <ResizablePanel id={PANEL_IDS.chat} minSize={CHAT_MIN_WIDTH} className="min-w-0">
               <div className="flex h-full w-full">
                 <ChatPanel
                   session={activeSession}
@@ -506,11 +552,11 @@ export function WorkspaceLayout({
                   sidebarCollapsed={sidebarCollapsed}
                   onToggleWorkbench={() => {
                     // 桌面端已展开就收起；否则展开到默认标签。移动端一律唤出抽屉
-                    if (workbenchOpen) setWorkbenchOpen(false);
+                    if (workbenchOpen) applyWorkbenchOpen(false);
                     else showWorkbench();
                   }}
                   workbenchOpen={workbenchOpen}
-                  onNewTask={startNewSession}
+                  onRenameSession={activeSession ? () => requestRename(activeSession) : undefined}
                   onFork={forkFrom}
                   onEdit={editMessage}
                   forkedFromName={forkSourceName}
@@ -612,6 +658,7 @@ export function WorkspaceLayout({
             onOpenChange={setPaletteOpen}
             sessions={sessionsView}
             fileRoot={activeSession?.cwd ?? workspacesDir}
+            hasSession={activeId !== null}
             onSelectSession={setActiveId}
             onRunBuiltin={runBuiltin}
             onNewTask={startNewSession}
@@ -620,7 +667,7 @@ export function WorkspaceLayout({
             onOpenSettings={openSettings}
             onToggleSidebar={toggleSidebar}
             onToggleWorkbench={() => {
-              if (workbenchOpen) setWorkbenchOpen(false);
+              if (workbenchOpen) applyWorkbenchOpen(false);
               else showWorkbench();
             }}
             onOpenFile={openPreview}

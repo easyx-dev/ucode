@@ -17,6 +17,7 @@ import {
   type ChatItem,
   type ContextUsage,
   DEFAULT_PERMISSION_MODE,
+  type EditMessagePayload,
   type GoalView,
   type InteractionRespondRequest,
   type ModelsResponse,
@@ -68,12 +69,12 @@ type ChatPanelProps = {
   onToggleWorkbench?: () => void;
   /** 工作台是否展开 */
   workbenchOpen?: boolean;
-  /** 新建任务（顶栏入口） */
-  onNewTask?: () => void;
+  /** 双击标题就地改名（新名称弹层由上层管） */
+  onRenameSession?: () => void;
   /** 从某条消息分叉出新会话 */
   onFork: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话、非生成中可用） */
-  onEdit: (item: ChatItem, text: string) => Promise<boolean>;
+  onEdit: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
   /** 本会话分叉自的源会话名；用于头部来源链接 */
   forkedFromName?: string | null;
   /** 当前会话目标；用于输入区上方的目标栏 */
@@ -119,7 +120,7 @@ export function ChatPanel({
   sidebarCollapsed,
   onToggleWorkbench,
   workbenchOpen,
-  onNewTask,
+  onRenameSession,
   onFork,
   onEdit,
   forkedFromName,
@@ -201,8 +202,8 @@ export function ChatPanel({
 
   /** 编辑重发与发送同一条路径：受理后同样要落回最新一行 */
   const handleEdit = useCallback(
-    async (item: ChatItem, text: string): Promise<boolean> => {
-      const accepted = await onEdit(item, text);
+    async (item: ChatItem, payload: EditMessagePayload): Promise<boolean> => {
+      const accepted = await onEdit(item, payload);
       if (accepted) setSentTick((tick) => tick + 1);
       return accepted;
     },
@@ -267,7 +268,7 @@ export function ChatPanel({
         sidebarCollapsed={sidebarCollapsed}
         onToggleWorkbench={onToggleWorkbench}
         workbenchOpen={workbenchOpen}
-        onNewTask={onNewTask}
+        onRenameSession={onRenameSession}
         // 草稿阶段还没有目录可看
         onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
         onBackToParent={onBackToParent}

@@ -63,6 +63,21 @@ describe("expandContexts", () => {
     assert.throws(() => expandContexts(root, [{ path: join(outside, "x.txt") }]), /越出工作目录/);
   });
 
+  it("相对路径按工作目录解析（编辑重发回传的就是相对写法）", () => {
+    const root = makeTemp();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "a.ts"), "line1\n", "utf8");
+
+    const out = expandContexts(root, [{ path: "src/a.ts", startLine: 1 }]);
+
+    assert.match(out, /^<context path="src\/a\.ts" lines="1-">/);
+    assert.match(out, /line1/);
+  });
+
+  it("相对写法同样受工作目录约束", () => {
+    assert.throws(() => expandContexts(makeTemp(), [{ path: "../escape.txt" }]), /越出工作目录/);
+  });
+
   it("不存在的路径抛 path_not_found", () => {
     const root = makeTemp();
     assert.throws(() => expandContexts(root, [{ path: join(root, "nope.txt") }]), /路径不存在/);

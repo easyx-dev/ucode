@@ -25,9 +25,17 @@ export const isWorkspaceSession = (cwd: string, root: string): boolean => {
   return cwd.startsWith(prefix);
 };
 
+/** 组内最早的创建时间：项目分组的排序键（组内是 `updatedAt` 降序，不能拿首项当最早） */
+const groupCreatedAt = (sessions: readonly SessionSummary[]): string =>
+  sessions.reduce(
+    (earliest, session) => (session.createdAt < earliest ? session.createdAt : earliest),
+    sessions[0]?.createdAt ?? "",
+  );
+
 /**
  * 分区：cwd 落在助理根之下的进「助理区」（平铺），其余按 cwd 精确归组进「项目区」。
- * 组内保持入参顺序（列表已按 `updatedAt` 降序）；项目区各组按组内最近活动降序。
+ * 组内保持入参顺序（列表已按 `updatedAt` 降序）；项目区各组按**组内最早会话的创建时间**降序——
+ * 新项目排最前，之后在哪个项目里发消息都不会把分组顺序顶得来回跳。
  * 空分区不输出。
  */
 export const groupSessions = (
@@ -51,7 +59,7 @@ export const groupSessions = (
 
   const projectGroups = [...byDir.entries()]
     .map(([path, items]) => ({ name: baseName(path), path, sessions: items }))
-    .sort((a, b) => (b.sessions[0]?.updatedAt ?? "").localeCompare(a.sessions[0]?.updatedAt ?? ""));
+    .sort((a, b) => groupCreatedAt(b.sessions).localeCompare(groupCreatedAt(a.sessions)));
   if (projectGroups.length > 0) sections.push({ kind: "projects", groups: projectGroups });
 
   if (assistant.length > 0) {

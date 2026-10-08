@@ -7,16 +7,6 @@ import { sessionIdSchema } from "../sessions/input";
 export const messageListInputSchema = z.object({ sessionId: sessionIdSchema });
 
 /**
- * 编辑一条已发送的用户消息并重发：`entryId` 是消息 DTO 的 id（即 pi 条目 id），
- * 服务端对着活动分支校验（不在活动分支 / 非用户消息一律 400）；旧分支保留在会话文件里。
- */
-export const messageEditInputSchema = z.object({
-  sessionId: sessionIdSchema,
-  entryId: z.string().min(1),
-  text: z.string().min(1),
-});
-
-/**
  * 附件引用：`id` 是上传接口返回的内容 hash（64 位小写 hex，sha256）。
  * 图片与非图片都用同一套引用；服务端按入库的 mimeType 决定发给模型还是只做引用。
  */
@@ -24,11 +14,27 @@ export const attachmentRefSchema = z.object({
   id: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
-/** `@` 上下文引用：绝对路径 + 可选行范围；服务端读内容后前置进正文 */
+/** `@` 上下文引用：绝对路径或工作目录相对路径 + 可选行范围；服务端读内容后前置进正文 */
 export const contextRefSchema = z.object({
   path: z.string().min(1),
   startLine: z.number().int().positive().optional(),
   endLine: z.number().int().positive().optional(),
+});
+
+/**
+ * 编辑一条已发送的用户消息并重发：`entryId` 是消息 DTO 的 id（即 pi 条目 id），
+ * 服务端对着活动分支校验（不在活动分支 / 非用户消息一律 400）；旧分支保留在会话文件里。
+ *
+ * `contexts` / `attachments` 与 `promptInputSchema` 同形：原消息里的 `@` 引用与附件由编辑器还原后
+ * 一并回传，重发时才不会丢掉它们（附件只需 id——引用按内容寻址，重建不需要其余视图信息）。
+ * `text` 必填：编辑的意义就是改正文，原样重发没有意义。
+ */
+export const messageEditInputSchema = z.object({
+  sessionId: sessionIdSchema,
+  entryId: z.string().min(1),
+  text: z.string().min(1),
+  contexts: z.array(contextRefSchema).max(PROMPT_MAX_CONTEXTS).optional(),
+  attachments: z.array(attachmentRefSchema).max(PROMPT_MAX_ATTACHMENTS).optional(),
 });
 
 /**

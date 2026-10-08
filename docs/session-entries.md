@@ -50,6 +50,28 @@
 
 ## 约定
 
+### 用户消息的正文形状
+
+一条用户消息的正文（`message` 条目里 user 角色的 `content` 文本）不是用户原话本身，而是
+「注入内容的边界块 + 用户原话」拼成的，顺序固定（见 `server/src/core/run.ts` 的 `composeText`）：
+
+```
+<skill name="…" location="…">…</skill>   ← `/skill:name` 展开的技能正文（可选）
+<command name="…" args="…">…</command>  ← `/name args` 展开的提示词命令正文（可选）
+<context path="…" lines="…">…</context> ← `@` 引用读到的内容，一条一个块（可多条）
+[附件: name (id: <sha256>)]              ← 非图片附件的引用行，一行一个（可多行）
+用户原话                                  ← 正文，`@<路径>` 标记留在句子里
+```
+
+- 边界块的正文归服务端中和同名标签、属性转义（`harness/tools/untrusted`），所以「匹配首个闭合标签」是安全的。
+- 命令与技能由**服务端**展开（pi 的展开要求整条输入以 `/` 开头，而 `@` 引用拼在前面，交给 pi 会整条不展开），
+  边界块同时是客户端认出「这是一条命令 / 技能」的唯一依据。
+- 客户端回放靠 `packages/ui/src/lib/message-chips.ts` 的段落化解析：剥块 → 出 chip；`@<路径>` 只认前置块里
+  出现过的路径，按最长匹配切成 chip，用户自己打的 `@张三` 不受影响。
+- `@` 引用的 `path` 是工作目录相对写法（编辑重发回传的也是它），服务端读内容时按会话工作目录解析。
+- 编辑重发（`messages/edit`）走同一套投递口径：客户端把原消息里的引用与附件一并回传，
+  重发才不丢它们。
+
 - 命名一律 `ucode.` 前缀加 kebab-case；常量写在 `packages/contracts/src/constants.ts`（跨端常量，
   值即条目里的 `customType`），并与本文档的表格逐条对齐——`scripts/verify` 双向校验。
 - payload 字段 camelCase（与 `docs/api.md` 的字段命名同口径）；时间用 `at`（ISO 8601 字符串），

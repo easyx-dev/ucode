@@ -1,5 +1,5 @@
 /** 会话流在界面上消费的类型：消息条目与子智能体进度（供各端复用） */
-import type { AttachmentView, ContextRef, MessageDTO } from "@ucode/contracts";
+import type { AttachmentRef, AttachmentView, ContextRef, MessageDTO } from "@ucode/contracts";
 
 /** 单条 assistant 消息的思考耗时；由客户端按事件到达时间测得，不落盘、快照重建后不再有 */
 export type ChatItemTiming = {
@@ -47,4 +47,15 @@ export type PromptPayload = {
   text: string;
   contexts: ContextRef[];
   attachments: AttachmentView[];
+};
+
+/**
+ * 编辑重发的载荷：正文 + 原消息里的 `@` 引用与附件。
+ * 附件只带 id —— 引用按内容寻址，重建时不需要名称 / 大小这些视图信息。
+ */
+export type EditMessagePayload = {
+  text: string;
+  contexts?: ContextRef[];
+  /** 只带 id 的附件引用 */
+  attachments?: AttachmentRef[];
 };

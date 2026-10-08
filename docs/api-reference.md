@@ -738,6 +738,12 @@
 | `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
 | `entryId` | string（长度≥1） | 是 | — | — |
 | `text` | string（长度≥1） | 是 | — | — |
+| `contexts` | object[]（≤32 项） | 否 | — | — |
+| `contexts[].path` | string（长度≥1） | 是 | — | — |
+| `contexts[].startLine` | integer（>0） | 否 | — | — |
+| `contexts[].endLine` | integer（>0） | 否 | — | — |
+| `attachments` | object[]（≤8 项） | 否 | — | — |
+| `attachments[].id` | string（格式 `^[0-9a-f]{64}$`） | 是 | — | — |
 
 **响应类型**：`PromptAdmittedResponse`
 
@@ -1647,7 +1653,7 @@
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
-| `source` | "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -1655,7 +1661,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
-| `source` | "project" \| "global" \| "agents-project" \| "agents-user" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | — |
 
 ### ModelUsage
 

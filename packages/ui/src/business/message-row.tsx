@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import type { ToolEntry } from "../lib/chat-nodes";
 import type { ChatRow } from "../lib/chat-rows";
 import { modeChangeText } from "../lib/mode";
-import type { ChatItem } from "../lib/types";
+import type { ChatItem, EditMessagePayload } from "../lib/types";
 import { ActivityGroup } from "./activity-group";
 import { CompactionDivider } from "./compaction-divider";
 import { DividerLine } from "./divider-line";
@@ -30,7 +30,7 @@ export type MessageRowContext = {
   /** 从该条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话） */
-  onEdit?: (item: ChatItem, text: string) => Promise<boolean>;
+  onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
 };
 
 export function MessageRow({ row, context }: { row: ChatRow; context: MessageRowContext }) {

@@ -10,6 +10,7 @@ import {
   type PromptInput,
 } from "@ucode/contracts";
 import type { Services } from "../app";
+import { expandCommand, expandSkillCommand } from "../harness/assets/expand";
 import { resolveAttachment } from "../harness/attachment";
 import { expandContexts } from "../harness/context";
 import { resolveEditableUserEntry } from "../harness/edit";
@@ -49,15 +50,25 @@ const startRun = (
   services.pool.startRun(sessionId, session, text, images);
 };
 
+/** 投递内容里与会话无关的那部分：前置展开块与 vision 数组都已备好，正文还没动 */
+type PreparedPrompt = {
+  /** 前置展开块（`@` 引用 + 非图片附件的引用行），无内容时为空串 */
+  prefix: string;
+  /** 用户正文，此时还没展开命令 */
+  text: string;
+  images: PromptImage[];
+};
+
 /**
- * 组装投递内容：展开引用、按附件 id 取回内容，拼成模型要读的正文。
- * 越界路径与查不到的附件在这里就报错，不必先把会话实例建出来。
+ * 展开引用、按附件 id 取回内容。`prompt` 与 `edit` 都以这三项为投递内容，故按最小结构接收。
+ * 越界路径与查不到的附件在这里就报错，不必先把会话实例建出来；
+ * 命令与技能的展开要等会话装配好（模板来自 `session`），见 `assemblePrompt`。
  */
-const buildPrompt = (
+const preparePrompt = (
   repo: Services["attachments"],
   cwd: string,
-  input: PromptInput,
-): { body: string; images: PromptImage[] } => {
+  input: Pick<PromptInput, "text" | "contexts" | "attachments">,
+): PreparedPrompt => {
   const expanded = expandContexts(cwd, input.contexts ?? []);
   const images: PromptImage[] = [];
   const refLines: string[] = [];
@@ -74,10 +85,33 @@ const buildPrompt = (
     else refLines.push(`[附件: ${found.name ?? found.id} (id: ${found.id})]`);
   }
 
-  const body = [expanded, refLines.join("\n"), input.text]
-    .filter((part) => part.length > 0)
-    .join("\n\n");
-  return { body, images };
+  return {
+    prefix: [expanded, refLines.join("\n")].filter((part) => part.length > 0).join("\n\n"),
+    text: input.text,
+    images,
+  };
+};
+
+/** 前置展开块 + 正文拼成一段；两段都空时给空串 */
+const composeText = (prefix: string, text: string): string =>
+  [prefix, text].filter((part) => part.length > 0).join("\n\n");
+
+/**
+ * 拼装模型要读的正文：`/name args`（提示词命令）与 `/skill:name args`（技能）在这里换成边界块。
+ * 两种展开都由服务端做——边界块同时是客户端认出「这是一条命令 / 技能」的依据，必须落在会话条目里。
+ * 展开后的块以 `<` 开头，pi 侧的技能与模板展开不会重复触发（见 `assets/expand.ts`）。
+ */
+const assemblePrompt = (
+  prepared: PreparedPrompt,
+  session: AgentSession,
+): { body: string; images: PromptImage[] } => {
+  const invocation =
+    expandSkillCommand(prepared.text, session.resourceLoader.getSkills().skills) ??
+    expandCommand(prepared.text, session.promptTemplates);
+  return {
+    body: composeText(prepared.prefix, invocation?.block ?? prepared.text),
+    images: prepared.images,
+  };
 };
 
 /**
@@ -101,15 +135,13 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
     throw new AppError(ERROR_CODES.invalidRequest, "消息不能为空", 400);
   }
 
-  const { body, images: content } = buildPrompt(
-    services.attachments,
-    resolveSessionCwd(record),
-    input,
-  );
+  const prepared = preparePrompt(services.attachments, resolveSessionCwd(record), input);
 
   // 只在「创建/取回 AgentSession」这段加锁；run 本身不占锁，
   // 否则并发请求会一直排队到上一轮结束，steer / follow-up 永远不会生效
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
+
+  const { body, images: content } = assemblePrompt(prepared, session);
 
   // 装配成功后再把附件转为永久：ensure 失败（如未配模型）时不留下永不清理的附件
   services.attachments.markReferenced(
@@ -120,9 +152,14 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   /**
    * 开新一轮：先让标题服务看一眼是不是首轮（是就与这一轮同时起一次标题），再投递。
    * 排队（steer / follow-up）不算新一轮，也走不到这里。
+   * 标题取用户那句：命令展开出来的模板正文会把标题带偏。
    */
   const beginTurn = (): void => {
-    services.titles.generateForPrompt(sessionId, session, body);
+    services.titles.generateForPrompt(
+      sessionId,
+      session,
+      composeText(prepared.prefix, prepared.text),
+    );
     startRun(services, sessionId, session, body, content);
   };
 
@@ -143,13 +180,16 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
 };
 
 /**
- * 编辑一条已发送的用户消息并重发：把活动分支移回该消息之前，再以新文本开一轮。
+ * 编辑一条已发送的用户消息并重发：把活动分支移回该消息之前，再以新内容开一轮。
+ *
+ * 与 `admitPrompt` 同一套投递口径：引用与附件按同一份 `preparePrompt` 展开、命令与技能同样换成
+ * 边界块——否则编辑过的命令会以裸模板正文落盘，界面认不出命令，引用与附件也一并丢掉。
  *
  * 旧分支条目原样留在会话文件里（不删除、不总结），因此这一步不是「修改历史」而是「换一条分支继续」。
  * 与 prompt 不同，编辑不能在忙碌时排队——它改变的是本轮起点，必须等会话彻底空闲。
  */
 export const admitEdit = async (services: Services, input: MessageEditInput): Promise<void> => {
-  const { sessionId, entryId, text } = input;
+  const { sessionId, entryId } = input;
 
   const record = services.sessions.find(sessionId);
   if (!record || record.deletedAt) {
@@ -161,6 +201,9 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
   if (record.parentSessionId || record.agent) {
     throw new AppError(ERROR_CODES.invalidRequest, "子智能体会话不支持编辑", 400);
   }
+
+  // 与会话无关的展开先做：越界路径 / 查不到的附件在排队等锁之前就报错
+  const prepared = preparePrompt(services.attachments, resolveSessionCwd(record), input);
 
   // 编辑先改活动分支再开生成，整段决策必须在同一把锁内完成：
   // 否则并发编辑会各自通过空闲检查、重复 navigateTree，把叶子改乱
@@ -180,9 +223,15 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
       throw new AppError(ERROR_CODES.invalidRequest, `编辑失败：${reason}`, 400);
     }
 
+    const { body, images } = assemblePrompt(prepared, session);
+    // 与 admitPrompt 一致：装配成功后再把附件转为永久，避免失败时留下永不清理的附件
+    services.attachments.markReferenced(
+      (input.attachments ?? []).map((ref) => ref.id),
+      new Date().toISOString(),
+    );
     // 活动分支已改变：让所有在线客户端丢弃本地历史、重新取快照
     services.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
-    startRun(services, sessionId, session, text);
+    startRun(services, sessionId, session, body, images);
   });
 };
 

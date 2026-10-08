@@ -3,14 +3,16 @@
  *
  * - `@`：`contextMention`（任意位置），发送时剥离为 `contexts[]`
  * - `/`：`commandMention`（仅文档开头），序列化为 `/name` 或 `/skill:name`；内置动作为空节点、立即执行
+ * - 历史：`@tiptap/pm/history` 的插件包一层，`⌘Z` 撤销、`⌘⇧Z` 与 `⌘Y` 前进
  */
-import type { Editor, JSONContent } from "@tiptap/core";
+import { type Editor, Extension, type JSONContent } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import HardBreak from "@tiptap/extension-hard-break";
 import Mention from "@tiptap/extension-mention";
 import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import Text from "@tiptap/extension-text";
+import { history, redo, undo } from "@tiptap/pm/history";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import type { ComposerNode } from "../../lib/composer-document";
@@ -18,6 +20,24 @@ import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
 
 const CHIP_CLASS = "rounded bg-muted px-1 py-0.5 text-foreground";
+
+/**
+ * 撤销 / 重做：本轮没有引入 `@tiptap/extension-undo-redo`，直接用已装的 ProseMirror 历史插件包一层，
+ * 与 Tiptap 自带扩展同一套命令（附件条在编辑器之外，不进这份历史）。
+ */
+const History = Extension.create({
+  name: "history",
+  addProseMirrorPlugins() {
+    return [history()];
+  },
+  addKeyboardShortcuts() {
+    return {
+      "Mod-z": () => undo(this.editor.view.state, this.editor.view.dispatch),
+      "Mod-Shift-z": () => redo(this.editor.view.state, this.editor.view.dispatch),
+      "Mod-y": () => redo(this.editor.view.state, this.editor.view.dispatch),
+    };
+  },
+});
 
 const ContextMention = Mention.extend({
   name: "contextMention",
@@ -119,6 +139,7 @@ export function ComposerEditor({
       Paragraph,
       Text,
       HardBreak,
+      History,
       ContextMention.configure({
         HTMLAttributes: { class: CHIP_CLASS },
         renderText: () => "",
@@ -159,6 +180,11 @@ export function ComposerEditor({
           command: ({ editor: target, range, props }) => {
             const item = props as SuggestionItem;
             if (typeof item.builtin === "string") {
+              // 参数型命令（如 `/goal`）只把命令名填进去，等用户在正文里补参数，不立即执行
+              if (item.takesArgument === true) {
+                target.chain().insertContentAt(range, `${item.label} `).focus("end").run();
+                return;
+              }
               target.chain().focus().deleteRange(range).run();
               onBuiltinRef.current(item.builtin);
               return;

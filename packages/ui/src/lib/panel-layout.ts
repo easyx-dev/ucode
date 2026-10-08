@@ -43,8 +43,11 @@ export const WORKBENCH_PANEL: PanelSpec = {
   id: PANEL_IDS.workbench,
   default: 420,
   min: 320,
-  max: 720,
+  max: 1200,
 };
+
+/** 对话区的宽度下限：再窄就读不下正文，拖拽到此为止 */
+export const CHAT_MIN_WIDTH = 400;
 
 /** 文件标签里左侧目录树的宽度 */
 export const FILE_TREE_PANEL: PanelSpec = { id: PANEL_IDS.tree, default: 200, min: 140, max: 360 };

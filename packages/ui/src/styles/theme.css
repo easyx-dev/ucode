@@ -192,6 +192,29 @@
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
+  /*
+   * 全局滚动条：细窄圆头、颜色全走语义 token（`.dark` 下自动跟随）。
+   * Firefox 认标准属性，Chrome / Electron 认 ::-webkit-scrollbar 那一套，两者都要写。
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: var(--border);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
 }
 /* markdown 渲染（assistant 输出） */
 .md-content {

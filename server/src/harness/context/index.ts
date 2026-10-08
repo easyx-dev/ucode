@@ -1,7 +1,8 @@
 /**
  * `@` 上下文展开：把引用（文件 / 目录）读成内容，用不可信边界包裹后前置进正文。
  *
- * 只允许会话工作目录内的路径（realpath 后校验，防符号链接逃逸）；目录给递归清单，
+ * 只允许会话工作目录内的路径（realpath 后校验，防符号链接逃逸）；`path` 给绝对路径或相对会话
+ * 工作目录的写法都行（编辑器插的是绝对路径，编辑重发回传的是相对写法）；目录给递归清单，
  * 文件按可选行范围切片；单文件与总量都有字节上限，超出截断并附注。
  */
 
@@ -126,7 +127,9 @@ const listDirectory = (root: string, path: string): { body: string; truncated: b
 type ContextBody = { rel: string; body: string; truncated: boolean };
 
 const readRef = (root: string, ref: ContextRefInput): ContextBody => {
-  const target = realTarget(ref.path);
+  // 相对路径按**会话工作目录**解析：编辑重发时客户端回传的是还原出来的相对写法，
+  // 而 `resolve` 单参版本会落到服务进程的 cwd 上（碰巧等于仓库根），那是错的
+  const target = realTarget(resolve(root, ref.path));
   if (!isInside(root, target)) {
     throw invalidPath(ERROR_CODES.invalidRequest, "引用越出工作目录", ref.path);
   }

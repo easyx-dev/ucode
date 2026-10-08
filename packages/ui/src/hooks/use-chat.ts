@@ -1,6 +1,6 @@
 /** 会话消息流：订阅 SDK 的 messages store，装配「无会话时先建会话再投递」的发送流程 */
 import type { CompactionNotice, SessionCreateRequest, SessionSummary } from "@ucode/contracts";
-import type { ChatItem, SubagentStreams } from "@ucode/sdk";
+import type { ChatItem, EditMessagePayload, SubagentStreams } from "@ucode/sdk";
 import { useCallback, useRef, useState } from "react";
 
 import type { ComposerPayload } from "../lib/composer-payload";
@@ -26,8 +26,8 @@ export type ChatController = {
   loadingHistory: boolean;
   /** 发送一条消息；还没有会话时先建会话（`seed` 是它的初始设置） */
   send: (payload: ComposerPayload, seed?: SessionCreateRequest) => Promise<SendResult>;
-  /** 编辑一条已发送的用户消息并重发；刷新由 transcript_reset 事件驱动 */
-  edit: (entryId: string, text: string) => Promise<boolean>;
+  /** 编辑一条已发送的用户消息并重发；引用与附件一并带上，刷新由 transcript_reset 事件驱动 */
+  edit: (entryId: string, payload: EditMessagePayload) => Promise<boolean>;
   /** 中断当前生成 */
   stop: () => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
@@ -88,9 +88,9 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
   );
 
   const edit = useCallback(
-    async (entryId: string, text: string): Promise<boolean> => {
+    async (entryId: string, payload: EditMessagePayload): Promise<boolean> => {
       if (!sessionId) return false;
-      return client.messages.edit(sessionId, entryId, text);
+      return client.messages.edit(sessionId, entryId, payload);
     },
     [client, sessionId],
   );

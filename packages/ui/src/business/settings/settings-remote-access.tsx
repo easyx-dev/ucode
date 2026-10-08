@@ -10,6 +10,7 @@ import { Label } from "../../base/label";
 import { Spinner } from "../../base/spinner";
 import { useAuth } from "../../hooks/use-auth";
 import { type RemoteAccess, useRemoteAccess } from "../../hooks/use-remote-access";
+import { copyText } from "../../lib/clipboard";
 import { useErrorText } from "../../lib/error";
 import { useClient } from "../../provider";
 import { SegmentedControl, type SegmentedOption } from "../segmented-control";
@@ -73,14 +74,13 @@ function PairingPanel({
   const { t } = useTranslation();
   const remaining = useCountdown(pairing?.expiresAt);
   const [copied, setCopied] = useState(false);
-  // 非安全上下文（局域网明文 HTTP）没有 navigator.clipboard，此时不渲染复制按钮
-  const canCopy = typeof navigator !== "undefined" && Boolean(navigator.clipboard);
 
   useEffect(() => setCopied(false), [pairing?.code]);
 
   const copy = (): void => {
-    if (!pairing || !canCopy) return;
-    void navigator.clipboard.writeText(pairing.url).then(() => setCopied(true));
+    if (!pairing) return;
+    // 局域网明文 HTTP 是非安全上下文（没有 `navigator.clipboard`），这里靠 lib/clipboard 的兜底能照样复制
+    void copyText(pairing.url).then((ok) => setCopied(ok));
   };
 
   return (
@@ -96,11 +96,9 @@ function PairingPanel({
             <PairingQrCode url={pairing.url} />
             <div className="flex items-center gap-2">
               <Input readOnly value={pairing.url} className="font-mono text-xs" />
-              {canCopy ? (
-                <Button variant="outline" size="icon-sm" aria-label={t("复制链接")} onClick={copy}>
-                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                </Button>
-              ) : null}
+              <Button variant="outline" size="icon-sm" aria-label={t("复制链接")} onClick={copy}>
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               {t("剩余有效时间 {{time}}", { time: formatRemaining(remaining) })}

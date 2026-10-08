@@ -134,7 +134,7 @@ describe("loadCommandAssets", () => {
     assert.equal(assets.skills[0]?.source, "project");
   });
 
-  it("没有资源目录时返回空集合", async () => {
+  it("没有资源目录时只剩内置命令", async () => {
     const { root, appHome, userHome } = layout();
     const assets = await loadCommandAssets({
       cwd: root,
@@ -142,6 +142,27 @@ describe("loadCommandAssets", () => {
       userHome,
       harnessDir: makeTemp(),
     });
-    assert.deepEqual(assets, { prompts: [], skills: [] });
+    assert.deepEqual(assets.skills, []);
+    assert.deepEqual(
+      assets.prompts.map((prompt) => [prompt.name, prompt.source]),
+      [["review", "builtin"]],
+    );
+  });
+
+  it("磁盘上的同名命令覆盖内置命令，内置来源只补空缺", async () => {
+    const { root, appHome, userHome } = layout();
+    writePrompt(join(root, PROJECT_CONFIG_DIRNAME, "prompts"), "review", "项目版审查");
+
+    const assets = await loadCommandAssets({
+      cwd: root,
+      appHome,
+      userHome,
+      harnessDir: makeTemp(),
+    });
+
+    assert.deepEqual(
+      assets.prompts.map((prompt) => [prompt.name, prompt.source, prompt.description]),
+      [["review", "project", "项目版审查"]],
+    );
   });
 });

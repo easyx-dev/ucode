@@ -49,6 +49,7 @@ export {
 export type {
   ChatItem,
   ChatItemTiming,
+  EditMessagePayload,
   PromptPayload,
   SubagentStream,
   SubagentStreams,

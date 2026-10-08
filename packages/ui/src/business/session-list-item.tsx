@@ -18,19 +18,22 @@ import { Spinner } from "../base/spinner";
 import { sessionTitle } from "../lib/session";
 import { relativeTimeLabel } from "../lib/time";
 
-/** 等待类与出错优先于「生成中」：交互请求挂起时 run 占位可能还在，但它在等的是用户 */
+/**
+ * 等待类与出错优先于「生成中」：交互请求挂起时 run 占位可能还在，但它在等的是用户
+ * 图标尺寸与父级项目行的文件夹图标一致（`size-4`），否则两者既不同大也不对齐
+ */
 function StatusMark({ status }: { status: SessionStatus }) {
   switch (status) {
     case "waiting_permission":
-      return <ShieldAlert className="size-3.5 shrink-0 text-warning" />;
+      return <ShieldAlert className="size-4 shrink-0 text-warning" />;
     case "waiting_question":
-      return <MessageCircleQuestion className="size-3.5 shrink-0 text-warning" />;
+      return <MessageCircleQuestion className="size-4 shrink-0 text-warning" />;
     case "waiting_plan":
-      return <ClipboardCheck className="size-3.5 shrink-0 text-warning" />;
+      return <ClipboardCheck className="size-4 shrink-0 text-warning" />;
     case "error":
-      return <CircleAlert className="size-3.5 shrink-0 text-destructive" />;
+      return <CircleAlert className="size-4 shrink-0 text-destructive" />;
     case "running":
-      return <Spinner className="size-3 text-muted-foreground" />;
+      return <Spinner className="size-4 text-muted-foreground" />;
     default:
       return null;
   }
@@ -87,8 +90,9 @@ export function SessionListItem({
         onClick={() => onSelect(session.id)}
         onDoubleClick={onRename}
       >
-        {/* 固定槽位：有没有指示器都占同样宽度，标题才能稳定对齐；置顶针与未读点可并存 */}
-        <span className="flex w-6 shrink-0 items-center justify-center gap-1">
+        {/* 固定槽位：有没有指示器都占同样宽度，标题才能稳定对齐；置顶针与未读点可并存；
+            图标左对齐，与项目行的文件夹图标同一列 */}
+        <span className="flex w-6 shrink-0 items-center gap-1">
           {statusLabel || session.running ? (
             <StatusMark status={statusLabel ? session.status : "running"} />
           ) : (

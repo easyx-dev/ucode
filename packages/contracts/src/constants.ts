@@ -473,14 +473,15 @@ export const PROMPT_MAX_CONTEXTS = 32;
 
 /**
  * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：
- * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents`。
- * 提示词命令只会有 `project` / `global` 两种。
+ * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 内置。
+ * 提示词命令只会有 `project` / `global` / `builtin` 三种。
  */
 export const COMMAND_ASSET_SOURCES = [
   "project",
   "agents-project",
   "global",
   "agents-user",
+  "builtin",
 ] as const;
 
 export type CommandAssetSource = (typeof COMMAND_ASSET_SOURCES)[number];

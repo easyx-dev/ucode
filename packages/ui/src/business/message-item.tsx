@@ -1,137 +1,17 @@
 /**
- * 单条消息的内容渲染：用户消息、assistant 内容段（正文 / 思考 / 图片 / 附件）与扩展条目。
+ * 非用户消息的内容渲染：assistant 内容段（正文 / 思考 / 图片 / 附件）、扩展条目与已忽略的计划。
  *
  * 工具调用与思考区块已由 chat-nodes 抽成 activity 聚合行，压缩摘要另有分隔行（compaction-divider），
  * 这里只渲染正文 / 图片 / 附件；`trailing` 表示该段是否是来源消息的最后一段。
- * 用户消息用浅底细边框而非反色气泡，操作与时刻悬停才现。
+ * 用户消息自成一体（含 chip、折叠与操作行），见 `user-message.tsx`。
  */
-import { FileText, Pencil, Sparkles } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Button } from "../base/button";
-import { useAttachmentUrl } from "../hooks/use-attachment-url";
 import type { ChatFooter } from "../lib/chat-nodes";
-import { parseUserMessage } from "../lib/message-chips";
 import { isPlanIgnored } from "../lib/plan";
-import { clockLabel } from "../lib/time";
-import type { ChatItem, MessageBlock } from "../lib/types";
-import { ForkAction, MessageFooter } from "./message-footer";
-
-/** 图片块：先取回字节再渲染（浏览器不会给 `<img src>` 附凭证） */
-function BlockImage({ url }: { url: string }) {
-  const { t } = useTranslation();
-  const { url: source, failed } = useAttachmentUrl(url);
-  if (!source) {
-    // 取不到字节（会话失效 / 字节已不在）时给一行说明，别让消息里的图凭空消失
-    return failed ? <p className="my-2 text-xs text-muted-foreground">{t("图片不可用")}</p> : null;
-  }
-  return (
-    <a href={source} target="_blank" rel="noreferrer" className="my-2 inline-block">
-      <img
-        src={source}
-        alt=""
-        loading="lazy"
-        className="max-h-96 rounded-md border border-border"
-      />
-    </a>
-  );
-}
-
-/** 附件下载入口：字节到位前不可点（不给带不上凭证的直链），取不到时标为不可用 */
-function AttachmentLink({
-  id,
-  name,
-  className,
-  withIcon = false,
-}: {
-  id: string;
-  name: string;
-  className: string;
-  withIcon?: boolean;
-}) {
-  const { t } = useTranslation();
-  const { url: source, failed } = useAttachmentUrl(id);
-  const label = (
-    <>
-      {withIcon ? <FileText className="size-3 shrink-0" /> : null}
-      {name}
-    </>
-  );
-  if (!source) {
-    return (
-      <span
-        className={`${className} ${failed ? "line-through opacity-60" : "opacity-60"}`}
-        title={failed ? t("附件不可用") : name}
-      >
-        {label}
-      </span>
-    );
-  }
-  return (
-    <a href={source} download={name} title={name} className={`${className} hover:text-foreground`}>
-      {label}
-    </a>
-  );
-}
-
-/** markdown 正文里的图片：本站附件走 blob，外链原样使用 */
-function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
-  const { t } = useTranslation();
-  const { url: source, failed } = useAttachmentUrl(src ?? "");
-  if (!source) {
-    return failed ? <span className="text-xs text-muted-foreground">{t("图片不可用")}</span> : null;
-  }
-  return (
-    <img
-      src={source}
-      alt={alt ?? ""}
-      loading="lazy"
-      className="max-h-96 rounded-md border border-border"
-    />
-  );
-}
-
-function BlockView({ block, live }: { block: MessageBlock; live?: boolean }) {
-  // 思考区块与工具调用已由 activity 聚合行渲染，这里不再兜底
-  if (block.type === "thinking" || block.type === "toolCall") return null;
-  if (block.type === "image") return <BlockImage url={block.url} />;
-  if (block.type === "file") {
-    return (
-      <AttachmentLink
-        id={block.id}
-        name={block.name}
-        className="my-1 inline-flex items-center rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
-      />
-    );
-  }
-  return (
-    <div className="md-content">
-      <Markdown remarkPlugins={[remarkGfm]} components={{ img: MarkdownImage }}>
-        {block.text}
-      </Markdown>
-      {live ? (
-        <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse bg-foreground align-text-bottom" />
-      ) : null}
-    </div>
-  );
-}
-
-/** 用户消息悬停时的编辑入口：行内改写并重发 */
-function EditAction({ onClick }: { onClick: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-      title={t("编辑并重新发送")}
-      onClick={onClick}
-    >
-      <Pencil className="size-3.5" />
-    </button>
-  );
-}
+import type { ChatItem, EditMessagePayload, MessageBlock } from "../lib/types";
+import { BlockView } from "./message-blocks";
+import { MessageFooter } from "./message-footer";
+import { UserMessage } from "./user-message";
 
 export function MessageItem({
   item,
@@ -151,127 +31,23 @@ export function MessageItem({
   footer?: ChatFooter;
   /** 从该条消息分叉；只有主对话传入，子智能体嵌套视图不提供 */
   onFork?: (item: ChatItem) => void;
-  /** 编辑该条用户消息并重发；成功后由事件刷新，返回是否已受理 */
-  onEdit?: (item: ChatItem, text: string) => Promise<boolean>;
+  /** 编辑该条用户消息并重发；引用与附件一并回传，成功后由事件刷新，返回是否已受理 */
+  onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
   /** 是否为本会话最后一条用户消息；非最后一条会提示其后内容将被移除 */
   isLastUser?: boolean;
 }) {
   const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
   const content = blocks ?? item.blocks;
-  const canFork = Boolean(onFork) && !item.live;
-  const canEdit = Boolean(onEdit) && item.role === "user" && !item.live;
-
-  const startEdit = () => {
-    const text = content.map((block) => (block.type === "text" ? block.text : "")).join("");
-    setDraft(text);
-    setEditing(true);
-  };
-
-  const submitEdit = async () => {
-    const text = draft.trim();
-    if (!text || !onEdit || saving) return;
-    setSaving(true);
-    const ok = await onEdit(item, text);
-    setSaving(false);
-    if (ok) setEditing(false);
-  };
 
   if (item.role === "user") {
-    const rawText = content.map((block) => (block.type === "text" ? block.text : "")).join("");
-    const parsed = parseUserMessage(rawText);
-    const media = content.filter((block) => block.type === "image" || block.type === "file");
-    if (editing) {
-      return (
-        <div className="flex justify-end">
-          <div className="w-full max-w-[85%] space-y-1.5">
-            <textarea
-              // biome-ignore lint/a11y/noAutofocus: 点击编辑后焦点应直接落在待改写的输入区
-              autoFocus
-              rows={3}
-              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setEditing(false);
-                // 与输入区一致：Enter 换行，Cmd/Ctrl+Enter 发送
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  void submitEdit();
-                }
-              }}
-            />
-            {isLastUser === false ? (
-              <p className="text-[11px] text-muted-foreground">
-                {t("发送后将移除这条消息之后的内容（仍保留在会话记录中）。")}
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                {t("取消")}
-              </Button>
-              <Button
-                size="sm"
-                disabled={!draft.trim() || saving}
-                onClick={() => void submitEdit()}
-              >
-                {t("发送")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="group flex items-center justify-end gap-1">
-        <span className="shrink-0 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-          {clockLabel(item.createdAt)}
-        </span>
-        <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-          {canEdit ? <EditAction onClick={startEdit} /> : null}
-          {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
-        </span>
-        <div className="flex max-w-[85%] flex-col items-end gap-1.5">
-          {parsed.skill || parsed.attachments.length > 0 ? (
-            <div className="flex flex-wrap justify-end gap-1.5">
-              {parsed.skill ? (
-                <span
-                  title={t("技能")}
-                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  <Sparkles className="size-3 shrink-0" />
-                  {parsed.skill.name}
-                </span>
-              ) : null}
-              {parsed.attachments.map((attachment, index) => (
-                <AttachmentLink
-                  // biome-ignore lint/suspicious/noArrayIndexKey: 同一文件可被引用多次，位置即身份
-                  key={`${item.id}-att-${index}`}
-                  id={attachment.id}
-                  name={attachment.name}
-                  withIcon
-                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                />
-              ))}
-            </div>
-          ) : null}
-          {media.length > 0 ? (
-            <div className="flex flex-wrap justify-end gap-2">
-              {media.map((block, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: 附件块按顺序排列，位置即身份
-                <BlockView key={`${item.id}-media-${index}`} block={block} />
-              ))}
-            </div>
-          ) : null}
-          {parsed.text ? (
-            <div className="rounded-lg rounded-br-sm border border-border bg-muted/60 px-3 py-2 text-sm whitespace-pre-wrap text-foreground">
-              {parsed.text}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <UserMessage
+        item={item}
+        blocks={content}
+        onFork={onFork}
+        onEdit={onEdit}
+        isLastUser={isLastUser}
+      />
     );
   }
 

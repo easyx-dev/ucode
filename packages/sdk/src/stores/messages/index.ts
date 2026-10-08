@@ -10,7 +10,7 @@ import type { Apis } from "../../apis";
 import { asApiError, toApiError } from "../../error";
 import type { EventStream } from "../../events";
 import { createStore, type Store } from "../../store";
-import type { PromptPayload, SubagentStreams } from "../../types";
+import type { EditMessagePayload, PromptPayload, SubagentStreams } from "../../types";
 import {
   applyChildFrame,
   applyFrame,
@@ -36,8 +36,8 @@ export type MessagesStore = {
   refresh: (sessionId: string) => void;
   /** 发送一条消息并乐观插入；返回是否被服务端受理 */
   send: (sessionId: string, payload: PromptPayload) => Promise<boolean>;
-  /** 编辑一条用户消息并重发；刷新由 transcript_reset 事件驱动 */
-  edit: (sessionId: string, entryId: string, text: string) => Promise<boolean>;
+  /** 编辑一条用户消息并重发；引用与附件一并带上，刷新由 transcript_reset 事件驱动 */
+  edit: (sessionId: string, entryId: string, payload: EditMessagePayload) => Promise<boolean>;
   /** 中断当前生成 */
   interrupt: (sessionId: string) => Promise<void>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
@@ -257,11 +257,11 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       }
     },
 
-    async edit(sessionId, entryId, text) {
+    async edit(sessionId, entryId, payload) {
       const engine = ensure(sessionId);
       patch(engine, { error: null });
       try {
-        await deps.apis.messages.edit({ sessionId, entryId, text });
+        await deps.apis.messages.edit({ sessionId, entryId, ...payload });
         return true;
       } catch (error) {
         patch(engine, { error: asApiError(error) });

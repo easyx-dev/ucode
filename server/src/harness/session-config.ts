@@ -30,7 +30,7 @@ import {
   type ResolvedCapability,
   usesDefaultToolSet,
 } from "./agents";
-import { commandAssetPaths } from "./assets";
+import { commandAssetPaths, withBuiltinPrompts } from "./assets";
 import { type ContextBudget, contextBudgetOf } from "./budget";
 import { mcpExtension } from "./mcp";
 import type { MemoryService } from "./memory";
@@ -178,6 +178,8 @@ const createSessionLoader = async (
     noPromptTemplates: true,
     additionalSkillPaths: assetPaths.skills.map((item) => item.path),
     additionalPromptTemplatePaths: assetPaths.prompts.map((item) => item.path),
+    // 内置命令补在磁盘目录之后：`/` 菜单与 `promptTemplates` 必须看到同一集合，否则选得中但展开不出来
+    promptsOverride: withBuiltinPrompts,
     extensionFactories: [
       createPermissionExtension(gate),
       // shell 兜底：同名覆盖内置 bash，保证命令不会停下来等交互输入（见 harness/shell）

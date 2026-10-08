@@ -13,7 +13,7 @@ import { useShowThinking } from "../hooks/use-show-thinking";
 import type { ToolEntry } from "../lib/chat-nodes";
 import { buildChatRows, type ChatRow, withoutThinking } from "../lib/chat-rows";
 import { subagentSessionIdOf } from "../lib/tool-view";
-import type { ChatItem, SubagentStreams } from "../lib/types";
+import type { ChatItem, EditMessagePayload, SubagentStreams } from "../lib/types";
 import { MessageRow } from "./message-row";
 import { SubagentProgress, SubagentSessionLink } from "./subagent-progress";
 
@@ -56,7 +56,7 @@ type MessageListProps = {
   /** 从某条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话）；返回是否已受理 */
-  onEdit?: (item: ChatItem, text: string) => Promise<boolean>;
+  onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
 };
 
 export function MessageList({

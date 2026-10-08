@@ -55,6 +55,8 @@ type CommandPaletteProps = {
   sessions: SessionSummary[];
   /** 文件检索根目录（当前会话 cwd 或助理工作区）；null 时不搜文件 */
   fileRoot: string | null;
+  /** 是否有当前会话：与 `/` 菜单同口径，草稿态隐藏需要会话才能执行的命令 */
+  hasSession: boolean;
   onSelectSession: (sessionId: string) => void;
   onRunBuiltin: (id: BuiltinCommandId) => void;
   onNewTask: () => void;
@@ -89,6 +91,7 @@ export function CommandPalette({
   onOpenChange,
   sessions,
   fileRoot,
+  hasSession,
   onSelectSession,
   onRunBuiltin,
   onNewTask,
@@ -191,9 +194,10 @@ export function CommandPalette({
 
     const builtins: PaletteItem[] = BUILTIN_COMMANDS.filter(
       (command) =>
-        !needle ||
-        command.name.includes(needle) ||
-        translate(command.descriptionKey).toLowerCase().includes(needle),
+        (!command.needsSession || hasSession) &&
+        (!needle ||
+          command.name.includes(needle) ||
+          translate(command.descriptionKey).toLowerCase().includes(needle)),
     ).map((command) => ({
       id: `builtin:${command.id}`,
       label: `/${command.name}`,
@@ -238,6 +242,7 @@ export function CommandPalette({
     sessions,
     t,
     translate,
+    hasSession,
     onNewTask,
     onNewAssistant,
     onOpenWorkspace,

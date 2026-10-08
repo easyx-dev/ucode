@@ -1,14 +1,17 @@
 /**
  * 命令与技能装载：按 `commandAssetPaths` 的有序目录交给 pi 的 `DefaultResourceLoader`，
- * 读回后映射为不含绝对路径的视图（供 `/` 菜单与技能广告使用）。
+ * 再补上磁盘目录里没有的同名内置命令，读回后映射为不含绝对路径的视图（供 `/` 菜单与技能广告使用）。
  *
- * 会话装配（`harness/session-config.ts`）用同一份路径给 resourceLoader，保证「界面列出的」与
- * 「pi 实际能展开 / 广告的」是同一集合。
+ * 会话装配（`harness/session-config.ts`）用同一份目录与同一个 `promptsOverride`，
+ * 保证「界面列出的」与「pi 实际能展开 / 广告的」是同一集合。
  */
 import { sep } from "node:path";
 
 import {
+  createSyntheticSourceInfo,
   DefaultResourceLoader,
+  type PromptTemplate,
+  type ResourceDiagnostic,
   SettingsManager,
   type Skill,
 } from "@earendil-works/pi-coding-agent";
@@ -19,13 +22,55 @@ import type {
   SkillCommandView,
 } from "@ucode/contracts";
 
+import { BUILTIN_PROMPT_COMMANDS, type BuiltinPromptCommand } from "./builtin";
 import { type CommandAssetPath, type CommandAssetPathInput, commandAssetPaths } from "./paths";
 
 export type { CommandAssetPath, CommandAssetPaths } from "./paths";
 export { commandAssetPaths } from "./paths";
 
-/** 按最长前缀把文件路径归到某个来源目录；理论上必命中，未命中回落最低档 */
+/** 内置命令的合成路径前缀；磁盘上不存在这个名字，只用来把来源标成 `builtin` */
+const BUILTIN_PATH_PREFIX = "builtin:";
+
+/** 内置命令的模板对象：路径是合成的（源码常量没有文件），`sourceInfo` 一并造出来 */
+const toBuiltinTemplate = (command: BuiltinPromptCommand): PromptTemplate => {
+  const filePath = `${BUILTIN_PATH_PREFIX}${command.name}`;
+  return {
+    name: command.name,
+    description: command.description,
+    ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
+    content: command.content,
+    filePath,
+    sourceInfo: createSyntheticSourceInfo(filePath, { source: "builtin" }),
+  };
+};
+
+/**
+ * 磁盘目录里没有被同名命令占用的内置命令。
+ * 与提示词目录同一套优先级：项目 / 全局同名者胜，内置只补空缺。
+ */
+const builtinPrompts = (taken: readonly PromptTemplate[]): PromptTemplate[] => {
+  const names = new Set(taken.map((template) => template.name));
+  return BUILTIN_PROMPT_COMMANDS.filter((command) => !names.has(command.name)).map(
+    toBuiltinTemplate,
+  );
+};
+
+/**
+ * `DefaultResourceLoader` 的 `promptsOverride`：把内置命令追加到磁盘命令之后。
+ * 界面列举（`loadCommandAssets`）与实际展开（`harness/session-config.ts`）共用这一份，
+ * 否则「菜单里看得到」与「pi 认得」会不一致。
+ */
+export const withBuiltinPrompts = (base: {
+  prompts: PromptTemplate[];
+  diagnostics: ResourceDiagnostic[];
+}): { prompts: PromptTemplate[]; diagnostics: ResourceDiagnostic[] } => ({
+  prompts: [...base.prompts, ...builtinPrompts(base.prompts)],
+  diagnostics: base.diagnostics,
+});
+
+/** 按最长前缀把文件路径归到某个来源目录；内置命令走合成路径，未命中回落最低档 */
 const sourceOf = (filePath: string, paths: CommandAssetPath[]): CommandAssetSource => {
+  if (filePath.startsWith(BUILTIN_PATH_PREFIX)) return "builtin";
   let best: CommandAssetPath | null = null;
   for (const item of paths) {
     if (filePath === item.path || filePath.startsWith(`${item.path}${sep}`)) {
@@ -53,16 +98,12 @@ const toSkillView = (skill: Skill, paths: CommandAssetPath[]): SkillCommandView 
 
 /**
  * 列举可用的提示词命令与技能。只读这些目录（禁用 pi 默认目录），
- * 同名时靠路径顺序决定（pi 侧 first-wins）。
+ * 同名时靠路径顺序决定（pi 侧 first-wins），内置命令排在最后。
  */
 export const loadCommandAssets = async (
   input: CommandAssetPathInput & { harnessDir: string },
 ): Promise<CommandsListResponse> => {
   const paths = commandAssetPaths(input);
-  if (paths.skills.length === 0 && paths.prompts.length === 0) {
-    return { prompts: [], skills: [] };
-  }
-
   const loader = new DefaultResourceLoader({
     cwd: input.cwd,
     agentDir: input.harnessDir,
@@ -74,6 +115,7 @@ export const loadCommandAssets = async (
     noPromptTemplates: true,
     additionalSkillPaths: paths.skills.map((item) => item.path),
     additionalPromptTemplatePaths: paths.prompts.map((item) => item.path),
+    promptsOverride: withBuiltinPrompts,
   });
   await loader.reload();
 

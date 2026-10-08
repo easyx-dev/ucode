@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { ComposerPayload } from "../composer-payload";
-import { contextMarker, parseUserMessage, relativizeContextRefs } from "../message-chips";
+import {
+  contextMarker,
+  contextRefsOf,
+  parseUserMessage,
+  relativizeContextRefs,
+  userMessageText,
+} from "../message-chips";
 
 const payloadOf = (text: string, contexts: string[]): ComposerPayload => ({
   text,
@@ -40,6 +46,143 @@ describe("parseUserMessage", () => {
 
   it("没有前置块的消息原样返回", () => {
     assert.equal(parseUserMessage("随便说点什么").text, "随便说点什么");
+  });
+
+  it("命令只剩 chip，用户写的参数作为正文", () => {
+    const raw = '<command name="review" args="改动 a.ts">\n你是一名代码审查员。\n</command>\n\n';
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.command, { name: "review", args: "改动 a.ts" });
+    assert.equal(parsed.text, "");
+    assert.equal(userMessageText(parsed), "/review 改动 a.ts");
+  });
+
+  it("命令参数在属性里转义后能还原", () => {
+    const parsed = parseUserMessage(
+      '<command name="ask" args="说 &quot;hi&quot; &amp; 结束">\n正文\n</command>\n\n',
+    );
+    assert.equal(parsed.command?.args, '说 "hi" & 结束');
+  });
+
+  it("无参数的命令还原时不留尾部空格", () => {
+    const parsed = parseUserMessage('<command name="review" args="">\n正文\n</command>\n\n');
+    assert.equal(userMessageText(parsed), "/review");
+  });
+
+  it("技能还原成 `/skill:name 参数`，正文就是块后的参数", () => {
+    const parsed = parseUserMessage(
+      '<skill name="tiny" location="/x/SKILL.md">\nReferences are relative to /x.\n\n技能正文\n</skill>\n\n看看这个',
+    );
+
+    assert.deepEqual(parsed.skill, { name: "tiny" });
+    assert.equal(parsed.text, "看看这个");
+    assert.equal(userMessageText(parsed), "/skill:tiny 看看这个");
+  });
+
+  it("无参数的技能还原时不带尾部空格", () => {
+    const parsed = parseUserMessage(
+      '<skill name="tiny" location="/x/SKILL.md">\nReferences are relative to /x.\n\n技能正文\n</skill>',
+    );
+    assert.equal(userMessageText(parsed), "/skill:tiny");
+  });
+});
+
+describe("parseUserMessage 的正文分段", () => {
+  it("引用标记切成 chip，句子其余部分留在文本段里", () => {
+    const raw =
+      '<context path="a.ts">\n内容\n</context>\n\n' +
+      '<context path="b.ts">\n内容\n</context>\n\n' +
+      "看看 @a.ts 与 @b.ts";
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.segments, [
+      { type: "text", text: "看看 " },
+      { type: "context", path: "a.ts" },
+      { type: "text", text: " 与 " },
+      { type: "context", path: "b.ts" },
+    ]);
+    assert.equal(parsed.text, "看看 @a.ts 与 @b.ts");
+  });
+
+  it("用户自己打的 `@` 与没引用过的路径都不是 chip", () => {
+    const raw = '<context path="a.ts">\n内容\n</context>\n\n发给 @张三，看 @a.ts 与 @c.ts';
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.segments, [
+      { type: "text", text: "发给 @张三，看 " },
+      { type: "context", path: "a.ts" },
+      { type: "text", text: " 与 @c.ts" },
+    ]);
+  });
+
+  it("同一路径被引用两次时标记各切一次，多出来的留在文本里", () => {
+    const raw = '<context path="a.ts">\n内容\n</context>\n\n看 @a.ts 再看 @a.ts';
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.segments, [
+      { type: "text", text: "看 " },
+      { type: "context", path: "a.ts" },
+      { type: "text", text: " 再看 @a.ts" },
+    ]);
+  });
+
+  it("前缀相同的两条引用按最长匹配切分", () => {
+    const raw =
+      '<context path="a.ts">\n内容\n</context>\n\n' +
+      '<context path="a.ts.bak">\n内容\n</context>\n\n' +
+      "看 @a.ts.bak 与 @a.ts";
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.segments, [
+      { type: "text", text: "看 " },
+      { type: "context", path: "a.ts.bak" },
+      { type: "text", text: " 与 " },
+      { type: "context", path: "a.ts" },
+    ]);
+  });
+
+  it("没有引用时整段正文就是一个文本段", () => {
+    assert.deepEqual(parseUserMessage("随便说点什么").segments, [
+      { type: "text", text: "随便说点什么" },
+    ]);
+    assert.deepEqual(parseUserMessage("").segments, []);
+  });
+
+  it("引用段带着原展开块上的行范围", () => {
+    const raw =
+      '<context path="a.ts" lines="3-">\n内容\n</context>\n\n' +
+      '<context path="b.ts" lines="5-9">\n内容\n</context>\n\n看 @a.ts 与 @b.ts';
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(
+      parsed.segments.filter((segment) => segment.type === "context"),
+      [
+        { type: "context", path: "a.ts", startLine: 3 },
+        { type: "context", path: "b.ts", startLine: 5, endLine: 9 },
+      ],
+    );
+  });
+});
+
+describe("contextRefsOf", () => {
+  const parsed = parseUserMessage(
+    '<context path="a.ts" lines="3-4">\n内容\n</context>\n\n看 @a.ts 与 @b.ts',
+  );
+
+  it("回传正文里留着的引用，行范围沿用展开块", () => {
+    assert.deepEqual(contextRefsOf(parsed, "看 @a.ts 与 @b.ts"), [
+      { path: "a.ts", startLine: 3, endLine: 4 },
+    ]);
+  });
+
+  it("编辑态删掉的标记不再回传", () => {
+    assert.deepEqual(contextRefsOf(parsed, "看这份文件"), []);
   });
 });
 

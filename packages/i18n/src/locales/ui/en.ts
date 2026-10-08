@@ -621,6 +621,8 @@ export default {
     "Generate a link for a device on the same network; opening it signs the device in. Valid for 5 minutes and usable once.",
   生成配对链接: "Generate pairing link",
   复制链接: "Copy link",
+  复制: "Copy",
+  已复制: "Copied",
   "剩余有效时间 {{time}}": "Expires in {{time}}",
   链接已过期: "Link expired",
   活动会话: "Active sessions",

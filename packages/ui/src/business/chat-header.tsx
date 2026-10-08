@@ -1,7 +1,6 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
 import {
   ChevronLeft,
-  CirclePlus,
   FolderOpen,
   Gauge,
   GitFork,
@@ -12,6 +11,7 @@ import {
   RefreshCw,
   Settings2,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
 import { Button } from "../base/button";
@@ -48,9 +48,44 @@ type ChatHeaderProps = {
   onToggleWorkbench?: () => void;
   /** 工作台当前是否展开 */
   workbenchOpen?: boolean;
-  /** 新建任务（顶栏的 + 入口） */
-  onNewTask?: () => void;
+  /** 双击标题就地改名；子会话等不可改名的场景不传 */
+  onRenameSession?: () => void;
 };
+
+/**
+ * 会话标题：溢出时悬停给全名（没溢出就不挂提示，免得白占一个弹层），双击就地改名。
+ * 是否溢出靠实测（`scrollWidth > clientWidth`），窗口缩放与标题变化都要重算。
+ */
+function SessionTitle({ title, onRename }: { title: string; onRename?: () => void }) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const [clipped, setClipped] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const update = (): void => setClipped(node.scrollWidth > node.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [title]);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          ref={ref}
+          type="button"
+          className="min-w-0 truncate text-left text-sm font-medium"
+          onDoubleClick={onRename}
+        >
+          {title}
+        </button>
+      </TooltipTrigger>
+      {clipped ? <TooltipContent>{title}</TooltipContent> : null}
+    </Tooltip>
+  );
+}
 
 export function ChatHeader({
   session,
@@ -68,7 +103,7 @@ export function ChatHeader({
   sidebarCollapsed,
   onToggleWorkbench,
   workbenchOpen,
-  onNewTask,
+  onRenameSession,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
@@ -89,17 +124,6 @@ export function ChatHeader({
           )}
         </Button>
       ) : null}
-      {onNewTask ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0"
-          title={t("新建任务")}
-          onClick={onNewTask}
-        >
-          <CirclePlus className="size-4" />
-        </Button>
-      ) : null}
       {session?.parentSessionId && onBackToParent ? (
         <Button
           variant="ghost"
@@ -112,9 +136,10 @@ export function ChatHeader({
         </Button>
       ) : null}
 
-      <div className="min-w-0 truncate text-sm font-medium">
-        {session ? sessionTitle(session, t("新会话")) : t("未选择会话")}
-      </div>
+      <SessionTitle
+        title={session ? sessionTitle(session, t("新会话")) : t("未选择会话")}
+        onRename={session && onRenameSession ? onRenameSession : undefined}
+      />
 
       {session?.parentSessionId ? (
         <Badge variant="secondary" className="shrink-0">

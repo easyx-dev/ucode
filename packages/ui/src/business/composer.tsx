@@ -7,7 +7,11 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "../base/button";
 import { useCommands } from "../hooks/use-commands";
-import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
+import {
+  BUILTIN_COMMANDS,
+  type BuiltinCommandId,
+  builtinCommandIdOf,
+} from "../lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-document";
 import type { ComposerPayload } from "../lib/composer-payload";
 import type { AttachmentView, CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
@@ -57,13 +61,6 @@ const MAX_CONTEXT_ITEMS = 20;
 
 /** 空文档常量：多处重置编辑器共用，保持引用稳定 */
 const EMPTY_DOC: ComposerNode = { type: "doc", content: [{ type: "paragraph" }] };
-
-/** 整条输入就是一个内置命令名（如 `/new`）时取其 id；带参数或不匹配返回 null */
-const builtinIdOf = (text: string): BuiltinCommandId | null => {
-  const match = /^\/([a-z][a-z0-9-]*)\s*$/.exec(text.trim());
-  if (!match) return null;
-  return BUILTIN_COMMANDS.find((command) => command.name === match[1])?.id ?? null;
-};
 
 export function Composer({
   sessionId,
@@ -202,7 +199,7 @@ export function Composer({
     }
     // 手动输入的整条内置命令（如 `/new`）：直接执行，不当作消息发出去
     if (doc.contexts.length === 0 && attachments.length === 0) {
-      const builtin = builtinIdOf(doc.text);
+      const builtin = builtinCommandIdOf(doc.text);
       if (builtin) {
         resetEditor(EMPTY_DOC);
         handleBuiltin(builtin);
@@ -232,15 +229,17 @@ export function Composer({
       const needle = query.trim().toLowerCase();
       const match = (value: string): boolean =>
         needle === "" || value.toLowerCase().includes(needle);
+      const translate = t as (key: string) => string;
       // 草稿态（无会话）不列需要会话才能执行的命令，避免选了没反应
       const builtin: SuggestionItem[] = BUILTIN_COMMANDS.filter(
         (command) => (sessionId !== null || !command.needsSession) && match(command.name),
       ).map((command) => ({
         id: `builtin:${command.id}`,
         label: `/${command.name}`,
-        hint: (t as (key: string) => string)(command.descriptionKey),
+        hint: [translate(command.descriptionKey), command.argumentHint].filter(Boolean).join(" · "),
         group: t("内置动作"),
         builtin: command.id,
+        takesArgument: command.takesArgument === true,
       }));
       const prompts: SuggestionItem[] = commands.prompts
         .filter((item) => match(item.name))
@@ -291,7 +290,7 @@ export function Composer({
   );
 
   return (
-    <div className="border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-3xl space-y-2">
         {suggestions && suggestions.length > 0 ? (
           <div className="flex flex-wrap gap-2">

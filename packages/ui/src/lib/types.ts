@@ -90,4 +90,4 @@ export {
 } from "@ucode/contracts";
 
 /** 界面上的一条消息与子智能体进度类型由 SDK 提供，各端共用 */
-export type { ChatItem, SubagentStream, SubagentStreams } from "@ucode/sdk";
+export type { ChatItem, EditMessagePayload, SubagentStream, SubagentStreams } from "@ucode/sdk";
