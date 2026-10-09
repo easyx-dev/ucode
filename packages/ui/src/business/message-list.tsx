@@ -11,7 +11,13 @@ import { useTranslation } from "react-i18next";
 import { Skeleton } from "../base/skeleton";
 import { useShowThinking } from "../hooks/use-show-thinking";
 import type { ToolEntry } from "../lib/chat-nodes";
-import { buildChatRows, type ChatRow, withoutThinking } from "../lib/chat-rows";
+import {
+  buildChatRows,
+  type ChatRow,
+  compactionKeyOf,
+  lastCompactionIndexOf,
+  withoutThinking,
+} from "../lib/chat-rows";
 import { subagentSessionIdOf } from "../lib/tool-view";
 import type { ChatItem, EditMessagePayload, SubagentStreams } from "../lib/types";
 import { MessageRow } from "./message-row";
@@ -32,10 +38,6 @@ const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
 
 /** 距底部多少像素内算「贴着底部」；更远就认为用户在回看历史 */
 const SCROLL_END_THRESHOLD = 96;
-
-/** 列表里第一条压缩分隔行的 key；没有压缩过时为 null */
-const compactionKeyOf = (rows: ChatRow[]): string | null =>
-  rows.find((row) => row.kind === "compaction")?.key ?? null;
 
 type MessageListProps = {
   items: ChatItem[];
@@ -81,6 +83,8 @@ export function MessageList({
   const followingRef = useRef(true);
   /** 上一次见过的压缩分隔行：新出现一条时才知道「这次重写带来了压缩」 */
   const lastCompactionKeyRef = useRef<string | null>(null);
+  /** 是否已经见过至少一行：hydrate 完成前列表必然为空，那一刻不算「历史」 */
+  const hadRowsRef = useRef(false);
 
   const rows = useMemo(
     () => buildChatRows(showThinking ? items : withoutThinking(items), working),
@@ -164,7 +168,8 @@ export function MessageList({
 
   // 首次挂载与切换会话都直接落到最新一条，避免先渲染顶部再跳一次
   useLayoutEffect(() => {
-    // 记住这一刻的分隔行：打开一个早就压缩过的会话不该被当成「刚压缩」，否则会停在旧的压缩点
+    // 重新等第一份历史：hydrate 还没回来时 rows 是空的，那一刻的分隔行不能当成「刚压过」（见下一条）
+    hadRowsRef.current = false;
     lastCompactionKeyRef.current = compactionKeyOf(rowsRef.current);
     virtualizer.measure();
     scrollToLatest();
@@ -185,10 +190,23 @@ export function MessageList({
   // 滚过去反而会关掉跟随，随后流式生成的回答就看不到了；没有记录的旧数据才需要这一下。
   useLayoutEffect(() => {
     const key = compactionKeyOf(rows);
+    // 列表清空时重等历史：切会话或重新 hydrate 都会经过这一步
+    if (rows.length === 0) {
+      hadRowsRef.current = false;
+      lastCompactionKeyRef.current = null;
+      return;
+    }
+    // 首次拿到历史：这一刻的分隔行是既有的，不是刚压出来的。刷新页面与打开一个早就压过的会话都走
+    // 这一支——hydrate 回来前 rows 是空的，基线只能是 null，不区分就会被当成「刚压缩」而停在旧压缩点
+    if (!hadRowsRef.current) {
+      hadRowsRef.current = true;
+      lastCompactionKeyRef.current = key;
+      return;
+    }
     if (key === lastCompactionKeyRef.current) return;
     lastCompactionKeyRef.current = key;
     if (key === null) return;
-    const index = rows.findIndex((row) => row.kind === "compaction");
+    const index = lastCompactionIndexOf(rows);
     if (index < 0 || index >= rows.length - 2) return;
     setFollowingBoth(false);
     virtualizer.scrollToIndex(index, { align: "start" });

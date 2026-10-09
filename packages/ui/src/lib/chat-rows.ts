@@ -175,6 +175,24 @@ export const buildChatRows = (items: ChatItem[], working?: boolean): ChatRow[] =
 };
 
 /**
+ * 最后一条压缩分隔行的下标；没有压缩过时为 -1。
+ *
+ * 取最后一条而不是第一条：一次会话可能被压缩多次，历史里留着多条分隔行，视口该对到最近的那次。
+ */
+export const lastCompactionIndexOf = (rows: readonly ChatRow[]): number => {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (rows[index]?.kind === "compaction") return index;
+  }
+  return -1;
+};
+
+/** 最后一条压缩分隔行的 key；没有压缩过时为 null */
+export const compactionKeyOf = (rows: readonly ChatRow[]): string | null => {
+  const index = lastCompactionIndexOf(rows);
+  return index < 0 ? null : (rows[index]?.key ?? null);
+};
+
+/**
  * 去掉思考区块，供「不展示思考过程」时使用。
  *
  * 在这一层而不是在组件里过滤：只留一个没有区块的内容行会白占一段行首间距，而全为思考的消息剔完就没有段，

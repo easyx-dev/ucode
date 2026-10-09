@@ -1,8 +1,8 @@
 /**
  * 上下文压缩的分隔行：标出「此前的历史已被摘要替代」，并说明这次压缩是怎么触发的。
  *
- * 摘要默认展开——压缩会重写可见历史，它是被替代掉那段的唯一凭据，藏着等于让人以为什么都没发生；
- * 想只留一行细线时可以收起。跳过与失败没有摘要，只出文案。
+ * 默认收起成一行细线——行本身已经说明「此处被压缩过」，摘要是回看时才需要的细节，常驻展开会把
+ * 历史挤成两段。有摘要时点开可看，跳过与失败没有摘要，只出文案。
  */
 import type { CompactionRecord } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
@@ -22,11 +22,7 @@ export function CompactionDivider({
   const hasSummary = summary.trim().length > 0;
 
   return (
-    <DividerLine
-      label={compactionLineText(record, t)}
-      detail={compactionLineDetail(record, t)}
-      defaultOpen={hasSummary}
-    >
+    <DividerLine label={compactionLineText(record, t)} detail={compactionLineDetail(record, t)}>
       {hasSummary ? <Markdown remarkPlugins={[remarkGfm]}>{summary}</Markdown> : undefined}
     </DividerLine>
   );

@@ -2,8 +2,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { PERMISSION_DECISION_CUSTOM_TYPE, PLAN_IGNORED_CUSTOM_TYPE } from "@ucode/contracts";
-import { buildChatRows, type ChatRow, withoutThinking } from "../chat-rows";
+import {
+  COMPACTION_RECORD_CUSTOM_TYPE,
+  PERMISSION_DECISION_CUSTOM_TYPE,
+  PLAN_IGNORED_CUSTOM_TYPE,
+} from "@ucode/contracts";
+import {
+  buildChatRows,
+  type ChatRow,
+  compactionKeyOf,
+  lastCompactionIndexOf,
+  withoutThinking,
+} from "../chat-rows";
 import type { ChatItem, MessageBlock } from "../types";
 
 const AT = "2026-01-01T10:00:00.000Z";
@@ -76,7 +86,18 @@ const permissionItem = (
   createdAt: AT,
 });
 
+/** 压缩记录：服务端落的 `custom` 扩展条目；摘要正文在配套的 `summary` 条目里 */
+const compactionItem = (id: string): ChatItem => ({
+  id,
+  role: "custom",
+  blocks: [],
+  customType: COMPACTION_RECORD_CUSTOM_TYPE,
+  compactionRecord: { reason: "threshold", outcome: "done", at: AT },
+  createdAt: AT,
+});
+
 type RowOf<K extends ChatRow["kind"]> = Extract<ChatRow, { kind: K }>;
+
 /** working 行不带节点也没有页脚，页脚断言据此收窄 */
 type FooterRow = Exclude<ChatRow, { kind: "working" }>;
 
@@ -581,5 +602,52 @@ describe("buildChatRows 的生成中行", () => {
 
   it("working 为假时不追加", () => {
     assert.deepEqual(kindsOf(buildChatRows([userItem("u1", "问")])), ["content"]);
+  });
+});
+
+describe("压缩分隔行的定位", () => {
+  it("没有压缩过时没有定位（空与 -1）", () => {
+    const rows = buildChatRows([userItem("u1", "问"), assistantItem("a1", [text("答")])]);
+
+    assert.equal(compactionKeyOf(rows), null);
+    assert.equal(lastCompactionIndexOf(rows), -1);
+  });
+
+  it("单条时指向它", () => {
+    const rows = buildChatRows([
+      userItem("u1", "问"),
+      compactionItem("c1"),
+      assistantItem("a1", [text("答")]),
+    ]);
+
+    const index = lastCompactionIndexOf(rows);
+    assert.equal(rows[index]?.kind, "compaction");
+    assert.equal(compactionKeyOf(rows), rows[index]?.key);
+  });
+
+  it("压过多次时指向最后一条：视口该对到最近那次压缩", () => {
+    const rows = buildChatRows([
+      userItem("u1", "问一"),
+      compactionItem("c1"),
+      assistantItem("a1", [text("答一")]),
+      compactionItem("c2"),
+      assistantItem("a2", [text("答二")]),
+    ]);
+
+    const compactions = rowsOfKind(rows, "compaction");
+    assert.equal(compactions.length, 2);
+    assert.equal(compactionKeyOf(rows), compactions[1]?.key);
+    assert.equal(lastCompactionIndexOf(rows), rows.indexOf(compactions[1]!));
+  });
+
+  it("旧数据只有摘要、没有记录时，照样定位到摘要那一行", () => {
+    const rows = buildChatRows([
+      { id: "s1", role: "summary", blocks: [text("早前的摘要")], createdAt: AT },
+      userItem("u1", "问"),
+      assistantItem("a1", [text("答")]),
+    ]);
+
+    assert.equal(rows[lastCompactionIndexOf(rows)]?.kind, "compaction");
+    assert.equal(compactionKeyOf(rows), "s1");
   });
 });
