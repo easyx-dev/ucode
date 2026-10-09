@@ -39,7 +39,6 @@ import { env } from "../env";
 import {
   type AgentProfile,
   type AgentRegistry,
-  hasPrimaryMode,
   loadAgentRegistry,
   parentModeRules,
   primaryCapability,
@@ -71,12 +70,7 @@ import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
 import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
-import {
-  hasRunSettingsChanged,
-  lastRunSettingsOf,
-  type RunSettings,
-  runSettingsPatch,
-} from "./run-settings";
+import { hasRunSettingsChanged, lastRunSettingsOf, type RunSettings } from "./run-settings";
 import { RunTracker } from "./run-tracker";
 import type { PiRuntime } from "./runtime";
 import { managerToIndex } from "./session-index";
@@ -96,7 +90,7 @@ type PooledSession = {
   skillHits: Set<string>;
 };
 
-/** 库里那份会话参数：权限档位缺省即默认档（写设置点与回填取值共用同一口径） */
+/** 库里那份会话参数：权限档位缺省即默认档（写审计设置点用） */
 const runSettingsOf = (record: SessionRecord): RunSettings => ({
   mode: record.mode,
   permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
@@ -615,7 +609,7 @@ export class SessionPool {
     // 装配要跨 await（loader 重建、MCP 连接），期间配置可能被换掉；
     // 那时回收计划扫不到这个还没入池的实例，只能靠代次比对补标脏
     const generation = this.generation;
-    let record = this.repository.find(sessionId);
+    const record = this.repository.find(sessionId);
     // 只为已存在的会话建实例：没有记录就没有可用的 cwd（见 run.ts 的同款前置检查）
     if (!record) {
       throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
@@ -648,23 +642,7 @@ export class SessionPool {
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
     }
-    // 打开已有会话：文件里记着「上一轮跑在什么参数下」，库里对应的列还没记过（建会话时没给模式 / 档位的行）时用它补上，
-    // 这些行的文件记录写的就是回落默认值，所以这一侧只是兜底。
-    // 库里已经有值就不动：那是用户刚切的、比文件里最后一条记录新，覆盖它等于把切换动作吞掉；
-    // 值不可用（模式 slug 已删 / 权限档位非法）也不写，由 `runSettingsPatch` 判定
-    if (sourcePath) {
-      const patch = runSettingsPatch(
-        lastRunSettingsOf(manager.getBranch()),
-        this.repository.readRunSettings(sessionId),
-        (slug) => hasPrimaryMode(slug, registry),
-      );
-      if (patch) {
-        this.repository.set(sessionId, patch);
-        // 重新取一份：本轮装配要用回填后的值，否则回填要等下一轮才生效
-        record = this.repository.find(sessionId) ?? record;
-      }
-    }
-    // 模式必须在回填之后取：它是工具集 / 提示词 / 记忆工具的输入，取早了这一轮就还是旧模式
+    // 模式只取这一份 record：它是工具集 / 提示词 / 记忆工具的输入，装配中途不再重取
     const mode = record.mode;
     const { profile, capability, parentRules } = this.resolveAgent(record, registry);
     // 子会话的审批 / 提问归属根（v1 即父）会话，并带上来源标注
@@ -959,11 +937,12 @@ export class SessionPool {
   }
 
   /**
-   * 轮开始时落一条本轮生效的运行参数（模式与权限档位）。
+   * 往会话文件追加一条「运行参数记录」。
    *
-   * 它不展示、也不参与投影：只供打开已有会话时回填 `app.db` 里没记过的列（见 `./run-settings`）。
-   * 去重对着会话文件里最后一条设置点，而不是内存：实例重装（重启 / 换模型 / 换权限档位都会
-   * dispose）后内存那份会重置，同一份参数会被反复记一条。
+   * 只写不读的审计条目：它记着这一轮跑在什么参数下，但**不拿它回写 `app.db`**——
+   * 模式 / 权限档位的真值只有库（切了就写），写点天然滞后于切换，回写会造出第二个真值源。
+   * 它不展示、也不参与投影。去重对着会话文件里最后一条设置点，而不是内存：实例重装（重启 / 换模型 /
+   * 换权限档位都会 dispose）后内存那份会重置，同一份参数会被反复记一条。
    */
   private recordRunSettings(sessionId: string): void {
     const entry = this.entries.get(sessionId);

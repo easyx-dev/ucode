@@ -4,13 +4,17 @@
 分叉与「编辑并重发」只是切分支，旧条目仍在文件里。本文档登记「有哪些条目、各自 payload 是什么、
 进不进模型上下文、界面展不展示、谁写谁读」——加新条目时在这里加一行，`scripts/verify` 会双向校验。
 
-两条容易踩的语义：
+三条容易踩的语义：
 
 - **压缩只裁剪「模型看到的视图」**：`buildSessionProjection()` 之后，被摘要覆盖的条目对模型不可见，
   但**文件里一条不少**。所以「回溯」= 直接扫 JSONL（`grep` / 脚本），「界面」= 走 `messages/list`
   的 DTO（只出当前分支、且只到最新压缩点之后）。两者口径不同，别混。
 - **`custom` 与 `custom_message` 是两件事**：前者只作扩展状态持久化、**不进模型上下文**；后者会转成一条
   user 文本进上下文（`convertToLlm` 不额外包裹），用来注入内容。只为回溯、观测用的记录一律用 `custom`。
+- **条目是审计事实，不回写应用状态**：`app.db` 是应用状态（名称 / 模式 / 权限档位 / 目标……）的**唯一**真值，
+  写入方只有应用侧接口；会话文件里的对应记录（`ucode.mode` / `ucode.goal` / `ucode.permission-decision` 等）
+  只用于回溯与展示。写点通常滞后于用户操作（切了还没跑，文件里还是上一轮的参数），拿条目回写会造出第二个
+  真值源，顺序反过来一次就会把刚做的操作吞掉——模式 / 权限档位被回退就是这么来的。
 
 界面是否可见由 `server/src/core/serialize.ts` 的 `entryToDTO` 白名单决定：**默认不下发**，
 只有明确要展示的条目才带 `customType` 出去。
@@ -39,7 +43,7 @@
 | `ucode.goal-prompt` | custom_message | 正文是注入的目标指令；`details` 为 `{ kind: kickoff \| continuation \| resume, turn? }` | `server/src/core/pool.ts`、`server/src/core/run.ts` | 展示成细线（目标启动 / 续跑 / 恢复） |
 | `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/core/run.ts` | 展示成细线（计划已批准） |
 | `ucode.plan-ignored` | custom | `{ at }` | `server/src/routes/messages` | 展示成「已忽略计划」 |
-| `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/core/pool.ts`（轮起点） | 不展示：只用于打开已有会话时回填 `app.db` 没记过的列 |
+| `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/core/pool.ts`（轮起点 `recordRunSettings`） | 不展示：审计「这一轮跑在什么参数下」（写侧靠它去重）；**不回读** |
 | `ucode.skill` | custom | `{ event, name, file, source, toolCallId?, at }`（`event` 取 `invoke` / `hit`，`source` 取 `COMMAND_ASSET_SOURCES`） | `server/src/core/pool.ts`、`server/src/core/run.ts` | 不单独成行：`hit` 挂在对应的 `read` 调用卡片上，`invoke` 只落文件 |
 | `ucode.retry` | custom | `{ event, attempt, maxAttempts, delayMs?, errorMessage?, success?, at }`（`event` 取 `start` / `end`） | `server/src/core/pool.ts` | 展示成细线：`start` 与 `end(success: false)`；重试成功那条不下发 |
 | `ucode.prune` | custom | `{ cleared, freedTokens, targets: Array<{ id, tool }>, at }` | `server/src/core/pool.ts` | 不展示 |

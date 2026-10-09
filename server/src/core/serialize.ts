@@ -441,7 +441,7 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
         };
       }
       // 设置点不发给客户端：界面不展示，`transcriptStates` 也不再推进它；
-      // 它只供打开已有会话时回填 `app.db` 里没记过的列（见 `./run-settings`）
+      // 它是只写不读的审计条目（见 `./run-settings`）
       if (entry.customType === MODE_RECORD_CUSTOM_TYPE) return null;
       if (entry.customType === SKILL_RECORD_CUSTOM_TYPE) {
         const record = skillRecordOf(entry.data);
