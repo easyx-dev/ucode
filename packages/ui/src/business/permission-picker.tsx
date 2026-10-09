@@ -1,11 +1,12 @@
 /** 权限档位选择器：只决定命中 `ask` 时弹审批还是自动放行，不改变工具集与 `deny` */
 import { cn } from "cn";
-import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ChevronDown, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../base/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../base/dropdown-menu";
 import { permissionModeDescription, permissionModeLabel } from "../lib/permission";
 import { PERMISSION_MODES, type PermissionMode } from "../lib/types";
+import { PICKER_TRIGGER_CLASS, type PickerOption, PickerOptions } from "./picker-options";
 
 type PermissionPickerProps = {
   value: PermissionMode;
@@ -38,36 +39,39 @@ export function PermissionPicker({
   const isFull = value === "full";
 
   return (
-    <Select
-      value={value}
+    <DropdownMenu
       open={open ?? internalOpen}
       onOpenChange={(next) => {
         if (!isControlled) setInternalOpen(next);
         onOpenChange?.(next);
       }}
-      onValueChange={(next) => onSelect(next as PermissionMode)}
-      disabled={disabled}
     >
-      <SelectTrigger
-        size="sm"
+      <DropdownMenuTrigger
         className={cn(
-          "gap-1 rounded-md border-0 bg-transparent px-2 text-xs dark:bg-transparent dark:hover:bg-muted [&_svg]:size-3.5",
-          isFull
-            ? "text-warning hover:bg-warning/10 hover:text-warning"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          PICKER_TRIGGER_CLASS,
+          isFull ? "text-warning hover:bg-warning/10 hover:text-warning" : "hover:text-foreground",
         )}
         title={t("权限档位")}
+        disabled={disabled}
       >
         <Icon />
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {PERMISSION_MODES.map((mode) => (
-          <SelectItem key={mode} value={mode} title={permissionModeDescription(mode, t)}>
-            {permissionModeLabel(mode, t)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        {permissionModeLabel(value, t)}
+        <ChevronDown />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-72">
+        <PickerOptions
+          options={PERMISSION_MODES.map(
+            (mode): PickerOption => ({
+              value: mode,
+              label: permissionModeLabel(mode, t),
+              description: permissionModeDescription(mode, t),
+              icon: ICONS[mode] ?? Shield,
+            }),
+          )}
+          value={value}
+          onSelect={(next) => onSelect(next as PermissionMode)}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -43,9 +43,10 @@ describe("思考档位选择器", () => {
     assert.doesNotMatch(text("low", "high"), /自动/);
   });
 
-  it("触发器里必须带 SelectValue", () => {
-    // base 的 SelectContent 默认 item-aligned，Radix 靠 SelectValue 注册的 `valueNode` 算位置：
-    // 漏掉它，弹层会渲在页面末尾——看起来就是「点了没反应」
-    assert.match(html("auto", "xhigh"), /data-slot="select-value"/);
+  it("触发器是菜单按钮且带得出当前档位", () => {
+    // 旧实现用 `select`：Radix 的 item-aligned 定位靠 SelectValue 注册的 `valueNode`，漏掉它弹层会渲在页面末尾。
+    // 换成 dropdown-menu 的 radio 组后那条约束不再适用（定位由 Radix 自己算），但触发器不能退化成空按钮
+    assert.match(html("auto", "xhigh"), /data-slot="dropdown-menu-trigger"/);
+    assert.match(text("auto", "xhigh"), /自动 · 极高/);
   });
 });
