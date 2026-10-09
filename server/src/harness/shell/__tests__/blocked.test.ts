@@ -32,6 +32,23 @@ describe("shell 命令预检", () => {
     assert.equal(blockedCommandNotice("pnpm check"), null);
   });
 
+  it("引号里的分隔符与 sleep 都不算命令", () => {
+    assert.equal(blockedCommandNotice("rg 'a; sleep 3' server/src"), null);
+    assert.equal(blockedCommandNotice('echo "x; sleep 5"'), null);
+    assert.equal(blockedCommandNotice('git commit -m "fix: 起服务; sleep 2"'), null);
+    // 已知代价：引号里的真等待也放过，换来「引号内不算命令」这条能一句话说清的规则
+    assert.equal(blockedCommandNotice("bash -c 'sleep 5'"), null);
+
+    // 引号外的 sleep 照旧命中，且引号不影响同一行里后续命令的判定
+    assert.ok(blockedCommandNotice('sleep 30 && rg "x; sleep 1" server/src'));
+  });
+
+  it("说明里原样引用命令，缺省单位不补成 s", () => {
+    const notice = blockedCommandNotice("sleep 20; pnpm check");
+    assert.ok(notice);
+    assert.match(notice, /`sleep 20` 未执行/);
+  });
+
   it("命中后不调底层执行，说明走 onData 并把退出码置为非零", async () => {
     let called = false;
     const base: BashOperations = {
