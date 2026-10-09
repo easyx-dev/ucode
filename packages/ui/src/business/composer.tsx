@@ -1,7 +1,8 @@
 /** 输入区：白卡容器，顶部上下文行 + Tiptap 编辑器 + 底部工具栏（模型 / 模式 / 思考 / 发送） */
 
+import { brand } from "@ucode/brand";
 import { cn } from "cn";
-import { ArrowUp, FolderOpen, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -20,9 +21,12 @@ import type {
   ThinkingLevel,
   ThinkingPreference,
 } from "../lib/types";
+import { AddMenu } from "./composer/add-menu";
 import { useContextItems } from "./composer/context-items";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer/editor";
+import { ProjectRow } from "./composer/project-row";
 import type { SuggestionItem } from "./composer/suggestion";
+import { ComposerSuggestions } from "./composer/suggestions";
 import { filesOf, useComposerAttachments } from "./composer/use-composer-attachments";
 import { ModePicker } from "./mode-picker";
 import { ModelPicker } from "./model-picker";
@@ -31,9 +35,7 @@ import { ThinkingPicker } from "./thinking-picker";
 
 type ComposerProps = {
   sessionId: string | null;
-  /** 展示用目录标签（助理区可能被替换成文案） */
-  cwd?: string;
-  /** 真实工作目录，`@` 检索用它 */
+  /** 真实工作目录：`@` 检索、技能清单与分支 chip 都用它 */
   cwdPath?: string;
   /** 草稿里恢复的初始文档（附件与引用都在文档的节点里） */
   initialDoc?: ComposerNode;
@@ -44,7 +46,13 @@ type ComposerProps = {
   onSend: (payload: ComposerPayload, doc: ComposerNode) => void;
   onStop: () => void;
   streaming: boolean;
-  suggestions?: readonly string[];
+  /** 空态（还没有消息）：占位符与卡下建议行只在这个状态下出现 */
+  showSuggestions?: boolean;
+  /** 项目展示名；助理区会话显示成文案 */
+  projectName: string;
+  /** 草稿态选中的项目路径；小助理为 null */
+  projectPath: string | null;
+  onSelectProject: (path: string | null) => void;
   providers: CatalogProvider[];
   model: string;
   thinkingLevel: ThinkingPreference;
@@ -65,7 +73,6 @@ const EMPTY_DOC: ComposerNode = { type: "doc", content: [{ type: "paragraph" }] 
 
 export function Composer({
   sessionId,
-  cwd,
   cwdPath,
   initialDoc,
   editorKey,
@@ -73,7 +80,10 @@ export function Composer({
   onSend,
   onStop,
   streaming,
-  suggestions,
+  showSuggestions,
+  projectName,
+  projectPath,
+  onSelectProject,
   providers,
   model,
   thinkingLevel,
@@ -262,27 +272,9 @@ export function Composer({
   return (
     <div className="bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-3xl space-y-2">
-        {suggestions && suggestions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((text) => (
-              <button
-                key={text}
-                type="button"
-                onClick={() => fill(text)}
-                className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: 卡片仅作粘贴 / 拖拽落点，真正的交互在内部编辑器 */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: 整条容器都作粘贴 / 拖拽落点，真正的交互在内部编辑器 */}
         <div
-          className={cn(
-            "rounded-xl bg-popover ring-1 ring-foreground/10 transition-shadow",
-            "focus-within:ring-2 focus-within:ring-ring/40",
-          )}
+          className="rounded-xl bg-muted/50"
           onPaste={(event) => {
             // 编辑器内的粘贴会先被它拦截（defaultPrevented），这里兜住其余区域的粘贴
             if (event.defaultPrevented) return;
@@ -303,79 +295,102 @@ export function Composer({
             handleFiles(files);
           }}
         >
-          {cwd ? (
-            <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-muted-foreground">
-              <FolderOpen className="size-3.5 shrink-0" />
-              <span className="truncate">{cwd}</span>
-            </div>
-          ) : null}
-
-          {attachmentError ? (
-            <p className="px-3 pt-2 text-xs text-destructive">
-              {t("无法添加附件：{{names}}", { names: attachmentError })}
-            </p>
-          ) : null}
-
-          <ComposerEditor
-            ref={editorHandle}
-            key={`${editorKey}:${version}`}
-            initialDoc={externalDoc && externalDoc.key === editorKey ? externalDoc.doc : initialDoc}
-            placeholder={t("输入消息，Enter 发送，Shift+Enter 换行")}
-            onChange={handleDocChange}
-            onSend={submit}
-            contextItems={contextItems}
-            commandItems={commandItems}
-            onBuiltin={(id) => handleBuiltin(id as BuiltinCommandId)}
-            onFiles={handleFiles}
+          <ProjectRow
+            draft={sessionId === null}
+            cwdPath={cwdPath}
+            projectName={projectName}
+            projectPath={projectPath}
+            onSelectProject={onSelectProject}
           />
 
-          <div className="flex items-center gap-1 px-2 pb-2">
-            {providers.length > 0 ? (
-              <ModelPicker
-                providers={providers}
-                value={model}
-                open={openPicker === "model"}
-                onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
-                onSelect={onSelectModel}
-              />
+          <div
+            className={cn(
+              "rounded-lg bg-popover ring-1 ring-foreground/10 transition-shadow",
+              "focus-within:ring-2 focus-within:ring-ring/40",
+            )}
+          >
+            {attachmentError ? (
+              <p className="px-3 pt-2 text-xs text-destructive">
+                {t("无法添加附件：{{names}}", { names: attachmentError })}
+              </p>
             ) : null}
 
-            <ModePicker
-              value={mode}
-              open={openPicker === "mode"}
-              onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
-              onSelect={onSelectMode}
+            <ComposerEditor
+              ref={editorHandle}
+              key={`${editorKey}:${version}`}
+              initialDoc={
+                externalDoc && externalDoc.key === editorKey ? externalDoc.doc : initialDoc
+              }
+              placeholder={
+                showSuggestions
+                  ? t("向 {{name}} 提问，使用 @ 添加上下文，使用 / 选择命令或能力", {
+                      name: brand.name,
+                    })
+                  : t("提出后续修改要求")
+              }
+              onChange={handleDocChange}
+              onSend={submit}
+              contextItems={contextItems}
+              commandItems={commandItems}
+              onBuiltin={(id) => handleBuiltin(id as BuiltinCommandId)}
+              onFiles={handleFiles}
             />
 
-            <PermissionPicker
-              value={permissionMode}
-              disabled={sessionId === null}
-              open={openPicker === "permission"}
-              onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
-              onSelect={onSelectPermissionMode}
-            />
-
-            <div className="ml-auto flex items-center gap-1">
-              <ThinkingPicker
-                value={thinkingLevel}
-                resolved={resolvedThinkingLevel}
-                open={openPicker === "thinking"}
-                onOpenChange={(next) => setOpenPicker(next ? "thinking" : null)}
-                onSelect={onSelectThinkingLevel}
+            <div className="flex items-center gap-1 px-2 pb-2">
+              <AddMenu
+                sessionId={sessionId}
+                cwdPath={cwdPath}
+                onFiles={handleFiles}
+                onInsertCommand={(command) => editorHandle.current?.insertCommand(command) ?? false}
               />
 
-              {streaming ? (
-                <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
-                  <Square className="size-3.5" />
-                </Button>
-              ) : (
-                <Button size="icon" onClick={submit} disabled={uploading} title={t("发送")}>
-                  <ArrowUp className="size-4" />
-                </Button>
-              )}
+              {providers.length > 0 ? (
+                <ModelPicker
+                  providers={providers}
+                  value={model}
+                  open={openPicker === "model"}
+                  onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
+                  onSelect={onSelectModel}
+                />
+              ) : null}
+
+              <ModePicker
+                value={mode}
+                open={openPicker === "mode"}
+                onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
+                onSelect={onSelectMode}
+              />
+
+              <PermissionPicker
+                value={permissionMode}
+                open={openPicker === "permission"}
+                onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
+                onSelect={onSelectPermissionMode}
+              />
+
+              <div className="ml-auto flex items-center gap-1">
+                <ThinkingPicker
+                  value={thinkingLevel}
+                  resolved={resolvedThinkingLevel}
+                  open={openPicker === "thinking"}
+                  onOpenChange={(next) => setOpenPicker(next ? "thinking" : null)}
+                  onSelect={onSelectThinkingLevel}
+                />
+
+                {streaming ? (
+                  <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
+                    <Square className="size-3.5" />
+                  </Button>
+                ) : (
+                  <Button size="icon" onClick={submit} disabled={uploading} title={t("发送")}>
+                    <ArrowUp className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
+        {showSuggestions ? <ComposerSuggestions onSelect={fill} /> : null}
       </div>
     </div>
   );

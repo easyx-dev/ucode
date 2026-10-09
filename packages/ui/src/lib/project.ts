@@ -25,3 +25,16 @@ export const projectSeedOf = (project: ProjectSummary | null): Partial<ComposerD
   mode: project?.mode ?? undefined,
   permissionMode: project?.permissionMode ?? undefined,
 });
+
+/**
+ * 建会话 / 换项目的草稿种子：目标目录 + 它记住的四项。
+ *
+ * 换项目也必须走它，不能只改 `cwd`：草稿是浅合并，漏掉的键会继承上一个目录的值。
+ */
+export const draftSeedOf = (
+  projects: readonly ProjectSummary[],
+  cwd: string | undefined,
+): Partial<ComposerDraft> => ({
+  cwd,
+  ...projectSeedOf(projectOf(projects, cwd ?? null)),
+});

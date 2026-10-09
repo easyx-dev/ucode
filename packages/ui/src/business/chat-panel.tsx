@@ -6,12 +6,14 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import type { ChatController } from "../hooks/use-chat";
 import type { ComposerDraftsController } from "../hooks/use-composer-drafts";
+import { useProjects } from "../hooks/use-projects";
 import type { BuiltinCommandId } from "../lib/builtin-commands";
 import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-document";
 import { composerKeyOf, emptyDraft } from "../lib/composer-draft";
 import type { ComposerPayload } from "../lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
 import { relativizeContextRefs } from "../lib/message-chips";
+import { draftSeedOf, projectLabel, projectOf } from "../lib/project";
 import { isWorkspaceSession } from "../lib/session-groups";
 import {
   type ChatItem,
@@ -146,6 +148,7 @@ export function ChatPanel({
   const openSubagent = useCallback((sessionId: string): void => {
     void openSubagentSessionDialog(sessionId);
   }, []);
+  const projects = useProjects();
   const draftKey = composerKeyOf(session?.id ?? null);
   const draft = composer.drafts[draftKey] ?? emptyDraft();
 
@@ -210,12 +213,18 @@ export function ChatPanel({
     [onEdit],
   );
 
-  // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」；
-  // 空态显示草稿绑定的目录（「在目录中新建」选的）
+  // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」
   const inWorkspace = Boolean(
     session && workspacesDir && isWorkspaceSession(session.cwd, workspacesDir),
   );
-  const cwd = session ? (inWorkspace ? t("助理区") : session.cwd) : (draft.cwd ?? t("助理区"));
+  /**
+   * 项目条要的展示名与路径：助理区（含还没选目录的草稿）没有项目行，草稿态没选目录时显示「小助理」。
+   * 展示名走项目登记表，用户在侧栏改过的名字在这里跟着变。
+   */
+  const projectPath = session ? (inWorkspace ? null : session.cwd) : (draft.cwd ?? null);
+  const projectName = projectPath
+    ? projectLabel(projectPath, projectOf(projects.projects, projectPath))
+    : t("小助理");
 
   // 模型选择器只列已接入的供应商：目录里还有大量没配凭证的内置供应商，选了必然报错
   const providers = (models?.providers ?? []).filter((provider) => provider.available);
@@ -248,8 +257,6 @@ export function ChatPanel({
       onFeedback={onFeedbackPlan}
     />
   ) : null;
-  /** 空对话时的起步建议，点击后填入输入框而不是直接发送 */
-  const suggestions = [t("了解这个项目"), t("排查构建报错"), t("补充单元测试"), t("重构这段代码")];
 
   return (
     <main
@@ -328,7 +335,6 @@ export function ChatPanel({
           <div inert={Boolean(decision)}>
             <Composer
               sessionId={session?.id ?? null}
-              cwd={cwd}
               cwdPath={session?.cwd ?? draft.cwd}
               initialDoc={initialDoc}
               editorKey={draftKey}
@@ -338,7 +344,13 @@ export function ChatPanel({
               onSend={submit}
               streaming={chat.streaming}
               onStop={() => void chat.stop()}
-              suggestions={shouldShowSuggestions(chat) ? suggestions : undefined}
+              showSuggestions={shouldShowSuggestions(chat)}
+              projectName={projectName}
+              projectPath={projectPath}
+              // 换项目要走草稿种子：只改 cwd 会把上一个项目的模型与权限档位留下来
+              onSelectProject={(path) =>
+                composer.update(draftKey, draftSeedOf(projects.projects, path ?? undefined))
+              }
               providers={providers}
               model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
               thinkingLevel={session?.thinkingLevel ?? draft.thinkingLevel ?? "auto"}

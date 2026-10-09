@@ -194,6 +194,9 @@ export default {
     "Type a message. Enter to send, Shift+Enter for a new line.",
   停止生成: "Stop generating",
   发送: "Send",
+  "向 {{name}} 提问，使用 @ 添加上下文，使用 / 选择命令或能力":
+    "Ask {{name}} anything. Use @ to add context, / to pick a command or skill",
+  提出后续修改要求: "Describe the next change",
   当前分支: "Current branch",
   "不绑定项目，会话落在助理区": "No project; the session lives in the assistant area",
   搜索工作区: "Search workspaces",
