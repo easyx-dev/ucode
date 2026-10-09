@@ -195,6 +195,7 @@ export default {
   停止生成: "Stop generating",
   发送: "Send",
   图片预览: "Image preview",
+  "图片 {{index}}": "Image {{index}}",
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
   "无法添加附件：{{names}}": "Could not add attachments: {{names}}",

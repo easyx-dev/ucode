@@ -1,11 +1,10 @@
 /**
- * 附件预览的共享层：图片开弹层看原图，非图片由各自的 chip 提供下载。
+ * 附件预览的共享层：图片开弹层看原图，非图片由各自的 token 提供下载。
  *
- * 编辑器里的 chip 与历史消息里的 chip 共用这一份——两处都要「先经客户端取回字节，再渲染」
+ * 消息回放与编辑器里的图片 token 共用这一份——两处都要「先经客户端取回字节，再渲染」
  * （浏览器不会给 `<img src>` / `<a href>` 附凭证）。用 hook 而非 Provider：预览状态本就是局部的，
- * 弹层挂在用到它的那个 chip 上即可，不必为它引入上下文。
+ * 弹层挂在用到它的那个 token 上即可，不必为它引入上下文。
  */
-import { ImageOff } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -14,19 +13,6 @@ import { useAttachmentUrl } from "../hooks/use-attachment-url";
 
 /** 预览目标：只需要 id（取字节）与显示名（标题 / 下载名） */
 export type AttachmentPreviewTarget = { id: string; name?: string | null };
-
-/** 缩略图：字节到位前留占位，取不回来给一个明确的缺失标记 */
-export function AttachmentThumb({ id, className }: { id: string; className: string }) {
-  const { url: source, failed } = useAttachmentUrl(id);
-  if (!source) {
-    return (
-      <span className={`${className} flex items-center justify-center bg-muted/40`}>
-        {failed ? <ImageOff className="size-3 text-muted-foreground" /> : null}
-      </span>
-    );
-  }
-  return <img src={source} alt="" className={className} />;
-}
 
 /** 弹层里的原图 */
 function PreviewImage({ id }: { id: string }) {

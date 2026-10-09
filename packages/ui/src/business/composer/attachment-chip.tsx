@@ -1,51 +1,54 @@
 /**
- * 编辑器里的附件 chip（Tiptap 节点视图）：图片显缩略图、其余显图标与文件名，上传中是占位。
+ * 编辑器里的附件节点视图：正文里就是一个文字 token（`<图片 n>` / `<文件名>`）。
  *
- * 只有图片的缩略图那一截是预览命中区（`mousedown` 上拦掉选区变化），其余区域仍是原子节点——
- * 点一下把光标落在 chip 上、Backspace 删除，与其它 mention 一致。
+ * 图片 token 是原图预览入口（`mousedown` 上拦掉选区变化），文件 token 不拦事件——编辑区点附件只落光标、
+ * Backspace 删除，误触不该触发下载；气泡里点附件才是下载。
  */
 import type { NodeViewProps } from "@tiptap/react";
-import { NodeViewWrapper } from "@tiptap/react";
-import { FileText } from "lucide-react";
+import { NodeViewWrapper, useEditorState } from "@tiptap/react";
+import { useTranslation } from "react-i18next";
 
-import { AttachmentThumb, useAttachmentPreview } from "../attachment-preview";
+import { attachmentOrdinalInDoc, type ComposerNode } from "../../lib/composer-document";
+import { useAttachmentPreview } from "../attachment-preview";
+import { AttachmentToken } from "../attachment-token";
 
 /** 节点名；`docToPayload` 与编辑器命令都按它找附件节点 */
 export const ATTACHMENT_NODE = "attachmentMention";
 
-const CHIP_CLASS =
-  "inline-flex max-w-48 items-center gap-1 rounded bg-muted px-1 py-0.5 align-baseline text-foreground";
-
-export function AttachmentChipView({ node }: NodeViewProps) {
+export function AttachmentChipView({ node, editor }: NodeViewProps) {
+  const { t } = useTranslation();
   const id = typeof node.attrs.id === "string" ? node.attrs.id : "";
+  const tempId = typeof node.attrs.tempId === "string" ? node.attrs.tempId : "";
   const name = typeof node.attrs.name === "string" ? node.attrs.name : "";
-  const isImage = node.attrs.kind === "image";
+  const kind = node.attrs.kind === "image" ? "image" : "file";
+  const key = id || tempId;
   const { open, dialog } = useAttachmentPreview();
+  // 序号按文档顺序现算而不是写进 attrs：删掉第一张图，第二张立刻变成 `<图片 1>`
+  const ordinal = useEditorState({
+    editor,
+    selector: ({ editor: target }) =>
+      attachmentOrdinalInDoc(target.getJSON() as ComposerNode, key, kind),
+  });
+
+  const token = (
+    <AttachmentToken kind={kind} index={ordinal ?? 0} name={name || id} pending={!id} />
+  );
 
   return (
-    <NodeViewWrapper as="span" className={CHIP_CLASS}>
-      {isImage ? (
-        id ? (
-          <button
-            type="button"
-            title={name}
-            className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-sm"
-            onMouseDown={(event) => {
-              // 拦下选区变化：缩略图是预览入口，不是落光标的地方
-              event.preventDefault();
-              open({ id, name });
-            }}
-          >
-            <AttachmentThumb id={id} className="size-4 object-cover" />
-          </button>
-        ) : (
-          <span className="size-4 shrink-0 animate-pulse rounded-sm bg-foreground/20" />
-        )
+    <NodeViewWrapper as="span" className="inline-block align-baseline">
+      {kind === "image" && id ? (
+        <button
+          type="button"
+          title={name || t("图片预览")}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            open({ id, name });
+          }}
+        >
+          {token}
+        </button>
       ) : (
-        <>
-          <FileText className="size-3 shrink-0" />
-          <span className="truncate">{name || id}</span>
-        </>
+        <span title={name}>{token}</span>
       )}
       {dialog}
     </NodeViewWrapper>

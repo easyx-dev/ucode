@@ -1,5 +1,5 @@
 /**
- * 用户消息：句子里的引用 / 图片 / 附件 chip + 句子外的技能与命令 chip + 气泡与底部操作行。
+ * 用户消息：句子里的引用 chip 与图片 / 附件 token + 句子外的技能与命令 chip + 气泡与底部操作行。
  *
  * 引用、图片与附件是句子成分，因此在用户写的那句里就地渲染（引用点开右侧工作台预览，
  * 图片开弹层看原图，附件下载），位置就是用户当初放的位置；技能与命令不属于任何句子，排在气泡上方。
@@ -13,13 +13,14 @@ import { cn } from "cn";
 import { Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAttachmentUrl } from "../hooks/use-attachment-url";
 import { contextMarker, parseUserMessage, userMessageText } from "../lib/message-chips";
 import { resolveFromCwd } from "../lib/path";
 import { clockLabel } from "../lib/time";
 import type { ChatItem, EditMessagePayload, MessageBlock } from "../lib/types";
 import { useWorkbench } from "../provider/workbench";
-import { AttachmentThumb, useAttachmentPreview } from "./attachment-preview";
-import { AttachmentLink, BlockView } from "./message-blocks";
+import { useAttachmentPreview } from "./attachment-preview";
+import { AttachmentToken } from "./attachment-token";
 import { MessageEditForm } from "./message-edit-form";
 import { CopyAction, ForkAction } from "./message-footer";
 
@@ -66,16 +67,51 @@ function ContextChip({ path }: { path: string }) {
   );
 }
 
-/** 正文里的图片：缩略图点击开弹层看原图，与编辑器里的附件 chip 共用预览 */
-function InlineImage({ id, onOpen }: { id: string; onOpen: (target: { id: string }) => void }) {
+/** 正文里的图片：token 点击开弹层看原图，与编辑器里的图片 token 共用预览 */
+function InlineImage({
+  id,
+  index,
+  onOpen,
+}: {
+  id: string;
+  index: number;
+  onOpen: (target: { id: string }) => void;
+}) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
-      className="mx-0.5 inline-block align-middle"
+      className="mx-0.5 align-baseline"
+      title={t("图片预览")}
       onClick={() => onOpen({ id })}
     >
-      <AttachmentThumb id={id} className="max-h-40 rounded-md border border-border align-middle" />
+      <AttachmentToken kind="image" index={index} />
     </button>
+  );
+}
+
+/**
+ * 正文里的附件：token 形态的下载入口。字节取不回来时先淡出、失败再加划线，
+ * 与 assistant 侧的文件块同一姿态——不让附件凭空消失。
+ */
+function AttachmentTokenLink({ id, name }: { id: string; name?: string | null }) {
+  const { t } = useTranslation();
+  const { url: source, failed } = useAttachmentUrl(id);
+  const label = name || id;
+  if (!source) {
+    return (
+      <span
+        className={failed ? "line-through opacity-60" : "opacity-60"}
+        title={failed ? t("附件不可用") : label}
+      >
+        <AttachmentToken kind="file" name={label} />
+      </span>
+    );
+  }
+  return (
+    <a href={source} download={label} title={label} className="group inline-block">
+      <AttachmentToken kind="file" name={label} className="group-hover:text-foreground" />
+    </a>
   );
 }
 
@@ -114,11 +150,13 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
     segments.filter((segment) => segment.type === "image").map((segment) => segment.index),
   );
   /** 媒体行只兜底正文里没有标记的图片（早期消息）与文件块 */
-  const mediaBlocks = blocks.filter((block) => {
-    if (block.type === "file") return true;
-    if (block.type !== "image") return false;
-    return !inlineImages.has(imageBlocks.indexOf(block) + 1);
-  });
+  const mediaBlocks = blocks.filter(
+    (block): block is Extract<MessageBlock, { type: "image" | "file" }> => {
+      if (block.type === "file") return true;
+      if (block.type !== "image") return false;
+      return !inlineImages.has(imageBlocks.indexOf(block) + 1);
+    },
+  );
 
   /**
    * 溢出只在收起状态下量：展开后高度就是内容高度，`scrollHeight` 与 `clientHeight` 永远相等。
@@ -167,10 +205,24 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
 
       {mediaBlocks.length > 0 ? (
         <div className="flex flex-wrap justify-end gap-2">
-          {mediaBlocks.map((block, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: 附件块按顺序排列，位置即身份
-            <BlockView key={`${item.id}-media-${index}`} block={block} />
-          ))}
+          {mediaBlocks.map((block, index) =>
+            block.type === "image" ? (
+              <InlineImage
+                // biome-ignore lint/suspicious/noArrayIndexKey: 附件块按顺序排列，位置即身份
+                key={`${item.id}-media-${index}`}
+                id={block.id}
+                index={imageBlocks.indexOf(block) + 1}
+                onOpen={preview.open}
+              />
+            ) : (
+              <AttachmentTokenLink
+                // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
+                key={`${item.id}-media-${index}`}
+                id={block.id}
+                name={block.name}
+              />
+            ),
+          )}
         </div>
       ) : null}
 
@@ -196,19 +248,18 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
                   path={segment.path}
                 />
               ) : segment.type === "attachment" ? (
-                <AttachmentLink
+                <AttachmentTokenLink
                   // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
                   key={`${item.id}-seg-${index}`}
                   id={segment.id}
                   name={segment.name}
-                  withIcon
-                  className={CHIP_CLASS}
                 />
               ) : imageBlocks[segment.index - 1] ? (
                 <InlineImage
                   // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
                   key={`${item.id}-seg-${index}`}
                   id={imageBlocks[segment.index - 1]?.id ?? ""}
+                  index={segment.index}
                   onOpen={preview.open}
                 />
               ) : null,

@@ -5,7 +5,8 @@
  * 这里只依赖节点的 JSON 形状（不 import Tiptap 类型），便于单测与复用。
  *
  * 附件在正文里留位置标记（`图片 N` / `附件 N.<ext>`，见 `@ucode/contracts` 的 markers）：
- * 服务端按标记就地展开，图片本体按标记顺序附在文本之后。
+ * 服务端按标记就地展开，图片本体按标记顺序附在文本之后。标记口径由写它的 `docToPayload` 与
+ * 渲染用的 `attachmentOrdinalInDoc` 共担，两处必须同源。
  */
 import {
   type AttachmentRef,
@@ -115,6 +116,36 @@ export const docToPayload = (doc: ComposerNode | null | undefined): ComposerPayl
   }
 
   return { text: lines.join("\n"), contexts, attachments };
+};
+
+/** 附件节点的身份：拿到 id 后用 id，上传中的占位用 tempId；两者都没有时为空串 */
+const attachmentKeyOf = (node: ComposerNode): string => {
+  const id = asString(node.attrs?.id);
+  return id || asString(node.attrs?.tempId);
+};
+
+/**
+ * 附件在文档里的同类序号（1 起）：与 `docToPayload` 写进正文的 `图片 N` / `附件 N` 同一口径，
+ * 编辑器据此把节点显示成 `<图片 n>`。`key` 取节点的 id（上传中的占位取 tempId），文档内唯一。
+ *
+ * 与 `docToPayload` 的已知差异：占位节点在这里照样占号，而 `docToPayload` 遇到没 id 的节点会跳过。
+ * 上传期间两者可能短暂对不上，但发送被 `hasPendingUploads` 挡住，落盘前必然收敛。
+ */
+export const attachmentOrdinalInDoc = (
+  doc: ComposerNode | null | undefined,
+  key: string,
+  kind: AttachmentView["kind"],
+): number => {
+  if (!key) return 0;
+  let ordinal = 0;
+  for (const paragraph of doc?.content ?? []) {
+    for (const node of paragraph.content ?? []) {
+      if (node.type !== "attachmentMention" || node.attrs?.kind !== kind) continue;
+      ordinal += 1;
+      if (attachmentKeyOf(node) === key) return ordinal;
+    }
+  }
+  return 0;
 };
 
 /** 文档是否为空（无任何文本、引用与附件） */
