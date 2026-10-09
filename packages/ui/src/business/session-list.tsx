@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import { isSessionUnread } from "../lib/session";
 import { groupSessions, type SessionGroup } from "../lib/session-groups";
-import type { SessionSummary } from "../lib/types";
+import type { ProjectSummary, SessionSummary } from "../lib/types";
 import { SessionListItem } from "./session-list-item";
 import { SessionProjectGroup } from "./session-project-group";
 import { SessionSection } from "./session-section";
@@ -31,6 +31,8 @@ const groupKey = (path: string | null): string => path ?? "";
 
 type SessionListProps = {
   sessions: SessionSummary[];
+  /** 项目行；提供组名（未命名时回落目录末段） */
+  projects: ProjectSummary[];
   /** 助理根目录（health.workspace）；用于区分助理区 */
   workspacesDir: string | null;
   activeId: string | null;
@@ -42,6 +44,8 @@ type SessionListProps = {
   onCreateAssistant: () => void;
   /** 打开目录选择器（项目分类的 +） */
   onOpenWorkspace: () => void;
+  /** 重命名项目（项目区组头的铅笔） */
+  onRenameProject: (path: string) => void;
   onRename: (session: SessionSummary) => void;
   onArchive: (session: SessionSummary) => void;
   onTogglePin: (session: SessionSummary) => void;
@@ -49,6 +53,7 @@ type SessionListProps = {
 
 export function SessionList({
   sessions,
+  projects,
   workspacesDir,
   activeId,
   loading,
@@ -56,12 +61,16 @@ export function SessionList({
   onCreate,
   onCreateAssistant,
   onOpenWorkspace,
+  onRenameProject,
   onRename,
   onArchive,
   onTogglePin,
 }: SessionListProps) {
   const { t } = useTranslation();
-  const sections = useMemo(() => groupSessions(sessions, workspacesDir), [sessions, workspacesDir]);
+  const sections = useMemo(
+    () => groupSessions(sessions, workspacesDir, projects),
+    [sessions, workspacesDir, projects],
+  );
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
 
   const toggle = useCallback((key: string, next: boolean) => {
@@ -149,6 +158,7 @@ export function SessionList({
                           collapsed={collapsed.has(gKey)}
                           onCollapsedChange={(next) => toggle(gKey, next)}
                           onCreate={() => group.path && onCreate(group.path)}
+                          onRename={() => group.path && onRenameProject(group.path)}
                           renderItem={renderItem}
                         />
                       );

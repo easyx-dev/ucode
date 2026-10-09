@@ -369,7 +369,7 @@ SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 | `agent_settled` | `{}` | 本次运行结束 |
 
 控制帧（无 `sessionId` / `seq`）：`server.connected`、`{ type: "error", sessionId?, code, message, params? }`、
-`{ type: "config_changed", config }`（配置重建）、`{ type: "mcp_changed", mcp }`。
+`{ type: "config_changed", config }`（配置重建）、`{ type: "mcp_changed", mcp }`、`{ type: "projects_changed", projects }`。
 
 `MessageDTO`：
 

@@ -17,6 +17,7 @@ import { CommandPalette } from "../business/command-palette";
 import { DialogHost } from "../business/dialog-host";
 import { openDirectoryPickerDialog } from "../business/directory-picker-dialog";
 import { ErrorToaster } from "../business/error-toaster";
+import { openRenameProjectDialog } from "../business/rename-project-dialog";
 import { openRenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
@@ -32,6 +33,7 @@ import { useInteractions } from "../hooks/use-interactions";
 import { useIsDesktop } from "../hooks/use-is-desktop";
 import { useModels } from "../hooks/use-models";
 import { usePanelLayout } from "../hooks/use-panel-layout";
+import { useProjects } from "../hooks/use-projects";
 import { useSessionNotices } from "../hooks/use-session-notices";
 import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
@@ -39,7 +41,7 @@ import { useStatus } from "../hooks/use-status";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
 import { compactionNoticeMessage } from "../lib/compaction";
 import { textToDoc } from "../lib/composer-document";
-import { composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
+import { type ComposerDraft, composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
 import type { GoalCommand } from "../lib/goal-command";
 import {
@@ -51,6 +53,7 @@ import {
   WORKSPACE_PANELS,
 } from "../lib/panel-layout";
 import { lastTurnPresentedPlan } from "../lib/plan";
+import { projectOf, projectSeedOf } from "../lib/project";
 import { isWorkspaceSession } from "../lib/session-groups";
 import { DEFAULT_SETTINGS_SECTION, type SettingsSectionId } from "../lib/settings-section";
 import type {
@@ -109,6 +112,7 @@ export function WorkspaceLayout({
   const { t } = useTranslation();
   const sessions = useSessions();
   const models = useModels();
+  const projects = useProjects();
   const workspacesDir = useStatus()?.workspace ?? null;
   const composer = useComposerDrafts();
   // 会话归档 / id 失效时把选中项清回空态
@@ -269,6 +273,15 @@ export function WorkspaceLayout({
   };
 
   /**
+   * 草稿的初始设置按目录所属的项目填：项目记住的模型 / 档位 / 模式 / 权限档位直接带进去，
+   * 没记住的目录把这四项清空，由服务端回落全局默认——`/new`、目录选择、小助理共用这一条路径。
+   */
+  const seedDraftFor = (cwd: string | undefined): Partial<ComposerDraft> => ({
+    cwd,
+    ...projectSeedOf(projectOf(projects.projects, cwd ?? null)),
+  });
+
+  /**
    * 新建会话 = 回到草稿态（输入框里没收尾的内容留着）。
    * 继承当前会话所在的项目目录：在某个项目里 `/new` 应继续待在该项目，而不是落回助理区。
    */
@@ -278,19 +291,19 @@ export function WorkspaceLayout({
     );
     const cwd = activeSession && !inWorkspace ? activeSession.cwd : undefined;
     setActiveId(null);
-    composer.update(NEW_SESSION_KEY, { cwd });
+    composer.update(NEW_SESSION_KEY, seedDraftFor(cwd));
   };
 
   /** 「在目录中新建」：回到草稿态并把它绑到选中的目录，首条消息时才真建会话 */
   const startInDirectory = (path: string): void => {
     setActiveId(null);
-    composer.update(NEW_SESSION_KEY, { cwd: path });
+    composer.update(NEW_SESSION_KEY, seedDraftFor(path));
   };
 
   /** 「小助理」：回到草稿态并清掉目录，会话落到助理工作区（不绑定项目） */
   const startAssistantSession = (): void => {
     setActiveId(null);
-    composer.update(NEW_SESSION_KEY, { cwd: undefined });
+    composer.update(NEW_SESSION_KEY, seedDraftFor(undefined));
   };
 
   // 快捷键监听持有最新的 startNewSession：它随当前会话每次重建，用 ref 避免反复绑定监听
@@ -321,6 +334,15 @@ export function WorkspaceLayout({
   const requestRename = (session: SessionSummary): void => {
     void openRenameSessionDialog(session).then((name) => {
       if (name) void sessions.rename(session.id, name);
+    });
+  };
+
+  /** 请求重命名项目：清空输入即回落目录名（弹层给 null），取消不提交 */
+  const requestRenameProject = (path: string): void => {
+    const project = projectOf(projects.projects, path);
+    void openRenameProjectDialog({ path, name: project?.name ?? null }).then((name) => {
+      if (name === undefined) return;
+      void projects.rename({ path, name });
     });
   };
 
@@ -473,6 +495,7 @@ export function WorkspaceLayout({
 
   const sidebarProps = {
     sessions: sessionsView,
+    projects: projects.projects,
     workspacesDir,
     activeId,
     loading: sessions.loading,
@@ -482,6 +505,7 @@ export function WorkspaceLayout({
     onCreateAssistant: startAssistantSession,
     onCreateInDirectory: startInDirectory,
     onRenameRequest: requestRename,
+    onRenameProject: requestRenameProject,
     onArchive: (id: string) => {
       void sessions.archive(id);
       composer.clear(composerKeyOf(id));

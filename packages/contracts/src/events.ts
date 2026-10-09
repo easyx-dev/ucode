@@ -1,6 +1,7 @@
 /** 事件流契约：全局 /events 的帧结构、事件名与序号语义 */
 import type { ConfigSnapshot } from "./config/output";
 import type { McpListResponse } from "./mcp/output";
+import type { ProjectListResponse } from "./projects/output";
 
 /**
  * 会话事件名（挂在 `ServerEventPayload` 上，带 sessionId 与 seq）。载荷约定：
@@ -77,6 +78,8 @@ export type ServerControlEvent =
   /** 配置已变更：模型运行时按需重建，内存会话在空闲后按新配置重装。客户端据此重取 models / health */
   | { type: "config_changed"; config: ConfigSnapshot }
   /** MCP 服务器配置变更：客户端据此刷新列表 */
-  | { type: "mcp_changed"; mcp: McpListResponse };
+  | { type: "mcp_changed"; mcp: McpListResponse }
+  /** 项目变更（改名、写回最近的会话参数）：客户端据此刷新项目行 */
+  | { type: "projects_changed"; projects: ProjectListResponse };
 
 export type ServerEvent = ServerControlEvent | ServerEventPayload;

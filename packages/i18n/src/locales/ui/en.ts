@@ -24,6 +24,8 @@ export default {
   知道了: "Got it",
   保存: "Save",
   重命名: "Rename",
+  重命名项目: "Rename project",
+  留空即用目录名: "Leave empty to use the directory name",
   删除: "Delete",
   更多操作: "More actions",
   未选择会话: "No session selected",

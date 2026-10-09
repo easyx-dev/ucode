@@ -14,6 +14,7 @@ import { createInteractionsStore } from "./stores/interactions";
 import { createMcpStore } from "./stores/mcp";
 import { createMessagesStore } from "./stores/messages";
 import { createModelsStore } from "./stores/models";
+import { createProjectsStore } from "./stores/projects";
 import { createSessionsStore } from "./stores/sessions";
 import { createStatusStore } from "./stores/status";
 import { createUsageStore } from "./stores/usage";
@@ -39,6 +40,7 @@ export const createClient = (options: ClientOptions = {}) => {
   const usage = createUsageStore({ apis, events });
   const config = createConfigStore({ apis, events });
   const mcp = createMcpStore({ apis, events });
+  const projects = createProjectsStore({ apis, events });
 
   return {
     apis,
@@ -54,6 +56,7 @@ export const createClient = (options: ClientOptions = {}) => {
     usage,
     config,
     mcp,
+    projects,
   };
 };
 

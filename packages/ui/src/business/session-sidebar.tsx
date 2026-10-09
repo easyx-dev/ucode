@@ -5,13 +5,15 @@ import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "../base/avatar";
 import { Button } from "../base/button";
 import { confirmArchiveSession } from "../lib/session";
-import type { SessionSummary } from "../lib/types";
+import type { ProjectSummary, SessionSummary } from "../lib/types";
 import { BrandLogo } from "./brand-logo";
 import { SessionList } from "./session-list";
 import { SessionSidebarMenu } from "./session-sidebar-menu";
 
 type SessionSidebarProps = {
   sessions: SessionSummary[];
+  /** 项目行；侧栏组名与重命名入口用 */
+  projects: ProjectSummary[];
   /** 助理根目录（health.workspace）；用于区分助理区 */
   workspacesDir: string | null;
   activeId: string | null;
@@ -24,6 +26,8 @@ type SessionSidebarProps = {
   onCreateAssistant: () => void;
   /** 在指定目录里新建会话 */
   onCreateInDirectory: (path: string) => void;
+  /** 请求重命名某个项目（对话框由 App 承载） */
+  onRenameProject: (path: string) => void;
   /** 请求重命名某个会话（对话框由 App 承载，便于 `/rename` 命令复用） */
   onRenameRequest: (session: SessionSummary) => void;
   onArchive: (sessionId: string) => void;
@@ -38,6 +42,7 @@ type SessionSidebarProps = {
 
 export function SessionSidebar({
   sessions,
+  projects,
   workspacesDir,
   activeId,
   loading,
@@ -46,6 +51,7 @@ export function SessionSidebar({
   onCreate,
   onCreateAssistant,
   onCreateInDirectory,
+  onRenameProject,
   onRenameRequest,
   onArchive,
   onTogglePin,
@@ -77,12 +83,14 @@ export function SessionSidebar({
 
       <SessionList
         sessions={sessions}
+        projects={projects}
         workspacesDir={workspacesDir}
         activeId={activeId}
         loading={loading}
         onSelect={onSelect}
         onCreate={onCreateInDirectory}
         onCreateAssistant={onCreateAssistant}
+        onRenameProject={onRenameProject}
         onRename={onRenameRequest}
         onArchive={(session) => {
           void confirmArchiveSession(session, t).then((confirmed) => {

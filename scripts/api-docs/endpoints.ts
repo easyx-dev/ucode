@@ -268,6 +268,25 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
 
   {
+    domain: "projects",
+    action: "list",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "ProjectListResponse",
+    summary: "项目列表（按 cwd 归口的展示名与最近的会话参数）",
+  },
+  {
+    domain: "projects",
+    action: "update",
+    method: "POST",
+    input: "projectUpdateInputSchema",
+    requestType: "ProjectUpdateInput",
+    output: "ProjectSummary",
+    summary: "重命名项目（name 传 null 即清空，界面回落目录末段）",
+  },
+
+  {
     domain: "messages",
     action: "list",
     method: "POST",

@@ -6,9 +6,21 @@ const HOME_PREFIX = /^(?:\/Users\/[^/]+|\/home\/[^/]+|\/root)(?=\/|$)/;
 /** 把绝对路径的家目录前缀缩写成 `~` */
 export const abbreviateHome = (path: string): string => path.replace(HOME_PREFIX, "~");
 
+/**
+ * 分隔符归一：Windows 的 `\` 与 POSIX 的 `/` 都归一成 `/`，并去掉尾部分隔符。
+ *
+ * 不按运行平台选分隔符：路径可能来自另一种写法的接口数据，
+ * 同一份判定必须在两种写法下给出同一结论，也才好在任何平台上单测。
+ */
+const normalizeSeparators = (path: string): string => path.replace(/\\/g, "/").replace(/\/+$/, "");
+
+/** 是否**严格**位于 `parent` 之下；分隔符无关，三种平台上结论一致 */
+export const isUnderPath = (child: string, parent: string): boolean =>
+  normalizeSeparators(child).startsWith(`${normalizeSeparators(parent)}/`);
+
 /** 目录名：取路径最后一段；根目录回落 `/` */
 export const baseName = (path: string): string => {
-  const trimmed = path.replace(/\/+$/, "");
+  const trimmed = normalizeSeparators(path);
   const index = trimmed.lastIndexOf("/");
   return index >= 0 ? trimmed.slice(index + 1) || "/" : trimmed;
 };

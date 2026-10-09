@@ -1,7 +1,7 @@
 /** 路径归一化与校验：fs / 会话工作区 / 权限规则共用，保证路径与会话 cwd 能精确匹配 */
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, resolve, sep } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 
 import { ERROR_CODES } from "@ucode/contracts";
 
@@ -32,11 +32,14 @@ const expandHome = (input: string): string => {
   return input;
 };
 
-/** 绝对化（含 `~` 展开），不要求存在；用于将要创建的目标路径 */
-export const resolveTargetPath = (input: string): string => {
-  const expanded = expandHome(input.trim());
-  return isAbsolute(expanded) ? expanded : resolve(process.cwd(), expanded);
-};
+/**
+ * 绝对化（含 `~` 展开）并折叠 `.` / `..`，不要求存在；用于将要创建的目标路径。
+ *
+ * 折叠这一步是会话 cwd、项目键与 fs 目标路径共用同一口径的前提：同一目录的
+ * `/a/../b` 与 `/b` 两种写法必须收敛到同一个字符串，否则会被当成两处。
+ */
+export const resolveTargetPath = (input: string): string =>
+  resolve(process.cwd(), expandHome(input.trim()));
 
 /**
  * 归一化成绝对真实路径（realpath），让符号链接、`..`、相对路径都收敛到同一串。

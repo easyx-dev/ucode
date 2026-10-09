@@ -42,6 +42,8 @@ export type {
   PermissionDecision,
   PermissionInteraction,
   PermissionMode,
+  ProjectSummary,
+  ProjectUpdateRequest,
   PromptAdmittedResponse,
   PromptCommandView,
   PromptRequest,

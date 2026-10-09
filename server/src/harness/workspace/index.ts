@@ -35,6 +35,24 @@ export const workspaceDirOf = (sessionId: string, root: string = env.workspacesD
 };
 
 /**
+ * 把 Windows 的 `\` 与 POSIX 的 `/` 都当归一分隔符，并去掉尾部分隔符。
+ *
+ * 不按运行平台选分隔符（不读 `path.sep`）：会话 cwd 可能来自另一种写法的接口入参，
+ * 同一份判定必须在两种写法下给出同一结论，也才好在任何平台上单测。
+ */
+const normalizeSeparators = (value: string): string =>
+  value.replace(/\\/g, "/").replace(/\/+$/, "");
+
+/**
+ * 路径是否落在工作区之下：这些目录是服务分配给「未绑定目录的会话」的，不是用户的目录，
+ * 因此不算项目（与 web 侧 `isWorkspaceSession` 同一口径，两边分组才不会分叉）。
+ *
+ * 严格位于之下才算：工作区根本身不算工作区。
+ */
+export const isWorkspaceCwd = (cwd: string, root: string = env.workspacesDir): boolean =>
+  normalizeSeparators(cwd).startsWith(`${normalizeSeparators(root)}/`);
+
+/**
  * 建出会话工作区目录（幂等）；路径只能从 `workspaceDirOf` 来，
  * 这样建目录这一侧也过同一道会话 id 校验，不会指到助理根之外。
  */

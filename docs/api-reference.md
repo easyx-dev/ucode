@@ -40,6 +40,8 @@
 | POST | `/api/v1/sessions/archive` | 归档会话（软删：从列表隐藏，文件保留） |
 | POST | `/api/v1/sessions/read` | 标记会话已读（写上次打开时间） |
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
+| POST | `/api/v1/projects/list` | 项目列表（按 cwd 归口的展示名与最近的会话参数） |
+| POST | `/api/v1/projects/update` | 重命名项目（name 传 null 即清空，界面回落目录末段） |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
 | POST | `/api/v1/messages/edit` | 编辑一条已发送的用户消息并重发 |
@@ -676,6 +678,48 @@
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
+
+## projects（`projects`）
+
+### POST /api/v1/projects/list
+
+项目列表（按 cwd 归口的展示名与最近的会话参数）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`ProjectListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | number | 是 | — |
+| `projects` | [ProjectSummary](#projectsummary)[] | 是 | — |
+
+### POST /api/v1/projects/update
+
+重命名项目（name 传 null 即清空，界面回落目录末段）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `name` | string（长度≥1） \| null | 是 | — | 新的展示名；`null` 表示清空（客户端回落目录末段） |
+
+**响应类型**：`ProjectSummary`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `path` | string | 是 | 归一化后的绝对路径；项目的自然键，会话按 cwd 归到它上面 |
+| `name` | string \| null | 是 | 展示名；为空时客户端回落目录末段 |
+| `model` | string \| null | 是 | 最近一次在该项目里选择的模型；为空表示未记住，或记住的那个已不可用 |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
+| `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
+| `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `createdAt` | string | 是 | — |
+| `updatedAt` | string | 是 | — |
 
 ## 消息（`messages`）
 
@@ -1352,6 +1396,13 @@
 | `type` | "mcp_changed" | 是 | — |
 | `mcp` | [McpListResponse](#mcplistresponse) | 是 | — |
 
+**取值之一（type = "projects_changed"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "projects_changed" | 是 | — |
+| `projects` | [ProjectListResponse](#projectlistresponse) | 是 | — |
+
 **事件名（`type`）**
 
 - `message_start`
@@ -1495,6 +1546,20 @@
 | `startedAt` | string | 是 | 目标设定时间（ISO 8601），也是用量统计的起点 |
 | `updatedAt` | string | 是 | — |
 | `verification` | [GoalVerification](#goalverification) \| null | 是 | 最近一次校验结果；还没校验过时为空 |
+
+### ProjectSummary
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `path` | string | 是 | 归一化后的绝对路径；项目的自然键，会话按 cwd 归到它上面 |
+| `name` | string \| null | 是 | 展示名；为空时客户端回落目录末段 |
+| `model` | string \| null | 是 | 最近一次在该项目里选择的模型；为空表示未记住，或记住的那个已不可用 |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
+| `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
+| `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `createdAt` | string | 是 | — |
+| `updatedAt` | string | 是 | — |
 
 ### MessageDTO
 
@@ -1725,6 +1790,13 @@
 | `servers` | [McpServerView](#mcpserverview)[] | 是 | — |
 | `configPath` | string | 是 | 配置文件绝对路径，供设置页展示与排查 |
 | `errors` | string[] | 是 | 读盘或解析失败的原因（坏 JSON、字段不合法）；空数组表示正常 |
+
+### ProjectListResponse
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | number | 是 | — |
+| `projects` | [ProjectSummary](#projectsummary)[] | 是 | — |
 
 ### CatalogModel
 

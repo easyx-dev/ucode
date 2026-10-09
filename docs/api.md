@@ -202,7 +202,8 @@
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、
   `{ type: "error", sessionId?, code, message, params? }`、
   `{ type: "config_changed", config: ConfigSnapshot }`（配置已变更，客户端据此重取 models / health）、
-  `{ type: "mcp_changed", mcp: McpListResponse }`
+  `{ type: "mcp_changed", mcp: McpListResponse }`、
+  `{ type: "projects_changed", projects: ProjectListResponse }`（项目改名或写回最近的会话参数）
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲
 
@@ -266,6 +267,24 @@
 - **临时与永久**：上传的附件先是「临时」（`referenced_at` 为空），被 `messages/prompt` 引用后
   转为永久；未被引用的临时附件超过 7 天由服务端后台清理（`referenced_at IS NULL AND
   created_at < now - TTL`）。同一份内容只有一个 id，一旦永久不会回退。
+
+## 项目（projects）
+
+项目是**按会话工作目录（cwd）归口**的一组偏好：侧栏项目区用的展示名，以及「最近一次在该项目里选择的」
+模型 / 思考档位 / 模式 / 权限档位。它不属于任何一份会话记录，故不存在会话文件里。
+
+- `projects/list`：全部项目行。行随会话创建自动登记，不提供删除——侧栏的项目来自「有未归档会话的
+  cwd」，会话全部归档后自然不再显示，行与记住的值保留。
+- `projects/update`：改名（`name` 传 `null` 即清空，界面回落目录末段）。
+  模型 / 档位 / 模式 / 权限档位**不走这个接口**：它们在会话里选择时由 `sessions/create` /
+  `sessions/update` 自动写回，单入口径才不会出现「项目设置」与「会话选择」互相覆盖。
+- 会话参数的两处交汇：新建会话时请求里缺的项按项目记住的值补（`sessions/create`），
+  用户在会话里改了就写回项目（`sessions/update`）。子智能体与分叉继承来的值不算「用户选择」，都不写回。
+- 写入（改名或写回默认值）都会广播控制帧 `projects_changed`（整份列表）：写回是「在会话里改了参数」的
+  副作用，不发的话各端手上的还是连接时加载的那份旧值。
+- 项目里的默认值只在读取时校验可用性：模型已不可用、模式角色已移除、枚举非法的一律按「未设置」回落，
+  不让陈旧值把新建会话打成 `unknown_model`。
+- 助理工作区（`<workspace>/<sessionId>`）不是项目：那是服务分配给未绑定目录的会话的目录。
 
 ## 交互请求（interactions）
 

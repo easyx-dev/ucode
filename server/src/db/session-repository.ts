@@ -183,13 +183,13 @@ const rowToRecord = (row: SessionRow): SessionRecord => ({
 });
 
 /** DB 里存的是文本，读到非法值时按「未设置」处理，避免脏数据把接口打挂 */
-const toThinkingPreference = (value: string | null): ThinkingPreference | undefined =>
+export const toThinkingPreference = (value: string | null): ThinkingPreference | undefined =>
   value && (THINKING_PREFERENCES as readonly string[]).includes(value)
     ? (value as ThinkingPreference)
     : undefined;
 
 /** 同 `toThinkingPreference`：档位是枚举，非法值按未设置回落默认 */
-const toPermissionMode = (value: string | null): PermissionMode | undefined =>
+export const toPermissionMode = (value: string | null): PermissionMode | undefined =>
   value && (PERMISSION_MODES as readonly string[]).includes(value)
     ? (value as PermissionMode)
     : undefined;
@@ -414,6 +414,14 @@ export class SessionRepository {
       .prepare("SELECT id FROM session")
       .all()
       .map((row) => (row as { id: string }).id);
+  }
+
+  /** 全部会话引用到的工作目录（去重，不含未绑定目录的会话）；项目对账据此判定「还有没有主」 */
+  listCwds(): string[] {
+    return this.db
+      .prepare("SELECT DISTINCT cwd FROM session WHERE cwd IS NOT NULL")
+      .all()
+      .map((row) => (row as { cwd: string }).cwd);
   }
 
   /**

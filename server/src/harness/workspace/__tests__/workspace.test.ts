@@ -1,11 +1,16 @@
-/** 会话工作区单测：目录派生、路径穿越拦截与孤儿清理 */
+/** 会话工作区单测：目录派生、路径穿越拦截、工作区判定与孤儿清理 */
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
-import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../index";
+import {
+  cleanOrphanWorkspaces,
+  ensureWorkspaceDir,
+  isWorkspaceCwd,
+  workspaceDirOf,
+} from "../index";
 
 describe("会话工作区", () => {
   let root: string;
@@ -53,5 +58,24 @@ describe("会话工作区", () => {
 
   it("工作区根不存在时不抛错", () => {
     assert.deepEqual(cleanOrphanWorkspaces({ keepIds: [], root: join(root, "nope") }), []);
+  });
+});
+
+describe("isWorkspaceCwd", () => {
+  it("严格位于工作区之下才算，工作区根本身与兄弟目录都不算", () => {
+    assert.equal(isWorkspaceCwd("/home/assistant/workspace/s1", "/home/assistant/workspace"), true);
+    assert.equal(isWorkspaceCwd("/home/assistant/workspace", "/home/assistant/workspace"), false);
+    assert.equal(
+      isWorkspaceCwd("/home/assistant/workspaces/s1", "/home/assistant/workspace"),
+      false,
+    );
+  });
+
+  it("Windows 写法的路径同样成立，工作区根带尾部分隔符也不影响", () => {
+    const cwdRoot = "C:\\Users\\me\\appdata\\workspace";
+    assert.equal(isWorkspaceCwd(`${cwdRoot}\\s1`, cwdRoot), true);
+    assert.equal(isWorkspaceCwd(`${cwdRoot}\\s1`, `${cwdRoot}\\`), true);
+    assert.equal(isWorkspaceCwd("C:\\Users\\me\\appdata\\workspaces\\s1", cwdRoot), false);
+    assert.equal(isWorkspaceCwd(cwdRoot, cwdRoot), false);
   });
 });

@@ -51,6 +51,9 @@ import type {
   MessageListResponse,
   ModelsResponse,
   PairingCreateOutput,
+  ProjectListResponse,
+  ProjectSummary,
+  ProjectUpdateRequest,
   PromptAdmittedResponse,
   PromptRequest,
   ProviderModelsRequest,
@@ -188,6 +191,13 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 全局使用统计；`days` 缺省为全部时间 */
       summary: (body: StatsSummaryRequest = {}) =>
         transport.post<StatsSummaryResponse>("stats/summary", body),
+    },
+    projects: {
+      /** 项目列表：按 cwd 归口的展示名与最近一次选择的会话参数 */
+      list: () => transport.post<ProjectListResponse>("projects/list", {}),
+      /** 重命名项目；`name` 传 null 即清空 */
+      update: (body: ProjectUpdateRequest) =>
+        transport.post<ProjectSummary>("projects/update", body),
     },
     goals: {
       /** 设定 / 替换当前会话目标；由服务端起第一轮 */

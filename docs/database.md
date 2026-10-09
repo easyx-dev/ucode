@@ -75,6 +75,27 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 按 id 认领（见「容错」）。**不再从文件回读任何元数据**（外部导入能力已放弃），所以删库重建后
 `name` / `cwd` / `model` / `thinking_level` / `mode` / `permission_mode` 会丢失——这是有意的取舍。
 
+### `project` 表
+
+按会话工作目录（cwd）归口的偏好（schema v9），列分两组语义：
+
+- **展示**：`name`（为空时客户端回落目录末段）
+- **会话默认值**：`model` / `thinking_level` / `mode` / `permission_mode`——新建会话时请求里缺的项
+  由它们补，用户在会话里改了就写回（见 [`docs/api.md`](./api.md)「项目」）
+
+`path` 是**项目的自然键**：归一化后的绝对路径，与 `session.cwd` 同一口径（`resolveTargetPath`，
+不做 `realpath`——同一目录的符号链接写法会算成两个项目，与侧栏分组同款行为）。
+`id` 按「主键固定名 `id`」的约定保留，供后续项目级数据挂外键；接口层一律按 `path` 寻址。
+
+行随会话创建登记（`ensure`，会话带 cwd 时），不提供按用户动作的删除；助理工作区（`<workspacesDir>/<sessionId>`）
+下的目录不算项目——判定分隔符无关，Windows 的 `\` 与 POSIX 的 `/` 都认（见 `harness/workspace`）。
+模型 / 模式这类「可能已经不可用」的值只在读取时校验：读到非法枚举、
+模型已不存在、模式角色已移除，一律按未设置回落（与 `session` 表的枚举读法一致）。
+
+**无主清理**：启动对账时删掉没有任何会话行（含已归档）引用的行（`ProjectService.reconcile`）。
+项目行随会话登记、界面上能看到的项目也来自会话，「一个会话都不引用」即无主——目录改名 / 迁移后
+留下的旧行否则只增不减。与工作区孤儿清理同取向，不做广播（启动阶段还没有订阅者）。
+
 ### `attachment` 表
 
 附件库的元数据表（schema v5，见 [`plans/input-commands-skills.md`](../plans/input-commands-skills.md)）：
@@ -143,6 +164,8 @@ server/src/db/
   两者都是「无内容、谈不上归档」的行
   - 仓储的 `delete(id)` 是硬删，只给对账与测试用
   - 仓储的 `discardChild(id)` 用于运行期丢弃未落盘的子会话行（带 `source_path IS NULL` 守卫，文件一旦写出就不删）
+- `project` 表是例外：它没有归档态，也无主时一律硬删（启动对账清掉没有会话引用的行，
+  逐行带 `WHERE` 删，见 `deleteOrphans`）——项目本来就只是一个目录的偏好，谈不上保留历史
 - 有活跃生成时先拒绝并返回 `409 session_busy`，不允许归档进行中的会话
 - 禁止无条件 `DELETE`（不带 `WHERE`）
 - 不再有草稿 TTL：会话在首条消息时才创建，空行由对账清理

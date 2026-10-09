@@ -28,6 +28,7 @@ export function ErrorToaster() {
       ["models", client.models],
       ["config", client.config],
       ["mcp", client.mcp],
+      ["projects", client.projects],
       ["usage", client.usage],
     ];
 

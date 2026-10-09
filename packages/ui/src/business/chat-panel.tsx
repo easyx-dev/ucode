@@ -169,6 +169,8 @@ export function ChatPanel({
         model: draft.model,
         thinkingLevel: draft.thinkingLevel,
         mode: draft.mode,
+        // 由项目继承而来（空态没有改动入口）；随建会话落成初始档位
+        permissionMode: draft.permissionMode,
       };
       const isPlainText = payload.contexts.length === 0 && payload.attachments.length === 0;
       const command = isPlainText ? parseGoalCommand(payload.text) : null;
@@ -343,7 +345,10 @@ export function ChatPanel({
               // 空态不知道模式的推荐档位，此时只显示「自动」；拿到会话摘要后才有实际档位
               resolvedThinkingLevel={session?.resolvedThinkingLevel}
               mode={session?.mode ?? draft.mode ?? "build"}
-              permissionMode={session?.permissionMode ?? DEFAULT_PERMISSION_MODE}
+              // 档位在空态由项目继承（选择器禁用，改不了）；没有项目行时为默认档
+              permissionMode={
+                session?.permissionMode ?? draft.permissionMode ?? DEFAULT_PERMISSION_MODE
+              }
               onSelectModel={onSelectModel}
               onSelectThinkingLevel={onSelectThinkingLevel}
               onSelectMode={onSelectMode}

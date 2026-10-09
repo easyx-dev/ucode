@@ -154,6 +154,7 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
 
 /**
  * 新建只返回 id 与草稿视图：会话文件在首次产生 assistant 回复时才落盘。
+ * 请求里缺的会话参数按项目记住的值补（见 `harness/project`）。
  */
 const createSessionRoute = (services: Services, input: SessionCreateInput): SessionSummary => {
   if (!services.runtime.getStatus().configured) {
@@ -163,12 +164,20 @@ const createSessionRoute = (services: Services, input: SessionCreateInput): Sess
       409,
     );
   }
+  // 校验只针对请求里显式给的值：项目里记住的陈旧值由装配层按未设置回落，不该报 400
   if (input.model) assertModel(services, input.model);
   if (input.mode) {
     assertPrimaryMode(input.cwd ? resolveTargetPath(input.cwd) : env.workspacesDir, input.mode);
   }
 
-  const sessionId = createSession(services, input);
+  const sessionId = createSession(services, services.projects.seedFor(input.cwd, input));
+  // 登记项目并写回这次显式选的参数：「项目记住最近一次」，下次在该目录新建会话即继承
+  services.projects.remember(input.cwd ?? null, {
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel } : {}),
+    ...(input.mode ? { mode: input.mode } : {}),
+    ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
+  });
 
   const summary = describeSessionSummary(summarySources(services), sessionId);
   if (!summary) {
@@ -265,6 +274,17 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
     ...(patch.mode ? { mode: patch.mode } : {}),
     ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
   });
+
+  // 显式改的会话参数写回项目：项目记住最近一次，下次在该目录新建会话即继承；
+  // 未绑定目录的会话（cwd 为空）与助理工作区不归项目管，remember 自己会忽略
+  if (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
+    services.projects.remember(record.cwd, {
+      ...(patch.model ? { model: patch.model } : {}),
+      ...(patch.thinkingLevel ? { thinkingLevel: patch.thinkingLevel } : {}),
+      ...(patch.mode ? { mode: patch.mode } : {}),
+      ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
+    });
+  }
 
   // 置顶是应用侧元数据：只写 pinned_at，不改 updated_at、不重建会话
   if (patch.pinned !== undefined) {

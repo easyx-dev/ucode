@@ -31,6 +31,8 @@ export * from "./messages/input";
 export * from "./messages/markers";
 export * from "./messages/output";
 export * from "./models/output";
+export * from "./projects/input";
+export * from "./projects/output";
 export * from "./runtime";
 export * from "./service/input";
 export * from "./service/output";

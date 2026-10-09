@@ -122,5 +122,28 @@ describe("isWorkspaceSession", () => {
   it("只看目录前缀，前缀相同的兄弟目录不算在内", () => {
     assert.equal(isWorkspaceSession("/home/assistant/s1", "/home/assistant"), true);
     assert.equal(isWorkspaceSession("/home/assistant2/s1", "/home/assistant"), false);
+    // 工作区根本身不算工作区（严格位于之下才算）
+    assert.equal(isWorkspaceSession("/home/assistant", "/home/assistant"), false);
+  });
+
+  it("Windows 写法的路径同样成立（服务端可能跑在 Windows）", () => {
+    assert.equal(
+      isWorkspaceSession(
+        "C:\\Users\\me\\appdata\\workspace\\s1",
+        "C:\\Users\\me\\appdata\\workspace",
+      ),
+      true,
+    );
+    assert.equal(
+      isWorkspaceSession("C:\\Users\\me\\appdata\\workspaces", "C:\\Users\\me\\appdata\\workspace"),
+      false,
+    );
+    assert.equal(
+      isWorkspaceSession(
+        "C:\\Users\\me\\appdata\\workspace\\s1\\",
+        "C:\\Users\\me\\appdata\\workspace\\",
+      ),
+      true,
+    );
   });
 });

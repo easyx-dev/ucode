@@ -109,6 +109,22 @@ describe("SessionRepository", () => {
     assert.equal(total, records.length);
   });
 
+  it("listCwds 给出去重后的工作目录，不含未绑定目录的会话", () => {
+    repo.create("cwd-a1", { cwd: "/work/cwd-a" });
+    repo.create("cwd-a2", { cwd: "/work/cwd-a" });
+    repo.create("cwd-b", { cwd: "/work/cwd-b" });
+    // 未绑定目录的会话 cwd 为空，不算项目目录
+    repo.create("cwd-none", {});
+
+    const cwds = repo.listCwds();
+    assert.equal(cwds.filter((cwd) => cwd === "/work/cwd-a").length, 1);
+    assert.ok(cwds.includes("/work/cwd-b"));
+    assert.equal(
+      cwds.some((cwd) => cwd.trim() === ""),
+      false,
+    );
+  });
+
   it("搜索按名称与预览匹配", () => {
     repo.create("s7", { name: "写周报" });
     const { records } = repo.search({ q: "周报", limit: 10 });

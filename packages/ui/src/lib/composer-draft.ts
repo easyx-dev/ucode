@@ -2,7 +2,7 @@
 
 import { brand } from "@ucode/brand";
 
-import type { ThinkingPreference } from "./types";
+import type { PermissionMode, ThinkingPreference } from "./types";
 
 export type ComposerDraft = {
   /** 输入框里还没发出去的内容（纯文本镜像，含附件位置标记，用于空判定与旧数据） */
@@ -17,6 +17,11 @@ export type ComposerDraft = {
   /** 档位偏好草稿；`auto` 表示按模式推荐值 */
   thinkingLevel?: ThinkingPreference;
   mode?: string;
+  /**
+   * 权限档位草稿：只在空态作为新会话的初始设置生效，且只由项目继承而来——
+   * 空态不提供改动入口（选择器禁用），免得还没看到会话就随手把审批放宽。
+   */
+  permissionMode?: PermissionMode;
   /** 「在目录中新建」选定的目录；未选时缺省（会话落到自己的工作区） */
   cwd?: string;
 };
@@ -53,6 +58,9 @@ const toDraft = (value: unknown): ComposerDraft | null => {
       ? { thinkingLevel: item.thinkingLevel as ComposerDraft["thinkingLevel"] }
       : {}),
     ...(typeof item.mode === "string" ? { mode: item.mode as ComposerDraft["mode"] } : {}),
+    ...(typeof item.permissionMode === "string"
+      ? { permissionMode: item.permissionMode as ComposerDraft["permissionMode"] }
+      : {}),
     ...(typeof item.cwd === "string" ? { cwd: item.cwd } : {}),
   };
 };

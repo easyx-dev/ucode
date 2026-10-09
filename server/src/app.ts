@@ -16,13 +16,16 @@ import { PiRuntime } from "./core/runtime";
 import { openDatabase } from "./db";
 import { AttachmentRepository } from "./db/attachment-repository";
 import { AuthSessionRepository } from "./db/auth-session-repository";
+import { ProjectRepository } from "./db/project-repository";
 import { SessionRepository } from "./db/session-repository";
 import { env } from "./env";
+import { hasPrimaryMode, loadAgentRegistry } from "./harness/agents";
 import { expireTempAttachments } from "./harness/attachment";
 import { contextBudgetOf } from "./harness/budget";
 import { GoalService } from "./harness/goal";
 import { MemoryService } from "./harness/memory";
 import { SessionAllowStore } from "./harness/permissions";
+import { ProjectService } from "./harness/project";
 import { TitleService } from "./harness/title";
 import { UsageService } from "./harness/usage";
 import { CredentialStore } from "./lib/auth/credentials";
@@ -38,6 +41,8 @@ export type Services = {
   sessions: SessionRepository;
   /** 附件元数据（SQLite）；字节在 `$APP_HOME/app/attachments` */
   attachments: AttachmentRepository;
+  /** 项目偏好：按 cwd 归口的展示名与最近的会话参数 */
+  projects: ProjectService;
   runtime: PiRuntime;
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
@@ -70,7 +75,7 @@ export type Services = {
 };
 
 export const createServices = async (registration: ServiceRegistration): Promise<Services> => {
-  // 单进程单连接：两个仓储共用同一个句柄，关闭也由这里统一负责
+  // 单进程单连接：几个仓储共用同一个句柄，关闭也由这里统一负责
   const db = openDatabase();
   const config = new ConfigStore();
   const sessions = new SessionRepository(db);
@@ -81,6 +86,18 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const loginLimiter = new RateLimiter();
   const runtime = new PiRuntime();
   const events = new SessionEventBus();
+  const projects = new ProjectService({
+    repository: new ProjectRepository(db),
+    isModelUsable: (ref) => Boolean(runtime.resolveModelRef(ref)),
+    // 自定义 primary 角色随项目目录走，故可用性判定要按该项目的 cwd 读一次角色注册表
+    hasMode: (cwd, mode) => hasPrimaryMode(mode, loadAgentRegistry({ cwd, appHome: env.homeDir })),
+    // 改名与写回默认值都广播：写回是「在会话里改了参数」的副作用，各端手上的项目行要跟上
+    onChange: (list) =>
+      events.emitControl({
+        type: "projects_changed",
+        projects: { projects: list, total: list.length },
+      }),
+  });
   // 池在这里之后才建，回调用到时现取（挂起的交互只存在于正在跑的会话上）
   const interactions = new InteractionBroker(events, ({ sessionId, request, outcome }) => {
     appendSessionRecord(
@@ -136,6 +153,11 @@ export const createServices = async (registration: ServiceRegistration): Promise
   config.load();
   // 以 JSONL 为准对齐索引：清理文件已消失的行
   await sessions.reconcile();
+  // 项目行以会话为「主」：上一个跑完的对账可能已经删掉了某些会话，这里一并清掉无主的项目行
+  const prunedProjects = projects.reconcile(sessions.listCwds());
+  if (prunedProjects.length > 0) {
+    logger.info({ paths: prunedProjects }, "清理无主项目行");
+  }
   await runtime.apply(config.get());
   // 内置 provider 集合要在首次 apply 之后才拿到，所以这里才能判断条目是否可落地；
   // 手改 config.json 留下的坏条目会被 pi 静默忽略，至少让它可见（不阻断启动）
@@ -215,6 +237,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     config,
     sessions,
     attachments,
+    projects,
     runtime,
     pool,
     events,

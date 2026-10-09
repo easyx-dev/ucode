@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -83,6 +83,21 @@ const migrations: Record<number, string> = {
   8: `
     ALTER TABLE session ADD COLUMN pinned_at TEXT;
     ALTER TABLE session ADD COLUMN last_read_at TEXT;
+  `,
+  // 项目：按会话 cwd 归口的偏好（展示名 + 最近一次选择的会话参数），见 docs/database.md
+  9: `
+    CREATE TABLE project (
+      id               TEXT PRIMARY KEY,
+      path             TEXT NOT NULL,
+      name             TEXT,
+      model            TEXT,
+      thinking_level   TEXT,
+      mode             TEXT,
+      permission_mode  TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX idx_project_path ON project(path);
   `,
 };
 
