@@ -64,6 +64,9 @@ export const SHELL_COMMAND_TIMEOUT_SECONDS = 30 * 60;
 /** agent 侧 shell 命令连续无输出的时长上限；到达即判定为等待交互输入并中止 */
 export const SHELL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** shell 命令里允许出现的固定空等（秒）：这以上的 `sleep` 直接拦下，让模型改用工具自身的等待能力 */
+export const SHELL_SLEEP_MIN_SECONDS = 1;
+
 /** 单个父会话同时运行的子智能体数量上限；超限排队等空位，不等就报错 */
 export const SUBAGENT_MAX_CONCURRENCY = 4;
 
