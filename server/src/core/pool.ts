@@ -8,9 +8,12 @@ import {
 import {
   COMPACTION_RECORD_CUSTOM_TYPE,
   type CompactionRecord,
+  DEFAULT_PERMISSION_MODE,
   ERROR_CODES,
   GOAL_PROMPT_CUSTOM_TYPE,
+  MODE_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
+  PERMISSION_MODES,
   type PermissionRecord,
   PRUNE_RECORD_CUSTOM_TYPE,
   RETRY_RECORD_CUSTOM_TYPE,
@@ -30,12 +33,14 @@ import {
   SUBAGENT_QUEUE_MAX,
   SUBAGENT_QUEUE_WAIT_MS,
 } from "../constants";
-import type { SessionRecord, SessionRepository } from "../db/session-repository";
+import type { SessionOverride, SessionRecord, SessionRepository } from "../db/session-repository";
+import { overrideOf } from "../db/session-repository";
 
 import { env } from "../env";
 import {
   type AgentProfile,
   type AgentRegistry,
+  hasPrimaryMode,
   loadAgentRegistry,
   parentModeRules,
   primaryCapability,
@@ -67,6 +72,7 @@ import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
 import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
+import { lastRunSettingsOf, type RunSettings } from "./run-settings";
 import { RunTracker } from "./run-tracker";
 import type { PiRuntime } from "./runtime";
 import { managerToIndex } from "./session-index";
@@ -84,6 +90,8 @@ type PooledSession = {
   skills: SkillIndex;
   /** 本轮已记过的技能名：同一轮里分片读同一个文件只留第一条，轮次边界清空 */
   skillHits: Set<string>;
+  /** 上一次写进文件的运行参数：与本轮相同就跳过，重装后自然重置 */
+  runSettings: RunSettings;
 };
 
 /**
@@ -312,6 +320,7 @@ export class SessionPool {
     if (!this.beginRun(sessionId)) {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
     }
+    this.recordRunSettings(sessionId);
     void session
       .prompt(text, images.length > 0 ? { images: [...images] } : undefined)
       .catch((error) => this.reportRunError(sessionId, error))
@@ -331,6 +340,7 @@ export class SessionPool {
     if (!this.beginRun(sessionId)) {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
     }
+    this.recordRunSettings(sessionId);
     void session
       .sendCustomMessage(
         {
@@ -597,7 +607,7 @@ export class SessionPool {
     // 装配要跨 await（loader 重建、MCP 连接），期间配置可能被换掉；
     // 那时回收计划扫不到这个还没入池的实例，只能靠代次比对补标脏
     const generation = this.generation;
-    const record = this.repository.find(sessionId);
+    let record = this.repository.find(sessionId);
     // 只为已存在的会话建实例：没有记录就没有可用的 cwd（见 run.ts 的同款前置检查）
     if (!record) {
       throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
@@ -617,11 +627,45 @@ export class SessionPool {
     const manager = sourcePath
       ? SessionManager.open(sourcePath, env.sessionsDir, cwd)
       : SessionManager.create(cwd, env.sessionsDir, { id: sessionId });
+    if (!sourcePath) {
+      // 新会话的第一条设置点：pi 只在有 user / assistant 消息时才落盘，这条会随首条消息一起写出去、
+      // 位置在它之前，天然就是「这一轮跑在什么参数下」的起点（子会话也走这里）
+      manager.appendCustomEntry(MODE_RECORD_CUSTOM_TYPE, {
+        mode,
+        permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
+        at: new Date().toISOString(),
+      });
+    }
 
     // 自定义角色按 cwd 祖先链 + 全局目录现读：用户新加 / 改角色文件后，新建或重开的会话即生效
     const registry = loadAgentRegistry({ cwd, appHome: env.homeDir });
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
+    }
+    // 打开已有会话：文件是权威、DB 是缓存。文件里有设置点就以它为准回写，删库 / 拷文件都不会丢模式；
+    // 未知 slug（自定义角色已删）不回写，装配侧本就有兑底
+    if (sourcePath) {
+      const recorded = lastRunSettingsOf(manager.getBranch());
+      const patch: SessionOverride = {};
+      if (
+        recorded?.mode !== undefined &&
+        recorded.mode !== record.mode &&
+        hasPrimaryMode(recorded.mode, registry)
+      ) {
+        patch.mode = recorded.mode;
+      }
+      if (
+        recorded?.permissionMode !== undefined &&
+        (PERMISSION_MODES as readonly string[]).includes(recorded.permissionMode) &&
+        recorded.permissionMode !== record.permissionMode
+      ) {
+        patch.permissionMode = recorded.permissionMode as SessionOverride["permissionMode"];
+      }
+      if (Object.keys(patch).length > 0) {
+        this.repository.set(sessionId, patch);
+        // 重新取一份：本轮装配要用校准后的值，否则校准要等下一轮才生效
+        record = this.repository.find(sessionId) ?? record;
+      }
     }
     const { profile, capability, parentRules } = this.resolveAgent(record, registry);
     // 子会话的审批 / 提问归属根（v1 即父）会话，并带上来源标注
@@ -810,6 +854,7 @@ export class SessionPool {
         stale: generation !== this.generation,
         skills: assembled.skills,
         skillHits: new Set(),
+        runSettings: {},
       };
       // 压缩触发点在这里算一次，同时喂给每步耗时记录与用量服务：
       // 口径与注入 pi 的阈值完全一致，界面上的「预算」不会与实际压缩点对不上
@@ -916,13 +961,45 @@ export class SessionPool {
   }
 
   /**
+   * 轮开始时落一条「这一轮跑在什么参数下」（模式与权限档位）。
+   *
+   * 与上一次写过的值相同就跳过：同一实例内连续多轮不必重复写。池条目上记着上次的值，
+   * 重装（dispose / 空闲回收）后自然重置——重建实例才让新设置生效，那时必须再写一条起点。
+   */
+  private recordRunSettings(sessionId: string): void {
+    const entry = this.entries.get(sessionId);
+    const record = this.repository.find(sessionId);
+    if (!entry || !record) return;
+    const settings: RunSettings = {
+      mode: record.mode,
+      permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
+    };
+    if (
+      entry.runSettings.mode === settings.mode &&
+      entry.runSettings.permissionMode === settings.permissionMode
+    ) {
+      return;
+    }
+    entry.runSettings = settings;
+    this.appendMarker(sessionId, entry.session.sessionManager, {
+      customType: MODE_RECORD_CUSTOM_TYPE,
+      label: "运行参数记录",
+      data: {
+        mode: settings.mode,
+        permissionMode: settings.permissionMode,
+        at: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
    * 写一条观测条目（技能命中 / 重试）并让在线客户端重取转录，与审批记录同一做法。
    * 失败只记日志：记录不该影响这一轮的投递。
    */
   private appendMarker(
     sessionId: string,
     manager: SessionManager | undefined,
-    entry: { customType: string; data: SkillRecord | RetryRecord; label: string },
+    entry: { customType: string; data: unknown; label: string },
   ): void {
     if (!manager) return;
     try {

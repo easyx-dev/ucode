@@ -31,17 +31,17 @@ export const modeDescription = (mode: string, t: TFunction): string => {
   }
 };
 
-/** 模式 / 权限档位变更的细线文案：只换一个时点明换的是哪一个，两个一起换就一并列出 */
+/**
+ * 模式 / 权限档位的细线文案：说的是「这一轮跑在什么参数下」，不是「刚切了设置」。
+ * 写点在轮开始（每轮最多一条），所以这里不带「已切换」这类动作词。
+ */
 export const modeChangeText = (
   record: ModeRecord,
   t: TFunction,
-): { label: string; detail?: string } => {
-  const mode = record.mode === undefined ? null : modeLabel(record.mode, t);
-  const permission =
-    record.permissionMode === undefined ? null : permissionModeText(record.permissionMode, t);
-  if (mode && permission) {
-    return { label: t("模式与权限档位已切换"), detail: `${mode} · ${permission}` };
-  }
-  if (mode) return { label: t("模式已切换"), detail: mode };
-  return { label: t("权限档位已切换"), detail: permission ?? "" };
+): { label: string; detail: string } => {
+  const parts = [
+    record.mode === undefined ? null : modeLabel(record.mode, t),
+    record.permissionMode === undefined ? null : permissionModeText(record.permissionMode, t),
+  ].filter((part): part is string => part !== null);
+  return { label: t("本轮参数"), detail: parts.join(" · ") };
 };

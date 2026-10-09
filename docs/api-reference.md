@@ -1581,6 +1581,8 @@
 | `modeChange` | [ModeRecord](#moderecord) | 否 | 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） |
 | `skillRecord` | [SkillRecord](#skillrecord) | 否 | custom 专用：技能命中记录；只有 `SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 条目会带上 |
 | `retryRecord` | [RetryRecord](#retryrecord) | 否 | custom 专用：模型请求重试记录；只有 `RETRY_RECORD_CUSTOM_TYPE` 会带上 |
+| `mode` | string | 否 | 本条所在这一轮生效的助手模式（沿完整分支推进的最近一条 `MODE_RECORD_CUSTOM_TYPE`） |
+| `permissionMode` | "default" \| "auto" \| "full" | 否 | 这一轮生效的权限档位 |
 | `goalPrompt` | [GoalPromptDetails](#goalpromptdetails) | 否 | custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |

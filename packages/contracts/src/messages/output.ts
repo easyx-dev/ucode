@@ -7,6 +7,7 @@ import type {
   MessageRole,
   ModeRecord,
   PermissionDecision,
+  PermissionMode,
   RetryRecord,
   SkillRecord,
   ThinkingLevel,
@@ -68,6 +69,10 @@ export type MessageDTO = {
   skillRecord?: SkillRecord;
   /** custom 专用：模型请求重试记录；只有 `RETRY_RECORD_CUSTOM_TYPE` 会带上 */
   retryRecord?: RetryRecord;
+  /** 本条所在这一轮生效的助手模式（沿完整分支推进的最近一条 `MODE_RECORD_CUSTOM_TYPE`） */
+  mode?: string;
+  /** 这一轮生效的权限档位 */
+  permissionMode?: PermissionMode;
   /** custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 */
   goalPrompt?: GoalPromptDetails;
   isError?: boolean;

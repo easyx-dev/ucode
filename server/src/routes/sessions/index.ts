@@ -4,7 +4,6 @@ import { rmSync } from "node:fs";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
-  MODE_RECORD_CUSTOM_TYPE,
   type SessionArchiveResponse,
   type SessionCreateInput,
   type SessionForkInput,
@@ -207,14 +206,8 @@ const appendTranscriptPatch = (
   }
   // 文件里记的是实际档位：pi 按这些条目标每轮页脚的档位，记 `auto` 就标不出来了
   if (resolvedThinkingLevel) manager.appendThinkingLevelChange(resolvedThinkingLevel);
-  // 模式与权限档位决定每轮的工具集与审批口径：换了什么、什么时候换的，只有文件里查得到
-  if (patch.mode || patch.permissionMode) {
-    manager.appendCustomEntry(MODE_RECORD_CUSTOM_TYPE, {
-      ...(patch.mode ? { mode: patch.mode } : {}),
-      ...(patch.permissionMode ? { permissionMode: patch.permissionMode } : {}),
-      at: new Date().toISOString(),
-    });
-  }
+  // 模式与权限档位**不在这里写**：写点挪到了「轮开始」（见 `SessionPool.recordRunSettings`），
+  // 文件里的每一条设置点都对应真正跑过的一轮，而不是设置面板的操作日志
   return manager;
 };
 
@@ -295,11 +288,6 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   if (patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
     services.pool.dispose(patch.sessionId);
   }
-  // 模式变更会在转录里多一条细线，转录已变、客户端手上的那份作废
-  if (patch.mode || patch.permissionMode) {
-    services.events.emitFrame(patch.sessionId, "transcript_reset", { fromEntryId: "" });
-  }
-
   // 与 /create 一致，返回扁平摘要（/info 才是 {session}）
   const info = describeSession(services, patch.sessionId);
   // 带上占用与窗口：改模型 / 模式会换掉生效窗口，不重发的话客户端会继续按旧窗口算百分比

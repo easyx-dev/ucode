@@ -49,12 +49,16 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 `session` 有意保持单表，列分两组语义，**新增列必须先归组**：
 
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
-  `thinking_level`（档位偏好：`auto` 或具体档位，为空即 `auto`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `mode`（未设置回落 `build`）/ `permission_mode`（会话级权限档位，未设置回落
-  `default`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `deleted_at`（软删标记，非空即已归档）/
+  `thinking_level`（档位偏好：`auto` 或具体档位，为空即 `auto`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/
+  `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
   `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/
   `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）/
   `pinned_at`（置顶时间，非空即置顶）
+- **可回读组**（会话文件里有一条权威记录，这里只是缓存）：`mode`（未设置回落 `build`）/ `permission_mode`
+  （会话级权限档位，未设置回落 `default`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）。
+  写点是每次「轮开始」往会话文件追加一条 `ucode.mode`（见 [`docs/session-entries.md`](./session-entries.md)），
+  打开已有会话时用文件里的最后一条校准这里；删库或把 JSONL 拷到别的实例后，模式按文件恢复
 - **列表缓存组**（为列表与搜索服务，由 `refresh()` 在生成落定后回写，会话文件一落盘也会补写一次，
   见「容错」）：`source_path` /
   `preview` / `created_at` / `updated_at` / `last_read_at`（上次打开时间，用于未读判定）
@@ -72,8 +76,9 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 会话正文的事实源是 pi 的 JSONL；`source_path` 指向它。为 null 说明这一行还没认过文件，
 正常只出现在「新建但还没发过消息」的会话上——正文绝不回读文件，**只有路径本身**在行缺它时
-按 id 认领（见「容错」）。**不再从文件回读任何元数据**（外部导入能力已放弃），所以删库重建后
-`name` / `cwd` / `model` / `thinking_level` / `mode` / `permission_mode` 会丢失——这是有意的取舍。
+按 id 认领（见「容错」）。**元数据也不再回读**（外部导入能力已放弃），唯一的例外是上表的
+「可回读组」（`mode` / `permission_mode`）；所以删库重建后 `name` / `cwd` / `model` /
+`thinking_level` 会丢失——这是有意的取舍。
 
 ### `project` 表
 
