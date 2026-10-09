@@ -208,7 +208,7 @@ export default {
   "@ 添加上下文": "@ to add context",
   "/ 选择命令或技能": "/ to pick a command or skill",
   图片预览: "Image preview",
-  "图片 {{index}}": "Image {{index}}",
+  "图片{{index}}": "Image {{index}}",
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
   "无法添加附件：{{names}}": "Could not add attachments: {{names}}",
@@ -230,11 +230,9 @@ export default {
   编码: "Build",
   计划: "Plan",
   问答: "Ask",
-  "可直接读写文件、执行命令。": "Read, write and run commands directly.",
-  "先给出方案，只读调研不改代码。":
-    "Produce a plan first; read-only research without code changes.",
-  "只读分析与回答，不改文件、不执行命令。":
-    "Read-only analysis and answers; no file writes or commands.",
+  "读写文件、执行命令。": "Read, write and run commands directly.",
+  "先出方案，只读调研不改代码。": "Plan first; read-only research, no code changes.",
+  "只读分析，不改文件不跑命令。": "Read-only analysis; no file writes or commands.",
   切换模式失败: "Failed to switch mode",
 
   // Permission levels
@@ -242,12 +240,10 @@ export default {
   默认: "Default",
   自动批准: "Auto-approve",
   完全访问: "Full access",
-  "按模式规则执行，需要授权时弹窗确认。":
-    "Follow the mode rules; prompt for approval when required.",
-  "自动批准常规工具，访问工作目录之外仍会询问。":
-    "Auto-approve routine tools; still ask before touching paths outside the working directory.",
-  "自动批准所有操作（含工作目录之外），仅保留规则里的阻断。":
-    "Auto-approve everything, including paths outside the working directory; only rule-based blocks remain.",
+  "需要授权时弹窗确认。": "Prompt for approval when required.",
+  "常规工具放行，目录外仍询问。":
+    "Routine tools allowed; still asks outside the working directory.",
+  "全部放行，仅保留规则阻断。": "Everything allowed; only rule-based blocks remain.",
 
   // Interaction request (permission / question)
   交互请求: "Interaction request",

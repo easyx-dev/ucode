@@ -1,5 +1,5 @@
 /**
- * 编辑器里的附件节点视图：正文里就是一个文字 token（`<图片 n>` / `<文件名>`）。
+ * 编辑器里的附件节点视图：正文里就是一枚 token（`图片n` / 文件名，带类型图标）。
  *
  * 图片 token 是原图预览入口（`mousedown` 上拦掉选区变化），文件 token 不拦事件——编辑区点附件只落光标、
  * Backspace 删除，误触不该触发下载；气泡里点附件才是下载。
@@ -23,7 +23,7 @@ export function AttachmentChipView({ node, editor }: NodeViewProps) {
   const kind = node.attrs.kind === "image" ? "image" : "file";
   const key = id || tempId;
   const { open, dialog } = useAttachmentPreview();
-  // 序号按文档顺序现算而不是写进 attrs：删掉第一张图，第二张立刻变成 `<图片 1>`
+  // 序号按文档顺序现算而不是写进 attrs：删掉第一张图，第二张立刻变成 `图片1`
   const ordinal = useEditorState({
     editor,
     selector: ({ editor: target }) =>

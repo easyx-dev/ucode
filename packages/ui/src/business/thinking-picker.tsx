@@ -47,7 +47,8 @@ export function ThinkingPicker({
         {thinkingPreferenceLabel(value, resolved, t)}
         <ChevronDown />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-72">
+      {/* 档位只有单字标签，比模式 / 权限那两栏窄：宽度跟着内容收，不留空半栏 */}
+      <DropdownMenuContent side="top" align="start" className="w-40">
         <PickerOptions
           options={THINKING_PREFERENCES.map(
             (preference): PickerOption => ({

@@ -306,7 +306,8 @@ export function Composer({
           <div
             className={cn(
               "rounded-lg bg-popover ring-1 ring-foreground/10 transition-shadow",
-              "focus-within:ring-2 focus-within:ring-ring/40",
+              // 聚焦只换 ring 颜色：变宽会让输入卡在光标进出时抖一下
+              "focus-within:ring-ring",
             )}
           >
             {attachmentError ? (

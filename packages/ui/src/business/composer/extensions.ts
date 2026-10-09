@@ -21,9 +21,9 @@ import { filesOf } from "./use-composer-attachments";
 
 const CHIP_CLASS = "rounded bg-muted px-1 py-0.5 text-foreground";
 
-/** 可编辑区的类：高度上限、内边距与占位提示的呈现 */
+/** 可编辑区的类：高度上限、内边距与占位提示的呈现；高度对输入区与消息编辑态一视同仁（同一个编辑器、同一种手感） */
 const CONTENT_CLASS =
-  "max-h-[220px] min-h-11 overflow-y-auto px-3 py-2.5 text-sm outline-none [&_.is-editor-empty]:before:pointer-events-none [&_.is-editor-empty]:before:float-left [&_.is-editor-empty]:before:h-0 [&_.is-editor-empty]:before:text-muted-foreground [&_.is-editor-empty]:before:content-[attr(data-placeholder)]";
+  "max-h-[220px] min-h-16 overflow-y-auto px-3 py-3 text-sm outline-none [&_.is-editor-empty]:before:pointer-events-none [&_.is-editor-empty]:before:float-left [&_.is-editor-empty]:before:h-0 [&_.is-editor-empty]:before:text-muted-foreground [&_.is-editor-empty]:before:content-[attr(data-placeholder)]";
 
 /** 编辑器要用的回调与开关：全部经 ref 取最新实现 */
 export type ComposerCallbacks = {

@@ -126,7 +126,7 @@ const attachmentKeyOf = (node: ComposerNode): string => {
 
 /**
  * 附件在文档里的同类序号（1 起）：与 `docToPayload` 写进正文的 `图片 N` / `附件 N` 同一口径，
- * 编辑器据此把节点显示成 `<图片 n>`。`key` 取节点的 id（上传中的占位取 tempId），文档内唯一。
+ * 编辑器据此把节点显示成 `图片n`。`key` 取节点的 id（上传中的占位取 tempId），文档内唯一。
  *
  * 与 `docToPayload` 的已知差异：占位节点在这里照样占号，而 `docToPayload` 遇到没 id 的节点会跳过。
  * 上传期间两者可能短暂对不上，但发送被 `hasPendingUploads` 挡住，落盘前必然收敛。

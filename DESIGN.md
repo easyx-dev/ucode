@@ -197,7 +197,7 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 | 行间距 | 行首用 padding：新一轮 `pt-6`、轮内 `pt-3`。**不能用 `space-y-*` / `mt-*`**——虚拟列表按元素高度测量，margin 不计入会让滚动位置算错 |
 | 用户消息 | `bg-muted/60` + `border border-border` + `rounded-lg`，右对齐，`max-w-[85%]`；不用反色气泡 |
 | 用户消息的 chip | 句子外的技能 / 命令排在气泡上方，句子里的 `@` 引用就地渲染；两类同一套外观（`rounded-full` + `bg-muted` + `text-xs`），引用可点开右侧工作台预览 |
-| 用户消息的图片 / 附件 | 正文里一律是带描边的等宽文字 token（`rounded-md` + `border-border` + `bg-muted/40` + `font-mono text-xs`），内容是 `图片 N` 与文件名；图片点开原图弹层、附件点开下载，输入区编辑器里是同一套 token（assistant 侧的图片与文件块不受此约束） |
+| 用户消息的图片 / 附件 | 正文里一律是带描边的等宽文字 token（`rounded-md` + `border-border` + `bg-background` + `text-foreground` + `font-mono text-xs`，前带 `size-3` 类型图标），内容是 `图片<序号>`（序号与「图片」之间不留空格）与文件名；图片点开原图弹层、附件点开下载，输入区编辑器里是同一套 token（assistant 侧的图片与文件块不受此约束） |
 | 过长的用户消息 | 超过 `max-h-80` 折叠（`overflow-hidden`），下方给「展开 / 收起」入口；用户贴整段日志时不该把屏幕占满 |
 | assistant 正文 | 直接铺在 `bg-card` 上，不套容器；排版交给 `.md-content` |
 | 思考过程 | 只在展开聚合行后出现，仍是单行灰字（「思考过程」+ 时长），自己再展开才看正文 |
@@ -232,14 +232,17 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 | 元素 | 取法 |
 | --- | --- |
 | 外层容器 | `rounded-xl bg-muted/50`，承载首行项目 / 分支条与内层白卡，也是粘贴 / 拖拽的落点 |
-| 项目 / 分支条 | 首行 `px-2 py-1.5`；项目 chip 草稿态可下拉（`rounded-md px-1.5 py-0.5 text-xs` + `hover:bg-muted`），已有会话同形但只读（无悬停反馈）；分支 chip 只在确实是 git 仓库且取得到分支名时出现 |
-| 输入卡 | 内层 `rounded-lg bg-popover` + `ring-1 ring-foreground/10`，聚焦时 `focus-within:ring-2`；不在 `bg-card` 上再套 `bg-card` |
+| 项目 / 分支条 | 首行 `px-2 py-2`（与列表行同高 36px）；项目 chip 草稿态可下拉（`rounded-md px-1.5 py-0.5 text-xs` + `hover:bg-muted`），已有会话同形但只读（无悬停反馈）；分支 chip 只在确实是 git 仓库且取得到分支名时出现 |
+| 输入卡 | 内层 `rounded-lg bg-popover` + `ring-1 ring-foreground/10`，聚焦只把 ring 换成 `ring-ring`（颜色变、粗细不变，省得光标进出时抖一下）；编辑区 `px-3 py-3`、`min-h-16`、`max-h-[220px]`（消息「编辑重发」复用同一个编辑器，高度口径自然一致）；不在 `bg-card` 上再套 `bg-card` |
 | 工具栏 | 左 `+`（附件 / 技能）· 模型 · 模式 · 权限；右 思考 · 发送 / 停止。均为无边框的 `text-xs` 轻量按钮，图标 `size-3.5` |
 | 建议行 | 只在空态出现，排在输入卡**下方**（`rounded-full` + `border` + `text-xs`，带 `size-3.5` 图标），点击填入输入框而不是发送 |
 | 空态 | 品牌图 + 按时段问候语，与输入卡同属居中一列 |
 
 - 空态与对话态**共用同一个输入卡挂载点**（父节点不变）：hero 只让外层容器 `justify-center` 并把问候渲染在输入卡上方；挪动父节点会让编辑器重挂载、草稿与附件占位一起丢
-- 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型口径见 `docs/components.md`），弹层开在触发钮上方（`side="top"`）并固定 `w-72` 以容纳副标题
+- 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型口径见 `docs/components.md`），弹层开在触发钮上方（`side="top"`）；带副标题的模式 / 权限固定 `w-72`（副标题压到一行放得下），只有档位名的思考收到 `w-40`
+- 选择器的选项行：图标占一列（`items-start`），标题与副标题都从图标之后起排；图标与文字 `gap-1.5`，标题与副标题之间 `gap-1`；带副标题的行 `py-2`，只有标题的行 `py-1.5`；整行 `cursor-pointer`
+- 选中打勾一律跟着**标题行**走：单行条目靠行容器 `items-center`（勾垂直居中就是标题行），带副标题的条目靠 `items-start`（勾贴标题行）——勾的落点是 `base/dropdown-menu` 里绝对定位的静态位置，由行容器的对齐方式决定，别在行里再补偏移
+- 项目弹层取「搜索行 + 单行条目」：面板 `rounded-xl`；搜索行 `h-11`（图标 `left-3.5 size-4`、输入 `pl-9 text-sm`）；条目行 `px-2 py-3` + `gap-2.5`，左侧 `Folder size-4 text-muted-foreground`、名称 `text-sm truncate`、选中打勾靠右；名称重名的（两个目录末段同名）才在名字后补父目录名（`ucode · job`），全路径落在条目的 `title` 里；底下两条动作（选择目录 / 小助理）与条目同高同形，都带图标
 
 ## Markdown 渲染
 

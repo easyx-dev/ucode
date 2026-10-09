@@ -37,7 +37,7 @@ export function ProjectRow({
   const branch = git.data?.isRepo ? (git.data.branch ?? null) : null;
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5">
+    <div className="flex items-center gap-1 px-2 py-2">
       {draft ? (
         <ProjectPicker name={projectName} path={projectPath} onSelect={onSelectProject} />
       ) : (

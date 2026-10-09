@@ -4,6 +4,7 @@
  * 互斥且带说明的选项用菜单的 radio 组（Radix 自带 `role="menuitemradio"`、方向键与焦点回收），
  * `select` 塞不下副标题；三者保持同形，不因思考档位没有说明就混用两种控件。
  */
+import { cn } from "cn";
 import type { LucideIcon } from "lucide-react";
 import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "../base/dropdown-menu";
 
@@ -34,15 +35,20 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
           <DropdownMenuRadioItem
             key={option.value}
             value={option.value}
-            className="flex-col items-start gap-0.5 py-1.5"
+            // 带副标题的行撑高一点才不显拥挤；只有一行标题的（如思考档位）保持紧凑
+            className={cn(
+              "cursor-pointer items-start gap-1.5",
+              option.description ? "py-2" : "py-1.5",
+            )}
           >
-            <span className="flex items-center gap-1.5 text-sm">
-              {Icon ? <Icon /> : null}
-              {option.label}
+            {/* 图标占一列，标题与副标题都从图标之后起排，两行描述不会各偏各的 */}
+            {Icon ? <Icon className="mt-0.5" /> : null}
+            <span className="flex flex-col gap-1">
+              <span>{option.label}</span>
+              {option.description ? (
+                <span className="text-xs text-muted-foreground">{option.description}</span>
+              ) : null}
             </span>
-            {option.description ? (
-              <span className="text-xs text-muted-foreground">{option.description}</span>
-            ) : null}
           </DropdownMenuRadioItem>
         );
       })}
