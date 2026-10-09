@@ -35,7 +35,6 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
         toUpdatePayload(
           draft.providers,
           draft.defaultModel || null,
-          draft.thinkingLevel,
           draft.websearch,
           draft.memoryEnabled,
         ),

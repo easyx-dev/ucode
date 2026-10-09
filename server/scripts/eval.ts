@@ -247,7 +247,6 @@ const runtimeFor = (modelRuntime: unknown, model: unknown): PiRuntime =>
   ({
     requireRuntime: () => modelRuntime,
     resolveModelRef: () => model,
-    getStatus: () => ({ thinkingLevel: "off" }),
   }) as unknown as PiRuntime;
 
 const report = (item: EvalCase, results: AttemptResult[]): void => {

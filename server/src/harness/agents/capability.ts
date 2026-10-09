@@ -4,8 +4,13 @@
  * 交集是这套机制的底座：子会话只能用父会话也有的工具、只能命中父会话也允许的权限，
  * 保证「计划模式只读」这样的父约束不会因为委派子角色而被放宽。
  */
-import { DEFAULT_SESSION_MODE } from "@ucode/contracts";
+import {
+  DEFAULT_SESSION_MODE,
+  type ThinkingLevel,
+  type ThinkingPreference,
+} from "@ucode/contracts";
 
+import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../constants";
 import type { PermissionRule } from "../permissions";
 import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS } from "../tools/names";
 import type { AgentRegistry } from "./custom";
@@ -40,6 +45,21 @@ export const primaryProfile = (slug: string, registry?: AgentRegistry): AgentPro
 export const hasPrimaryMode = (slug: string, registry?: AgentRegistry): boolean =>
   Object.hasOwn(registry?.primary ?? {}, slug) || Object.hasOwn(PRIMARY_PROFILES, slug);
 
+/**
+ * 本模式的推荐思考档位：即档位偏好为 `auto` 时的解析结果。
+ * 子会话行的 `mode` 就是父的 mode，所以委派出去的会话也按这里解析（不看子角色自身的声明）。
+ */
+export const recommendedThinkingLevelOf = (slug: string, registry?: AgentRegistry): ThinkingLevel =>
+  primaryProfile(slug, registry).recommendedThinkingLevel ?? DEFAULT_RECOMMENDED_THINKING_LEVEL;
+
+/** 档位偏好 → 实际注入 pi 的档位：`auto` 按本会话模式的推荐值解开 */
+export const resolveThinkingLevel = (
+  preference: ThinkingPreference,
+  mode: string,
+  registry?: AgentRegistry,
+): ThinkingLevel =>
+  preference === "auto" ? recommendedThinkingLevelOf(mode, registry) : preference;
+
 /** primary 能力解析：没有父会话，直接用角色声明值 */
 export const primaryCapability = (slug: string, registry?: AgentRegistry): ResolvedCapability => {
   const profile = primaryProfile(slug, registry);
@@ -48,9 +68,6 @@ export const primaryCapability = (slug: string, registry?: AgentRegistry): Resol
     excludeTools: [],
     permissions: profile.capability.permissions,
     ...(profile.capability.model ? { model: profile.capability.model } : {}),
-    ...(profile.capability.thinkingLevel
-      ? { thinkingLevel: profile.capability.thinkingLevel }
-      : {}),
   };
 };
 
@@ -104,9 +121,6 @@ export const resolveSubagentCapability = (
       excludeTools: excluded,
       permissions: profile.capability.permissions,
       ...(profile.capability.model ? { model: profile.capability.model } : {}),
-      ...(profile.capability.thinkingLevel
-        ? { thinkingLevel: profile.capability.thinkingLevel }
-        : {}),
     };
   }
 
@@ -123,9 +137,6 @@ export const resolveSubagentCapability = (
     excludeTools: excluded,
     permissions: profile.capability.permissions,
     ...(profile.capability.model ? { model: profile.capability.model } : {}),
-    ...(profile.capability.thinkingLevel
-      ? { thinkingLevel: profile.capability.thinkingLevel }
-      : {}),
   };
 };
 

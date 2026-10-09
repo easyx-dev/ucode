@@ -1,6 +1,7 @@
 /** server 侧常量：固定目录名与白名单集中于此；可配置的默认值由环境变量声明（见 .env / .env.prod） */
 import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
 import { brand } from "@ucode/brand/values";
+import type { ThinkingLevel } from "@ucode/contracts";
 
 /** 运行时数据目录名（位于 APP_HOME 下）：auth.json / sessions */
 export const HARNESS_DIRNAME = "harness";
@@ -69,6 +70,12 @@ export const SHELL_SLEEP_MIN_SECONDS = 1;
 
 /** 单个父会话同时运行的子智能体数量上限；超限排队等空位，不等就报错 */
 export const SUBAGENT_MAX_CONCURRENCY = 4;
+
+/**
+ * 模式的推荐思考档位缺省值：primary 角色没声明推荐值时用它（自定义模式不写 `thinking` 的情形）。
+ * 取 `medium` 与 pi 自己的缺省一致（`CreateAgentSessionOptions.thinkingLevel` 缺省即 medium）。
+ */
+export const DEFAULT_RECOMMENDED_THINKING_LEVEL: ThinkingLevel = "medium";
 
 /** 并发已满时最多等待的排队数；再多就别排了，直接告诉模型缩任务 */
 export const SUBAGENT_QUEUE_MAX = 2;

@@ -1,7 +1,7 @@
 /** 会话接口的请求 zod 模型；`*Request` 为客户端载荷（z.input），`*Input` 为服务端解析后（z.infer） */
 import { z } from "zod";
 
-import { PERMISSION_MODES, THINKING_LEVELS } from "../constants";
+import { PERMISSION_MODES, THINKING_PREFERENCES } from "../constants";
 
 /**
  * 会话 id 格式，与 pi 的 `assertValidSessionId` 一致。
@@ -45,7 +45,7 @@ export const sessionCreateInputSchema = z.object({
   name: z.string().min(1).optional(),
   cwd: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  thinkingLevel: z.enum(THINKING_LEVELS).optional(),
+  thinkingLevel: z.enum(THINKING_PREFERENCES).optional(),
   mode: sessionModeSchema.optional(),
   permissionMode: z.enum(PERMISSION_MODES).optional(),
 });
@@ -54,7 +54,7 @@ export const sessionUpdateInputSchema = z.object({
   sessionId: sessionIdSchema,
   name: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  thinkingLevel: z.enum(THINKING_LEVELS).optional(),
+  thinkingLevel: z.enum(THINKING_PREFERENCES).optional(),
   mode: sessionModeSchema.optional(),
   permissionMode: z.enum(PERMISSION_MODES).optional(),
   /** 置顶开关；与名称等覆盖值不同，不改会话文件、也不受生成中限制 */

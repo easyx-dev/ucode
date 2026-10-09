@@ -21,7 +21,6 @@ export type AgentCapability = {
   permissions: readonly PermissionRule[];
   /** 覆盖模型；缺省继承父会话 */
   model?: string;
-  thinkingLevel?: ThinkingLevel;
 };
 
 /** 与父会话取交集后的能力：工具选择已确定，`excludeTools` 兜住 pi 侧内置 / 扩展工具 */
@@ -30,7 +29,6 @@ export type ResolvedCapability = {
   excludeTools: readonly string[];
   permissions: readonly PermissionRule[];
   model?: string;
-  thinkingLevel?: ThinkingLevel;
 };
 
 /** 角色定义；主会话角色即原来的「模式」，子角色是它的子集形态 */
@@ -43,6 +41,13 @@ export type AgentProfile = {
   description: string;
   /** 自定义角色的提示词正文；内置角色缺省由语言目录按 slug 提供 */
   promptSection?: string;
+  /**
+   * 本模式的推荐思考档位（只对 primary 生效）：会话的档位偏好为 `auto` 时采用它，
+   * 缺省落到 `DEFAULT_RECOMMENDED_THINKING_LEVEL`。
+   * 子会话的 `auto` 也按它所属模式的推荐值解析（子会话行的 mode 就是父的 mode），
+   * 因此 subagent 角色不读这个字段。
+   */
+  recommendedThinkingLevel?: ThinkingLevel;
   capability: AgentCapability;
   /** 是否列进 `subagent` 工具的角色广告；缺省为是，显式 `false` 表示隐藏但仍可按名调用 */
   advertise?: boolean;

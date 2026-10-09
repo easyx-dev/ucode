@@ -123,7 +123,6 @@
 | --- | --- | --- | --- |
 | `configured` | boolean | 是 | 是否已有可用模型 |
 | `defaultModel` | string \| null | 是 | 实际生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
 | `workspace` | string | 是 | 助理根目录：未绑定工作目录的会话，工作区是它下面以会话 id 命名的那层 |
 | `activeSessions` | number | 是 | 内存中驻留的 AgentSession 数 |
@@ -310,7 +309,6 @@
 | --- | --- | --- | --- |
 | `configured` | boolean | 是 | 是否已有可用模型 |
 | `defaultModel` | string \| null | 是 | 实际生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
 | `providers` | [CatalogProvider](#catalogprovider)[] | 是 | — |
 
@@ -328,7 +326,6 @@
 | --- | --- | --- | --- |
 | `configured` | boolean | 是 | 是否已有可用模型 |
 | `defaultModel` | string \| null | 是 | 实际生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
 | `providers` | [CatalogProvider](#catalogprovider)[] | 是 | — |
 
@@ -412,7 +409,6 @@
 | `providers[].models[].headers` | Record<string, string> | 否 | — | — |
 | `providers[].models[].compat` | Record<string, unknown> | 否 | — | pi 的 OpenAICompletionsCompat 等兼容开关，原样透传给 pi 的 provider 配置。 具体字段随 api 收窄，详见 pi 的 *Compat 类型。 应用默认会补上 supportsDeveloperRole: false（部分网关只认 system role）。 |
 | `defaultModel` | string（长度≥1） \| null | 否 | — | — |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `websearch` | object | 否 | — | — |
 | `websearch.provider` | "tavily" \| "searxng" \| "brave" | 否 | — | — |
 | `websearch.apiKey` | string | 否 | — | — |
@@ -503,7 +499,7 @@
 | `name` | string（长度≥1） | 否 | — | — |
 | `cwd` | string（长度≥1） | 否 | — | — |
 | `model` | string（长度≥1） | 否 | — | — |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
+| `thinkingLevel` | "auto" \| "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
 | `permissionMode` | "default" \| "auto" \| "full" | 否 | — | — |
 
@@ -518,7 +514,8 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
@@ -561,7 +558,7 @@
 | `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
 | `name` | string（长度≥1） | 否 | — | — |
 | `model` | string（长度≥1） | 否 | — | — |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
+| `thinkingLevel` | "auto" \| "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
 | `mode` | string（长度≤64，格式 `^[a-z][a-z0-9-]*$`） | 否 | — | — |
 | `permissionMode` | "default" \| "auto" \| "full" | 否 | — | — |
 | `pinned` | boolean | 否 | — | 置顶开关；与名称等覆盖值不同，不改会话文件、也不受生成中限制 |
@@ -577,7 +574,8 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
@@ -628,7 +626,8 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
@@ -664,7 +663,8 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
@@ -1412,7 +1412,6 @@
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `defaultModel` | string \| null | 是 | — |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
 | `providers` | [ProviderConfigView](#providerconfigview)[] | 是 | — |
 | `websearch` | [WebsearchView](#websearchview) | 是 | — |
 | `memory` | [MemoryView](#memoryview) | 是 | — |
@@ -1423,7 +1422,6 @@
 | --- | --- | --- | --- |
 | `configured` | boolean | 是 | 是否已有可用模型 |
 | `defaultModel` | string \| null | 是 | 实际生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 生效的 thinking 档位 |
 | `error` | string \| null | 是 | 未就绪时的原因说明 |
 
 ### ProviderModelSuggestion
@@ -1450,7 +1448,8 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息，用作列表预览 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | — |
+| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |

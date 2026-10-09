@@ -105,6 +105,8 @@ export default {
   高: "High",
   极高: "Very high",
   最高: "Max",
+  自动: "Auto",
+  "自动 · {{level}}": "Auto · {{level}}",
   推理等级映射: "Reasoning level map",
   添加等级: "Add level",
   "未指定时按厂商默认处理，7 个档位都能用。":
@@ -133,9 +135,6 @@ export default {
   "新建会话时使用的模型；会话内可以单独覆盖。":
     "Model used for new sessions; each session can override it.",
   选择默认模型: "Select default model",
-  默认思考档位: "Default reasoning level",
-  "未单独设置档位的会话使用该值；模型本身需支持思考。":
-    "Sessions without their own setting use this value; the model must support reasoning.",
 
   // Model row
   "模型 id": "Model id",

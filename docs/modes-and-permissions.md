@@ -19,11 +19,29 @@
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
 内置三个，声明在 `server/src/harness/agents/profiles.ts`，工具名清单在 `server/src/harness/tools/names.ts`。
 
-| 模式 | 界面文案 | 工具集 | 专属权限规则 | 用途 |
-| --- | --- | --- | --- | --- |
-| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具） | 无（只受全局默认规则约束） | 正常编码与执行 |
-| `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
-| `ask` | 问答 | 只读集 + `subagent`（无 `present_plan`） | `deny` `edit` / `write` / `bash` | 只读分析与回答 |
+| 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
+| --- | --- | --- | --- | --- | --- |
+| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具） | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
+| `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
+| `ask` | 问答 | 只读集 + `subagent`（无 `present_plan`） | `deny` `edit` / `write` / `bash` | `medium` | 只读分析与回答 |
+
+### 思考档位
+
+档位有两个层面，口径不同不要混：
+
+- **偏好**（会话行 `thinking_level`，接口上是 `SessionSummary.thinkingLevel`）：`auto` 或具体档位。
+  `auto` 是缺省值，表示「按本会话模式的推荐档位」。
+- **实际生效档位**（`SessionSummary.resolvedThinkingLevel`）：注入 pi 的那个具体档位。
+  `auto` 按上表的推荐值解析；pi 还会按模型能力做一次 clamp（未显式映射 `xhigh` / `max` 的模型会被夹到
+  相邻可用档），所以显示以 pi 的实际值为准——摘要在会话驻留内存时取的正是它。
+
+解析只认**本会话的模式**（`recommendedThinkingLevelOf`）：子会话行的 `mode` 就是父的 mode，
+所以委派出去的子智能体也按父模式的推荐值跑，子角色自己不声明档位。自定义 primary 角色
+（`mode: primary` / `all`）可在 frontmatter 里写 `thinking` 覆盖推荐值；纯 `subagent` 角色写它会直接报错，
+因为那不是它能决定的事——要单独调某个子会话，用 `subagent` 工具的 `thinkingLevel` 入参。
+
+会话里显式选过档位就以会话为准（优先级：会话偏好 > 模式推荐值），切换会重建会话实例并在
+会话文件里追加 pi 原生的 `thinking_level_change`（记的是解析后的实际档位，不是 `auto`）。
 
 - 只读模式**直接禁 `bash`**，不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
 - 自定义 primary agent 可覆盖同名内置项或另取新名；`mode` 是字符串 slug，服务端按角色注册表校验。

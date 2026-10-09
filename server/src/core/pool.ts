@@ -32,6 +32,7 @@ import {
   primaryCapability,
   primaryProfile,
   type ResolvedCapability,
+  recommendedThinkingLevelOf,
   resolveSubagentCapability,
   subagentProfile,
   usesDefaultToolSet,
@@ -246,10 +247,14 @@ export class SessionPool {
         repository: this.repository,
         isActive: (id) => this.isActive(id),
         statusOf: (id) => this.statusOf(id),
-        defaults: () => {
-          const status = this.runtime.getStatus();
-          return { model: status.defaultModel, thinkingLevel: status.thinkingLevel };
-        },
+        defaultModel: () => this.runtime.getStatus().defaultModel,
+        effectiveThinkingLevel: (id) => this.get(id)?.thinkingLevel ?? null,
+        // 只有「会话不在内存 + 偏好 auto」才走到这里，按需加载注册表即可，不必缓存
+        recommendedThinkingLevel: (record) =>
+          recommendedThinkingLevelOf(
+            record.mode,
+            loadAgentRegistry({ cwd: resolveSessionCwd(record), appHome: env.homeDir }),
+          ),
       },
       sessionId,
     );

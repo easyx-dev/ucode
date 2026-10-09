@@ -5,7 +5,6 @@ import {
   API_TYPES,
   DEFAULT_SEARCH_PROVIDER,
   SEARCH_PROVIDERS,
-  THINKING_LEVELS,
   type ThinkingLevel,
 } from "../constants";
 
@@ -138,7 +137,6 @@ export const appConfigSchema = z.object({
   providers: z.array(providerSchema).default([]),
   /** "provider/model"，null 表示使用第一个可用模型 */
   defaultModel: z.string().min(1).nullable().default(null),
-  thinkingLevel: z.enum(THINKING_LEVELS).default("off"),
   websearch: websearchSchema.default({
     provider: DEFAULT_SEARCH_PROVIDER,
     apiKey: "",
@@ -164,7 +162,6 @@ export const memoryPatchSchema = z.object({
 export const appConfigPatchSchema = z.object({
   providers: z.array(providerPatchSchema).optional(),
   defaultModel: z.string().min(1).nullable().optional(),
-  thinkingLevel: z.enum(THINKING_LEVELS).optional(),
   websearch: websearchPatchSchema.optional(),
   memory: memoryPatchSchema.optional(),
 });

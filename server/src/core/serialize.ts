@@ -14,6 +14,7 @@ import {
   type CompactionSkipReason,
   DEFAULT_PERMISSION_MODE,
   DEFAULT_SESSION_MODE,
+  DEFAULT_THINKING_PREFERENCE,
   GOAL_PROMPT_CUSTOM_TYPE,
   GOAL_PROMPT_KINDS,
   GOAL_RECORD_CUSTOM_TYPE,
@@ -455,7 +456,8 @@ export const sessionInfoToDTO = (
   info: SessionInfo,
   override: SessionOverride,
   defaultModel: string | null,
-  defaultThinkingLevel: ThinkingLevel,
+  /** 实际生效的思考档位（`auto` 已解析） */
+  resolvedThinkingLevel: ThinkingLevel,
   runtime: SessionRuntimeState,
   childCount: number,
 ): SessionSummary => ({
@@ -466,7 +468,8 @@ export const sessionInfoToDTO = (
   updatedAt: info.modified.toISOString(),
   preview: info.firstMessage ?? "",
   model: override.model ?? defaultModel,
-  thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+  thinkingLevel: override.thinkingLevel ?? DEFAULT_THINKING_PREFERENCE,
+  resolvedThinkingLevel,
   mode: override.mode ?? DEFAULT_SESSION_MODE,
   permissionMode: override.permissionMode ?? DEFAULT_PERMISSION_MODE,
   parentSessionId: override.parentSessionId ?? null,
@@ -485,7 +488,8 @@ export const draftSessionSummary = (
   sessionId: string,
   override: SessionOverride,
   defaultModel: string | null,
-  defaultThinkingLevel: ThinkingLevel,
+  /** 实际生效的思考档位（`auto` 已解析） */
+  resolvedThinkingLevel: ThinkingLevel,
   /** 覆盖值与会话工作区都缺失时的兜底（全局工作目录） */
   fallbackCwd: string,
   runtime: SessionRuntimeState,
@@ -504,7 +508,8 @@ export const draftSessionSummary = (
     updatedAt: timestamps?.updatedAt ?? now,
     preview: "",
     model: override.model ?? defaultModel,
-    thinkingLevel: override.thinkingLevel ?? defaultThinkingLevel,
+    thinkingLevel: override.thinkingLevel ?? DEFAULT_THINKING_PREFERENCE,
+    resolvedThinkingLevel,
     mode: override.mode ?? DEFAULT_SESSION_MODE,
     permissionMode: override.permissionMode ?? DEFAULT_PERMISSION_MODE,
     parentSessionId: override.parentSessionId ?? null,

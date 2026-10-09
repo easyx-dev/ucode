@@ -24,7 +24,6 @@ const save = (patch: Parameters<ConfigStore["merge"]>[0]) => {
   const current = config.merge({
     providers: [{ id: "openai", api: "openai-completions", apiKey: "sk-1" }],
     defaultModel: "openai/gpt-4o",
-    thinkingLevel: "medium",
     websearch: { provider: "tavily", apiKey: "tvly-1" },
     memory: { enabled: true },
   });
@@ -55,11 +54,6 @@ describe("配置变更分级", () => {
 
   it("默认模型变化要重建", () => {
     const { current, next } = save({ defaultModel: "openai/gpt-4o-mini" });
-    assert.equal(classifyConfigChange(next, current), "runtime");
-  });
-
-  it("思考档位变化要重建", () => {
-    const { current, next } = save({ thinkingLevel: "high" });
     assert.equal(classifyConfigChange(next, current), "runtime");
   });
 

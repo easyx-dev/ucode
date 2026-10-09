@@ -14,7 +14,12 @@ import {
 } from "../lib/builtin-commands";
 import { type ComposerNode, docToPayload, isDocEmpty, textToDoc } from "../lib/composer-document";
 import type { ComposerPayload } from "../lib/composer-payload";
-import type { CatalogProvider, PermissionMode, ThinkingLevel } from "../lib/types";
+import type {
+  CatalogProvider,
+  PermissionMode,
+  ThinkingLevel,
+  ThinkingPreference,
+} from "../lib/types";
 import { useContextItems } from "./composer/context-items";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer/editor";
 import type { SuggestionItem } from "./composer/suggestion";
@@ -42,11 +47,13 @@ type ComposerProps = {
   suggestions?: readonly string[];
   providers: CatalogProvider[];
   model: string;
-  thinkingLevel: ThinkingLevel;
+  thinkingLevel: ThinkingPreference;
+  /** 实际生效的档位：`thinkingLevel` 为 `auto` 时展示成「自动 · 极高」 */
+  resolvedThinkingLevel?: ThinkingLevel;
   mode: string;
   permissionMode: PermissionMode;
   onSelectModel: (model: string) => void;
-  onSelectThinkingLevel: (level: ThinkingLevel) => void;
+  onSelectThinkingLevel: (level: ThinkingPreference) => void;
   onSelectMode: (mode: string) => void;
   onSelectPermissionMode: (mode: PermissionMode) => void;
   /** 内置动作（不落正文，由上层执行） */
@@ -70,6 +77,7 @@ export function Composer({
   providers,
   model,
   thinkingLevel,
+  resolvedThinkingLevel,
   mode,
   permissionMode,
   onSelectModel,
@@ -350,6 +358,7 @@ export function Composer({
             <div className="ml-auto flex items-center gap-1">
               <ThinkingPicker
                 value={thinkingLevel}
+                resolved={resolvedThinkingLevel}
                 open={openPicker === "thinking"}
                 onOpenChange={(next) => setOpenPicker(next ? "thinking" : null)}
                 onSelect={onSelectThinkingLevel}

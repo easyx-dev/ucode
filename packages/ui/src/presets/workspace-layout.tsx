@@ -59,7 +59,7 @@ import type {
   PermissionMode,
   SessionCreateRequest,
   SessionSummary,
-  ThinkingLevel,
+  ThinkingPreference,
 } from "../lib/types";
 import { WorkbenchProvider, type WorkbenchTab } from "../provider/workbench";
 
@@ -255,7 +255,7 @@ export function WorkspaceLayout({
     if (activeId) void sessions.setModel(activeId, model);
     else composer.update(draftKey, { model });
   };
-  const selectThinkingLevel = (level: ThinkingLevel): void => {
+  const selectThinkingLevel = (level: ThinkingPreference): void => {
     if (activeId) void sessions.setThinkingLevel(activeId, level);
     else composer.update(draftKey, { thinkingLevel: level });
   };

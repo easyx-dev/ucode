@@ -1,6 +1,11 @@
 /** 会话接口的响应模型 */
 import type { ListResult, SessionScoped } from "../common";
-import type { PermissionMode, SessionStatus, ThinkingLevel } from "../constants";
+import type {
+  PermissionMode,
+  SessionStatus,
+  ThinkingLevel,
+  ThinkingPreference,
+} from "../constants";
 import type { GoalView } from "../goals/output";
 import type { ContextUsage, UsageTotals } from "../stats/output";
 
@@ -18,7 +23,13 @@ export type SessionSummary = {
   preview: string;
   /** 生效的 "provider/model" */
   model: string | null;
-  thinkingLevel: ThinkingLevel;
+  /** 思考档位偏好：`auto` 表示按本会话模式的推荐档位 */
+  thinkingLevel: ThinkingPreference;
+  /**
+   * 实际生效的思考档位（`auto` 解析后的结果）。
+   * 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。
+   */
+  resolvedThinkingLevel: ThinkingLevel;
   /** 会话模式（primary agent slug）：决定工具集与权限 */
   mode: string;
   /** 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` */

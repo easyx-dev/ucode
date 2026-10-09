@@ -65,6 +65,7 @@ export type {
   SkillCommandView,
   StatsSummaryResponse,
   ThinkingLevel,
+  ThinkingPreference,
   UsageDayBucket,
   UsagePeakDay,
   UsageStreak,
@@ -87,6 +88,7 @@ export {
   SEARCH_PROVIDERS,
   SESSION_MODES,
   THINKING_LEVELS,
+  THINKING_PREFERENCES,
 } from "@ucode/contracts";
 
 /** 界面上的一条消息与子智能体进度类型由 SDK 提供，各端共用 */

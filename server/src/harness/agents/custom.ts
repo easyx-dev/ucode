@@ -92,7 +92,7 @@ const frontmatterSchema = z
       .trim()
       .min(1, { error: "model 不能为空" })
       .optional(),
-    /** 缺省继承父会话的思考档位 */
+    /** 本模式的推荐思考档位；只对 primary 角色有效（子会话的档位按所属模式解析） */
     thinking: z.enum(THINKING_LEVELS, { error: "thinking 取值非法" }).optional(),
     /** subagent 是否列进工具描述；缺省列出，`false` 表示隐藏但仍可按名调用 */
     advertise: z.boolean({ error: "advertise 必须是布尔值" }).optional(),
@@ -163,19 +163,24 @@ export const parseCustomAgent = (slug: string, content: string): ParsedCustomAge
   if (!promptSection) throw new Error("缺少提示词正文");
 
   const mode: CustomAgentMode = fields.mode ?? "subagent";
+  const kind = mode === "subagent" ? "subagent" : "primary";
+  // 档位按「本会话模式」解析，子角色没有自己的推荐值：显式拒绝好过静默忽略
+  if (kind === "subagent" && fields.thinking) {
+    throw new Error("subagent 角色不能声明 thinking（子会话的档位按所属模式解析）");
+  }
   const capability = {
     toolSelection: parseToolSelection(fields.tools, mode),
     permissions: [],
     ...(fields.model ? { model: fields.model } : {}),
-    ...(fields.thinking ? { thinkingLevel: fields.thinking } : {}),
   };
 
   const profile: AgentProfile = {
     slug,
-    kind: mode === "subagent" ? "subagent" : "primary",
+    kind,
     label: fields.name ?? slug,
     description: fields.description,
     promptSection,
+    ...(kind === "primary" && fields.thinking ? { recommendedThinkingLevel: fields.thinking } : {}),
     capability,
     ...(fields.advertise === false ? { advertise: false } : {}),
     ...(fields.hidden ? { hidden: true } : {}),

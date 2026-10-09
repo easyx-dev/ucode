@@ -29,10 +29,20 @@ import {
 } from "../../core/serialize";
 import { assertModel, createSession } from "../../core/session";
 import { managerToIndex, recordToInfo } from "../../core/session-index";
-import { describeSessionSummary, type SessionSummarySources } from "../../core/session-summary";
+import {
+  describeSessionSummary,
+  resolvedThinkingLevelOf,
+  type SessionSummarySources,
+} from "../../core/session-summary";
 import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
-import { hasPrimaryMode, loadAgentRegistry } from "../../harness/agents";
+import {
+  type AgentRegistry,
+  hasPrimaryMode,
+  loadAgentRegistry,
+  recommendedThinkingLevelOf,
+  resolveThinkingLevel,
+} from "../../harness/agents";
 import { createForkedSessionFile, resolveForkSource } from "../../harness/fork";
 import { resolveSessionCwd } from "../../harness/session-config";
 import { workspaceDirOf } from "../../harness/workspace";
@@ -50,12 +60,8 @@ const assertPrimaryMode = (cwd: string, mode: string): void => {
   }
 };
 
-const runtimeDefaults = (
-  services: Services,
-): { model: string | null; thinkingLevel: ThinkingLevel } => {
-  const status = services.runtime.getStatus();
-  return { model: status.defaultModel, thinkingLevel: status.thinkingLevel };
-};
+const defaultModelOf = (services: Services): string | null =>
+  services.runtime.getStatus().defaultModel;
 
 /**
  * 会话摘要：已落盘读行里的缓存，否则给草稿视图（只有覆盖值可展示）。
@@ -85,12 +91,27 @@ const describeSession = (services: Services, sessionId: string): SessionInfoResp
 };
 
 /** 事件下发与详情共用同一套摘要口径 */
-const summarySources = (services: Services): SessionSummarySources => ({
-  repository: services.sessions,
-  isActive: (sessionId) => services.pool.isActive(sessionId),
-  statusOf: (sessionId) => services.pool.statusOf(sessionId),
-  defaults: () => runtimeDefaults(services),
-});
+const summarySources = (services: Services): SessionSummarySources => {
+  // 列表一次要出上百行摘要：角色注册表按 cwd 各加载一次，别为每行扫一遍角色目录
+  const registries = new Map<string, AgentRegistry>();
+  const registryOf = (cwd: string): AgentRegistry => {
+    const cached = registries.get(cwd);
+    if (cached) return cached;
+    const loaded = loadAgentRegistry({ cwd, appHome: env.homeDir });
+    registries.set(cwd, loaded);
+    return loaded;
+  };
+
+  return {
+    repository: services.sessions,
+    isActive: (sessionId) => services.pool.isActive(sessionId),
+    statusOf: (sessionId) => services.pool.statusOf(sessionId),
+    defaultModel: () => defaultModelOf(services),
+    effectiveThinkingLevel: (sessionId) => services.pool.get(sessionId)?.thinkingLevel ?? null,
+    recommendedThinkingLevel: (record) =>
+      recommendedThinkingLevelOf(record.mode, registryOf(resolveSessionCwd(record))),
+  };
+};
 
 /** 列表行的运行态：活跃布尔与细分状态同源，免得两处口径分叉 */
 const runtimeState = (services: Services, sessionId: string): SessionRuntimeState => ({
@@ -99,18 +120,20 @@ const runtimeState = (services: Services, sessionId: string): SessionRuntimeStat
 });
 
 const listSessions = (services: Services, query: SessionListInput): SessionListResponse => {
-  const { model, thinkingLevel } = runtimeDefaults(services);
+  const sources = summarySources(services);
+  const model = sources.defaultModel();
   const { records, total } = services.sessions.search(query);
 
   // 已落盘行读行里的缓存；草稿行只有覆盖值可展示，用行里的真实时间保持排序口径一致
   const sessions = records.map((record) => {
     const runtime = runtimeState(services, record.id);
+    const resolvedThinkingLevel = resolvedThinkingLevelOf(sources, record);
     return record.sourcePath
       ? sessionInfoToDTO(
           recordToInfo(record),
           overrideOf(record),
           model,
-          thinkingLevel,
+          resolvedThinkingLevel,
           runtime,
           record.childCount,
         )
@@ -118,7 +141,7 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
           record.id,
           overrideOf(record),
           model,
-          thinkingLevel,
+          resolvedThinkingLevel,
           workspaceDirOf(record.id),
           runtime,
           record.childCount,
@@ -162,6 +185,8 @@ const appendTranscriptPatch = (
   sourcePath: string,
   cwd: string,
   patch: SessionUpdateInput,
+  /** 档位偏好解开的实际档位（`auto` 按模式推荐值）；null 表示本次没改档位 */
+  resolvedThinkingLevel: ThinkingLevel | null,
   /** 池里那个活会话的 manager：内存里的叶子才是权威，另开一句柄追加会让新条目挂在旧父节点上 */
   live?: SessionManager,
 ): SessionManager => {
@@ -171,7 +196,8 @@ const appendTranscriptPatch = (
     const separator = patch.model.indexOf("/");
     manager.appendModelChange(patch.model.slice(0, separator), patch.model.slice(separator + 1));
   }
-  if (patch.thinkingLevel) manager.appendThinkingLevelChange(patch.thinkingLevel);
+  // 文件里记的是实际档位：pi 按这些条目标每轮页脚的档位，记 `auto` 就标不出来了
+  if (resolvedThinkingLevel) manager.appendThinkingLevelChange(resolvedThinkingLevel);
   // 模式与权限档位决定每轮的工具集与审批口径：换了什么、什么时候换的，只有文件里查得到
   if (patch.mode || patch.permissionMode) {
     manager.appendCustomEntry(MODE_RECORD_CUSTOM_TYPE, {
@@ -209,10 +235,22 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   if (record.sourcePath) {
     // 只有名称 / 模型 / 档位 / 模式需要追加到会话文件；置顶等元数据不落文件
     if (patch.name || patch.model || patch.thinkingLevel || patch.mode || patch.permissionMode) {
+      const cwd = resolveSessionCwd(record);
+      // pi 按 `thinking_level_change` 条目标每轮页脚的档位，所以文件里记解析后的实际档位，不记 `auto`
+      // 档位跟随模式，同一次请求里还改了模式时按新模式解析——按旧模式解出来的档位与
+      // 重建后的会话（用新模式的推荐值）不一致，文件里的记录会撒谎
+      const resolved = patch.thinkingLevel
+        ? resolveThinkingLevel(
+            patch.thinkingLevel,
+            patch.mode ?? record.mode,
+            loadAgentRegistry({ cwd, appHome: env.homeDir }),
+          )
+        : null;
       const manager = appendTranscriptPatch(
         record.sourcePath,
-        resolveSessionCwd(record),
+        cwd,
         patch,
+        resolved,
         services.pool.get(patch.sessionId)?.sessionManager,
       );
       const index = managerToIndex(manager);
@@ -305,7 +343,7 @@ const forkSession = (services: Services, input: SessionForkInput): SessionSummar
     ...(input.fromEntryId ? { fromEntryId: input.fromEntryId } : {}),
   });
 
-  const { model, thinkingLevel } = runtimeDefaults(services);
+  const model = defaultModelOf(services);
   const override = overrideOf(source);
   try {
     services.sessions.createForked(forked.id, {
@@ -313,9 +351,9 @@ const forkSession = (services: Services, input: SessionForkInput): SessionSummar
       cwd,
       name: input.name ?? (source.name ? `${source.name} · 分叉` : null),
       mode: source.mode,
-      // 继承源会话的生效值，避免分叉后与源看到不一样的模型 / 档位
+      // 模型继承源会话的生效值，档位继承偏好：`auto` 保持 `auto`，而 mode 也继承，解析结果与源一致
       model: override.model ?? model ?? undefined,
-      thinkingLevel: override.thinkingLevel ?? thinkingLevel,
+      ...(override.thinkingLevel ? { thinkingLevel: override.thinkingLevel } : {}),
     });
   } catch (error) {
     // 行没落上：刚写出的分叉文件没有主，清掉避免留孤儿

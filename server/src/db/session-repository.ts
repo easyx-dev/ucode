@@ -11,8 +11,8 @@ import {
   DEFAULT_SESSION_MODE,
   PERMISSION_MODES,
   type PermissionMode,
-  THINKING_LEVELS,
-  type ThinkingLevel,
+  THINKING_PREFERENCES,
+  type ThinkingPreference,
 } from "@ucode/contracts";
 import { z } from "zod";
 
@@ -27,7 +27,8 @@ export type SessionOverride = {
   /** 新建会话时指定的工作目录 */
   cwd?: string;
   model?: string;
-  thinkingLevel?: ThinkingLevel;
+  /** 思考档位偏好：`auto` 表示按本会话模式的推荐档位 */
+  thinkingLevel?: ThinkingPreference;
   /** 会话模式（primary agent slug）；未设置时回落 `DEFAULT_SESSION_MODE` */
   mode?: string;
   /** 会话级权限档位；未设置时回落 `DEFAULT_PERMISSION_MODE` */
@@ -182,12 +183,12 @@ const rowToRecord = (row: SessionRow): SessionRecord => ({
 });
 
 /** DB 里存的是文本，读到非法值时按「未设置」处理，避免脏数据把接口打挂 */
-const toThinkingLevel = (value: string | null): ThinkingLevel | undefined =>
-  value && (THINKING_LEVELS as readonly string[]).includes(value)
-    ? (value as ThinkingLevel)
+const toThinkingPreference = (value: string | null): ThinkingPreference | undefined =>
+  value && (THINKING_PREFERENCES as readonly string[]).includes(value)
+    ? (value as ThinkingPreference)
     : undefined;
 
-/** 同 `toThinkingLevel`：档位是枚举，非法值按未设置回落默认 */
+/** 同 `toThinkingPreference`：档位是枚举，非法值按未设置回落默认 */
 const toPermissionMode = (value: string | null): PermissionMode | undefined =>
   value && (PERMISSION_MODES as readonly string[]).includes(value)
     ? (value as PermissionMode)
@@ -199,7 +200,7 @@ const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) =>
 /** 从索引行取出覆盖值；与 `get` 同一口径，供已持有行的调用方复用 */
 export const overrideOf = (record: SessionRecord | undefined): SessionOverride => {
   if (!record) return {};
-  const thinkingLevel = toThinkingLevel(record.thinkingLevel);
+  const thinkingLevel = toThinkingPreference(record.thinkingLevel);
   const permissionMode = toPermissionMode(record.permissionMode);
   return {
     ...(record.name ? { name: record.name } : {}),
@@ -251,7 +252,8 @@ export class SessionRepository {
       agent: string;
       name: string;
       model?: string;
-      thinkingLevel?: ThinkingLevel;
+      /** `subagent` 工具传入的显式档位；缺省即 `auto`（按所属模式的推荐档位） */
+      thinkingLevel?: ThinkingPreference;
       /** 继承父会话的权限档位；缺省为默认（不自动放宽） */
       permissionMode?: PermissionMode;
     },
@@ -289,7 +291,8 @@ export class SessionRepository {
       name: string | null;
       mode: string;
       model?: string;
-      thinkingLevel?: ThinkingLevel;
+      /** 沿用源会话的偏好（`auto` 保持 `auto`）；缺省即 `auto` */
+      thinkingLevel?: ThinkingPreference;
     },
   ): void {
     const now = new Date().toISOString();

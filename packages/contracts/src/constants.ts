@@ -21,6 +21,17 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+/**
+ * 思考档位的偏好：`auto` 表示按本会话模式的推荐档位（见 `harness/agents/profiles`），
+ * 其余取值是显式档位。会话行存的是偏好，实际注入 pi 的档位由装配层解析。
+ */
+export const THINKING_PREFERENCES = ["auto", ...THINKING_LEVELS] as const;
+
+export type ThinkingPreference = (typeof THINKING_PREFERENCES)[number];
+
+/** 未单独选择的会话按模式推荐档位走 */
+export const DEFAULT_THINKING_PREFERENCE: ThinkingPreference = "auto";
+
 /** 文件系统条目类型；fs/list 的 `entries[].type` 取值 */
 export const FS_ENTRY_TYPES = ["file", "directory"] as const;
 

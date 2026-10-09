@@ -3,7 +3,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { ERROR_CODES, type PermissionMode, type ThinkingLevel } from "@ucode/contracts";
+import { ERROR_CODES, type PermissionMode, type ThinkingPreference } from "@ucode/contracts";
 
 import type { Services } from "../app";
 import { AppError } from "../lib/response";
@@ -19,7 +19,8 @@ export const assertModel = (services: Services, ref: string): void => {
 export type SessionSeed = {
   cwd?: string;
   model?: string;
-  thinkingLevel?: ThinkingLevel;
+  /** 思考档位偏好；缺省即 `auto`（按模式的推荐档位） */
+  thinkingLevel?: ThinkingPreference;
   /** primary agent slug；缺省即内置 `build` */
   mode?: string;
   /** 会话级权限档位；缺省即内置 `default`（最放行档需显式选择） */

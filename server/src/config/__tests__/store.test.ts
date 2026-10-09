@@ -108,7 +108,7 @@ describe("记忆配置", () => {
   it("省略时不改动", () => {
     const store1 = store();
     store1.set(store1.merge({ memory: { enabled: true } }));
-    store1.set(store1.merge({ thinkingLevel: "high" }));
+    store1.set(store1.merge({ websearch: { provider: "searxng", apiKey: "" } }));
     assert.equal(store1.get().memory.enabled, true);
   });
 });

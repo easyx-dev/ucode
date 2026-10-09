@@ -11,13 +11,12 @@ export type ConfigChangeKind = "lazy" | "runtime";
  * 字段看不出真实改动。
  *
  * 只有联网搜索是运行期读取（自研 websearch 工具在调用时读闭包），改它不必重建运行时；
- * provider 目录、默认模型、思考档位与记忆开关都在会话装配时读入，必须重建。
+ * provider 目录、默认模型与记忆开关都在会话装配时读入，必须重建。
  * 装配期新增字段时必须加进下面的比较，漏掉会静默归为 `lazy`。
  */
 export const classifyConfigChange = (next: AppConfig, current: AppConfig): ConfigChangeKind =>
   isDeepStrictEqual(next.providers, current.providers) &&
   next.defaultModel === current.defaultModel &&
-  next.thinkingLevel === current.thinkingLevel &&
   isDeepStrictEqual(next.memory, current.memory)
     ? "lazy"
     : "runtime";

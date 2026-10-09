@@ -151,7 +151,7 @@ const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (
     );
   }
   if (status.configured) {
-    logger.info(`模型: ${status.defaultModel}   thinking: ${status.thinkingLevel}`);
+    logger.info(`模型: ${status.defaultModel}`);
   } else {
     logger.warn(`模型未配置：${status.error}（POST ${API_BASE_PATH}/config/update 配置）`);
   }

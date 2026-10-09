@@ -39,7 +39,6 @@ export function useConfigDraft(open: boolean) {
   const [providers, setProviders] = useState<DraftProvider[]>([]);
   const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("off");
   const [websearch, setWebsearch] = useState<DraftWebsearch>(emptyWebsearch);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
   /** 本次打开是否已用服务端配置填充过草稿 */
@@ -74,7 +73,6 @@ export function useConfigDraft(open: boolean) {
       ),
     );
     setDefaultModel(config.defaultModel ?? "");
-    setThinkingLevel(config.thinkingLevel);
     setWebsearch(toDraftWebsearch(config.websearch));
     setMemoryEnabled(config.memory.enabled);
   }, [configState.data, modelsState.data, modelsState.error, open]);
@@ -126,13 +124,11 @@ export function useConfigDraft(open: boolean) {
     catalog,
     configuredIds,
     defaultModel,
-    thinkingLevel,
     websearch,
     memoryEnabled,
     loading: configState.loading,
     options,
     setDefaultModel,
-    setThinkingLevel,
     patchProvider,
     addProvider,
     addFromCatalog,

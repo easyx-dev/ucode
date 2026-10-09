@@ -35,9 +35,7 @@ function DraftDefaultsPage({ title, draft }: { title: string; draft: ConfigDraft
       <SettingsDefaults
         options={draft.options}
         defaultModel={draft.defaultModel}
-        thinkingLevel={draft.thinkingLevel}
         onSelectDefaultModel={draft.setDefaultModel}
-        onSelectThinkingLevel={draft.setThinkingLevel}
       />
     </SettingsPage>
   );

@@ -11,7 +11,6 @@ const catalogOf = (services: Services): ModelsResponse => {
   return {
     configured: status.configured,
     defaultModel: status.defaultModel,
-    thinkingLevel: status.thinkingLevel,
     error: status.error,
     providers: services.runtime.getCatalog(),
   };

@@ -59,7 +59,6 @@ export class PiRuntime {
   private status: RuntimeStatus = {
     configured: false,
     defaultModel: null,
-    thinkingLevel: "off",
     error: "尚未加载配置",
   };
 
@@ -103,7 +102,6 @@ export class PiRuntime {
       this.status = {
         configured: false,
         defaultModel: null,
-        thinkingLevel: config.thinkingLevel,
         error:
           config.providers.length === 0
             ? "尚未接入模型供应商"
@@ -115,7 +113,6 @@ export class PiRuntime {
     this.status = {
       configured: true,
       defaultModel: `${model.provider}/${model.id}`,
-      thinkingLevel: config.thinkingLevel,
       error: null,
     };
     return this.status;

@@ -25,7 +25,7 @@ import {
   type PermissionMode,
   type SessionCreateRequest,
   type SessionSummary,
-  type ThinkingLevel,
+  type ThinkingPreference,
   type UsageTotals,
 } from "../lib/types";
 import { ChatHeader } from "./chat-header";
@@ -55,7 +55,7 @@ type ChatPanelProps = {
   empty: ReactNode;
   onReloadModels: () => void;
   onSelectModel: (model: string) => void;
-  onSelectThinkingLevel: (level: ThinkingLevel) => void;
+  onSelectThinkingLevel: (level: ThinkingPreference) => void;
   onSelectMode: (mode: string) => void;
   onSelectPermissionMode: (mode: PermissionMode) => void;
   onOpenSettings: () => void;
@@ -339,9 +339,9 @@ export function ChatPanel({
               suggestions={shouldShowSuggestions(chat) ? suggestions : undefined}
               providers={providers}
               model={session?.model ?? draft.model ?? models?.defaultModel ?? ""}
-              thinkingLevel={
-                session?.thinkingLevel ?? draft.thinkingLevel ?? models?.thinkingLevel ?? "off"
-              }
+              thinkingLevel={session?.thinkingLevel ?? draft.thinkingLevel ?? "auto"}
+              // 空态不知道模式的推荐档位，此时只显示「自动」；拿到会话摘要后才有实际档位
+              resolvedThinkingLevel={session?.resolvedThinkingLevel}
               mode={session?.mode ?? draft.mode ?? "build"}
               permissionMode={session?.permissionMode ?? DEFAULT_PERMISSION_MODE}
               onSelectModel={onSelectModel}

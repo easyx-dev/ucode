@@ -1,24 +1,18 @@
-/** 全局默认值：默认模型与 thinking 档位，按「设置行」排布 */
+/** 全局默认值：默认模型，按「设置行」排布 */
 import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
-import { thinkingLevelLabel } from "../../lib/thinking";
-import { THINKING_LEVELS, type ThinkingLevel } from "../../lib/types";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
 type SettingsDefaultsProps = {
   options: Array<{ value: string; label: string }>;
   defaultModel: string;
-  thinkingLevel: ThinkingLevel;
   onSelectDefaultModel: (model: string) => void;
-  onSelectThinkingLevel: (level: ThinkingLevel) => void;
 };
 
 export function SettingsDefaults({
   options,
   defaultModel,
-  thinkingLevel,
   onSelectDefaultModel,
-  onSelectThinkingLevel,
 }: SettingsDefaultsProps) {
   const { t } = useTranslation();
 
@@ -39,28 +33,6 @@ export function SettingsDefaults({
               {options.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        }
-      />
-
-      <SettingsRow
-        title={t("默认思考档位")}
-        description={t("未单独设置档位的会话使用该值；模型本身需支持思考。")}
-        control={
-          <Select
-            value={thinkingLevel}
-            onValueChange={(value) => onSelectThinkingLevel(value as ThinkingLevel)}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {THINKING_LEVELS.map((level) => (
-                <SelectItem key={level} value={level}>
-                  {thinkingLevelLabel(level, t)}
                 </SelectItem>
               ))}
             </SelectContent>

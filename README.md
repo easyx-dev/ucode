@@ -194,8 +194,7 @@ curl -X POST http://localhost:19688/api/v1/config/update \
         { "id": "glm-5.2", "name": "GLM 5.2", "reasoning": true }
       ]
     }],
-    "defaultModel": "local/deepseek-v4-flash",
-    "thinkingLevel": "medium"
+    "defaultModel": "local/deepseek-v4-flash"
   }'
 ```
 
@@ -251,6 +250,9 @@ curl -X POST http://localhost:19688/api/v1/config/test \
 | `compat` | `{ supportsDeveloperRole: false }` | pi 的 `*Compat` 开关，按 `api` 收窄，原样透传 |
 
 `thinkingLevel` 取值与 pi 一致：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
+会话的档位是**偏好**：输入区右下角选「自动」（默认）即按本会话模式的推荐档位跑
+（`plan` = `max`、`build` = `xhigh`、`ask` = `medium`，见 `server/src/harness/agents/profiles.ts`），
+选了具体档位就以会话的为准。
 
 ---
 

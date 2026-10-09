@@ -8,15 +8,19 @@ import { describe, it } from "node:test";
 
 import { SESSION_MODES } from "@ucode/contracts";
 
+import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../../constants";
 import { DEFAULT_PERMISSION_RULES } from "../../permissions";
 import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../../tools/names";
 import {
+  type AgentRegistry,
   agentRules,
   effectiveToolNames,
   PRIMARY_PROFILES,
   parentModeRules,
+  parseCustomAgent,
   primaryCapability,
   resolveSubagentCapability,
+  resolveThinkingLevel,
   SUBAGENT_PROFILES,
   SUBAGENT_SLUGS,
   subagentProfile,
@@ -62,21 +66,46 @@ describe("角色注册表", () => {
   });
 });
 
-describe("模式默认思考档位", () => {
-  it("编码 / 问答声明自己的档位，计划留空跟全局设置走", () => {
-    assert.equal(PRIMARY_PROFILES.build.capability.thinkingLevel, "high");
-    assert.equal(PRIMARY_PROFILES.ask.capability.thinkingLevel, "medium");
-    assert.equal(PRIMARY_PROFILES.plan.capability.thinkingLevel, undefined);
+describe("模式推荐思考档位", () => {
+  it("内置三模式的推荐值：计划最高、编码低一档、问答最轻", () => {
+    assert.equal(PRIMARY_PROFILES.plan.recommendedThinkingLevel, "max");
+    assert.equal(PRIMARY_PROFILES.build.recommendedThinkingLevel, "xhigh");
+    assert.equal(PRIMARY_PROFILES.ask.recommendedThinkingLevel, "medium");
   });
 
-  it("子角色不声明档位：编码降档不传导到委派出去的探索会话", () => {
+  it("子角色不声明推荐值：委派出去的会话按所属模式的推荐值跑", () => {
     for (const slug of SUBAGENT_SLUGS) {
       assert.equal(
-        SUBAGENT_PROFILES[slug].capability.thinkingLevel,
+        SUBAGENT_PROFILES[slug].recommendedThinkingLevel,
         undefined,
-        `${slug} 不应声明档位`,
+        `${slug} 不应声明推荐值`,
       );
     }
+  });
+
+  it("`auto` 按模式解析：自定义模式没声明推荐值时落到缺省档位", () => {
+    assert.equal(resolveThinkingLevel("auto", "plan"), "max");
+    assert.equal(resolveThinkingLevel("auto", "build"), "xhigh");
+    assert.equal(resolveThinkingLevel("low", "build"), "low");
+
+    const { profile } = parseCustomAgent(
+      "my-mode",
+      "---\nmode: primary\ndescription: 自定义模式\n---\n正文",
+    );
+    const registry: AgentRegistry = {
+      primary: { [profile.slug]: profile },
+      subagents: {},
+      errors: [],
+    };
+    assert.equal(
+      resolveThinkingLevel("auto", "my-mode", registry),
+      DEFAULT_RECOMMENDED_THINKING_LEVEL,
+    );
+    // 未知 slug 回落默认模式（删掉自定义文件后旧会话仍要能打开）
+    assert.equal(
+      resolveThinkingLevel("auto", "gone-mode"),
+      PRIMARY_PROFILES.build.recommendedThinkingLevel,
+    );
   });
 });
 

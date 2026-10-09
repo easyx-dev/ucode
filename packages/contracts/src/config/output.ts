@@ -1,5 +1,5 @@
 /** config 接口的响应模型，apiKey 已脱敏 */
-import type { ApiType, SearchProviderId, ThinkingLevel } from "../constants";
+import type { ApiType, SearchProviderId } from "../constants";
 import type { RuntimeStatus } from "../runtime";
 
 import type { ProviderModel } from "./input";
@@ -35,7 +35,6 @@ export type MemoryView = {
 
 export type ConfigView = {
   defaultModel: string | null;
-  thinkingLevel: ThinkingLevel;
   providers: ProviderConfigView[];
   websearch: WebsearchView;
   memory: MemoryView;

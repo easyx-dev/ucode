@@ -284,7 +284,6 @@ const toModelPayload = (model: DraftModel) => ({
 export const toUpdatePayload = (
   drafts: DraftProvider[],
   defaultModel: string | null,
-  thinkingLevel: ThinkingLevel,
   websearch: DraftWebsearch,
   memoryEnabled: boolean,
 ) => ({
@@ -307,7 +306,6 @@ export const toUpdatePayload = (
     };
   }),
   defaultModel,
-  thinkingLevel,
   websearch: {
     provider: websearch.provider,
     // 留空表示沿用服务端已保存的 key

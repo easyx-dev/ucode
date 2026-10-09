@@ -49,7 +49,7 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 `session` 有意保持单表，列分两组语义，**新增列必须先归组**：
 
 - **会话状态组**（应用自己写、会话文件里没有对应表示）：`name` / `cwd` / `model` /
-  `thinking_level` / `mode`（未设置回落 `build`）/ `permission_mode`（会话级权限档位，未设置回落
+  `thinking_level`（档位偏好：`auto` 或具体档位，为空即 `auto`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `mode`（未设置回落 `build`）/ `permission_mode`（会话级权限档位，未设置回落
   `default`；见 [`docs/modes-and-permissions.md`](./modes-and-permissions.md)）/ `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
   `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/

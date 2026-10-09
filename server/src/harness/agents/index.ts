@@ -7,7 +7,9 @@ export {
   primaryCapability,
   primaryProfile,
   primaryToolNames,
+  recommendedThinkingLevelOf,
   resolveSubagentCapability,
+  resolveThinkingLevel,
   subagentProfile,
   usesDefaultToolSet,
 } from "./capability";

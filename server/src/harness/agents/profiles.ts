@@ -43,29 +43,28 @@ const primary = (
   label: string,
   toolSelection: ToolSelection,
   permissions: readonly PermissionRule[],
-  /** 该模式的默认思考档位；缺省则继承设置里的全局档位 */
-  thinkingLevel?: ThinkingLevel,
+  /** 本模式的推荐思考档位：档位偏好为 `auto` 时采用；缺省落到 `DEFAULT_RECOMMENDED_THINKING_LEVEL` */
+  recommendedThinkingLevel?: ThinkingLevel,
 ): AgentProfile => ({
   slug,
   kind: "primary",
   label,
   description: "",
-  capability: {
-    toolSelection,
-    permissions,
-    ...(thinkingLevel ? { thinkingLevel } : {}),
-  },
+  capability: { toolSelection, permissions },
+  ...(recommendedThinkingLevel ? { recommendedThinkingLevel } : {}),
 });
 
 export const PRIMARY_PROFILES: Record<SessionMode, AgentProfile> = {
-  // 编码以执行步为主，比规划低一档；问答更轻。声明了就优先于设置里的全局档位
-  build: primary("build", "编码", BUILD_TOOLS, [], "high"),
-  // 计划模式多了 present_plan（提交计划的信号）；档位不声明，跟着全局走
+  // 编码以执行步为主，推荐比计划低一档；问答更轻——偏好为 auto 时按这里跑，
+  // 会话里显式选过档位就以会话的为准（见 harness/session-config）
+  build: primary("build", "编码", BUILD_TOOLS, [], "xhigh"),
+  // 计划模式多了 present_plan（提交计划的信号）；调研要出方案，推荐取最高档
   plan: primary(
     "plan",
     "计划",
     readOnlySelection(["present_plan", SUBAGENT_TOOL_NAME]),
     READ_ONLY_PERMISSIONS,
+    "max",
   ),
   ask: primary(
     "ask",

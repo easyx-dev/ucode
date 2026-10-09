@@ -3,7 +3,7 @@ import type {
   PermissionMode,
   SessionCreateRequest,
   SessionSummary,
-  ThinkingLevel,
+  ThinkingPreference,
 } from "@ucode/contracts";
 
 import { useErrorText } from "../lib/error";
@@ -20,7 +20,7 @@ export type SessionsController = {
   fork: (sessionId: string, fromEntryId?: string) => Promise<SessionSummary | null>;
   rename: (sessionId: string, name: string) => Promise<void>;
   setModel: (sessionId: string, model: string) => Promise<void>;
-  setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
+  setThinkingLevel: (sessionId: string, level: ThinkingPreference) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   /** 置顶 / 取消置顶 */

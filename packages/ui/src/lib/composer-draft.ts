@@ -2,7 +2,7 @@
 
 import { brand } from "@ucode/brand";
 
-import type { ThinkingLevel } from "./types";
+import type { ThinkingPreference } from "./types";
 
 export type ComposerDraft = {
   /** 输入框里还没发出去的内容（纯文本镜像，含附件位置标记，用于空判定与旧数据） */
@@ -14,7 +14,8 @@ export type ComposerDraft = {
   doc?: unknown;
   /** 会话级设置的草稿；只在「还没有会话」时作为新会话的初始设置生效 */
   model?: string;
-  thinkingLevel?: ThinkingLevel;
+  /** 档位偏好草稿；`auto` 表示按模式推荐值 */
+  thinkingLevel?: ThinkingPreference;
   mode?: string;
   /** 「在目录中新建」选定的目录；未选时缺省（会话落到自己的工作区） */
   cwd?: string;

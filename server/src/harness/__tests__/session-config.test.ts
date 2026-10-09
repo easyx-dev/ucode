@@ -12,6 +12,7 @@ import { describe, it } from "node:test";
 
 import {
   type AgentSession,
+  type CreateAgentSessionOptions,
   createAgentSession,
   ModelRuntime,
   SessionManager,
@@ -110,13 +111,15 @@ type SessionSnapshot = {
   compaction: { enabled: boolean; reserveTokens: number; keepRecentTokens: number };
 };
 
-const sessionOf = async (
+const optionsOf = async (
   mode: SessionMode,
   promptSource: PromptSource = "custom",
   memory?: MemoryService,
   subagent?: { profile: AgentProfile; capability: ResolvedCapability },
   agentRegistry?: AgentRegistry,
-): Promise<AgentSession> => {
+  /** 会话行；用于验证覆盖值与模式推荐值的优先级 */
+  record?: SessionRecord,
+): Promise<CreateAgentSessionOptions> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
     modelsPath: null,
@@ -131,14 +134,13 @@ const sessionOf = async (
   const runtime = {
     requireRuntime: () => modelRuntime,
     resolveModelRef: () => model,
-    getStatus: () => ({ thinkingLevel: "off" }),
     // 预算注入的两个口径：给一个百万窗口的模型，验证它不再等于「永不触发」
     contextWindowOf: () => 1_048_576,
     contextBudgetOf: () => null,
   } as unknown as PiRuntime;
 
-  const options = await buildSessionOptions({
-    record: undefined,
+  return await buildSessionOptions({
+    record,
     cwd,
     // 用测试自己的 pi 目录，别去读用户真实的数据目录
     harnessDir: join(root, "pi"),
@@ -161,7 +163,10 @@ const sessionOf = async (
     ...(agentRegistry ? { agentRegistry } : {}),
     promptSource,
   });
-  const { session }: { session: AgentSession } = await createAgentSession(options);
+};
+
+const sessionOf = async (...args: Parameters<typeof optionsOf>): Promise<AgentSession> => {
+  const { session }: { session: AgentSession } = await createAgentSession(await optionsOf(...args));
   return session;
 };
 
@@ -372,7 +377,6 @@ describe("buildSessionOptions 子智能体装配", () => {
   it("角色声明的模型不可用时装配报错，不静默回落默认模型", async () => {
     const runtime = {
       resolveModelRef: () => null,
-      getStatus: () => ({ thinkingLevel: "off" }),
       requireRuntime: () => assert.fail("校验应在建会话前就拦住"),
     } as unknown as PiRuntime;
 
@@ -427,5 +431,28 @@ describe("buildSessionOptions 子智能体装配", () => {
       childOf("build", "explore"),
     );
     assert.ok(systemPrompt.includes(catalog.subagentConstraints.explore));
+  });
+});
+
+describe("思考档位注入", () => {
+  it("缺省偏好（auto）按模式的推荐值注入 pi", async () => {
+    assert.equal((await optionsOf("plan")).thinkingLevel, "max");
+    assert.equal((await optionsOf("build")).thinkingLevel, "xhigh");
+    assert.equal((await optionsOf("ask")).thinkingLevel, "medium");
+  });
+
+  it("会话选过具体档位就压过模式推荐值", async () => {
+    const record = recordWith({ thinkingLevel: "low" });
+    const options = await optionsOf("plan", "custom", undefined, undefined, undefined, record);
+    assert.equal(options.thinkingLevel, "low");
+  });
+
+  it("子会话按所属模式的推荐值（build 父 → xhigh）", async () => {
+    const profile = subagentProfile("general");
+    const { thinkingLevel } = await optionsOf("build", "custom", undefined, {
+      profile,
+      capability: resolveSubagentCapability(profile, primaryCapability("build")),
+    });
+    assert.equal(thinkingLevel, "xhigh");
   });
 });

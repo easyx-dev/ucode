@@ -13,7 +13,11 @@ import {
   type SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_PERMISSION_MODE, type WebsearchConfig } from "@ucode/contracts";
+import {
+  DEFAULT_PERMISSION_MODE,
+  DEFAULT_THINKING_PREFERENCE,
+  type WebsearchConfig,
+} from "@ucode/contracts";
 import type { PromptSource } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
@@ -28,6 +32,7 @@ import {
   primaryCapability,
   primaryProfile,
   type ResolvedCapability,
+  resolveThinkingLevel,
   usesDefaultToolSet,
 } from "./agents";
 import { commandAssetPaths, withBuiltinPrompts } from "./assets";
@@ -231,8 +236,12 @@ export const buildSessionOptions = async (
   }
   const modelRef = override.model ?? capability.model ?? null;
   const model = input.runtime.resolveModelRef(modelRef) ?? input.runtime.resolveModelRef(null);
-  const thinkingLevel =
-    override.thinkingLevel ?? capability.thinkingLevel ?? input.runtime.getStatus().thinkingLevel;
+  // 档位：会话选过具体档位就用它，否则按模式的推荐值（子会话的 mode 是父的 mode，故父子同口径）
+  const thinkingLevel = resolveThinkingLevel(
+    override.thinkingLevel ?? DEFAULT_THINKING_PREFERENCE,
+    input.mode,
+    registry,
+  );
   // 装配要等 loader 重建，而保存配置会在这期间换掉运行时：先把运行时取一次给本次装配用，
   // 免得出现「模型解析自旧运行时、交给新运行时建会话」的错配
   // 这几行之间不得插入 await —— 同代快照靠「同一个同步块内不留让出点」保证

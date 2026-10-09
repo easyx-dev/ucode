@@ -19,7 +19,6 @@ import { AppError } from "../lib/response";
 export const emptyConfig = (): AppConfig => ({
   providers: [],
   defaultModel: null,
-  thinkingLevel: "off",
   websearch: { provider: DEFAULT_SEARCH_PROVIDER, apiKey: "", baseUrl: "" },
   memory: { enabled: false },
 });
@@ -113,7 +112,6 @@ export class ConfigStore {
     return appConfigSchema.parse({
       providers: providers ?? this.config.providers,
       defaultModel,
-      thinkingLevel: patch.thinkingLevel ?? this.config.thinkingLevel,
       websearch,
       memory,
     });
@@ -126,7 +124,6 @@ export const maskApiKey = (apiKey: string): string =>
 /** 对外返回的配置视图：apiKey 脱敏；不下发 provider 级 headers（可能含鉴权信息） */
 export const publicConfig = (config: AppConfig): ConfigView => ({
   defaultModel: config.defaultModel,
-  thinkingLevel: config.thinkingLevel,
   providers: config.providers.map((provider) => ({
     id: provider.id,
     name: provider.name ?? provider.id,

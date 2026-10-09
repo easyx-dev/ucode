@@ -9,7 +9,7 @@ import type {
   PermissionMode,
   SessionCreateRequest,
   SessionSummary,
-  ThinkingLevel,
+  ThinkingPreference,
 } from "@ucode/contracts";
 
 import type { Apis } from "../apis";
@@ -24,7 +24,7 @@ const LIST_LIMIT = 200;
 type SessionPatch = {
   name?: string;
   model?: string;
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: ThinkingPreference;
   mode?: string;
   permissionMode?: PermissionMode;
 };
@@ -49,7 +49,7 @@ export type SessionsStore = {
   fork: (sessionId: string, fromEntryId?: string) => Promise<SessionSummary | null>;
   rename: (sessionId: string, name: string) => Promise<void>;
   setModel: (sessionId: string, model: string) => Promise<void>;
-  setThinkingLevel: (sessionId: string, level: ThinkingLevel) => Promise<void>;
+  setThinkingLevel: (sessionId: string, level: ThinkingPreference) => Promise<void>;
   setMode: (sessionId: string, mode: string) => Promise<void>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   /** 置顶 / 取消置顶；影响列表排序，不改变会话内容 */
@@ -234,8 +234,13 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     });
   };
 
-  const applyUpdate = async (sessionId: string, patch: SessionPatch): Promise<void> => {
-    patchSession(sessionId, patch);
+  const applyUpdate = async (
+    sessionId: string,
+    patch: SessionPatch,
+    /** 只改本地态的字段，不发接口（如偏好变化时作废已解析的档位） */
+    optimistic: Partial<SessionSummary> = {},
+  ): Promise<void> => {
+    patchSession(sessionId, { ...patch, ...optimistic });
     try {
       await deps.apis.sessions.update({ sessionId, ...patch });
     } catch (error) {
@@ -310,7 +315,10 @@ export const createSessionsStore = (deps: { apis: Apis; events: EventStream }): 
     },
     rename: (sessionId, name) => applyUpdate(sessionId, { name }),
     setModel: (sessionId, model) => applyUpdate(sessionId, { model }),
-    setThinkingLevel: (sessionId, thinkingLevel) => applyUpdate(sessionId, { thinkingLevel }),
+    // 偏好一改，原来的解析值就不成立了（选「自动」时尤其明显：旧值来自上一个档位）；
+    // 权威值随随后的 session_updated 到达，这期间按「未知」显示成「自动」
+    setThinkingLevel: (sessionId, thinkingLevel) =>
+      applyUpdate(sessionId, { thinkingLevel }, { resolvedThinkingLevel: undefined }),
     setMode: (sessionId, mode) => applyUpdate(sessionId, { mode }),
     setPermissionMode: (sessionId, permissionMode) => applyUpdate(sessionId, { permissionMode }),
     async pin(sessionId, pinned) {
