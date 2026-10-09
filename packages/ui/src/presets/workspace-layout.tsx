@@ -22,7 +22,6 @@ import { openRenameSessionDialog } from "../business/rename-session-dialog";
 import { SessionSidebar } from "../business/session-sidebar";
 import { SettingsPanel } from "../business/settings/settings-panel";
 import { UsagePanel } from "../business/usage/usage-panel";
-import { WelcomePanel } from "../business/welcome-panel";
 import { WorkbenchPanel } from "../business/workbench/workbench-panel";
 import { useActiveSession } from "../hooks/use-active-session";
 import { useChat } from "../hooks/use-chat";
@@ -553,14 +552,7 @@ export function WorkspaceLayout({
                   workspacesDir={workspacesDir}
                   chat={chat}
                   composer={composer}
-                  empty={
-                    <WelcomePanel
-                      configured={configured}
-                      defaultModel={models.data?.defaultModel ?? null}
-                      workspacesDir={workspacesDir}
-                      onOpenSettings={openSettings}
-                    />
-                  }
+                  configured={configured}
                   onReloadModels={() => void models.refresh()}
                   onSelectModel={selectModel}
                   onSelectThinkingLevel={selectThinkingLevel}

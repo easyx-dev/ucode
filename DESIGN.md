@@ -171,8 +171,8 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 | 正文、消息内容 | `text-sm` | 默认档 |
 | 组件标题（会话标题、卡片标题） | `text-sm font-medium` | 不与正文拉开字号，靠字重区分 |
 | 说明、时间、分组标题、次级信息 | `text-xs` | 配 `text-muted-foreground` |
-| 空态问候语 | `text-xl font-semibold` | 界面上最大的正文层级 |
-| 空态水印 | `text-7xl font-semibold` + `text-foreground/5` | 纯装饰（`aria-hidden`），不算文字层级 |
+| 空态问候语 | `text-xl font-semibold` | 界面上最大的正文层级，与输入卡、建议行同属居中 hero |
+| 空态水印 | `BrandLogo` 大尺寸 + `opacity-[0.07]` | 品牌图（深浅色各自切图），纯装饰，不算文字层级 |
 | 代码、路径、内联片段 | `font-mono text-xs` | 配 `rounded-sm bg-muted` |
 
 - 中文正文用 `leading-relaxed`；密集列表用默认行高
@@ -224,6 +224,22 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 - 思考与工具的行与摘要一律用 `text-muted-foreground`（入参再淡一档 `/70`），不与正文争注意力；完全隐藏思考走设置（外观 → 思考过程）
 - 嵌套的可点行必须用具名 group（`group/thought` / `group/tool`）：无名 group 会被外层聚合行的悬停点亮，让整列小三角一起现形
 - 一屏内的层级只有两档：正文 `text-sm` > 折叠行与摘要 `text-xs text-muted-foreground`
+
+## 输入区
+
+输入区是「在哪儿干活 + 说什么」两件事，分两层：
+
+| 元素 | 取法 |
+| --- | --- |
+| 外层容器 | `rounded-xl bg-muted/50`，承载首行项目 / 分支条与内层白卡，也是粘贴 / 拖拽的落点 |
+| 项目 / 分支条 | 首行 `px-2 py-1.5`；项目 chip 草稿态可下拉（`rounded-md px-1.5 py-0.5 text-xs` + `hover:bg-muted`），已有会话同形但只读（无悬停反馈）；分支 chip 只在确实是 git 仓库且取得到分支名时出现 |
+| 输入卡 | 内层 `rounded-lg bg-popover` + `ring-1 ring-foreground/10`，聚焦时 `focus-within:ring-2`；不在 `bg-card` 上再套 `bg-card` |
+| 工具栏 | 左 `+`（附件 / 技能）· 模型 · 模式 · 权限；右 思考 · 发送 / 停止。均为无边框的 `text-xs` 轻量按钮，图标 `size-3.5` |
+| 建议行 | 只在空态出现，排在输入卡**下方**（`rounded-full` + `border` + `text-xs`，带 `size-3.5` 图标），点击填入输入框而不是发送 |
+| 空态 | 品牌图 + 按时段问候语，与输入卡同属居中一列 |
+
+- 空态与对话态**共用同一个输入卡挂载点**（父节点不变）：hero 只让外层容器 `justify-center` 并把问候渲染在输入卡上方；挪动父节点会让编辑器重挂载、草稿与附件占位一起丢
+- 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型口径见 `docs/components.md`），弹层开在触发钮上方（`side="top"`）并固定 `w-72` 以容纳副标题
 
 ## Markdown 渲染
 

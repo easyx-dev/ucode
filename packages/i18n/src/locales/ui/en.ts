@@ -385,10 +385,10 @@ export default {
     "Sending will remove everything after this message (kept in the session record).",
 
   // Empty states
-  "夜深了，接下来交给我吧": "It's late. Leave it to me.",
-  "早上好，接下来交给我吧": "Good morning. Leave it to me.",
-  "下午好，接下来交给我吧": "Good afternoon. Leave it to me.",
-  "晚上好，接下来交给我吧": "Good evening. Leave it to me.",
+  "深夜好呀，有什么想让我帮忙的吗": "Still up? What can I help with?",
+  "上午好呀，有什么想让我帮忙的吗": "Good morning. What can I help with?",
+  "下午好呀，有什么想让我帮忙的吗": "Good afternoon. What can I help with?",
+  "晚上好呀，有什么想让我帮忙的吗": "Good evening. What can I help with?",
   还没有配置模型: "No model configured yet",
   "填入一个 OpenAI 兼容端点（baseUrl / apiKey / 模型 id）后即可开始对话。":
     "Add an OpenAI-compatible endpoint (baseUrl / apiKey / model id) to start chatting.",

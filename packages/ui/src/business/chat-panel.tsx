@@ -1,7 +1,7 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
 import { cn } from "cn";
 import { Bot } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import type { ChatController } from "../hooks/use-chat";
@@ -40,6 +40,7 @@ import { PermissionRequest } from "./permission-request";
 import { PlanDecisionForm } from "./plan-decision-form";
 import { QuestionRequest } from "./question-request";
 import { openSubagentSessionDialog } from "./subagent-session-dialog";
+import { WelcomePanel } from "./welcome-panel";
 
 /** 还没有任何消息时展示起步建议（含空态：直接打字就是第一个会话） */
 const shouldShowSuggestions = (chat: ChatController): boolean =>
@@ -54,7 +55,8 @@ type ChatPanelProps = {
   /** 输入区草稿：按上下文持久化未发送的内容与初始设置 */
   composer: ComposerDraftsController;
   /** 没有会话时展示的内容 */
-  empty: ReactNode;
+  /** 还没配置模型：空态改成提示与设置入口，其余界面照常 */
+  configured: boolean;
   onReloadModels: () => void;
   onSelectModel: (model: string) => void;
   onSelectThinkingLevel: (level: ThinkingPreference) => void;
@@ -110,7 +112,7 @@ export function ChatPanel({
   workspacesDir,
   chat,
   composer,
-  empty,
+  configured,
   onReloadModels,
   onSelectModel,
   onSelectThinkingLevel,
@@ -230,6 +232,8 @@ export function ChatPanel({
   const providers = (models?.providers ?? []).filter((provider) => provider.available);
   /** 子会话由委派产生、只读查看，不提供输入区与 plan 决策表单 */
   const isChild = Boolean(session?.parentSessionId);
+  /** 空态：还没有任何消息（不在生成、也不是子会话）——输入卡居中，问候在它上方 */
+  const hero = shouldShowSuggestions(chat) && !chat.streaming && !isChild;
   /** 待答的审批 / 提问优先于计划决策：它正在阻塞工具调用，先答完才谈得上继续 */
   const showPlanForm = planReady && !isChild;
 
@@ -298,19 +302,20 @@ export function ChatPanel({
         </div>
       ) : null}
 
-      <MessageList
-        items={chat.items}
-        subagents={chat.subagents}
-        loading={chat.loadingHistory}
-        working={chat.streaming}
-        compacting={chat.compacting}
-        empty={empty}
-        resetKey={session?.id ?? ""}
-        sentTick={sentTick}
-        onOpenSession={openSubagent}
-        onFork={isChild ? undefined : onFork}
-        onEdit={isChild || chat.streaming ? undefined : handleEdit}
-      />
+      {hero ? null : (
+        <MessageList
+          items={chat.items}
+          subagents={chat.subagents}
+          loading={chat.loadingHistory}
+          working={chat.streaming}
+          compacting={chat.compacting}
+          resetKey={session?.id ?? ""}
+          sentTick={sentTick}
+          onOpenSession={openSubagent}
+          onFork={isChild ? undefined : onFork}
+          onEdit={isChild || chat.streaming ? undefined : handleEdit}
+        />
+      )}
 
       {/* 完成后收起状态条：目标在哪儿结束由对话里的「目标完成」细线负责，条不再常驻 */}
       {!isChild && goal && goal.status !== "completed" ? (
@@ -330,9 +335,10 @@ export function ChatPanel({
         </div>
       ) : (
         // 决策面板要盖住输入区，两者得在同一个定位上下文里
-        <div className="relative">
+        <div className={cn("relative", hero && "flex min-h-0 flex-1 flex-col justify-center")}>
           {/* 光盖住不够：焦点/键盘也得进不去，否则看不见的输入框照样收字符 */}
           <div inert={Boolean(decision)}>
+            {hero ? <WelcomePanel configured={configured} onOpenSettings={onOpenSettings} /> : null}
             <Composer
               sessionId={session?.id ?? null}
               cwdPath={session?.cwd ?? draft.cwd}
