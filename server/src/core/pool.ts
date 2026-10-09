@@ -680,8 +680,8 @@ export class SessionPool {
       if (mode === "build" && usesDefaultToolSet(capability)) await session.bindExtensions({});
 
       const unsubscribe = session.subscribe((event) => {
-        // 每步耗时归因：只看 turn_start / 首个 token / message_end / turn_end 四个锚点
-        this.telemetry.observe(sessionId, event, session.sessionManager);
+        // 每步耗时归因：只看 turn_start / message_start / 首个内容帧 / message_end / turn_end
+        this.telemetry.observe(sessionId, event, session.sessionManager, session.thinkingLevel);
         // 文件一落盘就把索引写进库，不等本轮落定：中间被回收或服务重启时才有文件可续接
         if (event.type === "message_end" || event.type === "entry_appended") {
           if (!this.indexedSources.has(sessionId)) this.writeIndex(sessionId);

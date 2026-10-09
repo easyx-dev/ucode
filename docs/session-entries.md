@@ -32,7 +32,7 @@
 
 | customType | 类型 | payload | 写入点 | 界面 |
 | --- | --- | --- | --- | --- |
-| `ucode.step` | custom | `{ turn, startedAt, firstTokenAt, respondedAt, endedAt, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/telemetry` | 不展示 |
+| `ucode.step` | custom | `{ turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/telemetry` | 不展示 |
 | `ucode.permission-decision` | custom | `{ tool, subject, scope, decision, sourceSessionId?, sourceDescription? }` | `server/src/core/pool.ts` | 展示成审批记录 |
 | `ucode.compaction` | custom | `{ reason, outcome, tokensBefore?, tokensAfter?, keptFrom?, skip?, error?, at }`（`reason` 取 `manual` / `threshold` / `overflow`，`outcome` 取 `done` / `skipped` / `failed`） | `server/src/core/pool.ts` | 展示成压缩分隔行 |
 | `ucode.goal` | custom | `{ event, status?, cause?, turns?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `verdict` / `completed`） | `server/src/harness/goal` | 只展示 `completed`（目标完成细线） |
@@ -92,6 +92,10 @@
   值即条目里的 `customType`），并与本文档的表格逐条对齐——`scripts/verify` 双向校验。
 - payload 字段 camelCase（与 `docs/api.md` 的字段命名同口径）；时间用 `at`（ISO 8601 字符串），
   只有 `ucode.step` 是热路径，用毫秒时间戳避免每步两次格式化。
+- `ucode.step` 把一次模型往返拆成四段：`firstEventMs`（发出 → 响应头）→ `ttftMs`（响应头 → 首个
+  内容帧）→ `streamMs`（首个内容帧 → `message_end`）→ `toolMs`（`message_end` → `turn_end`）。
+  锚点取自 pi 的 `message_start` 与首个 `message_update`——它的 `start` 帧不会走 `message_update`。
+  `hasText` 与 `toolNames` 用来事后区分「只有工具调用的执行步」与「有汇报的步」。
 - 只为回溯 / 观测的条目**不进** `serialize` 白名单，只在文件里；要上界面的条目必须在「界面」列写明形态。
 - 条目是追加语义：可以加字段，但不要改老字段的含义——看历史的人只能靠这一列对齐口径。
 - 排查时先按 `customType` 过滤，例如：

@@ -83,10 +83,11 @@ export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
 
 /**
  * 每步耗时记录：每次模型往返结束后，服务端往会话文件追加的 pi `custom` 条目。
- * `data` 为 `{turn, startedAt, firstTokenAt, respondedAt, endedAt, ttftMs, streamMs, toolMs,
- * userWaitMs, toolCalls, inputTokens, cacheReadTokens, outputTokens, reasoningTokens,
- * contextTokens, contextBudget, attachments}`——把「一次往返」拆成首 token / 解码 / 工具三段，
- * 外加等用户的时间，供事后算账。它只作服务端观测：既不进模型上下文，也不下发给客户端
+ * `data` 为 `{turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs,
+ * streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens,
+ * outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments}`——
+ * 把「一次往返」拆成响应头 / 首字节 / 解码 / 工具四段，外加等用户的时间，供事后算账。
+ * 它只作服务端观测：既不进模型上下文，也不下发给客户端
  * （见 `core/serialize` 的 customType 白名单）。
  */
 export const STEP_RECORD_CUSTOM_TYPE = "ucode.step";
