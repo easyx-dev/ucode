@@ -324,6 +324,19 @@ export class SessionRepository {
     return overrideOf(this.find(id));
   }
 
+  /**
+   * 库里**记过**的会话参数；没记过的列为 `null`。
+   *
+   * 与 `find` 只差 `mode` 一列：那里把空列回落成 `DEFAULT_SESSION_MODE`（读取方要的是生效值），
+   * 而打开已有会话时按文件回填只认「库里到底记过没有」（见 `core/run-settings`）。
+   */
+  readRunSettings(id: string): { mode: string | null; permissionMode: string | null } {
+    const row = this.db.prepare("SELECT mode, permission_mode FROM session WHERE id = ?").get(id) as
+      | { mode: string | null; permission_mode: string | null }
+      | undefined;
+    return { mode: row?.mode ?? null, permissionMode: row?.permission_mode ?? null };
+  }
+
   /** 覆盖值写入；不改 `updated_at`，重命名不应把会话顶到列表最前 */
   set(id: string, override: SessionOverride): void {
     const now = new Date().toISOString();
@@ -491,7 +504,7 @@ export class SessionRepository {
     };
   }
 
-  /** 生成落定后回写列表缓存；行不存在时顺带补建（例如外部导入的会话） */
+  /** 生成落定后回写列表缓存；行不存在时顺带补建 */
   refresh(id: string, index: SessionIndex): void {
     this.db
       .prepare(

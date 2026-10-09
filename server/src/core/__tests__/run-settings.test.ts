@@ -1,4 +1,4 @@
-/** core/run-settings：从会话条目里取最后一条运行参数（打开会话时用它校准 app.db） */
+/** core/run-settings：从会话条目里取最后一条运行参数（打开会话时用它回填 app.db 里没记过的列） */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
@@ -98,46 +98,59 @@ describe("hasRunSettingsChanged", () => {
 
 describe("runSettingsPatch", () => {
   const known = (): boolean => true;
-  const current = { mode: "build", permissionMode: null };
+  /** 库里两列都没记过（建会话时没给模式 / 档位） */
+  const unset = { mode: null, permissionMode: null };
 
-  it("文件与库不一致时两个字段都回写", () => {
-    assert.deepEqual(runSettingsPatch({ mode: "plan", permissionMode: "full" }, current, known), {
+  it("库里没记过的字段按文件回填", () => {
+    assert.deepEqual(runSettingsPatch({ mode: "plan", permissionMode: "full" }, unset, known), {
       mode: "plan",
       permissionMode: "full",
     });
   });
 
-  it("与库里一致时不回写", () => {
+  it("库里记过的字段不覆盖：用户刚切的值比文件里的记录新", () => {
     assert.equal(
       runSettingsPatch(
-        { mode: "build", permissionMode: "full" },
-        { mode: "build", permissionMode: "full" },
+        { mode: "plan", permissionMode: "full" },
+        { mode: "build", permissionMode: "default" },
         known,
       ),
       null,
     );
   });
 
+  it("只空着一侧时只写那一个", () => {
+    assert.deepEqual(
+      runSettingsPatch(
+        { mode: "plan", permissionMode: "full" },
+        { mode: "build", permissionMode: null },
+        known,
+      ),
+      { permissionMode: "full" },
+    );
+    assert.deepEqual(
+      runSettingsPatch(
+        { mode: "plan", permissionMode: "full" },
+        { mode: null, permissionMode: "full" },
+        known,
+      ),
+      { mode: "plan" },
+    );
+  });
+
   it("未知的模式 slug 不回写：自定义角色可能已被删", () => {
     assert.equal(
-      runSettingsPatch({ mode: "ghost" }, current, () => false),
+      runSettingsPatch({ mode: "ghost" }, unset, () => false),
       null,
     );
   });
 
   it("非法的权限档位不回写：文件可能被手改过", () => {
-    assert.equal(runSettingsPatch({ permissionMode: "readonly" }, current, known), null);
+    assert.equal(runSettingsPatch({ permissionMode: "readonly" }, unset, known), null);
   });
 
   it("没有设置点、或设置点里没有可用的字段时不回写", () => {
-    assert.equal(runSettingsPatch(null, current, known), null);
-    assert.equal(runSettingsPatch({}, current, known), null);
-  });
-
-  it("只有一个字段有差异时只写那一个", () => {
-    assert.deepEqual(
-      runSettingsPatch({ mode: "ask" }, { mode: "build", permissionMode: "full" }, known),
-      { mode: "ask" },
-    );
+    assert.equal(runSettingsPatch(null, unset, known), null);
+    assert.equal(runSettingsPatch({}, unset, known), null);
   });
 });

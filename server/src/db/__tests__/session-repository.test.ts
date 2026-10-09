@@ -52,6 +52,19 @@ describe("SessionRepository", () => {
     assert.equal(repo.find("s1")?.mode, "build");
   });
 
+  it("readRunSettings 只认库里记过的值：未记过的列为 null，find 那边已回落默认值", () => {
+    repo.create("s1-unset", {});
+    assert.deepEqual(repo.readRunSettings("s1-unset"), { mode: null, permissionMode: null });
+    assert.equal(repo.find("s1-unset")?.mode, "build");
+
+    repo.create("s1-set", { mode: "plan", permissionMode: "full" });
+    assert.deepEqual(repo.readRunSettings("s1-set"), { mode: "plan", permissionMode: "full" });
+
+    // 只切了一个字段时另一侧仍为空：回填要能区分「没记过」与「记成了默认值」
+    repo.set("s1-unset", { mode: "ask" });
+    assert.deepEqual(repo.readRunSettings("s1-unset"), { mode: "ask", permissionMode: null });
+  });
+
   it("覆盖值可写入并读回", () => {
     repo.create("s2", { mode: "ask", cwd: "/tmp" });
     const record = repo.find("s2");

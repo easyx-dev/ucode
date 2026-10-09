@@ -1,8 +1,8 @@
 /**
  * 会话文件里的「运行参数」读回：模式与权限档位的最后一条记录。
  *
- * 写点在轮开始（`SessionPool.recordRunSettings`），这里是它的反方向——打开已有会话时用文件校准
- * `app.db`：JSONL 是会话的事实源，删库或把文件拷到别的实例后，模式不该悄悄回落成 `build`。
+ * 写点在轮开始（`SessionPool.recordRunSettings`），这里是它的反方向——打开已有会话时用它补上
+ * `app.db` 里还没记过的列（建会话时没给模式 / 档位的行，见 `runSettingsPatch`）。
  */
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { MODE_RECORD_CUSTOM_TYPE, PERMISSION_MODES, type PermissionMode } from "@ucode/contracts";
@@ -43,26 +43,32 @@ export const lastRunSettingsOf = (entries: readonly SessionEntry[]): RunSettings
 };
 
 /**
- * 由「文件里的设置点」与「库里的现值」算出要回写的字段；返回 `null` 表示不用动。
+ * 由「文件里的设置点」与「库里记过的值」算出要回填的字段；返回 `null` 表示不用动。
  *
- * 两条不写回的理由各自独立：与库里一致（没必要写）、值不可用（不认识的模式 slug ——
- * 自定义角色可能已被删；不认识的权限档位 —— 文件可能被手改过）。写回一份用不了的值，
- * 会让别的读取方也跟着看到它。
+ * **只补库里没记过的列**（值为 `null`）：库里已有的值要么是用户刚切的、要么是建会话时定的，
+ * 都比文件里最后一条记录新。切换模式 / 档位先写库、写文件要等这一轮开始，一旦反过来拿文件
+ * 覆盖库，打开会话时正是「切了还没跑」的窗口，切换会被静默回退成上一轮的参数。
+ *
+ * 值不可用也不写：不认识的模式 slug（自定义角色可能已被删）、不合法的权限档位（文件可能被手改过）——
+ * 写回一份用不了的值，会让别的读取方也跟着看到它。
+ *
+ * 于是这一侧实际只是兜底：够得着它的只有「建会话时没给模式 / 档位」的行，而写进文件的值取自库里的
+ * 生效值（`runSettingsOf`，空列已是回落默认值），补回去的与读取方本来就会回落的默认值一致。
  */
 export const runSettingsPatch = (
   recorded: RunSettings | null,
-  // 库里存的是原始字符串（可能为空或历史值），比较用不着先校验；写回的那侧才校验
-  current: { mode: string; permissionMode: string | null },
+  // 库里记过的原值（可能为空或历史值），比较用不着先校验；写回的那侧才校验
+  current: { mode: string | null; permissionMode: string | null },
   isKnownMode: (slug: string) => boolean,
 ): SessionOverride | null => {
   if (!recorded) return null;
   const patch: SessionOverride = {};
-  if (recorded.mode !== undefined && recorded.mode !== current.mode && isKnownMode(recorded.mode)) {
+  if (recorded.mode !== undefined && current.mode === null && isKnownMode(recorded.mode)) {
     patch.mode = recorded.mode;
   }
   if (
     recorded.permissionMode !== undefined &&
-    recorded.permissionMode !== current.permissionMode &&
+    current.permissionMode === null &&
     (PERMISSION_MODES as readonly string[]).includes(recorded.permissionMode)
   ) {
     patch.permissionMode = recorded.permissionMode as PermissionMode;

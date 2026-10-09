@@ -39,7 +39,7 @@
 | `ucode.goal-prompt` | custom_message | 正文是注入的目标指令；`details` 为 `{ kind: kickoff \| continuation \| resume, turn? }` | `server/src/core/pool.ts`、`server/src/core/run.ts` | 展示成细线（目标启动 / 续跑 / 恢复） |
 | `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/core/run.ts` | 展示成细线（计划已批准） |
 | `ucode.plan-ignored` | custom | `{ at }` | `server/src/routes/messages` | 展示成「已忽略计划」 |
-| `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/core/pool.ts`（轮起点；打开已有会话时用它校准 `app.db`） | 不展示：只用于打开已有会话时校准 `app.db` |
+| `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/core/pool.ts`（轮起点） | 不展示：只用于打开已有会话时回填 `app.db` 没记过的列 |
 | `ucode.skill` | custom | `{ event, name, file, source, toolCallId?, at }`（`event` 取 `invoke` / `hit`，`source` 取 `COMMAND_ASSET_SOURCES`） | `server/src/core/pool.ts`、`server/src/core/run.ts` | 不单独成行：`hit` 挂在对应的 `read` 调用卡片上，`invoke` 只落文件 |
 | `ucode.retry` | custom | `{ event, attempt, maxAttempts, delayMs?, errorMessage?, success?, at }`（`event` 取 `start` / `end`） | `server/src/core/pool.ts` | 展示成细线：`start` 与 `end(success: false)`；重试成功那条不下发 |
 | `ucode.prune` | custom | `{ cleared, freedTokens, targets: Array<{ id, tool }>, at }` | `server/src/core/pool.ts` | 不展示 |

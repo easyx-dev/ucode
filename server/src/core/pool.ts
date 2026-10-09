@@ -96,7 +96,7 @@ type PooledSession = {
   skillHits: Set<string>;
 };
 
-/** 库里那份会话参数：权限档位缺省即默认档（写设置点与校准回读共用同一口径） */
+/** 库里那份会话参数：权限档位缺省即默认档（写设置点与回填取值共用同一口径） */
 const runSettingsOf = (record: SessionRecord): RunSettings => ({
   mode: record.mode,
   permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
@@ -623,7 +623,6 @@ export class SessionPool {
       });
     }
     const cwd = resolveSessionCwd(record);
-    const mode = record.mode;
     const isSubagent = Boolean(record.parentSessionId && record.agent);
 
     // 只有未绑定目录的会话住工作区：它同时是这类会话的 cwd，跑之前必须存在；
@@ -649,22 +648,24 @@ export class SessionPool {
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
     }
-    // 打开已有会话：文件是权威、DB 是缓存。文件里有设置点就以它为准回写，删库 / 拷文件都不会丢模式；
-    // 未知 slug（自定义角色已删）不回写，装配侧本就有兑底
+    // 打开已有会话：文件里记着「上一轮跑在什么参数下」，库里对应的列还没记过（建会话时没给模式 / 档位的行）时用它补上，
+    // 这些行的文件记录写的就是回落默认值，所以这一侧只是兜底。
+    // 库里已经有值就不动：那是用户刚切的、比文件里最后一条记录新，覆盖它等于把切换动作吞掉；
+    // 值不可用（模式 slug 已删 / 权限档位非法）也不写，由 `runSettingsPatch` 判定
     if (sourcePath) {
-      // 打开已有会话：文件是权威、DB 是缓存，文件里有设置点就以它为准回写；
-      // 值不可用（模式 slug 已删 / 权限档位非法）时不回写，由 `runSettingsPatch` 判定
       const patch = runSettingsPatch(
         lastRunSettingsOf(manager.getBranch()),
-        { mode: record.mode, permissionMode: record.permissionMode },
+        this.repository.readRunSettings(sessionId),
         (slug) => hasPrimaryMode(slug, registry),
       );
       if (patch) {
         this.repository.set(sessionId, patch);
-        // 重新取一份：本轮装配要用校准后的值，否则校准要等下一轮才生效
+        // 重新取一份：本轮装配要用回填后的值，否则回填要等下一轮才生效
         record = this.repository.find(sessionId) ?? record;
       }
     }
+    // 模式必须在回填之后取：它是工具集 / 提示词 / 记忆工具的输入，取早了这一轮就还是旧模式
+    const mode = record.mode;
     const { profile, capability, parentRules } = this.resolveAgent(record, registry);
     // 子会话的审批 / 提问归属根（v1 即父）会话，并带上来源标注
     const interactionSessionId = record.parentSessionId ?? sessionId;
@@ -960,7 +961,7 @@ export class SessionPool {
   /**
    * 轮开始时落一条本轮生效的运行参数（模式与权限档位）。
    *
-   * 它不展示、也不参与投影：只供打开已有会话时校准 `app.db`（见 `./run-settings`）。
+   * 它不展示、也不参与投影：只供打开已有会话时回填 `app.db` 里没记过的列（见 `./run-settings`）。
    * 去重对着会话文件里最后一条设置点，而不是内存：实例重装（重启 / 换模型 / 换权限档位都会
    * dispose）后内存那份会重置，同一份参数会被反复记一条。
    */
