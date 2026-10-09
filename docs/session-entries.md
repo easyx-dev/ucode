@@ -40,6 +40,7 @@
 | `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/core/run.ts` | 展示成细线（计划已批准） |
 | `ucode.plan-ignored` | custom | `{ at }` | `server/src/routes/messages` | 展示成「已忽略计划」 |
 | `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/routes/sessions` | 展示成细线（模式 / 权限档位已切换） |
+| `ucode.skill` | custom | `{ event, name, file, source, toolCallId?, at }`（`event` 取 `invoke` / `hit`，`source` 取 `COMMAND_ASSET_SOURCES`） | `server/src/core/pool.ts`、`server/src/core/run.ts` | 不单独成行：`hit` 挂在对应的 `read` 调用卡片上，`invoke` 只落文件 |
 | `ucode.prune` | custom | `{ cleared, freedTokens, targets: Array<{ id, tool }>, at }` | `server/src/core/pool.ts` | 不展示 |
 | `ucode.subagent` | custom | `{ event, childId, toolCallId, agent?, name?, isError?, aborted?, at }`（`event` 取 `start` / `end`） | `server/src/core/pool.ts` | 不展示 |
 | `ucode.interaction` | custom | `{ kind, requestId, outcome, sourceSessionId?, at }`（`kind` 取 `permission` / `question`，`outcome` 取 `resolved` / `dismissed` / `aborted`） | `server/src/app.ts` | 不展示 |

@@ -6,6 +6,7 @@ import {
   COMPACTION_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_IGNORED_CUSTOM_TYPE,
+  SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 import {
   buildChatRows,
@@ -93,6 +94,28 @@ const compactionItem = (id: string): ChatItem => ({
   blocks: [],
   customType: COMPACTION_RECORD_CUSTOM_TYPE,
   compactionRecord: { reason: "threshold", outcome: "done", at: AT },
+  createdAt: AT,
+});
+
+/** 技能命中记录：服务端落的 `custom` 扩展条目，`toolCallId` 指向读到技能文件的那次调用 */
+const skillItem = (
+  id: string,
+  name: string,
+  toolCallId: string,
+  event: "hit" | "invoke" = "hit",
+): ChatItem => ({
+  id,
+  role: "custom",
+  blocks: [],
+  customType: SKILL_RECORD_CUSTOM_TYPE,
+  skillRecord: {
+    event,
+    name,
+    file: `/skills/${name}/SKILL.md`,
+    source: "project",
+    ...(event === "hit" ? { toolCallId } : {}),
+    at: AT,
+  },
   createdAt: AT,
 });
 
@@ -649,5 +672,38 @@ describe("压缩分隔行的定位", () => {
 
     assert.equal(rows[lastCompactionIndexOf(rows)]?.kind, "compaction");
     assert.equal(compactionKeyOf(rows), "s1");
+  });
+});
+
+describe("技能命中记录", () => {
+  it("不单独成行，标记挂到读到技能文件的那次调用上", () => {
+    const rows = buildChatRows([
+      userItem("u1", "用它看看"),
+      assistantItem("a1", [call("c1", "read")]),
+      toolItem("t1", "c1", "read", "技能正文"),
+      skillItem("s1", "lark-base", "c1"),
+    ]);
+
+    assert.deepEqual(kindsOf(rows), ["content", "activity"]);
+    const leg = rowsOfKind(rows, "activity")[0]?.node.legs[0];
+    assert.equal(leg?.kind === "tool" ? leg.entry.skill?.name : undefined, "lark-base");
+  });
+
+  it("孤儿命中（那次调用不在当前分支）不产生任何行", () => {
+    const rows = buildChatRows([userItem("u1", "问"), skillItem("s1", "lark-base", "c-缺失")]);
+
+    assert.deepEqual(kindsOf(rows), ["content"]);
+  });
+
+  it("显式调用（invoke）没有可挂的调用，同样不成行", () => {
+    const rows = buildChatRows([
+      userItem("u1", "问"),
+      assistantItem("a1", [call("c1", "read")]),
+      toolItem("t1", "c1", "read", "技能正文"),
+      skillItem("s1", "review", "c1", "invoke"),
+    ]);
+
+    const leg = rowsOfKind(rows, "activity")[0]?.node.legs[0];
+    assert.equal(leg?.kind === "tool" ? leg.entry.skill : undefined, undefined);
   });
 });

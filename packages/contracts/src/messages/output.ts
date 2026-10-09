@@ -7,6 +7,7 @@ import type {
   MessageRole,
   ModeRecord,
   PermissionDecision,
+  SkillRecord,
   ThinkingLevel,
 } from "../constants";
 
@@ -62,6 +63,8 @@ export type MessageDTO = {
   goalRecord?: GoalRecord;
   /** 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） */
   modeChange?: ModeRecord;
+  /** custom 专用：技能命中记录；只有 `SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 条目会带上 */
+  skillRecord?: SkillRecord;
   /** custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 */
   goalPrompt?: GoalPromptDetails;
   isError?: boolean;

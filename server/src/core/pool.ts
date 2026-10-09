@@ -16,6 +16,8 @@ import {
   type ServerEventPayload,
   type SessionStatus,
   type SessionSummary,
+  SKILL_RECORD_CUSTOM_TYPE,
+  type SkillRecord,
   SUBAGENT_RECORD_CUSTOM_TYPE,
   type SubagentSnapshot,
   type WebsearchConfig,
@@ -37,16 +39,14 @@ import {
   subagentProfile,
   usesDefaultToolSet,
 } from "../harness/agents";
+import type { SkillIndex } from "../harness/assets";
+import { matchSkillHit, matchSkillInvoke } from "../harness/assets/skill-hit";
 import type { GoalService } from "../harness/goal";
 import type { PromptImage } from "../harness/image";
 import type { MemoryService } from "../harness/memory";
 import type { PermissionRule, SessionAllowStore } from "../harness/permissions";
 import { pruneToolOutputs } from "../harness/prune";
-import {
-  buildSessionOptions,
-  contextBudgetFor,
-  resolveSessionCwd,
-} from "../harness/session-config";
+import { assembleSession, contextBudgetFor, resolveSessionCwd } from "../harness/session-config";
 import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/subagents";
 import { StepTelemetry } from "../harness/telemetry";
 import type { UsageService } from "../harness/usage";
@@ -73,6 +73,10 @@ type PooledSession = {
   unsubscribe: () => void;
   /** 配置已变更：这一轮跑完（或下次访问）就按新配置重建 */
   stale: boolean;
+  /** 本次装配的技能索引：命中判定与显式调用都查它，与广告给模型的同一份 */
+  skills: SkillIndex;
+  /** 本轮已记过的技能名：同一轮里分片读同一个文件只留第一条，轮次边界清空 */
+  skillHits: Set<string>;
 };
 
 /**
@@ -623,59 +627,58 @@ export class SessionPool {
           }
         : undefined;
 
-    const { session } = await createAgentSession(
-      await buildSessionOptions({
-        record,
-        cwd,
-        mode,
-        sessionManager: manager,
-        runtime: this.runtime,
-        profile,
-        capability,
-        ...(parentRules ? { parentRules } : {}),
-        ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
-        agentRegistry: registry,
-        websearch: this.websearch,
-        permission: {
-          listGrants: () => this.permissions.allow.list(interactionSessionId),
-          grant: (rule) => this.permissions.allow.add(interactionSessionId, rule),
-          request: async (ask) => {
-            const outcome = await this.permissions.interactions.requestPermission(
-              interactionSessionId,
-              ask,
-              source,
-            );
-            // 只有用户真的作答过才留痕：超时 / 中断代打的 deny 写成「已拒绝」会误导事后回放
-            if (outcome.byUser) {
-              // 记录落在**被提问的会话**上：方案里子会话的审批归属根会话、弹窗也只出现在根会话，
-              // 用户答复时看的就是它；落在发起调用的子会话里，人再也对不上眼
-              const target =
-                interactionSessionId === sessionId
-                  ? manager
-                  : this.entries.get(interactionSessionId)?.session.sessionManager;
-              this.recordPermissionDecision(target, interactionSessionId, {
-                tool: ask.tool,
-                subject: ask.subject,
-                scope: ask.scope,
-                decision: outcome.decision,
-                ...(source ?? {}),
-              });
-            }
-            return outcome.decision;
-          },
+    const assembled = await assembleSession({
+      record,
+      cwd,
+      mode,
+      sessionManager: manager,
+      runtime: this.runtime,
+      profile,
+      capability,
+      ...(parentRules ? { parentRules } : {}),
+      ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
+      agentRegistry: registry,
+      websearch: this.websearch,
+      permission: {
+        listGrants: () => this.permissions.allow.list(interactionSessionId),
+        grant: (rule) => this.permissions.allow.add(interactionSessionId, rule),
+        request: async (ask) => {
+          const outcome = await this.permissions.interactions.requestPermission(
+            interactionSessionId,
+            ask,
+            source,
+          );
+          // 只有用户真的作答过才留痕：超时 / 中断代打的 deny 写成「已拒绝」会误导事后回放
+          if (outcome.byUser) {
+            // 记录落在**被提问的会话**上：方案里子会话的审批归属根会话、弹窗也只出现在根会话，
+            // 用户答复时看的就是它；落在发起调用的子会话里，人再也对不上眼
+            const target =
+              interactionSessionId === sessionId
+                ? manager
+                : this.entries.get(interactionSessionId)?.session.sessionManager;
+            this.recordPermissionDecision(target, interactionSessionId, {
+              tool: ask.tool,
+              subject: ask.subject,
+              scope: ask.scope,
+              decision: outcome.decision,
+              ...(source ?? {}),
+            });
+          }
+          return outcome.decision;
         },
-        question: {
-          ask: (ask, signal) =>
-            this.permissions.interactions.requestQuestion(
-              interactionSessionId,
-              ask.questions,
-              signal,
-              source,
-            ),
-        },
-        memory: this.memory,
-      }),
-    );
+      },
+      question: {
+        ask: (ask, signal) =>
+          this.permissions.interactions.requestQuestion(
+            interactionSessionId,
+            ask.questions,
+            signal,
+            source,
+          ),
+      },
+      memory: this.memory,
+    });
+    const { session } = await createAgentSession(assembled.options);
 
     // 会话已创建、但还没入池：这之后的任何失败都要先 dispose，否则会话（及其可能拉起的
     // MCP 子进程）会脱离池被泄漏
@@ -687,6 +690,12 @@ export class SessionPool {
       const unsubscribe = session.subscribe((event) => {
         // 每步耗时归因：只看 turn_start / message_start / 首个内容帧 / message_end / turn_end
         this.telemetry.observe(sessionId, event, session.sessionManager, session.thinkingLevel);
+        // 技能命中：轮次起头清空已记集合，读到技能文件（`SKILL.md`）时记一条
+        if (event.type === "turn_start") {
+          this.entries.get(sessionId)?.skillHits.clear();
+        } else if (event.type === "tool_execution_start") {
+          this.observeSkillHit(sessionId, event.toolName, event.args, event.toolCallId);
+        }
         // 文件一落盘就把索引写进库，不等本轮落定：中间被回收或服务重启时才有文件可续接
         if (event.type === "message_end" || event.type === "entry_appended") {
           if (!this.indexedSources.has(sessionId)) this.writeIndex(sessionId);
@@ -765,6 +774,8 @@ export class SessionPool {
         unsubscribe,
         // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
         stale: generation !== this.generation,
+        skills: assembled.skills,
+        skillHits: new Set(),
       };
       // 压缩触发点在这里算一次，同时喂给每步耗时记录与用量服务：
       // 口径与注入 pi 的阈值完全一致，界面上的「预算」不会与实际压缩点对不上
@@ -815,6 +826,68 @@ export class SessionPool {
       this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
     } catch (error) {
       logger.warn({ sessionId, error }, "写入权限审批记录失败");
+    }
+  }
+
+  /**
+   * 模型自己读到技能文件时记一条命中。同轮同一技能只记一次——模型分片读同一个 `SKILL.md`
+   * （`offset` / `limit`）时会连着调好几次。
+   */
+  private observeSkillHit(
+    sessionId: string,
+    toolName: string,
+    args: unknown,
+    toolCallId: string | undefined,
+  ): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    const cwd = this.repository.find(sessionId)?.cwd ?? process.cwd();
+    const skill = matchSkillHit(toolName, args, cwd, entry.skills);
+    if (!skill || entry.skillHits.has(skill.name)) return;
+    entry.skillHits.add(skill.name);
+    this.recordSkill(sessionId, entry.session.sessionManager, {
+      event: "hit",
+      name: skill.name,
+      file: skill.file,
+      source: skill.source,
+      ...(toolCallId ? { toolCallId } : {}),
+      at: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * 显式 `/skill:name` 的记录：只落文件、不下发界面——用户消息上的 chip 已经表达过这件事。
+   * 判定与写入都关在池里，调用方不接触资源装载。
+   */
+  noteSkillInvoke(sessionId: string, text: string): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    const skill = matchSkillInvoke(text, entry.skills);
+    if (!skill) return;
+    this.recordSkill(sessionId, entry.session.sessionManager, {
+      event: "invoke",
+      name: skill.name,
+      file: skill.file,
+      source: skill.source,
+      at: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * 写一条技能记录并让在线客户端重取转录（与审批记录同一做法）。
+   * 失败只记日志：记录不该影响这一轮的投递。
+   */
+  private recordSkill(
+    sessionId: string,
+    manager: SessionManager | undefined,
+    record: SkillRecord,
+  ): void {
+    if (!manager) return;
+    try {
+      const entryId = manager.appendCustomEntry(SKILL_RECORD_CUSTOM_TYPE, record);
+      this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
+    } catch (error) {
+      logger.warn({ sessionId, error }, "写入技能记录失败");
     }
   }
 

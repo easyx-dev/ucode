@@ -36,6 +36,12 @@
 
 ### 新增
 
+- **技能命中的记录**：模型照系统提示里的 `<available_skills>` 自己去读某个技能的 `SKILL.md` 时记一条
+  `ucode.skill`（`event: "hit"`，带上那次 `read` 的 `toolCallId`），显式 `/skill:name` 记 `event: "invoke"`。
+  服务端往会话文件追加 pi `custom` 条目：`hit` 下发客户端并标在那次调用的卡片上，`invoke` 只落文件
+  （用户消息上的 chip 已经表达过显式调用）。条目登记见 `docs/session-entries.md`，`MessageDTO` 因此多一个
+  `skillRecord` 字段。
+
 - **输入区与空态改版**：输入卡改「项目 / 分支条 + 白卡」双层（卡内那行 cwd 文本删掉），空态改居中
   hero（品牌图水印 + 按时段问候，输入卡居中、建议 chips 移到卡下方并带图标）；工具栏新增「+」菜单
   （只列附件与技能），模式 / 权限 / 思考三个选择器由 `select` 换成带副标题的菜单。草稿态的项目可切换，

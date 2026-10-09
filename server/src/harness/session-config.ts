@@ -35,7 +35,7 @@ import {
   resolveThinkingLevel,
   usesDefaultToolSet,
 } from "./agents";
-import { commandAssetPaths, withBuiltinPrompts } from "./assets";
+import { commandAssetPaths, type SkillIndex, skillIndexOf, withBuiltinPrompts } from "./assets";
 import { type ContextBudget, contextBudgetOf } from "./budget";
 import { mcpExtension } from "./mcp";
 import type { MemoryService } from "./memory";
@@ -149,7 +149,7 @@ const createSessionLoader = async (
   toolNames: readonly string[],
   settingsManager: SettingsManager,
   variant: PromptVariant,
-): Promise<DefaultResourceLoader> => {
+): Promise<{ loader: DefaultResourceLoader; skills: SkillIndex }> => {
   // 命令与技能只认我们的目录（全局 $APP_HOME + 项目祖先的项目配置目录 + .agents 兼容），
   // 不读 pi 默认的技能目录与 cwd/.pi/*；顺序即同名优先级（pi first-wins）
   const assetPaths = commandAssetPaths({ cwd: input.cwd, appHome: env.homeDir });
@@ -206,16 +206,17 @@ const createSessionLoader = async (
     }),
   });
   await loader.reload();
-  return loader;
+  // 索引在装载之后建一次：广告给模型的、`/skill:name` 展开的、记命中用的必须是同一份
+  return { loader, skills: skillIndexOf(loader.getSkills().skills, assetPaths.skills, input.cwd) };
 };
 
 /**
  * 组装 AgentSession 的创建参数；模型与档位按「会话覆盖 > 角色定义 > 全局默认」解析。
  * 异步是因为要先 `reload()` resourceLoader 才能建出会话。
  */
-export const buildSessionOptions = async (
+export const assembleSession = async (
   input: SessionAssemblyInput,
-): Promise<CreateAgentSessionOptions> => {
+): Promise<{ options: CreateAgentSessionOptions; skills: SkillIndex }> => {
   // 注册表同时决定 primary 与子角色：primary 走自定义（可覆盖内置），子会话取交集时也要它
   const registry =
     input.agentRegistry ?? loadAgentRegistry({ cwd: input.cwd, appHome: env.homeDir });
@@ -250,7 +251,7 @@ export const buildSessionOptions = async (
   // loader 与会话共用同一个 SettingsManager：分两个实例会让资源发现与运行期设置不一致
   const settingsManager = SettingsManager.inMemory();
   const variant = resolvePromptVariant(model ? `${model.provider}/${model.id}` : null);
-  const loader = await createSessionLoader(
+  const loaderResult = await createSessionLoader(
     input,
     profile,
     capability,
@@ -258,6 +259,7 @@ export const buildSessionOptions = async (
     settingsManager,
     variant,
   );
+  const { loader, skills } = loaderResult;
   const { toolSelection } = capability;
   // 覆盖必须在 loader.reload() 之后：reload 会重读设置，冲掉 reload 前的 in-memory 覆盖
   if (toolSelection.kind === "defaultTools")
@@ -280,7 +282,7 @@ export const buildSessionOptions = async (
       ? (input.memory?.tools(input.cwd) ?? [])
       : [];
 
-  return {
+  const options: CreateAgentSessionOptions = {
     cwd: input.cwd,
     agentDir: input.harnessDir ?? env.harnessDir,
     modelRuntime,
@@ -301,4 +303,10 @@ export const buildSessionOptions = async (
     }),
     resourceLoader: loader,
   };
+  return { options, skills };
 };
+
+/** 只取装配参数的薄包装：现有测试与脚本按它调用 */
+export const buildSessionOptions = async (
+  input: SessionAssemblyInput,
+): Promise<CreateAgentSessionOptions> => (await assembleSession(input)).options;

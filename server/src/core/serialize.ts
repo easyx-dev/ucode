@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { SessionEntry, SessionInfo } from "@earendil-works/pi-coding-agent";
 import {
   API_BASE_PATH,
+  COMMAND_ASSET_SOURCES,
   COMPACTION_OUTCOMES,
   COMPACTION_REASONS,
   COMPACTION_RECORD_CUSTOM_TYPE,
@@ -35,6 +36,9 @@ import {
   PLAN_IGNORED_CUSTOM_TYPE,
   type SessionStatus,
   type SessionSummary,
+  SKILL_RECORD_CUSTOM_TYPE,
+  SKILL_RECORD_EVENTS,
+  type SkillRecord,
   THINKING_LEVELS,
   type ThinkingLevel,
 } from "@ucode/contracts";
@@ -266,6 +270,35 @@ const modeRecordOf = (data: unknown): ModeRecord | null => {
 };
 
 /**
+ * 技能记录的 `data` 同样不可信：`event` / `source` 不在枚举内、或缺少名字与路径就当没有记录。
+ * `invoke` 与非法形状都不下发界面（`hit` 才带 `toolCallId`，界面靠它挂到那次 `read` 的卡片上）。
+ */
+const skillRecordOf = (data: unknown): SkillRecord | null => {
+  if (!isRecord(data)) return null;
+  const { event, name, file, source, toolCallId, at } = data;
+  if (typeof event !== "string" || !(SKILL_RECORD_EVENTS as readonly string[]).includes(event)) {
+    return null;
+  }
+  // `invoke` 只落文件：用户消息上的 chip 已经表达过显式调用，界面上再来一遍没有信息量
+  if (event !== "hit") return null;
+  if (typeof name !== "string" || typeof file !== "string" || typeof at !== "string") return null;
+  if (
+    typeof source !== "string" ||
+    !(COMMAND_ASSET_SOURCES as readonly string[]).includes(source)
+  ) {
+    return null;
+  }
+  return {
+    event,
+    name,
+    file,
+    source: source as SkillRecord["source"],
+    ...(typeof toolCallId === "string" ? { toolCallId } : {}),
+    at,
+  };
+};
+
+/**
  * 目标记录的 `data` 同样不可信：`event` 不在枚举内就当没有记录；其余字段按类型带上。
  * 界面只看 `completed`，但字典要完整——`verdict` / `pause` 这些留给回溯。
  */
@@ -388,6 +421,18 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
           blocks: [],
           customType: entry.customType,
           modeChange: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
+      if (entry.customType === SKILL_RECORD_CUSTOM_TYPE) {
+        const record = skillRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          skillRecord: record,
           createdAt: fallbackCreatedAt,
         };
       }

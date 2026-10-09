@@ -11,6 +11,7 @@ import {
   GOAL_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_IGNORED_CUSTOM_TYPE,
+  SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 
 import { blocksOf, entriesToDTO, entryToDTO } from "../serialize";
@@ -204,6 +205,82 @@ describe("entryToDTO 的 custom 分支", () => {
       skip: "too_small",
       at: "2026-01-01T00:00:00.000Z",
     });
+  });
+});
+
+describe("entryToDTO 的技能记录", () => {
+  const customEntry = (data: unknown): SessionEntry => ({
+    type: "custom",
+    id: "entry-1",
+    parentId: null,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    customType: SKILL_RECORD_CUSTOM_TYPE,
+    data,
+  });
+
+  it("命中投影为带 skillRecord 的 custom 条目", () => {
+    const data = {
+      event: "hit",
+      name: "lark-base",
+      file: "/repo/.agents/skills/lark-base/SKILL.md",
+      source: "project",
+      toolCallId: "call-1",
+      at: "2026-01-01T00:00:00.000Z",
+    };
+
+    assert.deepEqual(entryToDTO(customEntry(data)), {
+      id: "entry-1",
+      role: "custom",
+      blocks: [],
+      customType: SKILL_RECORD_CUSTOM_TYPE,
+      skillRecord: data,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("显式调用不下发：用户消息上的 chip 已经表达过这件事", () => {
+    const dto = entryToDTO(
+      customEntry({
+        event: "invoke",
+        name: "review",
+        file: "/repo/.agents/skills/review/SKILL.md",
+        source: "project",
+        at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    assert.equal(dto, null);
+  });
+
+  it("形状不对时不下发：缺名字 / 路径、event 或 source 越界都当没有记录", () => {
+    assert.equal(
+      entryToDTO(customEntry({ event: "hit", source: "project", at: "2026-01-01T00:00:00.000Z" })),
+      null,
+    );
+    assert.equal(
+      entryToDTO(
+        customEntry({
+          event: "nope",
+          name: "x",
+          file: "/f",
+          source: "project",
+          at: "2026-01-01T00:00:00.000Z",
+        }),
+      ),
+      null,
+    );
+    assert.equal(
+      entryToDTO(
+        customEntry({
+          event: "hit",
+          name: "x",
+          file: "/f",
+          source: "nope",
+          at: "2026-01-01T00:00:00.000Z",
+        }),
+      ),
+      null,
+    );
   });
 });
 

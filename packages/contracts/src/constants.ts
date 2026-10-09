@@ -206,6 +206,35 @@ export type PruneRecord = {
 };
 
 /**
+ * 技能命中与调用的记录：模型照着系统提示里的 `<available_skills>` 自己去读了 `SKILL.md`（`hit`），
+ * 或用户显式发了 `/skill:name`（`invoke`）。服务端往会话文件追加的 pi `custom` 条目，`data` 为 `SkillRecord`。
+ *
+ * 两条通道此前都没有可辨认的痕迹：前者就是一次普通 `read`，后者只有界面上的 chip。
+ * 只为回溯：不进模型上下文；`hit` 会下发客户端并挂到那次 `read` 的卡片上，`invoke` 不下发界面。
+ */
+export const SKILL_RECORD_CUSTOM_TYPE = "ucode.skill";
+
+/** 使用方式：`invoke` 是显式调用，`hit` 是模型按描述自行选用 */
+export const SKILL_RECORD_EVENTS = ["invoke", "hit"] as const;
+
+export type SkillRecordEvent = (typeof SKILL_RECORD_EVENTS)[number];
+
+export type SkillRecord = {
+  /** 使用方式 */
+  event: SkillRecordEvent;
+  /** 技能名（pi 的 `Skill.name`） */
+  name: string;
+  /** 技能文件（`SKILL.md`）的绝对路径 */
+  file: string;
+  /** 来源目录档位，与 `commands/list` 的 `source` 同口径 */
+  source: CommandAssetSource;
+  /** 读到它的那次工具调用；仅 `hit` 有 */
+  toolCallId?: string;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
  * 目标记录：目标状态每次变迁（设定 / 暂停 / 恢复 / 清除）与每轮校验结论，服务端往会话文件
  * 追加的 pi `custom` 条目，`data` 为 `GoalRecord`。
  *

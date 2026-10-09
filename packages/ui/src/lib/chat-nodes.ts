@@ -28,6 +28,7 @@ import {
   MODE_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_APPROVED_CUSTOM_TYPE,
+  SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 import { PRESENT_PLAN_TOOL } from "./plan";
 import type { ChatItem } from "./types";
@@ -46,6 +47,8 @@ export type ToolEntry = {
   isError?: boolean;
   /** 是否仍在执行 */
   running?: boolean;
+  /** 模型自行读到了某个技能（`SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 记录），卡片上标出技能名 */
+  skill?: { name: string };
 };
 
 /** 一轮回复的页脚信息：模型 / 时间取自来源 assistant 消息，耗时由起止时间戳算出 */
@@ -247,12 +250,15 @@ const toolEntryOf = (
   item: ChatItem,
   block: ToolCallBlock,
   results: Map<string, ChatItem>,
+  skillHits: Map<string, string>,
 ): ToolEntry => {
   const result = results.get(block.id);
+  const skill = skillHits.get(block.id);
   return {
     id: block.id,
     name: block.name,
     args: block.args,
+    ...(skill ? { skill: { name: skill } } : {}),
     ...(result ? { result: itemText(result) } : {}),
     isError: result?.isError === true,
     running: result ? Boolean(result.live) : Boolean(item.live),
@@ -260,10 +266,29 @@ const toolEntryOf = (
 };
 
 /**
+ * 索引技能命中：`toolCallId` → 技能名。
+ *
+ * 必须预扫——命中条目排在 assistant 消息之后，主循环走到那次工具调用时还看不到它。
+ */
+const indexSkillHits = (items: ChatItem[]): Map<string, string> => {
+  const hits = new Map<string, string>();
+  for (const item of items) {
+    if (item.customType !== SKILL_RECORD_CUSTOM_TYPE) continue;
+    const record = item.skillRecord;
+    if (record?.toolCallId) hits.set(record.toolCallId, record.name);
+  }
+  return hits;
+};
+
+/**
  * 按区块顺序把 assistant 消息切成段：思考与工具调用各自成段，其余区块（正文 / 图片 / 附件）连续合并。
  * 段 key 用「消息 id + 区块下标」，流式追加区块时已有段的 key 不变；`trailing` 标记消息的最后一段。
  */
-const buildAssistantLegs = (item: ChatItem, results: Map<string, ChatItem>): AssistantLeg[] => {
+const buildAssistantLegs = (
+  item: ChatItem,
+  results: Map<string, ChatItem>,
+  skillHits: Map<string, string>,
+): AssistantLeg[] => {
   const legs: AssistantLeg[] = [];
   item.blocks.forEach((block, index) => {
     if (block.type === "toolCall") {
@@ -281,7 +306,11 @@ const buildAssistantLegs = (item: ChatItem, results: Map<string, ChatItem>): Ass
         });
         return;
       }
-      legs.push({ kind: "tool", key: block.id, entry: toolEntryOf(item, block, results) });
+      legs.push({
+        kind: "tool",
+        key: block.id,
+        entry: toolEntryOf(item, block, results, skillHits),
+      });
       return;
     }
     if (block.type === "thinking") {
@@ -393,6 +422,7 @@ const summaryTextOf = (items: ChatItem[]): string => {
 
 export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
   const { results, callIds } = indexToolResults(items);
+  const skillHits = indexSkillHits(items);
   const nodes: ChatNode[] = [];
   // 摘要挂到**最后一条**记录上：一次会话可能压过多次，只有最新那次配得上前面的摘要
   const lastRecord = [...items].reverse().find((item) => compactionRecordOf(item));
@@ -432,6 +462,8 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
         nodes.push({ kind: "mode", key: uidOf(item), record: modeChange });
         continue;
       }
+      // 技能记录不单独成行：标记已经挂到那次 `read` 的卡片上（见 `indexSkillHits`）
+      if (item.customType === SKILL_RECORD_CUSTOM_TYPE) continue;
       // 其它目标记录（每轮校验、暂停原因）只留在会话文件里，不进消息区
       if (item.customType === GOAL_RECORD_CUSTOM_TYPE) {
         const completed = goalCompletionOf(item);
@@ -450,7 +482,7 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
 
     // 还没吐任何区块的 assistant（包括思考被设置过滤掉的那种）不成行：
     // 生成中的提示由列表尾部的「工作中」一行给出
-    const legs = buildAssistantLegs(item, results);
+    const legs = buildAssistantLegs(item, results, skillHits);
     if (legs.length > 0) appendLegs(nodes, legs, item);
   }
   markTurnEnd(nodes);

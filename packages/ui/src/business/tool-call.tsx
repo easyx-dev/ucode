@@ -204,6 +204,14 @@ export function ToolCall({ entry, children }: ToolCallProps) {
         </CollapsibleTrigger>
         <span className="flex min-w-0 shrink items-center gap-1.5">
           <InputLabel input={input} />
+          {entry.skill ? (
+            <span
+              className="shrink-0 rounded bg-muted px-1 text-[11px] text-muted-foreground"
+              title={t("技能 {{name}}", { name: entry.skill.name })}
+            >
+              {t("技能 {{name}}", { name: entry.skill.name })}
+            </span>
+          ) : null}
         </span>
         <span
           className="flex shrink-0 items-center"

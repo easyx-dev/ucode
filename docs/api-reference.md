@@ -1579,6 +1579,7 @@
 | `compactionRecord` | [CompactionRecord](#compactionrecord) | 否 | custom 专用：压缩记录；只有该类型的扩展条目会带上 |
 | `goalRecord` | [GoalRecord](#goalrecord) | 否 | custom 专用：目标记录；只有该类型的扩展条目会带上（界面展示 `completed` 那一条） |
 | `modeChange` | [ModeRecord](#moderecord) | 否 | 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） |
+| `skillRecord` | [SkillRecord](#skillrecord) | 否 | custom 专用：技能命中记录；只有 `SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 条目会带上 |
 | `goalPrompt` | [GoalPromptDetails](#goalpromptdetails) | 否 | custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
@@ -1932,6 +1933,17 @@
 | --- | --- | --- | --- |
 | `mode` | string | 否 | 变更后的模式（编码 / 计划 / 提问）；只改权限档位时没有 |
 | `permissionMode` | string | 否 | 变更后的权限档位 |
+| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
+
+### SkillRecord
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `event` | "invoke" \| "hit" | 是 | 使用方式 |
+| `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
+| `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
+| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
 ### GoalPromptDetails

@@ -147,6 +147,8 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
 
   const { body, images: content } = assemblePrompt(prepared, session);
+  // 显式 `/skill:name` 的记录：只落文件，界面上用户消息的 chip 已经表达过这件事
+  services.pool.noteSkillInvoke(sessionId, prepared.text);
 
   // 装配成功后再把附件转为永久：ensure 失败（如未配模型）时不留下永不清理的附件
   services.attachments.markReferenced(
@@ -229,6 +231,8 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
     }
 
     const { body, images } = assemblePrompt(prepared, session);
+    // 编辑重发同样可能是一条 `/skill:name`，与 admitPrompt 一样先记下来
+    services.pool.noteSkillInvoke(sessionId, prepared.text);
     // 与 admitPrompt 一致：装配成功后再把附件转为永久，避免失败时留下永不清理的附件
     services.attachments.markReferenced(
       (input.attachments ?? []).map((ref) => ref.id),

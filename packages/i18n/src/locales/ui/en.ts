@@ -601,6 +601,7 @@ export default {
   内置动作: "Built-in",
   命令: "Commands",
   技能: "Skills",
+  "技能 {{name}}": "Skill {{name}}",
   文件: "Files",
   帮助: "Help",
   压缩上下文: "Compact context",

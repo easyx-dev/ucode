@@ -19,7 +19,7 @@ import { wrapUntrusted } from "../tools/untrusted";
 const COMMAND_PATTERN = /^\/([^\s]+)(?:\s+([\s\S]*))?$/;
 
 /** 整条输入就是一次技能调用：`/skill:name` 或 `/skill:name args` */
-const SKILL_PATTERN = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
+export const SKILL_PATTERN = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 
 /** 一条占位；分组顺序与 pi 的实现逐字对应，便于两处对照 */
 const PLACEHOLDER_PATTERN =

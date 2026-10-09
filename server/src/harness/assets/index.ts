@@ -5,7 +5,9 @@
  * 会话装配（`harness/session-config.ts`）用同一份目录与同一个 `promptsOverride`，
  * 保证「界面列出的」与「pi 实际能展开 / 广告的」是同一集合。
  */
-import { sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, resolve, sep } from "node:path";
 
 import {
   createSyntheticSourceInfo,
@@ -69,7 +71,7 @@ export const withBuiltinPrompts = (base: {
 });
 
 /** 按最长前缀把文件路径归到某个来源目录；内置命令走合成路径，未命中回落最低档 */
-const sourceOf = (filePath: string, paths: CommandAssetPath[]): CommandAssetSource => {
+export const sourceOf = (filePath: string, paths: CommandAssetPath[]): CommandAssetSource => {
   if (filePath.startsWith(BUILTIN_PATH_PREFIX)) return "builtin";
   let best: CommandAssetPath | null = null;
   for (const item of paths) {
@@ -122,5 +124,58 @@ export const loadCommandAssets = async (
   return {
     prompts: loader.getPrompts().prompts.map((template) => toPromptView(template, paths.prompts)),
     skills: loader.getSkills().skills.map((skill) => toSkillView(skill, paths.skills)),
+  };
+};
+
+/** 技能索引里的一项：名字、`SKILL.md` 的归一化绝对路径、来源档位 */
+export type SkillIndexEntry = {
+  name: string;
+  file: string;
+  source: CommandAssetSource;
+};
+
+/** 本会话的技能索引：按名字与按文件路径两条路都能查到 */
+export type SkillIndex = {
+  list: SkillIndexEntry[];
+  byFile: Map<string, SkillIndexEntry>;
+  byName: Map<string, SkillIndexEntry>;
+};
+
+/**
+ * 技能文件的比对口径：展开 `~`、相对路径按 cwd 解析、能取到 `realpath` 就用它。
+ *
+ * 模型给的路径可能是相对写法或 `~` 开头，而 pi 广告的是它自己解析出的路径；
+ * 不归一就会出现「同一个文件两种写法对不上」。拿不到 `realpath`（文件已删 / 权限不足）时
+ * 退化为字符串比较，不把命中判定卡在文件系统上。
+ */
+export const normalizeSkillFile = (filePath: string, cwd: string): string => {
+  const expanded =
+    filePath === "~" || filePath.startsWith("~/") ? `${homedir()}${filePath.slice(1)}` : filePath;
+  const absolute = isAbsolute(expanded) ? expanded : resolve(cwd, expanded);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+};
+
+/**
+ * 建本次会话的技能索引。广告给模型、`/skill:name` 展开、命中记录必须取自同一份索引——
+ * 另起一次装载会让三处的集合不一致。
+ */
+export const skillIndexOf = (
+  skills: readonly Skill[],
+  paths: CommandAssetPath[],
+  cwd: string,
+): SkillIndex => {
+  const list: SkillIndexEntry[] = skills.map((skill) => ({
+    name: skill.name,
+    file: normalizeSkillFile(skill.filePath, cwd),
+    source: sourceOf(skill.filePath, paths),
+  }));
+  return {
+    list,
+    byFile: new Map(list.map((item) => [item.file, item])),
+    byName: new Map(list.map((item) => [item.name, item])),
   };
 };
