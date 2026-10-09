@@ -24,6 +24,9 @@ export const SUBSCRIBER_QUEUE_MAX = 256;
 /** /events 的心跳间隔（毫秒），防止中间代理掐掉空闲连接 */
 export const EVENTS_HEARTBEAT_MS = 15_000;
 
+/** 回合级模型请求重试上限（pi 的 `retry.maxRetries` 默认 3，这里提到 5） */
+export const RETRY_MAX_ATTEMPTS = 5;
+
 export const CONFIG_FILENAME = "config.json";
 
 /** 服务注册文件（位于 app 目录下）：host / port / 凭证，由服务独占写、客户端只读 */

@@ -16,6 +16,7 @@ type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
 type InjectedNode = Extract<ChatNode, { kind: "injected" }>;
 type GoalNode = Extract<ChatNode, { kind: "goal" }>;
 type ModeNode = Extract<ChatNode, { kind: "mode" }>;
+type RetryNode = Extract<ChatNode, { kind: "retry" }>;
 
 type ChatRowBase = {
   /** 虚拟列表稳定 key，跨流式增量必须不变 */
@@ -59,6 +60,9 @@ export type ChatInjectedRow = ChatRowBase & { kind: "injected"; node: InjectedNo
 /** 模式 / 权限档位变更行：一条细线 */
 export type ChatModeRow = ChatRowBase & { kind: "mode"; node: ModeNode };
 
+/** 重试细线行：模型请求失败到重试之间的一条分隔线 */
+export type ChatRetryRow = ChatRowBase & { kind: "retry"; node: RetryNode };
+
 /** 目标完成行：一条细线，展开看校验结论 */
 export type ChatGoalRow = ChatRowBase & { kind: "goal"; node: GoalNode };
 
@@ -79,6 +83,7 @@ export type ChatRow =
   | ChatInjectedRow
   | ChatGoalRow
   | ChatModeRow
+  | ChatRetryRow
   | ChatWorkingRow;
 
 const WORKING_ROW_KEY = "working";
@@ -102,6 +107,9 @@ const rowOfNode = (
   }
   if (node.kind === "mode") {
     return { kind: "mode", key: node.key, turnKey, isTurnStart, node };
+  }
+  if (node.kind === "retry") {
+    return { kind: "retry", key: node.key, turnKey, isTurnStart, node };
   }
   const base: ChatRowBase = {
     key: node.key,

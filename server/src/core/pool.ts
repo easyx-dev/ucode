@@ -13,6 +13,8 @@ import {
   PERMISSION_DECISION_CUSTOM_TYPE,
   type PermissionRecord,
   PRUNE_RECORD_CUSTOM_TYPE,
+  RETRY_RECORD_CUSTOM_TYPE,
+  type RetryRecord,
   type ServerEventPayload,
   type SessionStatus,
   type SessionSummary,
@@ -22,7 +24,12 @@ import {
   type SubagentSnapshot,
   type WebsearchConfig,
 } from "@ucode/contracts";
-import { SUBAGENT_MAX_CONCURRENCY, SUBAGENT_QUEUE_MAX, SUBAGENT_QUEUE_WAIT_MS } from "../constants";
+import {
+  RETRY_MAX_ATTEMPTS,
+  SUBAGENT_MAX_CONCURRENCY,
+  SUBAGENT_QUEUE_MAX,
+  SUBAGENT_QUEUE_WAIT_MS,
+} from "../constants";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
 
 import { env } from "../env";
@@ -695,6 +702,33 @@ export class SessionPool {
           this.entries.get(sessionId)?.skillHits.clear();
         } else if (event.type === "tool_execution_start") {
           this.observeSkillHit(sessionId, event.toolName, event.args, event.toolCallId);
+        } else if (event.type === "auto_retry_start") {
+          this.appendMarker(sessionId, session.sessionManager, {
+            customType: RETRY_RECORD_CUSTOM_TYPE,
+            label: "重试记录",
+            data: {
+              event: "start",
+              attempt: event.attempt,
+              maxAttempts: event.maxAttempts,
+              delayMs: event.delayMs,
+              ...(event.errorMessage ? { errorMessage: event.errorMessage } : {}),
+              at: new Date().toISOString(),
+            },
+          });
+        } else if (event.type === "auto_retry_end") {
+          // 成功的那条界面不需要（紧接着就是正常输出）；写进文件供回溯
+          this.appendMarker(sessionId, session.sessionManager, {
+            customType: RETRY_RECORD_CUSTOM_TYPE,
+            label: "重试记录",
+            data: {
+              event: "end",
+              attempt: event.attempt,
+              maxAttempts: RETRY_MAX_ATTEMPTS,
+              success: event.success,
+              ...(event.finalError ? { errorMessage: event.finalError } : {}),
+              at: new Date().toISOString(),
+            },
+          });
         }
         // 文件一落盘就把索引写进库，不等本轮落定：中间被回收或服务重启时才有文件可续接
         if (event.type === "message_end" || event.type === "entry_appended") {
@@ -845,13 +879,17 @@ export class SessionPool {
     const skill = matchSkillHit(toolName, args, cwd, entry.skills);
     if (!skill || entry.skillHits.has(skill.name)) return;
     entry.skillHits.add(skill.name);
-    this.recordSkill(sessionId, entry.session.sessionManager, {
-      event: "hit",
-      name: skill.name,
-      file: skill.file,
-      source: skill.source,
-      ...(toolCallId ? { toolCallId } : {}),
-      at: new Date().toISOString(),
+    this.appendMarker(sessionId, entry.session.sessionManager, {
+      customType: SKILL_RECORD_CUSTOM_TYPE,
+      label: "技能记录",
+      data: {
+        event: "hit",
+        name: skill.name,
+        file: skill.file,
+        source: skill.source,
+        ...(toolCallId ? { toolCallId } : {}),
+        at: new Date().toISOString(),
+      },
     });
   }
 
@@ -864,30 +902,34 @@ export class SessionPool {
     if (!entry) return;
     const skill = matchSkillInvoke(text, entry.skills);
     if (!skill) return;
-    this.recordSkill(sessionId, entry.session.sessionManager, {
-      event: "invoke",
-      name: skill.name,
-      file: skill.file,
-      source: skill.source,
-      at: new Date().toISOString(),
+    this.appendMarker(sessionId, entry.session.sessionManager, {
+      customType: SKILL_RECORD_CUSTOM_TYPE,
+      label: "技能记录",
+      data: {
+        event: "invoke",
+        name: skill.name,
+        file: skill.file,
+        source: skill.source,
+        at: new Date().toISOString(),
+      },
     });
   }
 
   /**
-   * 写一条技能记录并让在线客户端重取转录（与审批记录同一做法）。
+   * 写一条观测条目（技能命中 / 重试）并让在线客户端重取转录，与审批记录同一做法。
    * 失败只记日志：记录不该影响这一轮的投递。
    */
-  private recordSkill(
+  private appendMarker(
     sessionId: string,
     manager: SessionManager | undefined,
-    record: SkillRecord,
+    entry: { customType: string; data: SkillRecord | RetryRecord; label: string },
   ): void {
     if (!manager) return;
     try {
-      const entryId = manager.appendCustomEntry(SKILL_RECORD_CUSTOM_TYPE, record);
+      const entryId = manager.appendCustomEntry(entry.customType, entry.data);
       this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: entryId });
     } catch (error) {
-      logger.warn({ sessionId, error }, "写入技能记录失败");
+      logger.warn({ sessionId, error }, `${entry.label}写入失败`);
     }
   }
 

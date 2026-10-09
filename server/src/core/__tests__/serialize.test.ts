@@ -11,6 +11,7 @@ import {
   GOAL_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_IGNORED_CUSTOM_TYPE,
+  RETRY_RECORD_CUSTOM_TYPE,
   SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 
@@ -281,6 +282,75 @@ describe("entryToDTO 的技能记录", () => {
       ),
       null,
     );
+  });
+});
+
+describe("entryToDTO 的重试记录", () => {
+  const customEntry = (data: unknown): SessionEntry => ({
+    type: "custom",
+    id: "entry-1",
+    parentId: null,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    customType: RETRY_RECORD_CUSTOM_TYPE,
+    data,
+  });
+
+  it("准备重试时下发，带上次数与等待时长", () => {
+    const data = {
+      event: "start",
+      attempt: 1,
+      maxAttempts: 5,
+      delayMs: 2000,
+      errorMessage: "fetch failed",
+      at: "2026-01-01T00:00:00.000Z",
+    };
+
+    assert.deepEqual(entryToDTO(customEntry(data)), {
+      id: "entry-1",
+      role: "custom",
+      blocks: [],
+      customType: RETRY_RECORD_CUSTOM_TYPE,
+      retryRecord: data,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("重试成功不下发：紧接着就是正常输出，界面多一行是噪音", () => {
+    const dto = entryToDTO(
+      customEntry({
+        event: "end",
+        attempt: 2,
+        maxAttempts: 5,
+        success: true,
+        at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    assert.equal(dto, null);
+  });
+
+  it("最终失败下发，带上上游的错误文本", () => {
+    const dto = entryToDTO(
+      customEntry({
+        event: "end",
+        attempt: 5,
+        maxAttempts: 5,
+        success: false,
+        errorMessage: "stream ended before message_stop",
+        at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    assert.equal(dto?.retryRecord?.success, false);
+    assert.equal(dto?.retryRecord?.errorMessage, "stream ended before message_stop");
+  });
+
+  it("形状不对时不下发：event 越界、attempt 不是数字、缺 at 都当没有记录", () => {
+    const base = { attempt: 1, maxAttempts: 5, at: "2026-01-01T00:00:00.000Z" };
+
+    assert.equal(entryToDTO(customEntry({ ...base, event: "nope" })), null);
+    assert.equal(entryToDTO(customEntry({ ...base, event: "start", attempt: "1" })), null);
+    assert.equal(entryToDTO(customEntry({ event: "start", attempt: 1, maxAttempts: 5 })), null);
   });
 });
 

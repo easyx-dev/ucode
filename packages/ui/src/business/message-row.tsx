@@ -19,6 +19,7 @@ import { InjectedLine } from "./injected-line";
 import { MessageItem } from "./message-item";
 import { PermissionRecordView } from "./permission-record";
 import { QuestionForm } from "./question-form";
+import { RetryLine } from "./retry-line";
 import { WorkingIndicator } from "./working-indicator";
 
 /** 每行的上下文：由列表统一构造，避免逐行重建回调 */
@@ -68,6 +69,8 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
   } else if (row.kind === "mode") {
     const change = modeChangeText(row.node.record, t);
     body = <DividerLine label={change.label} detail={change.detail} />;
+  } else if (row.kind === "retry") {
+    body = <RetryLine record={row.node.record} />;
   } else if (row.kind === "content") {
     body = (
       <MessageItem

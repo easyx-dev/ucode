@@ -28,6 +28,8 @@ import {
   MODE_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_APPROVED_CUSTOM_TYPE,
+  RETRY_RECORD_CUSTOM_TYPE,
+  type RetryRecord,
   SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 import { PRESENT_PLAN_TOOL } from "./plan";
@@ -144,6 +146,16 @@ type ModeNode = {
   record: ModeRecord;
 };
 
+/**
+ * 一次模型请求重试：一条细线。
+ * 重试成功后不会再有后续记录（那一条不下发），所以界面上看到的就是「正在重试」与「重试到底仍失败」。
+ */
+type RetryNode = {
+  kind: "retry";
+  key: string;
+  record: RetryRecord;
+};
+
 /** 目标跑完（校验通过）：一条细线，展开看校验结论 */
 type GoalNode = {
   kind: "goal";
@@ -159,10 +171,14 @@ export type ChatNode =
   | CompactionNode
   | InjectedNode
   | GoalNode
-  | ModeNode;
+  | ModeNode
+  | RetryNode;
 
 /** 能承载轮页脚的节点：压缩、合成输入与目标完成都不是回答，没有「本轮模型与耗时」可报 */
-type ChatFooterNode = Exclude<ChatNode, { kind: "compaction" | "injected" | "goal" | "mode" }>;
+type ChatFooterNode = Exclude<
+  ChatNode,
+  { kind: "compaction" | "injected" | "goal" | "mode" | "retry" }
+>;
 
 type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 
@@ -464,6 +480,13 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
       }
       // 技能记录不单独成行：标记已经挂到那次 `read` 的卡片上（见 `indexSkillHits`）
       if (item.customType === SKILL_RECORD_CUSTOM_TYPE) continue;
+      // 重试记录自成一条细线：失败到重试之间用户否则只看到「什么都没发生」
+      const retryRecord =
+        item.customType === RETRY_RECORD_CUSTOM_TYPE ? item.retryRecord : undefined;
+      if (retryRecord) {
+        nodes.push({ kind: "retry", key: uidOf(item), record: retryRecord });
+        continue;
+      }
       // 其它目标记录（每轮校验、暂停原因）只留在会话文件里，不进消息区
       if (item.customType === GOAL_RECORD_CUSTOM_TYPE) {
         const completed = goalCompletionOf(item);
@@ -520,12 +543,13 @@ const markTurnEnd = (nodes: ChatNode[]): void => {
       turnStartMs = msOf(node.item.createdAt);
       continue;
     }
-    // 压缩、合成输入、目标完成与模式切换不是回答，不参与轮末判定（拿它们当轮末会把页脚挂到细线上）
+    // 压缩、合成输入、目标完成、模式切换与重试都不是回答，不参与轮末判定（拿它们当轮末会把页脚挂到细线上）
     if (
       node.kind === "compaction" ||
       node.kind === "injected" ||
       node.kind === "goal" ||
-      node.kind === "mode"
+      node.kind === "mode" ||
+      node.kind === "retry"
     ) {
       continue;
     }

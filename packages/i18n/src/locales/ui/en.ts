@@ -602,6 +602,9 @@ export default {
   命令: "Commands",
   技能: "Skills",
   "技能 {{name}}": "Skill {{name}}",
+  "模型请求失败，{{seconds}}s 后重试（第 {{attempt}}/{{maxAttempts}} 次）":
+    "Model request failed; retrying in {{seconds}}s (attempt {{attempt}}/{{maxAttempts}})",
+  "重试 {{attempt}} 次仍失败": "Still failing after {{attempt}} retries",
   文件: "Files",
   帮助: "Help",
   压缩上下文: "Compact context",

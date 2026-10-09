@@ -34,6 +34,9 @@ import {
   type PermissionDecision,
   type PermissionRecord,
   PLAN_IGNORED_CUSTOM_TYPE,
+  RETRY_RECORD_CUSTOM_TYPE,
+  RETRY_RECORD_EVENTS,
+  type RetryRecord,
   type SessionStatus,
   type SessionSummary,
   SKILL_RECORD_CUSTOM_TYPE,
@@ -299,6 +302,31 @@ const skillRecordOf = (data: unknown): SkillRecord | null => {
 };
 
 /**
+ * 重试记录的 `data` 不可信：`event` 不在枚举内、`attempt` / `maxAttempts` 不是数字就当没有记录。
+ * 重试成功（`end` 且 `success`）不下发：紧接着就是正常输出，界面多一行是噪音。
+ */
+const retryRecordOf = (data: unknown): RetryRecord | null => {
+  if (!isRecord(data)) return null;
+  const { event, attempt, maxAttempts, delayMs, errorMessage, success, at } = data;
+  if (typeof event !== "string" || !(RETRY_RECORD_EVENTS as readonly string[]).includes(event)) {
+    return null;
+  }
+  if (typeof attempt !== "number" || typeof maxAttempts !== "number" || typeof at !== "string") {
+    return null;
+  }
+  if (event === "end" && success === true) return null;
+  return {
+    event: event as RetryRecord["event"],
+    attempt,
+    maxAttempts,
+    ...(typeof delayMs === "number" ? { delayMs } : {}),
+    ...(typeof errorMessage === "string" && errorMessage ? { errorMessage } : {}),
+    ...(typeof success === "boolean" ? { success } : {}),
+    at,
+  };
+};
+
+/**
  * 目标记录的 `data` 同样不可信：`event` 不在枚举内就当没有记录；其余字段按类型带上。
  * 界面只看 `completed`，但字典要完整——`verdict` / `pause` 这些留给回溯。
  */
@@ -433,6 +461,18 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
           blocks: [],
           customType: entry.customType,
           skillRecord: record,
+          createdAt: fallbackCreatedAt,
+        };
+      }
+      if (entry.customType === RETRY_RECORD_CUSTOM_TYPE) {
+        const record = retryRecordOf(entry.data);
+        if (!record) return null;
+        return {
+          id: entry.id,
+          role: "custom",
+          blocks: [],
+          customType: entry.customType,
+          retryRecord: record,
           createdAt: fallbackCreatedAt,
         };
       }

@@ -6,6 +6,7 @@ import {
   COMPACTION_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
   PLAN_IGNORED_CUSTOM_TYPE,
+  RETRY_RECORD_CUSTOM_TYPE,
   SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 import {
@@ -114,6 +115,26 @@ const skillItem = (
     file: `/skills/${name}/SKILL.md`,
     source: "project",
     ...(event === "hit" ? { toolCallId } : {}),
+    at: AT,
+  },
+  createdAt: AT,
+});
+
+/** 重试记录：服务端落的 `custom` 扩展条目 */
+const retryItem = (
+  id: string,
+  data: { event: "start" | "end"; attempt: number; success?: boolean },
+): ChatItem => ({
+  id,
+  role: "custom",
+  blocks: [],
+  customType: RETRY_RECORD_CUSTOM_TYPE,
+  retryRecord: {
+    event: data.event,
+    attempt: data.attempt,
+    maxAttempts: 5,
+    ...(data.event === "start" ? { delayMs: 2000, errorMessage: "fetch failed" } : {}),
+    ...(data.success !== undefined ? { success: data.success } : {}),
     at: AT,
   },
   createdAt: AT,
@@ -705,5 +726,33 @@ describe("技能命中记录", () => {
 
     const leg = rowsOfKind(rows, "activity")[0]?.node.legs[0];
     assert.equal(leg?.kind === "tool" ? leg.entry.skill : undefined, undefined);
+  });
+});
+
+describe("重试细线", () => {
+  it("准备重试与最终失败各成一条细线", () => {
+    const rows = buildChatRows([
+      userItem("u1", "问"),
+      retryItem("r1", { event: "start", attempt: 1 }),
+      retryItem("r2", { event: "end", attempt: 5, success: false }),
+      assistantItem("a1", [text("答")]),
+    ]);
+
+    const retries = rowsOfKind(rows, "retry");
+    assert.equal(retries.length, 2);
+    assert.equal(retries[0]?.node.record.delayMs, 2000);
+    assert.equal(retries[1]?.node.record.success, false);
+  });
+
+  it("不抢走页脚：页脚仍落在真正回答的那一行", () => {
+    const rows = buildChatRows([
+      userItem("u1", "问"),
+      assistantItem("a1", [text("答")], "2026-01-01T10:00:02.000Z"),
+      retryItem("r1", { event: "end", attempt: 5, success: false }),
+    ]);
+
+    const footers = footerRows(rows);
+    assert.equal(footers.length, 1);
+    assert.equal(footers[0]?.key, "a1:c0");
   });
 });

@@ -19,6 +19,7 @@ import {
   type WebsearchConfig,
 } from "@ucode/contracts";
 import type { PromptSource } from "../constants";
+import { RETRY_MAX_ATTEMPTS } from "../constants";
 import type { PiRuntime } from "../core/runtime";
 import { overrideOf, type SessionRecord } from "../db/session-repository";
 import { env } from "../env";
@@ -275,6 +276,9 @@ export const assembleSession = async (
       },
     });
   }
+
+  // 回合级重试上限：pi 默认 3 次，这里提到 5（覆盖流式中途断开这类失败）
+  settingsManager.applyOverrides({ retry: { enabled: true, maxRetries: RETRY_MAX_ATTEMPTS } });
 
   // 记忆工具只在主会话的 build 模式注册；子会话与只读模式都不纳入
   const memoryTools =

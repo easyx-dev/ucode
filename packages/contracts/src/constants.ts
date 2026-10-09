@@ -235,6 +235,37 @@ export type SkillRecord = {
 };
 
 /**
+ * 模型请求重试的记录：一轮里某次模型请求失败、准备退避重试（`start`），或重试链结束（`end`）。
+ * 服务端往会话文件追加的 pi `custom` 条目，`data` 为 `RetryRecord`。
+ *
+ * pi 的回合级重试默认就开着（3 次、指数退避），此前事件被丢弃：界面完全无感，耗尽后也是静默收尾。
+ * 这条记录让「失败 → 等待 → 重试」可见。只为回溯与展示：不进模型上下文；`end` 且成功的那条不下发。
+ */
+export const RETRY_RECORD_CUSTOM_TYPE = "ucode.retry";
+
+/** 重试链上的两个时点：即将重试、重试链结束 */
+export const RETRY_RECORD_EVENTS = ["start", "end"] as const;
+
+export type RetryRecordEvent = (typeof RETRY_RECORD_EVENTS)[number];
+
+export type RetryRecord = {
+  /** 时点 */
+  event: RetryRecordEvent;
+  /** 第几次重试（1 起） */
+  attempt: number;
+  /** 本次允许的最大重试次数 */
+  maxAttempts: number;
+  /** 距下次尝试的等待时长（毫秒）；仅 `start` 有 */
+  delayMs?: number;
+  /** 上游给的错误文本（外部内容，界面按纯文本截断展示，不渲染标记）；仅 `start` 有 */
+  errorMessage?: string;
+  /** 重试链的结果：成功则这一轮继续，失败则是最终失败；仅 `end` 有 */
+  success?: boolean;
+  /** 写入时刻（ISO 8601 UTC） */
+  at: string;
+};
+
+/**
  * 目标记录：目标状态每次变迁（设定 / 暂停 / 恢复 / 清除）与每轮校验结论，服务端往会话文件
  * 追加的 pi `custom` 条目，`data` 为 `GoalRecord`。
  *

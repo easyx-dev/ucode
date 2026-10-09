@@ -1580,6 +1580,7 @@
 | `goalRecord` | [GoalRecord](#goalrecord) | 否 | custom 专用：目标记录；只有该类型的扩展条目会带上（界面展示 `completed` 那一条） |
 | `modeChange` | [ModeRecord](#moderecord) | 否 | 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） |
 | `skillRecord` | [SkillRecord](#skillrecord) | 否 | custom 专用：技能命中记录；只有 `SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 条目会带上 |
+| `retryRecord` | [RetryRecord](#retryrecord) | 否 | custom 专用：模型请求重试记录；只有 `RETRY_RECORD_CUSTOM_TYPE` 会带上 |
 | `goalPrompt` | [GoalPromptDetails](#goalpromptdetails) | 否 | custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
@@ -1944,6 +1945,18 @@
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
 | `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
+| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
+
+### RetryRecord
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `event` | "start" \| "end" | 是 | 时点 |
+| `attempt` | number | 是 | 第几次重试（1 起） |
+| `maxAttempts` | number | 是 | 本次允许的最大重试次数 |
+| `delayMs` | number | 否 | 距下次尝试的等待时长（毫秒）；仅 `start` 有 |
+| `errorMessage` | string | 否 | 上游给的错误文本（外部内容，界面按纯文本截断展示，不渲染标记）；仅 `start` 有 |
+| `success` | boolean | 否 | 重试链的结果：成功则这一轮继续，失败则是最终失败；仅 `end` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
 ### GoalPromptDetails

@@ -36,6 +36,12 @@
 
 ### 新增
 
+- **模型请求重试的记录与展示**：回合级重试上限从 pi 默认的 3 提到 5（`RETRY_MAX_ATTEMPTS`，只改回合级、
+  provider 层保持不重试），并把 `auto_retry_start` / `auto_retry_end` 落成 `ucode.retry` 条目：
+  `start` 与最终失败下发展示为一条细线（带上等待时长与上游错误文本，纯文本截断），重试成功那条只落文件。
+  此前重试一直在后台跑但完全不可见，耗尽后也是静默收尾。条目登记见 `docs/session-entries.md`，
+  `MessageDTO` 多一个 `retryRecord` 字段。
+
 - **技能命中的记录**：模型照系统提示里的 `<available_skills>` 自己去读某个技能的 `SKILL.md` 时记一条
   `ucode.skill`（`event: "hit"`，带上那次 `read` 的 `toolCallId`），显式 `/skill:name` 记 `event: "invoke"`。
   服务端往会话文件追加 pi `custom` 条目：`hit` 下发客户端并标在那次调用的卡片上，`invoke` 只落文件
