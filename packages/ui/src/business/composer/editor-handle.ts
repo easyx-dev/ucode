@@ -8,7 +8,11 @@ import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { AttachmentView } from "@ucode/contracts";
 
+import { commandNode, type MentionKind } from "../../lib/composer-document";
 import { ATTACHMENT_NODE } from "./attachment-chip";
+
+/** 命令 / 技能节点名；与 `extensions.ts` 的节点定义同名 */
+const COMMAND_NODE = "commandMention";
 
 export type ComposerEditorHandle = {
   focus: () => void;
@@ -22,6 +26,8 @@ export type ComposerEditorHandle = {
   dropAttachment: (tempId: string) => void;
   /** 当前附件节点数（含上传中的占位），用于数上限 */
   attachmentCount: () => number;
+  /** 在正文开头插入命令 / 技能节点；开头已有一条时返回 false（命令只能整条匹配，再插一条会作废） */
+  insertCommand: (command: { kind: MentionKind; name: string }) => boolean;
 };
 
 const findAttachment = (
@@ -46,6 +52,10 @@ const countAttachments = (doc: ProseMirrorNode): number => {
   });
   return count;
 };
+
+/** 正文开头（首个非空段的首个节点）是否已经是命令 / 技能节点 */
+const startsWithCommand = (doc: ProseMirrorNode): boolean =>
+  doc.firstChild?.firstChild?.type.name === COMMAND_NODE;
 
 /** `getEditor` 读的是组件的编辑器 ref：句柄在外部长期持有，不能捕获实例 */
 export const createEditorHandle = (getEditor: () => Editor | null): ComposerEditorHandle => ({
@@ -91,5 +101,16 @@ export const createEditorHandle = (getEditor: () => Editor | null): ComposerEdit
   attachmentCount: () => {
     const editor = getEditor();
     return editor ? countAttachments(editor.state.doc) : 0;
+  },
+  insertCommand: (command) => {
+    const editor = getEditor();
+    if (!editor || startsWithCommand(editor.state.doc)) return false;
+    // 参数写在节点之后（与 `/goal` 的「命令名 + 参数」语义一致），光标落到末尾接着打
+    editor
+      .chain()
+      .insertContentAt(1, [commandNode(command.name, command.kind), { type: "text", text: " " }])
+      .focus("end")
+      .run();
+    return true;
   },
 });
