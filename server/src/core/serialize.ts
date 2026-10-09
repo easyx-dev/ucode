@@ -32,7 +32,6 @@ import {
   PERMISSION_DECISION_CUSTOM_TYPE,
   PERMISSION_DECISIONS,
   type PermissionDecision,
-  type PermissionMode,
   type PermissionRecord,
   PLAN_IGNORED_CUSTOM_TYPE,
   RETRY_RECORD_CUSTOM_TYPE,
@@ -161,10 +160,6 @@ const permissionRecordOf = (data: unknown): PermissionRecord | null => {
 export type TranscriptState = {
   provider?: string;
   thinkingLevel?: ThinkingLevel;
-  /** 这一轮生效的模式；`MODE_RECORD_CUSTOM_TYPE` 条目推进 */
-  mode?: string;
-  /** 这一轮生效的权限档位 */
-  permissionMode?: PermissionMode;
 };
 
 /**
@@ -184,18 +179,6 @@ export const transcriptStates = (entries: SessionEntry[]): Map<string, Transcrip
       if (level) current = { ...current, thinkingLevel: level };
     } else if (entry.type === "model_change") {
       current = { ...current, provider: entry.provider };
-    } else if (entry.type === "custom" && entry.customType === MODE_RECORD_CUSTOM_TYPE) {
-      // 模式 / 权限档位不是 pi 原生条目，按同一套推进：每条消息都能答出自己跑在什么参数下
-      const record = modeRecordOf(entry.data);
-      if (record) {
-        current = {
-          ...current,
-          ...(record.mode !== undefined ? { mode: record.mode } : {}),
-          ...(record.permissionMode !== undefined
-            ? { permissionMode: record.permissionMode as PermissionMode }
-            : {}),
-        };
-      }
     }
     states.set(entry.id, current);
   }
@@ -213,15 +196,10 @@ export const messageToDTO = (
   if (!isRecord(message)) return null;
   const role = message.role;
   const createdAt = isoOf(message.timestamp) ?? fallbackCreatedAt;
-  // 模式 / 权限档位是转录级的：同一条消息在 API 上也要能答出自己跑在什么参数下
-  const runSettings = {
-    ...(state.mode !== undefined ? { mode: state.mode } : {}),
-    ...(state.permissionMode !== undefined ? { permissionMode: state.permissionMode } : {}),
-  };
 
   switch (role) {
     case "user":
-      return { id, role: "user", blocks: blocksOf(message.content), ...runSettings, createdAt };
+      return { id, role: "user", blocks: blocksOf(message.content), createdAt };
     case "assistant":
       return {
         id,
@@ -230,7 +208,6 @@ export const messageToDTO = (
         model: typeof message.model === "string" ? message.model : undefined,
         provider: typeof message.provider === "string" ? message.provider : state.provider,
         ...(state.thinkingLevel ? { thinkingLevel: state.thinkingLevel } : {}),
-        ...runSettings,
         createdAt,
       };
     case "toolResult":
@@ -463,18 +440,9 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
           createdAt: fallbackCreatedAt,
         };
       }
-      if (entry.customType === MODE_RECORD_CUSTOM_TYPE) {
-        const record = modeRecordOf(entry.data);
-        if (!record) return null;
-        return {
-          id: entry.id,
-          role: "custom",
-          blocks: [],
-          customType: entry.customType,
-          modeChange: record,
-          createdAt: fallbackCreatedAt,
-        };
-      }
+      // 设置点不发给客户端：界面不展示，`transcriptStates` 也不再推进它；
+      // 它只供打开已有会话时校准 `app.db`（见 `./run-settings`）
+      if (entry.customType === MODE_RECORD_CUSTOM_TYPE) return null;
       if (entry.customType === SKILL_RECORD_CUSTOM_TYPE) {
         const record = skillRecordOf(entry.data);
         if (!record) return null;

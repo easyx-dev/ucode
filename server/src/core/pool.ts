@@ -71,7 +71,12 @@ import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
 import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
-import { lastRunSettingsOf, type RunSettings, runSettingsPatch } from "./run-settings";
+import {
+  hasRunSettingsChanged,
+  lastRunSettingsOf,
+  type RunSettings,
+  runSettingsPatch,
+} from "./run-settings";
 import { RunTracker } from "./run-tracker";
 import type { PiRuntime } from "./runtime";
 import { managerToIndex } from "./session-index";
@@ -89,9 +94,13 @@ type PooledSession = {
   skills: SkillIndex;
   /** 本轮已记过的技能名：同一轮里分片读同一个文件只留第一条，轮次边界清空 */
   skillHits: Set<string>;
-  /** 上一次写进文件的运行参数：与本轮相同就跳过，重装后自然重置 */
-  runSettings: RunSettings;
 };
+
+/** 库里那份会话参数：权限档位缺省即默认档（写设置点与校准回读共用同一口径） */
+const runSettingsOf = (record: SessionRecord): RunSettings => ({
+  mode: record.mode,
+  permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
+});
 
 /**
  * 内存中的 AgentSession 池。
@@ -630,8 +639,7 @@ export class SessionPool {
       // 新会话的第一条设置点：pi 只在有 user / assistant 消息时才落盘，这条会随首条消息一起写出去、
       // 位置在它之前，天然就是「这一轮跑在什么参数下」的起点（子会话也走这里）
       manager.appendCustomEntry(MODE_RECORD_CUSTOM_TYPE, {
-        mode,
-        permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
+        ...runSettingsOf(record),
         at: new Date().toISOString(),
       });
     }
@@ -844,7 +852,6 @@ export class SessionPool {
         stale: generation !== this.generation,
         skills: assembled.skills,
         skillHits: new Set(),
-        runSettings: {},
       };
       // 压缩触发点在这里算一次，同时喂给每步耗时记录与用量服务：
       // 口径与注入 pi 的阈值完全一致，界面上的「预算」不会与实际压缩点对不上
@@ -951,34 +958,23 @@ export class SessionPool {
   }
 
   /**
-   * 轮开始时落一条「这一轮跑在什么参数下」（模式与权限档位）。
+   * 轮开始时落一条本轮生效的运行参数（模式与权限档位）。
    *
-   * 与上一次写过的值相同就跳过：同一实例内连续多轮不必重复写。池条目上记着上次的值，
-   * 重装（dispose / 空闲回收）后自然重置——重建实例才让新设置生效，那时必须再写一条起点。
+   * 它不展示、也不参与投影：只供打开已有会话时校准 `app.db`（见 `./run-settings`）。
+   * 去重对着会话文件里最后一条设置点，而不是内存：实例重装（重启 / 换模型 / 换权限档位都会
+   * dispose）后内存那份会重置，同一份参数会被反复记一条。
    */
   private recordRunSettings(sessionId: string): void {
     const entry = this.entries.get(sessionId);
     const record = this.repository.find(sessionId);
     if (!entry || !record) return;
-    const settings: RunSettings = {
-      mode: record.mode,
-      permissionMode: overrideOf(record).permissionMode ?? DEFAULT_PERMISSION_MODE,
-    };
-    if (
-      entry.runSettings.mode === settings.mode &&
-      entry.runSettings.permissionMode === settings.permissionMode
-    ) {
-      return;
-    }
-    entry.runSettings = settings;
+    const settings = runSettingsOf(record);
+    const last = lastRunSettingsOf(entry.session.sessionManager.getBranch());
+    if (!hasRunSettingsChanged(last, settings)) return;
     this.appendMarker(sessionId, entry.session.sessionManager, {
       customType: MODE_RECORD_CUSTOM_TYPE,
       label: "运行参数记录",
-      data: {
-        mode: settings.mode,
-        permissionMode: settings.permissionMode,
-        at: new Date().toISOString(),
-      },
+      data: { ...settings, at: new Date().toISOString() },
     });
   }
 

@@ -299,7 +299,6 @@ export default {
   "跳到第 {{index}} 题": "Jump to question {{index}}",
   "放弃这组问题，本轮按没有答复继续": "Discard these questions and continue without answers",
   提交: "Submit",
-  本轮参数: "This turn",
   "{{turns}} 轮 · {{tokens}}": "{{turns}} turns · {{tokens}}",
   目标启动: "Goal started",
   "目标续跑 · 第 {{turn}} 轮": "Goal continued · round {{turn}}",

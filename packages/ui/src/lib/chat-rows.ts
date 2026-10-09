@@ -15,7 +15,6 @@ type PermissionNode = Extract<ChatNode, { kind: "permission" }>;
 type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
 type InjectedNode = Extract<ChatNode, { kind: "injected" }>;
 type GoalNode = Extract<ChatNode, { kind: "goal" }>;
-type ModeNode = Extract<ChatNode, { kind: "mode" }>;
 type RetryNode = Extract<ChatNode, { kind: "retry" }>;
 
 type ChatRowBase = {
@@ -57,9 +56,6 @@ export type ChatCompactionRow = ChatRowBase & { kind: "compaction"; node: Compac
 /** 合成输入行：目标启动 / 续跑 / 恢复、计划批准，只占一条细线 */
 export type ChatInjectedRow = ChatRowBase & { kind: "injected"; node: InjectedNode };
 
-/** 模式 / 权限档位变更行：一条细线 */
-export type ChatModeRow = ChatRowBase & { kind: "mode"; node: ModeNode };
-
 /** 重试细线行：模型请求失败到重试之间的一条分隔线 */
 export type ChatRetryRow = ChatRowBase & { kind: "retry"; node: RetryNode };
 
@@ -82,7 +78,6 @@ export type ChatRow =
   | ChatCompactionRow
   | ChatInjectedRow
   | ChatGoalRow
-  | ChatModeRow
   | ChatRetryRow
   | ChatWorkingRow;
 
@@ -95,7 +90,7 @@ const rowOfNode = (
   /** 生成中的那一轮不报模型与耗时，由调用方置 false */
   withFooter: boolean,
 ): ChatRow => {
-  // 压缩、合成输入、目标完成与模式切换都不是回答，没有「这一轮的模型与耗时」可挂，也不参与轮末判定
+  // 压缩、合成输入与目标完成都不是回答，没有「这一轮的模型与耗时」可挂，也不参与轮末判定
   if (node.kind === "compaction") {
     return { kind: "compaction", key: node.key, turnKey, isTurnStart, node };
   }
@@ -104,9 +99,6 @@ const rowOfNode = (
   }
   if (node.kind === "goal") {
     return { kind: "goal", key: node.key, turnKey, isTurnStart, node };
-  }
-  if (node.kind === "mode") {
-    return { kind: "mode", key: node.key, turnKey, isTurnStart, node };
   }
   if (node.kind === "retry") {
     return { kind: "retry", key: node.key, turnKey, isTurnStart, node };

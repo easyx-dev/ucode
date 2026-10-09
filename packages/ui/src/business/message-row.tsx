@@ -6,14 +6,11 @@
  */
 import { cn } from "cn";
 import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
 import type { ToolEntry } from "../lib/chat-nodes";
 import type { ChatRow } from "../lib/chat-rows";
-import { modeChangeText } from "../lib/mode";
 import type { ChatItem, EditMessagePayload } from "../lib/types";
 import { ActivityGroup } from "./activity-group";
 import { CompactionDivider } from "./compaction-divider";
-import { DividerLine } from "./divider-line";
 import { GoalDivider } from "./goal-divider";
 import { InjectedLine } from "./injected-line";
 import { MessageItem } from "./message-item";
@@ -35,7 +32,6 @@ export type MessageRowContext = {
 };
 
 export function MessageRow({ row, context }: { row: ChatRow; context: MessageRowContext }) {
-  const { t } = useTranslation();
   let body: ReactNode;
 
   if (row.kind === "working") {
@@ -66,9 +62,6 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
     );
   } else if (row.kind === "goal") {
     body = <GoalDivider record={row.node.record} />;
-  } else if (row.kind === "mode") {
-    const change = modeChangeText(row.node.record, t);
-    body = <DividerLine label={change.label} detail={change.detail} />;
   } else if (row.kind === "retry") {
     body = <RetryLine record={row.node.record} />;
   } else if (row.kind === "content") {

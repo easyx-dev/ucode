@@ -142,6 +142,11 @@
 
 ### 变更
 
+- **「本轮参数」不再展示**：模式 / 权限档位的设置点（`ucode.mode`）不再下发（`MessageDTO` 去掉
+  `modeChange`，以及只服务于它的 `mode` / `permissionMode` 两个字段），客户端也不再渲染该细线。
+  条目本身照旧落文件——pi 的 assistant 条目没有扩展位，参数只能另起一条——只用于打开已有会话时
+  校准 `app.db`。
+
 - **会话参数（模式 / 权限档位）的写点挪到「轮开始」**：`ucode.mode` 不再在 `PATCH /sessions/update`
   时写（切了没跑也记一笔），改为每次轮开始落一条「这一轮跑在什么参数下」（同实例内与前一条相同则跳过）。
   打开已有会话时用文件里的最后一条校准 `app.db`（JSONL 权威、DB 缓存），删库或把会话文件拷到别的
@@ -255,6 +260,10 @@
 - 输入区编辑器上方的附件行（`packages/ui/src/business/composer/attachment-strip.tsx`）：附件改为内联 chip。
 
 ### 修复
+
+- **重复的 `ucode.mode` 设置点**：去重此前只看内存里那份上次值（实例创建时为空、重装后重置），
+  于是新会话首轮必定写两条相同记录，服务重启 / 换模型 / 换权限档位导致实例重装后也会再写一条，
+  消息区里于是每轮都冒出一行「本轮参数」。改为对着会话文件里最后一条设置点去重。
 
 - **每步耗时记录的首 token / 解码两段永远是空值**：`harness/telemetry` 等的 `message_update` +
   `assistantMessageEvent.type === "start"` 永远不会出现——pi 的 `start` 帧走的是 `message_start` 事件，

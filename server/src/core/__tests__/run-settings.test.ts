@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { MODE_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
 
-import { lastRunSettingsOf, runSettingsPatch } from "../run-settings";
+import { hasRunSettingsChanged, lastRunSettingsOf, runSettingsPatch } from "../run-settings";
 
 const modeEntry = (id: string, data: unknown): SessionEntry => ({
   type: "custom",
@@ -52,6 +52,46 @@ describe("lastRunSettingsOf", () => {
     assert.deepEqual(
       lastRunSettingsOf([modeEntry("m1", { mode: "ask", at: "t" }), modeEntry("m2", { at: "t" })]),
       { mode: "ask" },
+    );
+  });
+});
+
+describe("hasRunSettingsChanged", () => {
+  it("两个字段都一致时不记（实例重装后同一份参数也不重复写）", () => {
+    assert.equal(
+      hasRunSettingsChanged(
+        { mode: "build", permissionMode: "full" },
+        { mode: "build", permissionMode: "full" },
+      ),
+      false,
+    );
+  });
+
+  it("任一字段变了就算变化", () => {
+    assert.equal(
+      hasRunSettingsChanged(
+        { mode: "build", permissionMode: "default" },
+        { mode: "plan", permissionMode: "default" },
+      ),
+      true,
+    );
+    assert.equal(
+      hasRunSettingsChanged(
+        { mode: "build", permissionMode: "default" },
+        { mode: "build", permissionMode: "full" },
+      ),
+      true,
+    );
+  });
+
+  it("没有设置点（老会话）时要记一条起点", () => {
+    assert.equal(hasRunSettingsChanged(null, { mode: "build", permissionMode: "default" }), true);
+  });
+
+  it("文件里只记了模式时，缺的那侧也算变化", () => {
+    assert.equal(
+      hasRunSettingsChanged({ mode: "build" }, { mode: "build", permissionMode: "default" }),
+      true,
     );
   });
 });

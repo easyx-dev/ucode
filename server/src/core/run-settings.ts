@@ -16,6 +16,17 @@ export type RunSettings = {
   permissionMode?: string;
 };
 
+/**
+ * 这一轮的参数与文件里最后一条设置点是否不同——决定要不要再记一条。
+ *
+ * 去重对着文件而不是内存：实例重装（重启 / 换模型 / 换权限档位都会 dispose）后内存那份会重置，
+ * 同一份参数每轮都被重记一条，消息区里于是反复出现「本轮参数」。
+ */
+export const hasRunSettingsChanged = (last: RunSettings | null, next: RunSettings): boolean => {
+  if (!last) return true;
+  return last.mode !== next.mode || last.permissionMode !== next.permissionMode;
+};
+
 /** 从条目里取最后一条设置点；没有（老会话 / 从未设置过）时返回 null */
 export const lastRunSettingsOf = (entries: readonly SessionEntry[]): RunSettings | null => {
   for (let index = entries.length - 1; index >= 0; index -= 1) {

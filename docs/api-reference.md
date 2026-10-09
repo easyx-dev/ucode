@@ -1578,11 +1578,8 @@
 | `permissionDecision` | [PermissionRecord](#permissionrecord) | 否 | custom 专用：权限审批记录；只有该类型的扩展条目会带上 |
 | `compactionRecord` | [CompactionRecord](#compactionrecord) | 否 | custom 专用：压缩记录；只有该类型的扩展条目会带上 |
 | `goalRecord` | [GoalRecord](#goalrecord) | 否 | custom 专用：目标记录；只有该类型的扩展条目会带上（界面展示 `completed` 那一条） |
-| `modeChange` | [ModeRecord](#moderecord) | 否 | 模式 / 权限档位的变更（`MODE_RECORD_CUSTOM_TYPE` 条目） |
 | `skillRecord` | [SkillRecord](#skillrecord) | 否 | custom 专用：技能命中记录；只有 `SKILL_RECORD_CUSTOM_TYPE` 的 `hit` 条目会带上 |
 | `retryRecord` | [RetryRecord](#retryrecord) | 否 | custom 专用：模型请求重试记录；只有 `RETRY_RECORD_CUSTOM_TYPE` 会带上 |
-| `mode` | string | 否 | 本条所在这一轮生效的助手模式（沿完整分支推进的最近一条 `MODE_RECORD_CUSTOM_TYPE`） |
-| `permissionMode` | "default" \| "auto" \| "full" | 否 | 这一轮生效的权限档位 |
 | `goalPrompt` | [GoalPromptDetails](#goalpromptdetails) | 否 | custom 专用：目标指令的来源（启动 / 续跑 / 恢复）；只有目标注入的条目会带上 |
 | `isError` | boolean | 否 | — |
 | `createdAt` | string | 否 | 消息产生时间（ISO 8601 UTC）；时间不可用时缺省 |
@@ -1928,14 +1925,6 @@
 | `verdict` | object | 否 | 校验结论；`verdict` 与 `completed` 都带 |
 | `tokensUsed` | number | 否 | 本轮的用量累计（token）；存储态只给当前值，历史需要自己带 |
 | `objective` | string | 否 | 目标正文；只在 `set` 时带，其余从存储态能看出 |
-| `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
-
-### ModeRecord
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `mode` | string | 否 | 变更后的模式（编码 / 计划 / 提问）；只改权限档位时没有 |
-| `permissionMode` | string | 否 | 变更后的权限档位 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
 ### SkillRecord
