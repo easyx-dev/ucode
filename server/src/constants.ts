@@ -266,10 +266,11 @@ export const PAIRING_TTL_MS = 5 * 60 * 1000;
 /**
  * 上下文预算：压缩的触发点与保留量。
  *
- * 触发点按「有效预算」而不是模型声明的窗口算——声明 1M 的模型常常在 400k 前后就开始明显退化，
- * 而 pi 的默认判据（窗口 − 16k）在 1M 窗口下几乎永不触发。
+ * 触发点按「有效预算」而不是模型声明的窗口算——pi 的默认判据（窗口 − 16k）在 1M 窗口下几乎永不触发。
+ * 上限取「能力优先」：单步延迟随上下文线性上升，但长任务确实要用到大容量，所以不把上限压到退化点附近；
+ * 需要更早压缩的模型在配置里写 `contextBudget` 覆盖。
  */
-export const CONTEXT_BUDGET_MAX_TOKENS = 400_000;
+export const CONTEXT_BUDGET_MAX_TOKENS = 850_000;
 
 /** 触发点相对窗口的留白比例：给输出与下一批工具结果留空间 */
 export const CONTEXT_BUDGET_RESERVE_RATIO = 0.1;

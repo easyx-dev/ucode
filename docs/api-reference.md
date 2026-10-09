@@ -392,7 +392,7 @@
 | `providers[].models[].inputLimits.images.maxPerMessage` | integer（>0） | 否 | — | — |
 | `providers[].models[].inputLimits.images.maxPerRequest` | integer（>0） | 否 | — | — |
 | `providers[].models[].contextWindow` | integer（>0） | 否 | `128000` | — |
-| `providers[].models[].contextBudget` | integer（>0） | 否 | — | 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/budget`）。 声明窗口常常远大于可用窗口（1M 的模型可能 400k 就开始明显退化），这里给一个人工覆盖的口子。 |
+| `providers[].models[].contextBudget` | integer（>0） | 否 | — | 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/budget`）。 单步延迟随上下文线性上升，而各模型的实际退化点相差很大（声明窗口常常远大于可用窗口）， 这里给一个人工覆盖的口子。 |
 | `providers[].models[].maxTokens` | integer（>0） | 否 | `8192` | — |
 | `providers[].models[].cost` | object | 否 | `{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}` | — |
 | `providers[].models[].cost.input` | number（≥0） | 否 | `0` | — |

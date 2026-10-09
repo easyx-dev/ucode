@@ -84,7 +84,8 @@ export const providerModelSchema = z.object({
   contextWindow: z.number().int().positive().default(128000),
   /**
    * 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/budget`）。
-   * 声明窗口常常远大于可用窗口（1M 的模型可能 400k 就开始明显退化），这里给一个人工覆盖的口子。
+   * 单步延迟随上下文线性上升，而各模型的实际退化点相差很大（声明窗口常常远大于可用窗口），
+   * 这里给一个人工覆盖的口子。
    */
   contextBudget: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().default(8192),

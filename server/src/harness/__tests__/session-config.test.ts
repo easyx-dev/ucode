@@ -20,7 +20,11 @@ import { brand } from "@ucode/brand/values";
 import type { ProviderConfig, SessionMode } from "@ucode/contracts";
 
 import type { PromptSource } from "../../constants";
-import { SHELL_COMMAND_TIMEOUT_SECONDS, SHELL_IDLE_TIMEOUT_MS } from "../../constants";
+import {
+  CONTEXT_BUDGET_MAX_TOKENS,
+  SHELL_COMMAND_TIMEOUT_SECONDS,
+  SHELL_IDLE_TIMEOUT_MS,
+} from "../../constants";
 import { toProviderConfigInput } from "../../core/provider-config";
 import type { PiRuntime } from "../../core/runtime";
 import type { SessionRecord } from "../../db/session-repository";
@@ -198,7 +202,7 @@ describe("buildSessionOptions 工具装配", () => {
     const { compaction } = await snapshotOf("build");
     assert.equal(compaction.enabled, true);
     // 触发点 = 窗口 − reserveTokens，应落在绝对上限而不是贴近窗口
-    assert.equal(compaction.reserveTokens, 1_048_576 - 400_000);
+    assert.equal(compaction.reserveTokens, 1_048_576 - CONTEXT_BUDGET_MAX_TOKENS);
     assert.ok(compaction.keepRecentTokens > 0);
   });
 
