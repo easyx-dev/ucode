@@ -15,7 +15,7 @@
 - 编辑器 chip：图片显 `size-4` 缩略图（`business/composer/attachment-chip.tsx:39`），文件显图标 + 文件名；
 - 用户消息气泡内联：`max-h-40` 缩略图（`business/user-message.tsx:70` 的 `InlineImage`）；
 - 兜底媒体行（早期消息 / 标记对不上的块）：图片走 `BlockView` 的 `max-h-96` 大图、文件走带框的
-  `AttachmentLink`（`business/message-blocks.tsx:15` / `:88`）。
+  `AttachmentLink`（同文件：`BlockImage` :15、`AttachmentLink` :35、`BlockView` :88）。
 
 **目标**：图片与附件在正文里一律是**文字 token**——`<图片1>` / `<report.pdf>`，配一套克制的样式块；
 图片点开原图弹层，附件点开下载；输入区编辑器与消息回放共用同一套形态。序号与发送时写进正文的
@@ -29,27 +29,31 @@
 - 删掉 `AttachmentThumb`（缩略图已无消费者）；
 - 同步 `DESIGN.md` 消息区表格与 `packages/i18n` 的 en 目录。
 
-**明确不做**：assistant 的图片块与 markdown 图片（`BlockImage`、`MarkdownImage`）一行不动；不改载荷与
-标记协议（`docToPayload`、`contracts/messages/markers.ts`、服务端的按标记展开都不动）；不新增「附件内容
-预览弹层」；不回填老消息。
+**明确不做**：assistant 的图片块与 markdown 图片（`BlockImage`、`MarkdownImage`）一行不动——
+连它的**文件块**也保持现状（assistant 消息经 `message-item.tsx:12` / `:76` 走 `BlockView`，文件分支在
+`message-blocks.tsx:92-99`，仍渲染带框 chip），所以 §8 改 `DESIGN.md` 时必须把措辞限定在「用户消息」上，
+否则与 assistant 侧现状矛盾；不改载荷与标记协议（`docToPayload`、`contracts/messages/markers.ts`、
+服务端的按标记展开都不动）；不新增「附件内容预览弹层」；不回填老消息。
 
 ## 二、范围界定
 
 | 场景 | 现状 | 本次 |
 | --- | --- | --- |
-| 输入区 / 编辑态编辑器的图片 | `size-4` 缩略图 | `<图片n>`，点击开原图弹层 |
+| 输入区 / 编辑态编辑器的图片 | `size-4` 缩略图 | `<图片 n>`，点击开原图弹层 |
 | 输入区 / 编辑态编辑器的文件 | 图标 + 文件名 | `<文件名>`，纯文字不可点（落光标、Backspace 删除） |
-| 用户消息里的 `图片 N` 标记 | `max-h-40` 缩略图 | `<图片n>`，点击开原图弹层 |
+| 用户消息里的 `图片 N` 标记 | `max-h-40` 缩略图 | `<图片 n>`，点击开原图弹层 |
 | 用户消息里的附件引用行 | `rounded-full` chip + 图标 + `<a download>` | `<文件名>` token + 同样的 `<a download>` |
 | 兜底媒体行（无标记的图片 / 文件块） | `max-h-96` 大图、带框附件 | 同样的 token（图片序号取块顺序） |
-| 上传中的占位 | 灰色脉冲方块 / 文件名 | `<图片n>` / `<文件名>` + 脉冲淡出，不可点 |
+| 上传中的占位 | 灰色脉冲方块 / 文件名 | `<图片 n>` / `<文件名>` + 脉冲淡出，不可点 |
 | 草稿恢复（文档即草稿） | 无额外存储 | 不变：序号渲染时现算，不落盘 |
-| assistant 的图片块 / markdown 图片 | `max-h-96` 大图 | **不变**（本轮范围外） |
+| assistant 的图片块 / markdown 图片 / 文件块 | `max-h-96` 大图、带框 chip | **不变**（本轮范围外） |
 
 ## 三、已锁定的决策
 
-1. **token 是字面尖括号文本**：`<图片1>` / `<report.pdf>`，尖括号随 token 一起渲染，读屏只读中间那段
-   （两个尖括号 `aria-hidden`）。
+1. **token 是字面尖括号文本**：`<图片 1>` / `<report.pdf>`，尖括号随 token 一起渲染，读屏只读中间那段
+   （两个尖括号 `aria-hidden`）。中间那段与发送时写进正文的 `图片 N` 标记**完全同形**（含那个空格，
+   见 `contracts/messages/markers.ts:22`）——原稿正文写 `<图片1>`、§四.3 却用 `t("图片 {{index}}")`，
+   两者自相矛盾，这里以标记口径为准。
 2. **图片用序号、附件用文件名**：图片序号与正文标记 `图片 N` 同口径；文件名给辨识度，过长截断、`title`
    与下载名给全名。
 3. **范围只到输入区编辑器与用户消息**：assistant 的图片块与 markdown 图片保持现状（模型产出的图仍按原样铺开）。
@@ -71,7 +75,7 @@
 ```ts
 /**
  * 附件在文档里的同类序号（1 起）：与 `docToPayload` 写进正文的 `图片 N` / `附件 N` 同一口径，
- * 编辑器据此显示 `<图片n>`。`key` 取节点的 id（上传中的占位取 tempId）——两者在文档内都唯一。
+ * 编辑器据此显示 `<图片 n>`。`key` 取节点的 id（上传中的占位取 tempId）——两者在文档内都唯一。
  */
 export const attachmentOrdinalInDoc = (
   doc: ComposerNode | null | undefined,
@@ -123,7 +127,8 @@ export function AttachmentToken({ … }: AttachmentTokenProps) { … }
 ### 4. `packages/ui/src/business/composer/attachment-chip.tsx` — 编辑器
 
 - `NodeViewWrapper` 只留 `inline-block align-baseline`：token 自带描边与底色，wrapper 再带一层会成两层框；
-- 序号用 Tiptap v3 的 `useEditorState`（选择值不变不重渲染）：
+- 序号用 Tiptap v3 的 `useEditorState`（选择值不变不重渲染；**本仓库尚无先例**，只有 `useEditor` /
+  `EditorContent` / `ReactNodeViewRenderer`，实现时先验一次整数返回值的重渲染行为）：
 
 ```tsx
 const key = id || tempId;
@@ -146,8 +151,10 @@ const ordinal = useEditorState({
   仍是划线淡出；
 - 兜底媒体行（:117 的 `mediaBlocks`、:172 的 `BlockView`）不再走 `BlockView`：图片块渲染成可点 token
   （序号 `imageBlocks.indexOf(block) + 1`）、文件块渲染成可下载 token；
-- 随之删掉 `message-blocks`（`AttachmentLink` / `BlockView`）与 `attachment-preview` 的 `AttachmentThumb`
-  导入；`useAttachmentPreview` 继续用。
+- 随之删掉 `user-message.tsx` 对 `AttachmentLink` / `BlockView` 的**引用**（不是删 `message-blocks.tsx`
+  文件：assistant 侧仍走 `message-item.tsx:12` / `:76` → `BlockView`，其中文件分支 :92-99 是
+  `AttachmentLink` 剩下的唯一消费者）与 `attachment-preview` 的 `AttachmentThumb` 导入；
+  `useAttachmentPreview` 继续用。
 
 ### 6. `packages/ui/src/business/attachment-preview.tsx` — 收尾
 
@@ -157,14 +164,15 @@ const ordinal = useEditorState({
 
 ### 7. `packages/i18n/src/locales/ui/en.ts` — 文案
 
-加 `"图片 {{index}}": "Image {{index}}"`（放在 `图片预览`(:198) 附近）。zh-CN 不登记——中文原文 key 靠
+加 `"图片 {{index}}": "Image {{index}}"`（放在 `图片预览`(:197) 附近）。zh-CN 不登记——中文原文 key 靠
 回退并插值，登记了会被 `pnpm verify` 的 i18n 校验判为冗余。
 
 ### 8. `DESIGN.md` — 消息区表格
 
 「用户消息的 chip」一行(:199)改写：句子里的 `@` 引用与句子外的技能 / 命令仍是 `rounded-full` + `bg-muted` +
-`text-xs` 的 chip；图片与附件改成带描边的等宽文字 token（`rounded-md` + `border-border` + `bg-muted/40` +
-`font-mono text-xs`），点图片开原图弹层、点附件下载；并写明输入区编辑器与消息里共用同一套 token。
+`text-xs` 的 chip；**用户消息里的**图片与附件改成带描边的等宽文字 token（`rounded-md` + `border-border` +
+`bg-muted/40` + `font-mono text-xs`，内容是 `图片 N` / 文件名），点图片开原图弹层、点附件下载；
+并写明输入区编辑器与消息里共用同一套 token，以及 assistant 侧（图片与文件块）仍是原样。
 
 ## 五、测试
 
@@ -182,11 +190,11 @@ const ordinal = useEditorState({
 
 - `pnpm check` 一轮全绿（含 i18n 的硬编码中文与 en 目录校验）。
 - 真实浏览器走查一次（`pnpm build && pnpm start` → `http://127.0.0.1:19688`）：
-  1. 粘贴「一张图 + 一个 pdf」→ 编辑器里就地是 `<图片1>` / `<report.pdf>`，无缩略图、行高与普通文本一致；
+  1. 粘贴「一张图 + 一个 pdf」→ 编辑器里就地是 `<图片 1>` / `<report.pdf>`，无缩略图、行高与普通文本一致；
   2. 点编辑器里的 `<图片1>` → 弹原图；点 `<report.pdf>` → 只落光标，不触发下载；
   3. 发送后气泡里是同样的 token，气泡高度不再被图片撑开；点图片弹层、点附件下载；
-  4. Backspace 删掉第一张图 → 剩下的图片变 `<图片1>`（与发送后的正文标记一致）；
-  5. 再粘一张图 → `<图片2>`；上传中先脉冲、落定后可点；
+  4. Backspace 删掉第一张图 → 剩下的图片变 `<图片 1>`（与发送后的正文标记一致）；
+  5. 再粘一张图 → `<图片 2>`；上传中先脉冲、落定后可点；
   6. 编辑这条消息 → token 原样还原、序号正确，重发后正文标记与界面一致；
   7. 早期消息（正文无标记，走兜底媒体行）→ 仍是 token，不出现大图；
   8. 长文件名截断且 `title` 给全名；字节取不回来时 token 划线淡出。

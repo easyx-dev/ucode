@@ -96,13 +96,20 @@ pi 的技能是「提示词清单 + 模型自己读文件」的机制，不是�
 - **刷新代价**：`transcript_reset` 会让在线客户端重取快照，生成中途多一次历史重取——与 threshold 压缩
   完成时的既有行为同级；换来的是命中立刻可见（否则要等本轮落定）。
 - **顺序**：`invoke` 的记录写在投递之前，排在那条用户消息前面；它不下发界面，先后不影响渲染。
+- **读技能的渠道取决于工具集**：pi 在 `read` 与 `bash` 之间挑第一个**在工具集里**的作为广告渠道
+  （`dist/core/system-prompt.js:99-101` 取 `["read","bash"]` 的 `find`）。自定义角色的 `tools` 白名单若只有
+  `bash` 没有 `read`，模型会改用 bash 读技能文件——按决策 6 我们不认这条路径，那类角色的命中恒为零。
+  本仓库的只读档含 `read`（`server/src/harness/tools/names.ts:19` 的 `READ_ONLY_TOOLS`），现实里成立。
+- **索引口径只此一份**：`loader.getSkills()` 与 `commands/list` 的来源判定必须同源。本仓库的约束写在
+  `server/src/harness/assets/index.ts` 的文件头注释里——另起一次装载会让「界面列出的」「pi 认的」
+  「记录里的」出现三份口径。
 
 ## 五、改动清单
 
 ### 1. `packages/contracts/src/constants.ts`
 
-在 `PRUNE_RECORD_CUSTOM_TYPE`（:183）一族附近新增；`source` 直接用同文件的 `CommandAssetSource`
-（:487），不需要跨模块引用：
+在 `PRUNE_RECORD_CUSTOM_TYPE`（:195）一族附近新增；`source` 直接用同文件的 `CommandAssetSource`
+（:499，取值表 `COMMAND_ASSET_SOURCES` 在 :491），不需要跨模块引用：
 
 ```ts
 export const SKILL_RECORD_CUSTOM_TYPE = "ucode.skill";
@@ -163,43 +170,52 @@ export const matchSkillInvoke = (
 ```
 
 `matchSkillHit`：`toolName !== "read"` 直接返回 `null`；取 `args.path`（非字符串 / 空串返回 `null`），
-归一化后查 `byFile`。`matchSkillInvoke`：匹配 `^/skill:(\S+)`，名字查 `byName`，查不到返回 `null`
-（pi 也是原样透传）。
+归一化后查 `byFile`。`matchSkillInvoke`：判据复用既有的 `SKILL_PATTERN`（`server/src/harness/assets/expand.ts:26`，改为导出）
+而不是另写一条 `^/skill:(\S+)`——`expandSkillCommand`（同名文件 :116）用的就是它，两处正则漂移会让
+「展开的」与「记录的」对不上。取到名字查 `byName`，查不到返回 `null`（pi 也是原样透传）。
 
 ### 5. `server/src/harness/session-config.ts`
 
-- `createSessionLoader`（:140）在 `await loader.reload()`（:203）之后返回 `{ loader, skills }`，
-  `skills` 由 `loader.getSkills().skills` 经 `skillIndexOf` 得到（路径用 `assetPaths.skills`，:150/:179）；
+- `createSessionLoader`（:145）在 `await loader.reload()`（:208）之后返回 `{ loader, skills }`，
+  `skills` 由 `loader.getSkills().skills` 经 `skillIndexOf` 得到（路径用本地 `assetPaths.skills`，:155/:184）；
 - 内部抽 `assembleSession(input) → { options, skills }`（即现在 `buildSessionOptions` 的主体），
-  `buildSessionOptions`（:211，`return` 在 :274）保留为 `(await assembleSession(input)).options` 的薄包装——
-  现有测试与脚本不受影响，会话池改用新函数。
+  `buildSessionOptions`（:216，`return` 在 :299）保留为 `(await assembleSession(input)).options` 的薄包装——
+  现有测试与脚本不受影响，会话池改用新函数。注意 `assets/index.ts` 里的同名局部量是 `paths`，
+  `assetPaths` 只存在于本文件，实施时别把两处当成同一个东西。
 
 ### 6. `server/src/core/pool.ts`
 
-- `PooledSession`（:68）加 `skills: SkillIndex`（本会话装配时的那一份）；
-- `ensure` 的装配调用（:622）改用 `assembleSession`，把 `skills` 存进池条目（:757 的 `entry` 构造）；
-- `session.subscribe`（:682）里、既有 `message_end` / `entry_appended` 提前 `return` **之前**加一段观察：
+- `PooledSession`（:69）加 `skills: SkillIndex`（本会话装配时的那一份）；
+- `ensure` 的装配调用（:627，`ensure` 定义在 :576）改用 `assembleSession`，把 `skills` 存进池条目
+  （:762 的 `entry` 构造）；
+- `session.subscribe`（:687）里、既有 `message_end` / `entry_appended` 提前 `return` **之前**加一段观察：
   - `turn_start` → 清空本轮的命中集合；
   - `tool_execution_start` → `matchSkillHit(...)` 命中且本轮未记过 → 写条目；
 - 新增私有方法 `recordSkillHit(manager, sessionId, record)`：`appendCustomEntry(SKILL_RECORD_CUSTOM_TYPE, record)`
   → `events.emitFrame(sessionId, "transcript_reset", { fromEntryId })`；失败只记日志
-  （照 :802 的 `recordPermissionDecision`）；
+  （照 :807 的 `recordPermissionDecision`）；
 - 新增公开方法 `noteSkillInvoke(sessionId, text)`：内部用池条目的 `skills` 判 `matchSkillInvoke` 并写
   `event: "invoke"` 记录；技能索引与写入都关在池里，调用方不接触资源装载。
 
 ### 7. `server/src/core/run.ts`
 
-`assemblePrompt`（:142）之后、`admitPrompt`（:159）的两条投递分支（:195 的 `beginTurn`、:211 的
-`steer` / `followUp`）之前调一次 `services.pool.noteSkillInvoke(sessionId, prepared.text)`——
-一处判定覆盖两条路径。
+`assemblePrompt`（定义 :109）有**两个调用点**，各自在投递之前调一次
+`services.pool.noteSkillInvoke(sessionId, prepared.text)`：
+
+- `admitPrompt`（:126）——它的投递分支是 `beginTurn`（:162，兜底分支在 :184）与同一轮内排队的
+  `steer` / `followUp`（:178/:179）；
+- `admitEdit`（:198，调用 `assemblePrompt` 在 :231）——**原稿漏了这条**：编辑并重发 `/skill:name` 时
+  正文同样会被换成 `<skill …>` 块，不记就没有 `invoke` 条目。
+
+`admitGoalRun`（:270）与 `admitPlanApproval`（:291）是合成注入，正文由我们自己写，不记。
 
 ### 8. `server/src/core/serialize.ts`
 
-- `modeRecordOf`（:255）旁加 `skillRecordOf(data: unknown): SkillRecord | null`：逐字段校验
+- `modeRecordOf`（:256）旁加 `skillRecordOf(data: unknown): SkillRecord | null`：逐字段校验
   （`event` 在 `SKILL_RECORD_EVENTS` 里、`name` / `file` / `at` 是字符串、`source` 在
   `COMMAND_ASSET_SOURCES` 里、`toolCallId` 可选字符串），形状不对返回 `null`；
-- `custom` 分支（:343-393，`MODE_RECORD_CUSTOM_TYPE` 那段之后）加一条：`event === "hit"` 才下发
-  `skillRecord`，`invoke` 与非法形状都 `return null`。
+- `custom` 分支（`case "custom":` 在 :344，`MODE_RECORD_CUSTOM_TYPE` 段在 :382-393）在这段之后加一条：
+  `event === "hit"` 才下发 `skillRecord`，`invoke` 与非法形状都 `return null`。
 
 ### 9. `packages/ui/src/lib/chat-nodes.ts`
 
@@ -213,13 +229,13 @@ export const matchSkillInvoke = (
 
 ### 10. `packages/ui/src/business/tool-call.tsx`
 
-`ToolCall`（:177）在 `InputLabel`（:206）之后插技能标记：`entry.skill` 存在时渲染一个
+`ToolCall`（:177）在 `InputLabel` 的渲染点（:206，组件定义在 :114）之后插技能标记：`entry.skill` 存在时渲染一个
 `rounded bg-muted px-1 text-[11px]` 的 chip，文案 `t("技能 {{name}}", { name })`，`title` 同文案。
 行高仍是 32px，不新增可点区域（路径按钮的预览行为不变）。
 
 ### 11. `packages/i18n/src/locales/ui/en.ts`
 
-加 `"技能 {{name}}": "Skill {{name}}"`。zh-CN 不登记（中文 key 靠回退），符合
+加 `"技能 {{name}}": "Skill {{name}}"`（放在既有 `技能: "Skills"`（:589）附近）。zh-CN 不登记（中文 key 靠回退），符合
 `scripts/verify/checks/i18n.ts` 的「zh-CN 只登记摘要 key」约束。
 
 ## 六、测试

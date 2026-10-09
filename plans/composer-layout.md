@@ -74,7 +74,10 @@
 5. **弹层交互用 `base/dropdown-menu` 的 radio 组**：互斥且带说明的选项要的是「菜单 + 选中态 + 键盘导航」，
    Radix 的 `RadioGroup` / `RadioItem` 自带 `role="menuitemradio"`、方向键与 Esc、关闭后焦点回收；
    自己用 `Popover` + 按钮列表会丢掉这些，用 `Select` 则塞不下副标题。`docs/components.md` 的
-   「组件选型」补一句口径（带说明走菜单，不带说明用 `select`）。
+   「组件选型」补一句口径（带说明走菜单，不带说明用 `select`），**并写清例外**：同一组相邻控件
+   （工具栏里的模式 / 权限 / 思考）保持同形，不因思考条目只有标题就混用两种控件。
+   `business/` 下此前没有任何 `dropdown-menu` 用法（全目录零 import），这三个是首次引入，
+   §七 的键盘路径必须真过一遍。
 6. **草稿态可预设权限档位**：`sessionCreateInputSchema` 已有 `permissionMode`，草稿加 `permissionMode`
    字段并在建会话时带上，权限选择器在草稿态不再 `disabled`。这是本轮唯一的**行为变化**，不想放开就
    只保留禁用态（改动收敛为「选择器换皮」）。
@@ -90,28 +93,20 @@
 
 ## 四、改动清单
 
-### 1. `packages/ui/src/lib/workspace-list.ts`（新）
+### 1. ~~`packages/ui/src/lib/workspace-list.ts`（新）~~ → 复用 `projects`
 
-```ts
-/** 「在哪儿干活」的候选项：一个已知的项目目录 */
-export type WorkspaceOption = {
-  /** 项目目录绝对路径 */
-  path: string;
-  /** 展示名（目录名） */
-  name: string;
-};
+**原稿要新建的派生模块不必存在**：`projects.projects`（`hooks/use-projects.ts` 的 `useProjects()`，
+契约 `packages/contracts/src/projects/output.ts` 的 `ProjectSummary`）就是「按 cwd 登记 + 带展示名」的
+列表——行随会话创建自动登记、没有任何会话引用的行在启动对账时清掉（`CHANGELOG.md` 的项目偏好条），
+与 `recentWorkspaces` 想算的东西是同一份数据，且多了用户可改的展示名。自己再从会话列表派生一遍
+只会多一份去重逻辑与一条测试。
 
-/** 从会话列表派生最近用过的项目目录：剔除助理区、按 cwd 去重，保持入参顺序（已是 updatedAt 降序） */
-export const recentWorkspaces = (
-  sessions: readonly SessionSummary[],
-  workspacesDir: string | null,
-): WorkspaceOption[] => …
-```
-
-- 助理区判定复用 `isWorkspaceSession`（`lib/session-groups.ts`），展示名用 `baseName`（`lib/path.ts`）。
-- 不加 `limit` 参数：调用方按需 `slice`，列表滚动兜住（弹层内限高）。
-- 配 `packages/ui/src/lib/__tests__/workspace-list.test.ts`：助理区被剔除、同 cwd 只留最近一条、
-  顺序稳定、`workspacesDir` 为 null 时全部保留。
+- 项目名一律走 `projectLabel(path, projectOf(projects.projects, path))`（`lib/project.ts:8-13`）：
+  取项目展示名、未命名才回落目录末段。直接用 `baseName` 会出现「侧栏叫『客户后台』、输入区 chip 叫
+  目录名」。
+- 列表排序沿用侧栏项目组的同一份口径（`lib/session-groups.ts:43-66`）。
+- 助理区不在 `projects.projects` 里（项目表不登记助理工作区），原稿那条「剔除助理区」的派生逻辑
+  因此也不需要。
 
 ### 2. `packages/ui/src/business/picker-options.tsx`（新）
 
@@ -142,17 +137,19 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
 - 权限：`full` 档仍走 `warning` 色；三项的副标题取 `permissionModeDescription`。
 - 模式：副标题取 `modeDescription`（`build` / `plan` / `ask`）。
 - 思考：条目只有标题（`THINKING_PREFERENCES` + `thinkingPreferenceLabel`），触发钮上的「自动 · 极高」
-  展示逻辑不变。
+  展示逻辑不变。它与模式 / 权限同形（决策 5 的例外口径），`docs/components.md` 的选型描述要跟着更新。
 - `Content` 用 `side="top" align="start"`（控件在底部）与 `w-72`（`DropdownMenuContent` 默认取触发钮宽度，
   放不下副标题）。
-- 三个组件的 props 形状不变，`composer.tsx` 与 `workspace-layout.tsx` 的调用点只删 `disabled`（见 §四.9）。
+- 三个组件的 props 形状不变；调用点只有 `composer.tsx`（:334 / :343 / :350 / :359），
+  `workspace-layout.tsx` 里没有选择器调用点；`disabled` 也只有 `composer.tsx:352` 一处（见 §四.9）。
 
 ### 4. `business/composer/project-row.tsx`（新）
 
 输入卡上方的条（外层容器的首行）：
 
 - 草稿态：渲染 `<ProjectPicker />`（§四.5）。
-- 已有会话：只读 chip——图标 + `baseName(session.cwd)`（助理区会话显示 `t("助理区")`），
+- 已有会话：只读 chip——图标 + `projectLabel(session.cwd, projectOf(projects.projects, session.cwd))`
+  （助理区会话显示 `t("助理区")`）；展示名由 `ChatPanel` 算好传下来，`Composer` 自身不读项目列表。
   `title` 给 `abbreviateHome(cwd)` 的全路径；不可点、无下拉。
 - 分支 chip：两态都有，`useGitStatus(cwd)`（`hooks/use-workbench-data.ts`）取 `branch`，
   `isRepo && branch` 为真才渲染，`GitBranch` 图标 + 分支名，`title` 为「当前分支」，只读。
@@ -167,7 +164,8 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
   显示 `t("小助理")`（与侧栏同一套用词），`title` 说明「不绑定项目，会话落在助理区」。
 - 内容：
   - 顶部搜索框（筛选项目名与路径，本地过滤）；
-  - 最近工作区列表（`recentWorkspaces` + `useSessions()`），当前项打勾；
+  - 项目列表（`useProjects()` 的 `projects.projects`，沿用侧栏排序），当前项打勾，每行主文案走
+    `projectLabel`、副行给 `abbreviateHome(path)`；
   - 分隔线 + 「选择目录」（`openDirectoryPickerDialog()`，与侧栏 / ⌘O 同一个弹层）+「小助理」。
 - 选择结果由 `onSelect(path: string | null)` 往外抛，`Composer` 透传给 `ChatPanel`（§四.9 落草稿）。
 - 列表为空时给一句 `t("还没有打开过项目")`，不留空白。
@@ -225,8 +223,11 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
   否则父节点变化会让编辑器重挂载（见决策 7）。
 - 把 `empty` prop 从 `MessageList` 的调用点去掉（hero 与之互斥，对话态不需要空态）。
 - 传 `showSuggestions={hero}`；`suggestions` 数组删掉（文案搬进 §四.6）。
-- 项目选择：`onSelectProject={(path) => composer.update(draftKey, { cwd: path ?? undefined })}`，
-  项目名与路径从 `draft.cwd` 派生后传给 `Composer`。
+- 项目选择：`onSelectProject` **必须复用 `seedDraftFor`**（`workspace-layout.tsx:279-282`），
+  不能只改 `cwd`：草稿走浅合并，而 `projectSeedOf` 把模型 / 思考档位 / 模式 / 权限这四项**显式写成
+  `undefined`**（理由写在 `lib/project.ts:19-24`）——只改 `cwd` 会让「从 A 项目切到小助理」留着 A 的
+  模型与权限档位。即 `onSelectProject={(path) => composer.update(draftKey, seedDraftFor(path ?? undefined))}`。
+  项目名与路径从 `draft.cwd` 经 `projectLabel` 派生后传给 `Composer`。
 - 发送 seed 带上 `permissionMode: draft.permissionMode`。
 
 ### 10. `business/composer/editor-handle.ts`（改）
@@ -235,8 +236,10 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
 
 ```ts
 /** 在文档开头插入命令 / 技能节点；正文开头已有一条时返回 false（命令只能整条匹配，再插一条会作废） */
-insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string }) => boolean;
+insertCommand: (command: { kind: "prompt" | "skill"; name: string }) => boolean;
 ```
+
+不传 `label`：`commandNode(name, kind)` 自己算（`lib/composer-document.ts:41-43`）。
 
 - 实现：文档首个非空节点已是 `commandMention` → 返回 `false`；否则 `insertContentAt(1, [节点, 空格])`
   并 `focus("end")`（参数写在正文尾部，与 `/goal` 的「命令名 + 参数」语义一致）。
@@ -254,8 +257,13 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 ### 12. `packages/ui/src/lib/composer-draft.ts` 与 `presets/workspace-layout.tsx`（改）
 
 - `ComposerDraft` 加 `permissionMode?: PermissionMode`，`toDraft` 里按字符串校验保留。
-- `workspace-layout.tsx` 的 `selectPermissionMode`：无会话时
-  `composer.update(draftKey, { permissionMode: mode })`，有会话时保持 `sessions.setPermissionMode`。
+  **这半条已实现**（`lib/composer-draft.ts:22-27` / `:62-64`）；发送 seed 也已带上它
+  （`business/chat-panel.tsx:173`），`chat-panel.tsx:349-351` 的三段取值也在。本轮只需删
+  `composer.tsx:352` 的 `disabled`。
+- **要跟着改的注释**：`lib/composer-draft.ts:22-27` 与 `workspace-layout.tsx:270` 都写着「空态不提供
+  改动入口（选择器禁用）」，放开后它们立刻变成假话。
+- `workspace-layout.tsx:271-273` 的 `selectPermissionMode` 现在只 `if (activeId)`，要补
+  `else composer.update(draftKey, { permissionMode: mode })`，有会话时保持 `sessions.setPermissionMode`。
 
 ## 五、i18n（`packages/i18n/src/locales/ui/en.ts`）
 
@@ -263,7 +271,9 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 
 - 问候语 4 条、两个占位符（`向 {{name}} 提问，使用 @ 添加上下文，使用 / 选择命令或能力` 与
   `提出后续修改要求`）；
-- 项目 / 分支条：`项目`、`当前分支`、`小助理`（已有）、`不绑定项目，会话落在助理区`、`选择目录`（已有）；
+- 项目 / 分支条：`当前分支`、`小助理`（已有）、`不绑定项目，会话落在助理区`、`选择目录`（已有）；
+  **不要复用 `项目`**——`en.ts:401` 已有 `项目: "Projects"`（侧栏分区标题，复数），拿它做单项目 chip 的
+  标签，英文界面会显示 "Projects"；chip 另立 key。
 - 工作区弹层：`搜索工作区`、`最近工作区`、`还没有打开过项目`；
 - 「+」菜单：`添加`、`附件`、`技能`（已有）、`当前目录没有技能`、`正文开头已经有一条命令或技能`、
   `@ 添加上下文`、`/ 选择命令或技能`；
@@ -280,7 +290,8 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 - `docs/components.md`：「组件选型」补「互斥选项带说明时用 `base/dropdown-menu` 的 radio 组（菜单语义，
   键盘与焦点回收由 Radix 保证），不带说明时用 `base/select`」。
 - `CHANGELOG.md`：`[未发布] → 新增` 记一条（输入区与空态改版：项目 / 分支条、「+」菜单、带说明的模式 /
-  权限选择器、草稿态可预设权限档位）。
+  权限选择器）；**并改掉 :132-134 那条**——它写着「输入区空态仍然不提供档位入口（选择器禁用），
+  只有显示值跟随项目」，与决策 6 相反，归「变更」而不是仅添一条「新增」。
 - 本文件落地后补「复盘」一节（实际偏差）。
 
 ## 七、验证
@@ -288,7 +299,8 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 - `pnpm check` 一轮一次（biome + 各包 typecheck + 单测 + `pnpm verify`，含 i18n / tokens / brand 校验）。
 - `agent-browser` 走查一轮（`pnpm dev` 开 `:5173`；一批改动只走一次）：
   1. 空态 hero：水印、问候语、居中输入卡、卡下建议 chips 点击填入输入框；
-  2. 项目弹层：搜索过滤、最近工作区打勾、选一个项目后 chip 更新、「选择目录」弹层、「小助理」清绑定；
+  2. 项目弹层：搜索过滤、列表打勾、选一个项目后 chip 更新且四项参数按项目预填（切到小助理后不留上一个
+     项目的模型 / 权限档位）、「选择目录」弹层、「小助理」清绑定；
   3. 分支 chip：git 项目里显示分支名、非 git 目录不出现；
   4. 「+」菜单：附件走文件选择器入库并出现 chip；技能插入到正文开头、已有命令时提示且禁用；
   5. 三个选择器：弹出位置在控件上方、副标题可见、`完全访问` 为 warning 色、选中打勾、Esc 关闭后焦点
@@ -306,8 +318,8 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 - **占位符在挂载时定稿**：Tiptap 的 options 只在挂载时算一次（`composer/editor.tsx` 的 `options` ref），
   所以占位符只靠「`editorKey` 变化 / 文档被外部重置」触发重挂载——发送后清空草稿正好会走到这条路径，
   但改动时不要改成「只按状态切换文案」。
-- **项目列表来自会话**：没在任何项目里开过会话时列表为空，只有「选择目录」与「小助理」两项——这是诚实
-  的口径（我们不知道用户机器上有哪些目录，也不维护「最近打开的文件夹」历史）。
+- **项目列表即项目登记表**：没在任何项目里开过会话时列表为空，只有「选择目录」与「小助理」两项——这是
+  诚实的口径（我们不知道用户机器上有哪些目录，也不维护「最近打开的文件夹」历史）。
 - **分支 chip 可能过期**：只在 `cwd` 变化时取一次；agent 在会话中途切了分支不会自动刷新（只读展示，
   是否加 `agent_settled` 刷新留待走查后决定）。
 - **草稿态权限档位是行为变化**：放开后新建会话会带上该档位（例如草稿选了「完全访问」，首条消息就在
@@ -318,7 +330,7 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string; label: string
 
 ## 九、落地顺序
 
-1. `lib/workspace-list.ts` + 单测；
+1. 项目列表接线（`useProjects()` + `projectLabel`，不新建派生模块）；
 2. `business/picker-options.tsx` → 三个选择器改造（此时输入区尚未改结构，先保证功能与键盘可用）；
 3. `business/composer/project-row.tsx` / `project-picker.tsx` / `add-menu.tsx` / `suggestions.tsx` +
    `editor-handle.ts` 的 `insertCommand`；
