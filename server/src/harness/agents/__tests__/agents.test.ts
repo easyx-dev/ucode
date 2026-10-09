@@ -62,6 +62,24 @@ describe("角色注册表", () => {
   });
 });
 
+describe("模式默认思考档位", () => {
+  it("编码 / 问答声明自己的档位，计划留空跟全局设置走", () => {
+    assert.equal(PRIMARY_PROFILES.build.capability.thinkingLevel, "high");
+    assert.equal(PRIMARY_PROFILES.ask.capability.thinkingLevel, "medium");
+    assert.equal(PRIMARY_PROFILES.plan.capability.thinkingLevel, undefined);
+  });
+
+  it("子角色不声明档位：编码降档不传导到委派出去的探索会话", () => {
+    for (const slug of SUBAGENT_SLUGS) {
+      assert.equal(
+        SUBAGENT_PROFILES[slug].capability.thinkingLevel,
+        undefined,
+        `${slug} 不应声明档位`,
+      );
+    }
+  });
+});
+
 describe("能力交集", () => {
   it("explore 在 build 父下仍是只读", () => {
     const capability = resolveSubagentCapability(

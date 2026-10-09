@@ -4,7 +4,7 @@
  * primary 与子角色的能力在这里以同一形状声明；与父会话取交集的逻辑见 `capability.ts`。
  * 模式约束文案不放这里（按语言存放在 `harness/prompt/locales`），这里只管能力。
  */
-import type { SessionMode } from "@ucode/contracts";
+import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
 
 import { DEFAULT_PERMISSION_RULES, type PermissionRule } from "../permissions";
 import {
@@ -43,24 +43,37 @@ const primary = (
   label: string,
   toolSelection: ToolSelection,
   permissions: readonly PermissionRule[],
+  /** 该模式的默认思考档位；缺省则继承设置里的全局档位 */
+  thinkingLevel?: ThinkingLevel,
 ): AgentProfile => ({
   slug,
   kind: "primary",
   label,
   description: "",
-  capability: { toolSelection, permissions },
+  capability: {
+    toolSelection,
+    permissions,
+    ...(thinkingLevel ? { thinkingLevel } : {}),
+  },
 });
 
 export const PRIMARY_PROFILES: Record<SessionMode, AgentProfile> = {
-  build: primary("build", "编码", BUILD_TOOLS, []),
-  // 计划模式多了 present_plan（提交计划的信号），问答模式没有
+  // 编码以执行步为主，比规划低一档；问答更轻。声明了就优先于设置里的全局档位
+  build: primary("build", "编码", BUILD_TOOLS, [], "high"),
+  // 计划模式多了 present_plan（提交计划的信号）；档位不声明，跟着全局走
   plan: primary(
     "plan",
     "计划",
     readOnlySelection(["present_plan", SUBAGENT_TOOL_NAME]),
     READ_ONLY_PERMISSIONS,
   ),
-  ask: primary("ask", "问答", readOnlySelection([SUBAGENT_TOOL_NAME]), READ_ONLY_PERMISSIONS),
+  ask: primary(
+    "ask",
+    "问答",
+    readOnlySelection([SUBAGENT_TOOL_NAME]),
+    READ_ONLY_PERMISSIONS,
+    "medium",
+  ),
 };
 
 export const SUBAGENT_PROFILES: Record<SubagentSlug, AgentProfile> = {
