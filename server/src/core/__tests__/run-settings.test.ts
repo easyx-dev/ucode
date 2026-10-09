@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { MODE_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
 
-import { lastRunSettingsOf } from "../run-settings";
+import { lastRunSettingsOf, runSettingsPatch } from "../run-settings";
 
 const modeEntry = (id: string, data: unknown): SessionEntry => ({
   type: "custom",
@@ -51,6 +51,52 @@ describe("lastRunSettingsOf", () => {
   it("形状损坏的那条跳过，继续往前找", () => {
     assert.deepEqual(
       lastRunSettingsOf([modeEntry("m1", { mode: "ask", at: "t" }), modeEntry("m2", { at: "t" })]),
+      { mode: "ask" },
+    );
+  });
+});
+
+describe("runSettingsPatch", () => {
+  const known = (): boolean => true;
+  const current = { mode: "build", permissionMode: null };
+
+  it("文件与库不一致时两个字段都回写", () => {
+    assert.deepEqual(runSettingsPatch({ mode: "plan", permissionMode: "full" }, current, known), {
+      mode: "plan",
+      permissionMode: "full",
+    });
+  });
+
+  it("与库里一致时不回写", () => {
+    assert.equal(
+      runSettingsPatch(
+        { mode: "build", permissionMode: "full" },
+        { mode: "build", permissionMode: "full" },
+        known,
+      ),
+      null,
+    );
+  });
+
+  it("未知的模式 slug 不回写：自定义角色可能已被删", () => {
+    assert.equal(
+      runSettingsPatch({ mode: "ghost" }, current, () => false),
+      null,
+    );
+  });
+
+  it("非法的权限档位不回写：文件可能被手改过", () => {
+    assert.equal(runSettingsPatch({ permissionMode: "readonly" }, current, known), null);
+  });
+
+  it("没有设置点、或设置点里没有可用的字段时不回写", () => {
+    assert.equal(runSettingsPatch(null, current, known), null);
+    assert.equal(runSettingsPatch({}, current, known), null);
+  });
+
+  it("只有一个字段有差异时只写那一个", () => {
+    assert.deepEqual(
+      runSettingsPatch({ mode: "ask" }, { mode: "build", permissionMode: "full" }, known),
       { mode: "ask" },
     );
   });

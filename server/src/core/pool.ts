@@ -13,7 +13,6 @@ import {
   GOAL_PROMPT_CUSTOM_TYPE,
   MODE_RECORD_CUSTOM_TYPE,
   PERMISSION_DECISION_CUSTOM_TYPE,
-  PERMISSION_MODES,
   type PermissionRecord,
   PRUNE_RECORD_CUSTOM_TYPE,
   RETRY_RECORD_CUSTOM_TYPE,
@@ -72,7 +71,7 @@ import type { InteractionBroker, InteractionSource } from "./interactions";
 import { isPlanAwaitingDecision } from "./plan-state";
 import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
-import { lastRunSettingsOf, type RunSettings } from "./run-settings";
+import { lastRunSettingsOf, type RunSettings, runSettingsPatch } from "./run-settings";
 import { RunTracker } from "./run-tracker";
 import type { PiRuntime } from "./runtime";
 import { managerToIndex } from "./session-index";
@@ -645,23 +644,14 @@ export class SessionPool {
     // 打开已有会话：文件是权威、DB 是缓存。文件里有设置点就以它为准回写，删库 / 拷文件都不会丢模式；
     // 未知 slug（自定义角色已删）不回写，装配侧本就有兑底
     if (sourcePath) {
-      const recorded = lastRunSettingsOf(manager.getBranch());
-      const patch: SessionOverride = {};
-      if (
-        recorded?.mode !== undefined &&
-        recorded.mode !== record.mode &&
-        hasPrimaryMode(recorded.mode, registry)
-      ) {
-        patch.mode = recorded.mode;
-      }
-      if (
-        recorded?.permissionMode !== undefined &&
-        (PERMISSION_MODES as readonly string[]).includes(recorded.permissionMode) &&
-        recorded.permissionMode !== record.permissionMode
-      ) {
-        patch.permissionMode = recorded.permissionMode as SessionOverride["permissionMode"];
-      }
-      if (Object.keys(patch).length > 0) {
+      // 打开已有会话：文件是权威、DB 是缓存，文件里有设置点就以它为准回写；
+      // 值不可用（模式 slug 已删 / 权限档位非法）时不回写，由 `runSettingsPatch` 判定
+      const patch = runSettingsPatch(
+        lastRunSettingsOf(manager.getBranch()),
+        { mode: record.mode, permissionMode: record.permissionMode },
+        (slug) => hasPrimaryMode(slug, registry),
+      );
+      if (patch) {
         this.repository.set(sessionId, patch);
         // 重新取一份：本轮装配要用校准后的值，否则校准要等下一轮才生效
         record = this.repository.find(sessionId) ?? record;
