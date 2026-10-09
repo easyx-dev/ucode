@@ -36,6 +36,10 @@
 
 ### 新增
 
+- **shell 命令预检**：注册的 `bash` 在进进程之前先过一道命令预检，命令位置上的固定空等（`sleep` ≥ 1 秒）
+  会被直接拦下，输出里给出替代写法（改用工具自身的等待能力，如 agent-browser 的 `wait --load`）；
+  工具描述也补上了这条。起因是实测一轮长任务里 217 步带写死的 `sleep`、累计纯睡 14.6 分钟。
+
 - **会话条目的登记表与校验**：`docs/session-entries.md` 逐条登记会话 JSONL 里的条目（pi 原生 +
   `ucode.*` 扩展），写明类型、payload 字段与值域、是否进模型上下文、界面是否展示、写入点与读取方；
   `pnpm verify` 新增 `session-entries` 校验，契约里的 `*_CUSTOM_TYPE` 常量与文档必须双向对齐，
@@ -108,6 +112,13 @@
 
 ### 变更
 
+- **压缩触发点上限提到 850k**：`CONTEXT_BUDGET_MAX_TOKENS` 由 400k 改为 850k，百万窗口的模型触发点
+  随之从 400k 抬到 850k（注入 pi 的 `reserveTokens` 从 648,576 收到 150,000）。实测该端点在 850k 输入下
+  响应头 9.2s（200k 2.8s / 500k 5.1s），即每次往返多花约 4s，换来长任务能用到大半窗口；
+  要更早压缩的模型仍可在设置里写 `contextBudget` 覆盖。
+- **模式默认思考档位**：`编码` 声明 `high`、`问答` 声明 `medium`，`计划` 不声明（继承设置里的全局档位）。
+  角色声明优先于全局设置，所以编码 / 问答会话不再跟随设置页的档位调整——要改这两个模式得用会话级
+  覆盖。子角色不声明档位，委派出去的探索会话仍按全局档位跑。
 - **依赖口径改为「成熟、维护活跃、收益高」**（见 `AGENTS.md` 技术选型原则）：不再以「少一个依赖」为名自建
   高风险部件。据此换掉三处自研——行级 diff 交给 `diff`（jsdiff 的 Myers，顺带修掉「大文件里改几行也被当成
   全量替换」的规模闸门，改按编辑距离退化）、事件流拆帧交给 `eventsource-parser`（并给单条事件加上缓冲上限）、
@@ -193,6 +204,11 @@
 
 ### 修复
 
+- **每步耗时记录的首 token / 解码两段永远是空值**：`harness/telemetry` 等的 `message_update` +
+  `assistantMessageEvent.type === "start"` 永远不会出现——pi 的 `start` 帧走的是 `message_start` 事件，
+  `message_update` 只承载内容帧。锤点改为 `message_start`（响应头到达）与首个 `message_update`
+  （首个内容帧），`ucode.step` 因此新增 `firstEventAt` / `firstEventMs` / `toolNames` / `hasText` /
+  `thinkingLevel` 五个字段，登记表同步。
 - **刚发出去的消息编辑 / 分叉必然失败**：`message_end` 的实时帧里 pi 还没把消息落盘（事件先于 `appendMessage`），
   服务端只能给一个临时 id，而界面拿这个 id 去调 `messages/edit` 与 `sessions/fork`，于是「发完立刻改」一律
   400（不在活动分支），刷新页面（走快照）后才正常。现在事件总线把这一帧推迟一个微任务，按消息对象身份在

@@ -119,6 +119,10 @@
 | `pnpm dev` | server `:19688` + web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
 
+`pnpm check` 是提交前的强制入口，一轮里只跑一次：它要把 biome / typecheck / test / verify 全跑一遍，
+在一轮里反复全量跑会直接排进会话耗时前排（实测一轮里 102 步、8.8 分钟）。要收窄范围用 `--filter`
+（如 `pnpm -F @ucode/server typecheck`），改完一批再统一跑。
+
 单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
 （如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
 写在别处不会被执行。断言用 `node:assert/strict`，不引第三方测试框架。
@@ -131,6 +135,19 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
 或 `pnpm dev` 后开 `:5173`。harness 自带的浏览器能力已撤（过于局限，改由插件提供，见 `TODO.md`）。
 两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接 `ERR_UNSAFE_PORT`，换端口即可；
 弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，否则坐标会落到遮罩上把弹层关掉。
+
+走查成本几乎全在调用次数上（每调一次都要起进程连浏览器），所以按这几条来：
+
+- 一串动作串成一次 bash：`agent-browser open <url> && wait --load networkidle && snapshot -i && click @e3 && snapshot -i`，
+  或用 `batch --json`。浏览器由后台 daemon 常驻，串联是官方推荐用法。
+- 等页面稳定用 `wait`，不要 `sleep`（固定空等已被 shell 预检拦下）：`wait --load domcontentloaded|load|networkidle`、
+  `wait "<选择器>" --state visible|hidden`、`wait --fn "…"`。
+- 交互用 `snapshot -i` 给出的 `@eN` ref，不要手写 CSS 选择器——选择器脆，失败重试会变成一堆多余的往返。
+  页面变了要重新 snapshot，但同一次调用里完成。
+- 一批改动只走查一次，不要每改一个文件就开一次浏览器。
+
+安全边界：不要用 `--auto-connect` / `--profile` 复用本机 Chrome 的登录态（那等于把全部登录态交给
+agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里明文写口令，命令会原样落进会话 JSONL。
 
 ### 构建与生产运行
 
