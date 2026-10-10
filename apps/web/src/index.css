@@ -6,3 +6,5 @@
 
 /* 共享 UI 包的 className 也要纳入扫描 */
 @source "../../../packages/ui/src";
+/* streamdown 输出的 className 在它自己的 dist 里，Tailwind 默认不扫 node_modules */
+@source "../../../packages/ui/node_modules/streamdown/dist/*.js";

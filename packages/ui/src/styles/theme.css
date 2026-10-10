@@ -287,11 +287,29 @@
 }
 .md-content th,
 .md-content td {
-  @apply border border-border px-3 py-1.5 text-left align-top;
+  /* streamdown 给单元格带了自己的字号与 nowrap，这里按本仓库口径盖回去 */
+  @apply border border-border px-3 py-1.5 text-left align-top text-xs whitespace-normal;
+}
+.md-content thead {
+  /* 表头底色只由 th 提供，避免与 streamdown 的 thead 底色叠成两层 */
+  @apply bg-transparent;
 }
 .md-content th {
   @apply bg-muted/50 font-medium;
 }
 .md-content hr {
   @apply my-4 border-border;
+}
+/*
+ * 图表块：宽图自己横向滚动而不是缩字（缩字后标签会挤成一团），并给高度上限，避免一张图吃掉整屏。
+ * 底色用卡片色，图看起来是正文里的一张卡片；容器自身不滚动，全屏按钮才不会被图解带着跑。
+ */
+.md-content .md-mermaid {
+  @apply relative rounded-lg border border-border bg-card;
+}
+.md-content .md-mermaid-viewport {
+  @apply max-h-[420px] overflow-auto p-3;
+}
+.md-content .md-mermaid-viewport svg {
+  @apply h-auto max-w-none;
 }

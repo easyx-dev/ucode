@@ -211,6 +211,22 @@ export default {
   "图片{{index}}": "Image {{index}}",
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
+  图表: "Diagram",
+  "图表渲染中…": "Rendering diagram…",
+  图表预览: "Diagram preview",
+  全屏查看: "View fullscreen",
+  "图表全屏预览：拖拽平移，Ctrl 加滚轮缩放":
+    "Diagram fullscreen preview: drag to pan, Ctrl + scroll to zoom",
+  缩小: "Zoom out",
+  放大: "Zoom in",
+  缩放比例: "Zoom level",
+  适配窗口: "Fit to window",
+  重置缩放: "Reset zoom",
+  关闭预览: "Close preview",
+  表格预览: "Table preview",
+  "表格全屏预览：表格自己横向滚动":
+    "Table fullscreen preview: the table scrolls horizontally on its own",
+  "图片全屏预览：按容器等比缩放": "Image fullscreen preview: scaled to fit the viewport",
   "无法添加附件：{{names}}": "Could not add attachments: {{names}}",
   "改写这条消息，Enter 发送，Shift+Enter 换行":
     "Edit this message. Enter to send, Shift+Enter for a new line.",

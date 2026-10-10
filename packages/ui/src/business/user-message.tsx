@@ -21,8 +21,9 @@ import type { ChatItem, EditMessagePayload, MessageBlock } from "../lib/types";
 import { useWorkbench } from "../provider/workbench";
 import { useAttachmentPreview } from "./attachment-preview";
 import { AttachmentToken } from "./attachment-token";
+import { CopyAction } from "./copy-action";
 import { MessageEditForm } from "./message-edit-form";
-import { CopyAction, ForkAction } from "./message-footer";
+import { ForkAction } from "./message-footer";
 
 /** chip 共用一套外观：句子外的技能 / 命令与句子里的引用都长这样 */
 const CHIP_CLASS =

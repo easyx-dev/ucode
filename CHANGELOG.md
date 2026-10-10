@@ -36,6 +36,20 @@
 
 ### 新增
 
+- **内容区 markdown 支持 Mermaid 渲染**：对话正文、md 文件预览、压缩摘要三处改用同一个渲染入口
+  （`packages/ui/src/business/message-response.tsx`，解析与流式交给 `streamdown`）。`mermaid` 代码块渲染成图：
+  文档里首次出现图表才按需下载 mermaid，全页串行渲染；图源不完整或语法不在支持范围时回落成代码块，
+  不弹错误面板。图的主题取自语义 token：token 是 oklch，而 mermaid 的颜色引擎（khroma）只认 hex / rgb / hsl，
+  故先用 canvas 采成 rgb 再交给它，深浅色由 token 自己切换。图可双击或点右上角悬浮按钮开全屏预览
+  （拖拽平移、滚轮与 `Ctrl` 加滚轮缩放、适配窗口与重置缩放）。
+
+- **表格与正文图片支持全屏查看**：三者共用同一个全屏外壳（`business/fullscreen-dialog.tsx`，走 `openDialog`），
+  窄屏铺满、桌面 `90vw × 86vh`；表格另将 streamdown 自带的外层容器（`border + bg-sidebar + p-2`）整份换掉，
+  描边与滚动只由 `.md-content table` 一层负责，不再卡片套卡片。入口统一为点内容本身或右上角悬浮按钮。
+
+- **代码块支持复制**：块级代码右上角新增悬浮复制按钮，复制的是源码原文（不从高亮后的 DOM 取）；
+  成功后图标换成对勾并保持 1.5s，与消息页脚的复制共用 `business/copy-action.tsx`。
+
 - **目标模式的收口**（阶段 11 的后续，`68abc27` 之后的五项）：
   - 新增模型侧结算工具 `goal_complete` / `goal_blocked`：调了即结算（工具优先），没调才跑服务端校验兜底；
     `goal_blocked` 新增暂停原因 `blocked`。两个工具按目标状态**条件注册**（同记忆工具，见 `docs/modes-and-permissions.md`），
@@ -154,6 +168,8 @@
 
 ### 变更
 
+- **markdown 渲染底座换成 streamdown**：移除 `react-markdown` / `remark-gfm`，改用 `streamdown` +
+  `@streamdown/cjk`（中文标点与断行）+ `@streamdown/mermaid`；web / desktop 的 chunk 分组同步跟进。
 - **只读模式不再收窄工具集**：`plan` / `ask` 的工具声明与 `build` 一致（`plan` 多一个 `present_plan`），
   写盘 / 执行改由权限规则在 `tool_call` 上 `deny`——连同 `codemode` 的嵌套调用、子会话（父模式规则一并施加、
   取较严者），且不受权限档位影响（切到 `full` 也放不开）。原因是 pi 会把工具声明写进会话文件
@@ -296,6 +312,9 @@
 
 ### 修复
 
+- **流式代码块在高亮与纯文本之间反复抖**：代码块接上 shiki 后没看「这一块还在不在流式」，每来一个 chunk
+  都重算一次并先把结果清空，模型边写边闪。现在流式期间只铺纯文本，写完再上色。
+- **全屏查看会吞掉 `Cmd` / `Ctrl` + `-`**：图表预览把裸键与修饰键一起拦了，页面缩放因此失效；现在只接管裸键。
 - **目标起轮失败时会把目标换回上一个**：`goals/set` / `goals/resume` 的失败分支拿的是请求开头那份会话快照
   （`goalState` 还是写入前的值），而 `GoalService.pause` 只看传入状态是否 `active`：旧目标是 `active` 时
   （如刚重启过服务、目标还没在跑）它会把旧 `objective` / 旧 `id` 写回去——刚设的新目标被静默覆盖，

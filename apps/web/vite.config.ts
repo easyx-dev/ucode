@@ -63,7 +63,7 @@ export default defineConfig(({ command, mode }) => {
               { name: "editor", test: /node_modules[\\/](@tiptap|prosemirror)/ },
               {
                 name: "markdown",
-                test: /node_modules[\\/](react-markdown|remark-|rehype-|micromark|mdast-|hast-|unist-|unified|vfile|property-information|space-separated-tokens|comma-separated-tokens|character-entities|decode-named-character-reference|trim-lines|devlop|zwitch|longest-streak|ccount|escape-string-regexp|markdown-table|bail|trough|is-plain-obj|html-url-attributes)/,
+                test: /node_modules[\\/](streamdown|marked|remend|remark-|rehype-|micromark|mdast-|hast-|unist-|unified|vfile|property-information|space-separated-tokens|comma-separated-tokens|character-entities|decode-named-character-reference|trim-lines|devlop|zwitch|longest-streak|ccount|escape-string-regexp|markdown-table|bail|trough|is-plain-obj|html-url-attributes)/,
               },
               {
                 name: "ui",

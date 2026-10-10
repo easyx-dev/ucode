@@ -246,16 +246,32 @@ ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme
 
 ## Markdown 渲染
 
-对话区的正文由 `packages/ui/src/styles/theme.css` 的 `.md-content` 一层渲染（`react-markdown` + `remark-gfm`），
+对话区的正文由 `packages/ui/src/styles/theme.css` 的 `.md-content` 一层渲染，解析与流式交给 `streamdown`
+（唯一入口是 `packages/ui/src/business/message-response.tsx`，对话正文、md 预览、压缩摘要共用），
 取值口径就写在那里，新增元素先看这一节再动：
 
 - 层级只有两档：正文 `text-sm leading-7`，代码块与表格 `text-xs`；标题不与正文拉开字号，靠字重
 - 标题 `mt-5 mb-2`（首个元素不带上边距），与段落一同构成长文的阅读节奏
 - 表格**自己滚**：`block w-max max-w-full overflow-x-auto`。宽表不但撑破列宽，还会把整段对话变成
   横向滚动区；它按内容宽度渲染、上限不超列宽，超出时只滚表格自身。表头 `bg-muted/50`，
-  单元格 `px-3 py-1.5` 且顶对齐（多行单元格不会被另一列拉歪）
+  单元格 `px-3 py-1.5` 且顶对齐（多行单元格不会被另一列拉歪）。**不要再套一层容器卡片**：streamdown
+  自带的表格容器（`border + bg-sidebar + p-2`）已由 `business/markdown-table.tsx` 整份替换，描边与滚动
+  只由 `.md-content table` 一层负责
+- 正文图片：本站附件先取字节转 blob 再渲染（`business/attachment-image.tsx`）；外层用 `span`，因为正文里的
+  图片常落在 `<p>` 里，块级元素会把段落拆开
 - 列表标记用 `text-muted-foreground`；GFM 任务列表去掉圆点（勾选框本身就是标记）
 - 行内 code 与代码块都只换底色（`bg-muted`）不换色相；字号仍只用 Tailwind 默认档位
+- 代码块右上角有悬浮复制按钮（`business/code-block.tsx`），与图块、表格、图片的悬浮按钮同一口径：
+  悬停或键盘聚焦时出现；复制的是源码原文，成功图标换成对勾并保持 1.5s（`business/copy-action.tsx`，
+  消息页脚的复制共用同一份）
+- Mermaid 图块（`.md-mermaid` + 内层 `.md-mermaid-viewport`）：底色用卡片色（与图自身的 `background` 一致）、
+  `p-3`、圆角描边同代码块；高度上限 `max-h-[420px]`，宽图在块内自己横向滚（`svg` 保持 `max-w-none`，
+  缩字会把标签挤成一团）。图源不完整或语法不在支持范围时回落成代码块，不弹错误面板
+- 全屏查看（图块 / 表格 / 图片共用 `business/fullscreen-dialog.tsx`，走 `openDialog`，挂载即打开）：
+  窄屏铺满、桌面 `90vw × 86vh`，工具条右侧依次是内容自己的动作（图表的缩放控件）与关闭按钮。
+  图表与图片的入口统一为「点内容本身或点右上角悬浮按钮」（图块的悬浮按钮常驻显示逻辑同表格、图片）；
+  图表视口内拖拽平移、滚轮平移、`Ctrl` 加滚轮与加减号键缩放，比例下拉给 50% / 100% / 200% 与
+  「适配窗口」「重置缩放」
 
 ## 阴影
 

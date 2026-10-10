@@ -6,10 +6,9 @@
  */
 import type { CompactionRecord } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { compactionLineDetail, compactionLineText } from "../lib/compaction";
 import { DividerLine } from "./divider-line";
+import { MessageResponse } from "./message-response";
 
 export function CompactionDivider({
   summary,
@@ -23,7 +22,7 @@ export function CompactionDivider({
 
   return (
     <DividerLine label={compactionLineText(record, t)} detail={compactionLineDetail(record, t)}>
-      {hasSummary ? <Markdown remarkPlugins={[remarkGfm]}>{summary}</Markdown> : undefined}
+      {hasSummary ? <MessageResponse text={summary} /> : undefined}
     </DividerLine>
   );
 }
