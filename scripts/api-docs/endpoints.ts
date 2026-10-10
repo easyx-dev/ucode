@@ -542,6 +542,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "goals",
+    action: "budget",
+    method: "POST",
+    input: "goalBudgetInputSchema",
+    requestType: "GoalBudgetInput",
+    output: "GoalResponse",
+    summary: "只改目标的 token 预算（不动轮数与校验结果）",
+  },
+  {
+    domain: "goals",
     action: "pause",
     method: "POST",
     input: "sessionIdInputSchema",

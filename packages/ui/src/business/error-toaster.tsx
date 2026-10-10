@@ -30,6 +30,7 @@ export function ErrorToaster() {
       ["mcp", client.mcp],
       ["projects", client.projects],
       ["usage", client.usage],
+      ["goal", client.goal],
     ];
 
     const check = (name: string, error: ApiError | null): void => {

@@ -32,6 +32,7 @@ const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
   compaction: 44,
   injected: 36,
   goal: 44,
+  goalTurn: 44,
   retry: 36,
   working: 32,
 };

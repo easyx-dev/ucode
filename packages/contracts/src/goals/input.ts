@@ -16,3 +16,15 @@ export const goalSetInputSchema = z.object({
 
 export type GoalSetInput = z.infer<typeof goalSetInputSchema>;
 export type GoalSetRequest = z.input<typeof goalSetInputSchema>;
+
+/**
+ * 只改当前会话目标的 token 预算（patch 语义）：不动轮数、校验结果与身份 id。
+ * `tokenBudget` 传 null 即取消上限。
+ */
+export const goalBudgetInputSchema = z.object({
+  sessionId: sessionIdSchema,
+  tokenBudget: z.number().int().positive().nullable(),
+});
+
+export type GoalBudgetInput = z.infer<typeof goalBudgetInputSchema>;
+export type GoalBudgetRequest = z.input<typeof goalBudgetInputSchema>;

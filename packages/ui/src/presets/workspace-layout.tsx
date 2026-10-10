@@ -578,6 +578,9 @@ export function WorkspaceLayout({
                   forkedFromName={forkSourceName}
                   goal={goal.goal}
                   onGoalCommand={runGoalCommand}
+                  onGoalBudget={(tokenBudget) => {
+                    if (activeId) void goal.setBudget(activeId, tokenBudget);
+                  }}
                   usage={sessionUsage.usage}
                   context={sessionUsage.context}
                   onOpenUsage={() => setUsageOpen(true)}

@@ -1,7 +1,7 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
 import { cn } from "cn";
 import { Bot } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import type { ChatController } from "../hooks/use-chat";
@@ -12,6 +12,7 @@ import { type ComposerNode, docToPayload, textToDoc } from "../lib/composer-docu
 import { composerKeyOf, emptyDraft } from "../lib/composer-draft";
 import type { ComposerPayload } from "../lib/composer-payload";
 import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
+import { buildGoalTurns } from "../lib/goal-turns";
 import { relativizeContextRefs } from "../lib/message-chips";
 import { draftSeedOf, projectLabel, projectOf } from "../lib/project";
 import { isWorkspaceSession } from "../lib/session-groups";
@@ -85,6 +86,8 @@ type ChatPanelProps = {
   goal?: GoalView | null;
   /** 处理 `/goal` 命令（设定 / 暂停 / 恢复 / 清除 / 查看） */
   onGoalCommand: (command: GoalCommand, seed?: SessionCreateRequest) => void;
+  /** 改写目标预算（null 表示不限）；由目标栏的内联编辑提交 */
+  onGoalBudget: (tokenBudget: number | null) => void;
   /** 执行内置命令（`/` 菜单里的动作型命令） */
   onBuiltin: (id: BuiltinCommandId) => void;
   /** 本会话累计 token 用量；用于头部徽标的显示条件 */
@@ -130,6 +133,7 @@ export function ChatPanel({
   forkedFromName,
   goal,
   onGoalCommand,
+  onGoalBudget,
   onBuiltin,
   usage,
   context,
@@ -146,6 +150,13 @@ export function ChatPanel({
   const [directoryOpen, setDirectoryOpen] = useState(false);
   /** 发送 / 编辑重发被受理后自增，交给消息列表把视口拉回最新一行 */
   const [sentTick, setSentTick] = useState(0);
+  // 目标栏的逐轮列表与消息区的「目标续跑」分隔行同源；只保留本次目标开始之后的轮次
+  // （同一会话换过目标时，前一个目标的轮次不该算在现目标头上），并按条目算一次
+  const goalTurns = useMemo(() => {
+    const all = buildGoalTurns(chat.items).turns;
+    if (!goal) return all;
+    return all.filter((turn) => turn.at === undefined || turn.at >= goal.startedAt);
+  }, [chat.items, goal]);
   // 子智能体工具卡的入口直接开详情小窗（弹层自己管开关），保持引用稳定以免作废消息行的记忆化
   const openSubagent = useCallback((sessionId: string): void => {
     void openSubagentSessionDialog(sessionId);
@@ -319,7 +330,12 @@ export function ChatPanel({
 
       {/* 完成后收起状态条：目标在哪儿结束由对话里的「目标完成」细线负责，条不再常驻 */}
       {!isChild && goal && goal.status !== "completed" ? (
-        <GoalBar goal={goal} onCommand={(command) => onGoalCommand(command)} />
+        <GoalBar
+          goal={goal}
+          turns={goalTurns}
+          onCommand={(command) => onGoalCommand(command)}
+          onBudget={onGoalBudget}
+        />
       ) : null}
 
       {/* 输入区照常留在原位，等用户作答时由决策面板盖住它（待答交互优先于计划决策）；子会话只读，连同输入区一起收起 */}

@@ -33,6 +33,7 @@ import type {
   GitShowResponse,
   GitStatusRequest,
   GitStatusResponse,
+  GoalBudgetRequest,
   GoalResponse,
   GoalSetRequest,
   InteractionListResponse,
@@ -202,6 +203,8 @@ export const createApis = (options: ApisOptions = {}) => {
     goals: {
       /** 设定 / 替换当前会话目标；由服务端起第一轮 */
       set: (body: GoalSetRequest) => transport.post<GoalResponse>("goals/set", body),
+      /** 只改目标预算（patch 语义）；`tokenBudget` 传 null 即取消上限 */
+      budget: (body: GoalBudgetRequest) => transport.post<GoalResponse>("goals/budget", body),
       status: (sessionId: string) =>
         transport.post<GoalResponse>("goals/status", { sessionId } satisfies SessionIdRequest),
       pause: (sessionId: string) =>

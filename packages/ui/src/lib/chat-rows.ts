@@ -5,7 +5,8 @@
  * 「一行一个节点」，交给虚拟列表按行测量与回收。行的 key 直接取自节点的稳定 key（同一条 assistant 消息
  * 流式追加区块时已有行的 key 不变），节点上的 `footer` 原样带到行上。
  */
-import { buildChatNodes, type ChatFooter, type ChatNode, uidOf } from "./chat-nodes";
+import { uidOf } from "./chat-item";
+import { buildChatNodes, type ChatFooter, type ChatNode } from "./chat-nodes";
 import type { ChatItem } from "./types";
 
 type ContentNode = Extract<ChatNode, { kind: "content" }>;
@@ -15,6 +16,7 @@ type PermissionNode = Extract<ChatNode, { kind: "permission" }>;
 type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
 type InjectedNode = Extract<ChatNode, { kind: "injected" }>;
 type GoalNode = Extract<ChatNode, { kind: "goal" }>;
+type GoalTurnNode = Extract<ChatNode, { kind: "goalTurn" }>;
 type RetryNode = Extract<ChatNode, { kind: "retry" }>;
 
 type ChatRowBase = {
@@ -62,6 +64,9 @@ export type ChatRetryRow = ChatRowBase & { kind: "retry"; node: RetryNode };
 /** 目标完成行：一条细线，展开看校验结论 */
 export type ChatGoalRow = ChatRowBase & { kind: "goal"; node: GoalNode };
 
+/** 目标逐轮行：一次注入与它那一轮的结论合成的一条细线 */
+export type ChatGoalTurnRow = ChatRowBase & { kind: "goalTurn"; node: GoalTurnNode };
+
 /** 尾部的生成中行：列表最后一道提示，带本轮的实时耗时，没有对应节点也不承载页脚 */
 export type ChatWorkingRow = Omit<ChatRowBase, "footer"> & {
   kind: "working";
@@ -78,6 +83,7 @@ export type ChatRow =
   | ChatCompactionRow
   | ChatInjectedRow
   | ChatGoalRow
+  | ChatGoalTurnRow
   | ChatRetryRow
   | ChatWorkingRow;
 
@@ -99,6 +105,9 @@ const rowOfNode = (
   }
   if (node.kind === "goal") {
     return { kind: "goal", key: node.key, turnKey, isTurnStart, node };
+  }
+  if (node.kind === "goalTurn") {
+    return { kind: "goalTurn", key: node.key, turnKey, isTurnStart, node };
   }
   if (node.kind === "retry") {
     return { kind: "retry", key: node.key, turnKey, isTurnStart, node };

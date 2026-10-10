@@ -41,6 +41,13 @@ export const goalStateSchema = z.object({
   noProgress: z.number().int().nonnegative(),
   /** 上一轮的正文指纹（规范化后），用于判断是否原样重复 */
   lastText: z.string(),
+  /**
+   * 本轮开始时目标的累计用量，用来算「本轮用量增量」。
+   * 带默认值：存量目标没有这个字段，加必填会让它们被当成「无目标」。
+   */
+  tokensAtTurnStart: z.number().int().nonnegative().default(0),
+  /** 本轮开始时刻（ISO 8601），与下一轮起点的时刻差即本轮耗时；存量目标为空串 */
+  turnStartedAt: z.string().default(""),
 });
 
 export type GoalState = z.infer<typeof goalStateSchema>;
@@ -75,6 +82,8 @@ export const startGoal = (
   verification: null,
   noProgress: 0,
   lastText: "",
+  tokensAtTurnStart: 0,
+  turnStartedAt: now,
 });
 
 export const pauseGoal = (
@@ -83,12 +92,19 @@ export const pauseGoal = (
   now = new Date().toISOString(),
 ): GoalState => ({ ...state, status: "paused", cause, updatedAt: now });
 
-/** 恢复并轮换身份 id：暂停期间迟到的旧校验据此作废 */
+/**
+ * 恢复并轮换身份 id：暂停期间迟到的旧校验据此作废。
+ * 无进展计数随恢复归零（暂停期间的空等不该继续累计），轮数与校验结果保留；
+ * `tokensAtTurnStart` 由调用方回填——纯函数拿不到用量。
+ */
 export const resumeGoal = (state: GoalState, now = new Date().toISOString()): GoalState => ({
   ...state,
   id: randomUUID(),
   status: "active",
   cause: null,
+  noProgress: 0,
+  lastText: "",
+  turnStartedAt: now,
   updatedAt: now,
 });
 
@@ -114,9 +130,15 @@ export const recordVerification = (
   now = new Date().toISOString(),
 ): GoalState => ({ ...state, verification, ...progress, updatedAt: now });
 
-/** 记一次自动续跑：轮数递增，返回新状态 */
-export const advanceTurn = (state: GoalState, now = new Date().toISOString()): GoalState => ({
+/** 记一次自动续跑：轮数递增、记下本轮起点，返回新状态 */
+export const advanceTurn = (
+  state: GoalState,
+  tokensUsed: number,
+  now = new Date().toISOString(),
+): GoalState => ({
   ...state,
   turns: state.turns + 1,
+  tokensAtTurnStart: tokensUsed,
+  turnStartedAt: now,
   updatedAt: now,
 });

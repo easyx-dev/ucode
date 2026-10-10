@@ -55,8 +55,9 @@ import {
 } from "./prompt";
 import { createShellExtension } from "./shell";
 import type { SubagentHooks } from "./subagents";
+import type { GoalToolHooks } from "./tools/goal";
 import { buildCustomTools } from "./tools/index";
-import { SUBAGENT_TOOL_NAME } from "./tools/names";
+import { GOAL_TOOL_NAMES, SUBAGENT_TOOL_NAME } from "./tools/names";
 import type { QuestionHooks } from "./tools/question";
 import { workspaceDirOf } from "./workspace";
 
@@ -115,6 +116,8 @@ export type SessionAssemblyInput = {
   question?: QuestionHooks;
   /** 项目级记忆：索引注入与 remember / forget 工具；缺省即不启用 */
   memory?: MemoryService;
+  /** 目标结算工具（`goal_complete` / `goal_blocked`）；只在会话有 active 目标时注入 */
+  goal?: GoalToolHooks;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
@@ -225,11 +228,15 @@ export const assembleSession = async (
   const capability = input.capability ?? primaryCapability(input.mode, registry);
   // 可用工具名同时决定「注册哪些自研工具」与「提示词列哪些工具」；
   // 依赖钩子的工具（question / subagent）在钩子缺失时一并去掉，避免提示词提到不存在的工具
-  const toolNames = effectiveToolNames(capability).filter(
+  const baseToolNames = effectiveToolNames(capability).filter(
     (name) =>
       (name !== "question" || Boolean(input.question)) &&
       (name !== SUBAGENT_TOOL_NAME || Boolean(input.subagents)),
   );
+  // 目标结算工具按目标状态条件注册（同记忆工具）：仅默认工具集的会话挂得上，
+  // plan / ask 这类白名单会话不该有「结算目标」这回事
+  const goalToolNames = input.goal && usesDefaultToolSet(capability) ? GOAL_TOOL_NAMES : [];
+  const toolNames = [...new Set([...baseToolNames, ...goalToolNames])];
   const override = overrideOf(input.record);
   // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来
   // 会话覆盖值的模型在 create / update 已校验，这里只兜角色声明这一路
@@ -304,6 +311,7 @@ export const assembleSession = async (
       // 传全量：advertise 只决定是否写进描述，隐藏角色仍要进 `agent` 入参枚举
       ...(registry ? { subagentProfiles: allSubagents(registry) } : {}),
       memoryTools,
+      ...(input.goal ? { goal: input.goal } : {}),
     }),
     resourceLoader: loader,
   };

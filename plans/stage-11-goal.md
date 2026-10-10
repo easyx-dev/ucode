@@ -4,7 +4,7 @@
 > 参考：[zcode 目标模式](https://zcode.z.ai/cn/docs/goal)、[Codex `/goal`](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex)、
 > [Claude Code `/goal`](https://code.claude.com/docs/en/goal)、[`@schovest/pi-goal`](https://pi.dev/packages/@schovest/pi-goal)。
 >
-> 状态：**已完成**（`68abc27`）。本文是阶段 11 的细化方案与落地记录。
+> 状态：**已完成**（`68abc27`）。本文是阶段 11 的细化方案与落地记录；后续的收口五项见「十二、收口轮」。
 
 ## 一、目标与范围
 
@@ -19,10 +19,12 @@
 
 **明确不做**（留后续）：
 
-- 模型侧 `goal_complete` / `goal_blocked` 工具（本期用服务端评估器，见「已锁定的决策」）。
-- 消息流里的「第 N 轮」分隔线与逐轮摘要面板。
 - 校验器独立核对文件系统（它只看转录与工具活动摘要，实据靠提示词约束模型自查）。
 - 关掉应用后的后台续跑（服务端进程在才续跑；重开后目标状态还在，可手动恢复）。
+- `/goal` 命令的语法扩展（改预算只有一个入口：目标栏内联编辑 + `POST /goals/budget`）。
+
+> 模型侧 `goal_complete` / `goal_blocked` 与消息流的逐轮分隔线已在收口轮补上（见「十二、收口轮」），
+> 不再是「不做」项；这里保留记录当时的范围决策。
 
 ## 二、已锁定的决策
 
@@ -30,8 +32,9 @@
    与 zcode / Codex / pi-goal 一致——目标决定「做到什么程度算完」，模式决定「过程中多少操作要确认」。
 2. **仅 `build` 可设目标**；`plan` / `ask`（只读）拒绝设置。设置期间把模式切走 → 自动暂停（`cause = mode`，见母文档）。
    Codex / zcode 同为「计划模式不续跑」。
-3. **达成判定走服务端评估器**（Claude 口径）：每轮落定后 `runtime.completeSimple` 判定，输出
-   `{achieved, reason, nextStep}`。模型无专用完成工具。
+3. **达成判定工具优先、服务端校验兜底**：模型调 `goal_complete` / `goal_blocked` 即结算（工具优先）；
+   没调才在每轮落定后由 `runtime.completeSimple` 判定，输出 `{achieved, reason, nextStep}`（兜底）。
+   两条路共用一个状态机与状态守卫——迟到的工具调用由 `GoalService` 的 active 守卫兜住。
 4. **状态存 `session` 表单列 `goal_state`（JSON）**，归「会话状态组」。删库重建会丢目标（与 `mode` 同口径，不做迁移）。
 5. **`/goal` 由客户端识别 + 专用 `goals/*` 接口**，不进 `messages/prompt`。
 6. **三层止损**（对齐其他家）：
@@ -128,7 +131,8 @@
 
 - **模式不是安全边界**：目标模式同样防不住提示注入；止损只降低代价，不构成隔离。
 - **校验器不独立取证**：它只看转录与工具摘要，不能核对文件系统；「实据」靠提示词约束模型自查。
-- **校验调用不计入用量**：`completeSimple` 不进 JSONL，因此 goal 的 token 预算不含校验开销。
+- **校验调用也计入用量**：校验的 `usage` 会落成会话文件里的 `usage` 条目（`kind = goal_verify`），
+  因此 goal 的 token 预算与全局统计都含这笔开销（见「十二、收口轮」）。
 - **续跑与用户输入的竞态**：只在 `agent_settled` 且空闲时续跑；单会话在途守卫避免重复校验；
   与用户新轮次的极小竞态按「用户优先」处理（用户轮次会自然接管）。
 - **掉库即丢**：`goal_state` 不随 JSONL 重建，删 `app.db` 后目标清空（与 `mode` 同口径）。
@@ -153,10 +157,11 @@
 - **校验复用记忆的交流摘取**：`textOf` / `sliceExchange` 抽到 `agent/transcript.ts`，记忆与目标各按自己的
   轮数 / 字符上限调用，去掉 goal → memory 的跨功能依赖。
 - **无进展口径**：比较最后一条 assistant 正文规范化后的结果，连续 3 轮无工具调用即暂停；
-  `noProgress` / `lastText` 随状态一起存库，跨回收保持。
+  `noProgress` / `lastText` 随状态一起存库，跨回收保持（但**恢复时归零**，见「十二、收口轮」）。
 - **首版 kickoff / continuation 以 `<goal>` 开头**，侧栏标题因此显示 `<goal>`（标题取首条用户消息首行）；
   改为以「目标：…」开头（用户可读、也是标题来源），把「这是任务数据不是系统指令」的声明紧随其后。
-- **用量口径**：`usageOf(sinceMs = startedAt)` 现算，校验调用经 `completeSimple`、不进 JSONL，不计入。
+- **用量口径**：`usageOf(sinceMs = startedAt)` 现算；校验调用经 `completeSimple`，其 `usage` 现在会落成
+  `usage` 条目并计入（收口轮补上，见「十二、收口轮」）。
 - **验收**：`pnpm check` 全绿（**236 单测** + 6 项约定校验，较阶段 10 的 208 增 28）。
   真实服务 curl 走通——`goals/set` 启动第一轮即由校验判达成并 `completed`、`tokensUsed` 正确；
   plan 模式设置 → 400；`pause`（`user`）/ `resume` / `clear` 与 `sessions/info.goal` 均符合预期；
@@ -165,5 +170,31 @@
 - **未做**：L3 `app.request` 集成测试（沿用阶段 10 口径，只覆盖 L2 + 真实服务 curl）；
   真实服务里没构造出「必然需要续跑」的用例（简单目标一轮即达成），三层止损由单测覆盖；
   「校验期间清除 / 替换」的竞态由单测按可控时序覆盖。
-- **已知边界**：与「风险与边界」一致——校验器不独立取证、校验调用不计用量、
-  `goal_state` 掉库即丢；`/goal` 只在客户端识别（其它客户端需直接调 `goals/*` 接口）。
+- **已知边界**：与「风险与边界」一致——校验器不独立取证、`goal_state` 掉库即丢；
+  `/goal` 只在客户端识别（其它客户端需直接调 `goals/*` 接口）。
+
+## 十二、收口轮（工具优先结算、逐轮回看、预算入口）
+
+首版落地后的五项收口，方向与落点如下（决策已拍定，不再重开方案评审）：
+
+1. **模型侧完成工具**（决策 3 改为「工具优先、服务端校验兜底」）：新增 `goal_complete` / `goal_blocked`，
+   按目标状态**条件注册**（同记忆工具，见 `docs/modes-and-permissions.md`）；`goal_blocked` 新增暂停原因 `blocked`。
+   pi 没有「工具结果即终止本轮」的机制，工具之后模型可能再写一段：靠 `promptGuidelines` 约束，
+   **不用** `pool.abort`（那会被当成 `interrupted`）。工具按「装配那一刻有无 active 目标」注册，
+   完成 / 受阻后不会立即摘掉（状态守卫兜住迟到调用），下次装配自然消失。
+   这带出本次唯一的架构让步：`goals/set` 与恢复在起轮前 `pool.dispose` 一次，让新装配挂上工具
+   （会话文件是权威，重建不丢上下文，且这两处都已确认会话空闲）。
+2. **校验开销进账**：校验调用的 `usage` 落成 `usage` 条目（`kind = goal_verify`），**先记账再算 `tokensUsed`**，
+   使目标预算与全局用量都含这笔开销。代价是与历史数据口径不同（见 `plans/usage-stats-refactor.md` 的「口径不变」前提）。
+3. **逐轮分隔线与逐轮列表**：`ucode.goal-prompt` 与它那一轮的结论按**条目顺序**配对（暂停后恢复会沿用同一轮号，
+   按轮号配会把两轮并到一起），合成消息区的一条细线（未配对仍走合成输入行）；目标栏的「第 N 轮」可展开同一份配对结果。
+   记录新增 `turnTokens` / `turnToolCalls` / `turnMs` 三个逐轮字段，`event` 新增 `budget`。
+4. **预算入口**：目标栏内联编辑（回车提交 / Esc 取消 / 空串即取消上限）+ `POST /goals/budget`（patch 语义：
+   只改上限，不动轮数与校验结果、不轮换 id、不起轮）。
+5. **恢复只重置无进展计数**（`noProgress` / `lastText` 归零），`turns` / `startedAt` / `verification` 保留。
+
+顺带：六个 `goals/*` 接口统一拒子会话（400）；失败反馈接进 `ErrorToaster`（`goal` store 的 `error`）；
+`sessionManager.appendUsage` 这条路径独立于模型回合，是校验开销能被统计认出的前提。
+
+**已知边界**：`goal_complete` 之后模型可能继续输出一段（见上）；校验器仍不独立取证；
+逐轮记录只在会话文件里，历史被压缩掉的轮次在界面上无处可归（不消费、不展示）。

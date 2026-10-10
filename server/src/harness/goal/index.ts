@@ -13,7 +13,7 @@ import {
   type GoalView,
 } from "@ucode/contracts";
 
-import { GOAL_MAX_TURNS, GOAL_NO_PROGRESS_TURNS } from "../../constants";
+import { GOAL_MAX_TURNS, GOAL_NO_PROGRESS_TURNS, GOAL_VERIFY_USAGE_KIND } from "../../constants";
 import type { SessionEventBus } from "../../core/event-bus";
 import type { SessionRecord, SessionRepository } from "../../db/session-repository";
 import { logger } from "../../lib/logger";
@@ -32,6 +32,7 @@ import {
 } from "./state";
 import {
   collectGoalEvidence,
+  type GoalVerifyUsage,
   lastAssistantActivity,
   lastAssistantStopReason,
   runGoalVerification,
@@ -76,11 +77,76 @@ export class GoalService {
     return this.persist(record, pauseGoal(state, cause), live, { event: "pause", cause });
   }
 
-  /** 恢复；只有 `paused` 才生效 */
+  /**
+   * 恢复；只有 `paused` 才生效。
+   * 无进展计数归零，本轮起点回填成当前累计用量——纯状态机不知道用量，只能在这里补。
+   */
   resume(record: SessionRecord, live?: AgentSession): GoalView | null {
     const state = parseGoalState(record.goalState);
     if (state?.status !== "paused") return this.view(record, live);
-    return this.persist(record, resumeGoal(state), live, { event: "resume" });
+    return this.persist(
+      record,
+      { ...resumeGoal(state), tokensAtTurnStart: this.tokensUsed(state, record, live) },
+      live,
+      { event: "resume" },
+    );
+  }
+
+  /** 只改 token 预算（不动轮数 / 校验结果 / 身份 id）；无目标时返回 null */
+  setBudget(
+    record: SessionRecord,
+    tokenBudget: number | null,
+    live?: AgentSession,
+  ): GoalView | null {
+    const state = parseGoalState(record.goalState);
+    if (!state) return null;
+    return this.persist(
+      record,
+      { ...state, tokenBudget, updatedAt: new Date().toISOString() },
+      live,
+      { event: "budget" },
+    );
+  }
+
+  /**
+   * 模型侧报告目标达成（`goal_complete` 工具）：状态守卫在 `onSettled` 之前短路，
+   * 这一轮不再跑校验。非 `active` 时只回视图（迟到的工具调用不重复结算）。
+   */
+  completeByModel(record: SessionRecord, summary: string, live?: AgentSession): GoalView | null {
+    const state = parseGoalState(record.goalState);
+    if (state?.status !== "active") return this.view(record, live);
+    const now = new Date().toISOString();
+    const tokensUsed = this.tokensUsed(state, record, live);
+    const view = this.persist(
+      record,
+      completeGoal(state, { achieved: true, reason: summary, nextStep: "", at: now }, now),
+      live,
+      {
+        event: "completed",
+        verdict: { achieved: true, reason: summary, nextStep: "" },
+        tokensUsed,
+        ...this.turnMetrics(state, live, tokensUsed, now),
+      },
+    );
+    // 目标完成会在对话里留一条线，界面得重取快照才看得见
+    this.events.emitFrame(record.id, "transcript_reset", { fromEntryId: "" });
+    return view;
+  }
+
+  /** 模型侧报告受阻（`goal_blocked` 工具）：按 `blocked` 暂停，原因写进校验结论供回看 */
+  blockByModel(record: SessionRecord, reason: string, live?: AgentSession): GoalView | null {
+    const state = parseGoalState(record.goalState);
+    if (state?.status !== "active") return this.view(record, live);
+    const now = new Date().toISOString();
+    const tokensUsed = this.tokensUsed(state, record, live);
+    const text = reason.trim();
+    return this.persist(record, pauseGoal(state, "blocked", now), live, {
+      event: "pause",
+      cause: "blocked",
+      tokensUsed,
+      ...(text ? { verdict: { achieved: false, reason: text, nextStep: "" } } : {}),
+      ...this.turnMetrics(state, live, tokensUsed, now),
+    });
   }
 
   /** 清除目标；不中断当前轮 */
@@ -124,9 +190,9 @@ export class GoalService {
     this.verifying.add(sessionId);
     try {
       const evidence = collectGoalEvidence(session.messages);
-      let verdict: Awaited<ReturnType<typeof runGoalVerification>>;
+      let outcome: Awaited<ReturnType<typeof runGoalVerification>>;
       try {
-        verdict = await runGoalVerification({
+        outcome = await runGoalVerification({
           runtime: session.modelRuntime,
           model,
           objective: state.objective,
@@ -144,10 +210,14 @@ export class GoalService {
         return null;
       }
 
+      // 这笔 token 无论结论是否被采用都已经花掉：先记账，之后的 tokensUsed 才算得上「含校验开销」
+      this.recordVerificationUsage(session, outcome.usage);
+
       const current = this.activeStateOf(sessionId, activationId);
       if (!current) return null;
 
       const now = new Date().toISOString();
+      const verdict = outcome.verdict;
       if (verdict?.achieved) {
         const achieved = {
           achieved: true,
@@ -161,6 +231,7 @@ export class GoalService {
           event: "completed",
           verdict: { achieved: true, reason: verdict.reason, nextStep: verdict.nextStep },
           tokensUsed,
+          ...this.turnMetrics(current, session, tokensUsed, now),
         });
         // 目标完成会在对话里留一条线，界面得重取快照才看得见
         if (view) this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
@@ -198,6 +269,7 @@ export class GoalService {
           nextStep: next.verification?.nextStep ?? "",
         },
         tokensUsed,
+        ...this.turnMetrics(current, session, tokensUsed, now),
       });
       if (next.tokenBudget !== null && tokensUsed >= next.tokenBudget) {
         this.persist(record, pauseGoal(next, "budget", now), session, {
@@ -221,7 +293,7 @@ export class GoalService {
         return null;
       }
 
-      next = advanceTurn(next, now);
+      next = advanceTurn(next, tokensUsed, now);
       this.persist(record, next, session);
       return {
         continue: {
@@ -302,5 +374,45 @@ export class GoalService {
       ...(live ? { live } : {}),
       ...(Number.isFinite(sinceMs) ? { sinceMs } : {}),
     }).totalTokens;
+  }
+
+  /**
+   * 本轮的规模与耗时：用量增量按轮起点差算，工具调用数取最后一条 assistant 的调用数。
+   * 耗时只在两个时间点都能解析时给——存量目标的 `turnStartedAt` 是空串。
+   */
+  private turnMetrics(
+    state: GoalState,
+    live: AgentSession | undefined,
+    tokensUsed: number,
+    now: string,
+  ): Pick<GoalRecord, "turnTokens" | "turnToolCalls" | "turnMs"> {
+    const startedMs = Date.parse(state.turnStartedAt);
+    const nowMs = Date.parse(now);
+    return {
+      turnTokens: Math.max(0, tokensUsed - state.tokensAtTurnStart),
+      turnToolCalls: live ? lastAssistantActivity(live.messages).toolCalls : 0,
+      ...(Number.isFinite(startedMs) && Number.isFinite(nowMs) && nowMs >= startedMs
+        ? { turnMs: nowMs - startedMs }
+        : {}),
+    };
+  }
+
+  /**
+   * 校验调用的用量落成会话里的 `usage` 条目：它不经过模型回合，不记就既不进目标预算也不进全局统计。
+   * 写盘失败不影响判定，故全程 best-effort。
+   */
+  private recordVerificationUsage(session: AgentSession, usage: GoalVerifyUsage | null): void {
+    if (!usage) return;
+    try {
+      session.sessionManager.appendUsage(
+        GOAL_VERIFY_USAGE_KIND,
+        usage.provider,
+        usage.model,
+        usage.usage,
+        "目标达成校验",
+      );
+    } catch (error) {
+      logger.warn({ error }, "写入目标校验用量失败");
+    }
   }
 }

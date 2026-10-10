@@ -141,7 +141,7 @@ const goalRecordItem = (id: string, record: GoalRecord): ChatItem => ({
 });
 
 describe("目标完成与合成输入", () => {
-  it("合成输入只占一条细线，不再当用户消息", () => {
+  it("目标注入与结论并成一条逐轮行，计划批准仍是合成输入行", () => {
     const items = [
       userItem("u1", "继续"),
       assistantItem("a1", [text("好的")]),
@@ -149,13 +149,63 @@ describe("目标完成与合成输入", () => {
         kind: "continuation",
         turn: 3,
       }),
+      goalRecordItem("g1", {
+        event: "verdict",
+        turns: 3,
+        verdict: { achieved: false, reason: "还差测试", nextStep: "跑测试" },
+        at: AT,
+      }),
       injectedItem("i2", PLAN_APPROVED_CUSTOM_TYPE, "计划已批准，请开始执行。"),
     ];
     const rows = buildChatRows(items);
 
     assert.deepEqual(
       rows.map((row) => row.kind),
-      ["content", "content", "injected", "injected"],
+      ["content", "content", "goalTurn", "injected"],
+    );
+    const turn = rows[2];
+    if (turn?.kind !== "goalTurn") throw new Error("应是目标逐轮行");
+    assert.equal(turn.node.turn.kind, "continuation");
+    assert.equal(turn.node.turn.turn, 3);
+    assert.equal(turn.node.turn.outcome?.reason, "还差测试");
+  });
+
+  it("逐轮行处在轮末也不抢走页脚，页脚仍落在真正回答的那一行", () => {
+    const items = [
+      userItem("u1", "问一句"),
+      assistantItem("a1", [text("答一句")]),
+      injectedItem("i1", GOAL_PROMPT_CUSTOM_TYPE, "目标：继续", { kind: "continuation", turn: 1 }),
+      goalRecordItem("g1", { event: "verdict", turns: 1, at: AT }),
+    ];
+    const rows = buildChatRows(items);
+
+    assert.deepEqual(
+      rows.map((row) => row.kind),
+      ["content", "content", "goalTurn"],
+    );
+    const owner = rows.find((row) => "footer" in row && row.footer) as
+      | { footer?: { item: ChatItem } }
+      | undefined;
+    assert.equal(owner?.footer?.item.role, "assistant");
+  });
+
+  it("开轮条目被压缩掉时，完成仍单独成线（兜底）", () => {
+    const items = [
+      userItem("u1", "跑吧"),
+      assistantItem("a1", [text("做完了")]),
+      goalRecordItem("g1", {
+        event: "completed",
+        status: "completed",
+        turns: 2,
+        verdict: { achieved: true, reason: "测试全绿", nextStep: "" },
+        at: AT,
+      }),
+    ];
+    const rows = buildChatRows(items);
+
+    assert.deepEqual(
+      rows.map((row) => row.kind),
+      ["content", "content", "goal"],
     );
   });
 

@@ -9,6 +9,8 @@ import { useStore } from "./use-store";
 export type GoalController = {
   goal: GoalView | null;
   set: (sessionId: string, input: GoalInput) => Promise<void>;
+  /** 只改预算（null 表示不限） */
+  setBudget: (sessionId: string, tokenBudget: number | null) => Promise<void>;
   pause: (sessionId: string) => Promise<void>;
   resume: (sessionId: string) => Promise<void>;
   clear: (sessionId: string) => Promise<void>;
@@ -26,6 +28,7 @@ export function useGoal(sessionId: string | null): GoalController {
   return {
     goal: sessionId ? (state.bySession[sessionId] ?? null) : null,
     set: client.goal.set,
+    setBudget: client.goal.setBudget,
     pause: client.goal.pause,
     resume: client.goal.resume,
     clear: client.goal.clear,

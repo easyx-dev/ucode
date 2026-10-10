@@ -12,6 +12,7 @@ import type { ChatItem, EditMessagePayload } from "../lib/types";
 import { ActivityGroup } from "./activity-group";
 import { CompactionDivider } from "./compaction-divider";
 import { GoalDivider } from "./goal-divider";
+import { GoalTurnLine } from "./goal-turn-line";
 import { InjectedLine } from "./injected-line";
 import { MessageItem } from "./message-item";
 import { PermissionRecordView } from "./permission-record";
@@ -62,6 +63,8 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
     );
   } else if (row.kind === "goal") {
     body = <GoalDivider record={row.node.record} />;
+  } else if (row.kind === "goalTurn") {
+    body = <GoalTurnLine turn={row.node.turn} />;
   } else if (row.kind === "retry") {
     body = <RetryLine record={row.node.record} />;
   } else if (row.kind === "content") {

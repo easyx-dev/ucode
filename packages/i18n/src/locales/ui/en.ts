@@ -300,6 +300,7 @@ export default {
   "放弃这组问题，本轮按没有答复继续": "Discard these questions and continue without answers",
   提交: "Submit",
   "{{turns}} 轮 · {{tokens}}": "{{turns}} turns · {{tokens}}",
+  未达成: "Not achieved",
   目标启动: "Goal started",
   "目标续跑 · 第 {{turn}} 轮": "Goal continued · round {{turn}}",
   目标恢复: "Goal resumed",
@@ -584,11 +585,10 @@ export default {
   达到轮数上限: "Paused: turn limit",
   达到用量上限: "Paused: token budget",
   生成出错已暂停: "Paused: error",
-  设置目标失败: "Failed to set the goal",
-  暂停目标失败: "Failed to pause the goal",
-  恢复目标失败: "Failed to resume the goal",
-  清除目标失败: "Failed to clear the goal",
-  目标加载失败: "Failed to load the goal",
+  因受阻暂停: "Paused: blocked",
+  目标轮次: "Goal rounds",
+  设置预算: "Set budget",
+  "输入 token 上限，留空表示不限": "Enter a token limit; leave it empty for no limit",
 
   // Composer commands
   内置动作: "Built-in",

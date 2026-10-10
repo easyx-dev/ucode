@@ -69,6 +69,7 @@
 | POST | `/api/v1/commands/list` | 列出可用的提示词命令与技能 |
 | POST | `/api/v1/goals/set` | 设定 / 替换当前会话目标 |
 | POST | `/api/v1/goals/status` | 查看当前会话目标状态 |
+| POST | `/api/v1/goals/budget` | 只改目标的 token 预算（不动轮数与校验结果） |
 | POST | `/api/v1/goals/pause` | 暂停目标自动续跑 |
 | POST | `/api/v1/goals/resume` | 恢复目标自动续跑 |
 | POST | `/api/v1/goals/clear` | 清除当前会话目标 |
@@ -1272,6 +1273,24 @@
 | `sessionId` | string | 是 | — |
 | `goal` | [GoalView](#goalview) \| null | 是 | 当前目标；已清除或从未设置时为空 |
 
+### POST /api/v1/goals/budget
+
+只改目标的 token 预算（不动轮数与校验结果）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+| `tokenBudget` | integer（>0） \| null | 是 | — | — |
+
+**响应类型**：`GoalResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `goal` | [GoalView](#goalview) \| null | 是 | 当前目标；已清除或从未设置时为空 |
+
 ### POST /api/v1/goals/pause
 
 暂停目标自动续跑
@@ -1539,10 +1558,10 @@
 | --- | --- | --- | --- |
 | `objective` | string | 是 | — |
 | `status` | "active" \| "paused" \| "completed" | 是 | — |
-| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
+| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
 | `turns` | number | 是 | 已自动续跑的轮数（不含用户触发的那轮） |
 | `tokenBudget` | number \| null | 是 | token 预算；为空表示不限 |
-| `tokensUsed` | number | 是 | 目标开始后本会话累计消耗的 token（不含校验调用） |
+| `tokensUsed` | number | 是 | 目标开始后本会话累计消耗的 token（含校验调用） |
 | `startedAt` | string | 是 | 目标设定时间（ISO 8601），也是用量统计的起点 |
 | `updatedAt` | string | 是 | — |
 | `verification` | [GoalVerification](#goalverification) \| null | 是 | 最近一次校验结果；还没校验过时为空 |
@@ -1918,12 +1937,15 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `event` | "set" \| "completed" \| "pause" \| "resume" \| "clear" \| "verdict" | 是 | — |
+| `event` | "set" \| "completed" \| "budget" \| "pause" \| "resume" \| "clear" \| "verdict" | 是 | — |
 | `status` | "active" \| "paused" \| "completed" | 否 | 本次事件后的状态（`clear` 时缺省） |
-| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" | 否 | `pause` 专用：暂停原因 |
+| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" | 否 | `pause` 专用：暂停原因 |
 | `turns` | number | 否 | 目标激活后累计的轮数 |
+| `turnTokens` | number | 否 | 本轮的用量增量（token），含本轮校验开销；`verdict` 与 `completed` 都带 |
+| `turnToolCalls` | number | 否 | 本轮的工具调用次数；`verdict` 与 `completed` 都带 |
+| `turnMs` | number | 否 | 本轮耗时（毫秒）；起止时间可解析时才带 |
 | `verdict` | object | 否 | 校验结论；`verdict` 与 `completed` 都带 |
-| `tokensUsed` | number | 否 | 本轮的用量累计（token）；存储态只给当前值，历史需要自己带 |
+| `tokensUsed` | number | 否 | 本轮的用量累计（token，含校验开销）；存储态只给当前值，历史需要自己带 |
 | `objective` | string | 否 | 目标正文；只在 `set` 时带，其余从存储态能看出 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 

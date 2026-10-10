@@ -42,6 +42,7 @@
 | `StatsSummaryResponse` 的形状 | 已上线 | 只**加**字段，不改既有字段与口径 |
 | `ContextUsage` 的归属 | 与统计同文件 | 迁到 `stats/context.ts`（类型不变） |
 | 会话级 `usage` / `contextUsage`（`describeSession`） | 已上线 | 不变 |
+| 用量口径 | 已上线 | 加一笔新开销：目标校验调用此前不入账，现在会落成 `usage` 条目（`kind = goal_verify`，见 `stage-11-goal.md`「十二、收口轮」）；字段与算法不变，但历史数据与之后的统计会有一层差異 |
 | 实时性 | 会话级走 `session_updated` 帧 | 不变；步级与命中率走 HTTP 聚合接口，不新开实时通道 |
 | 成本 | 只用 token、不计成本 | **不变**（`stage-10-usage-stats.md` 的定稿取舍） |
 | `ucode.step` 下发界面 | 不下发（只在文件里） | 不变（聚合在服务端算，不把逐条记录推给客户端） |

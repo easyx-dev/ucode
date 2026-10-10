@@ -24,7 +24,7 @@ export type GoalView = {
   turns: number;
   /** token 预算；为空表示不限 */
   tokenBudget: number | null;
-  /** 目标开始后本会话累计消耗的 token（不含校验调用） */
+  /** 目标开始后本会话累计消耗的 token（含校验调用） */
   tokensUsed: number;
   /** 目标设定时间（ISO 8601），也是用量统计的起点 */
   startedAt: string;

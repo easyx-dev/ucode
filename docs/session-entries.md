@@ -28,7 +28,7 @@
 | `custom_message` | 是（转 user 文本） | 合成输入，见下表 | 按 `customType` 决定 |
 | `custom` | 否 | 本项目的观测与状态记录，见下表 | 白名单放行 |
 | `context_edit` | 是（改写目标条目的内容） | 旧工具输出清理（prune）写它 | 不展示 |
-| `usage` | 否 | pi 记的每轮用量 | 不展示（用量面板另走统计） |
+| `usage` | 否 | pi 记的每轮用量，含目标校验调用记的 `goal_verify` 一条 | 不展示（用量面板另走统计） |
 | `model_change` / `thinking_level_change` | 是（作为边界） | 模型 / 思考档位切换 | 不展示 |
 | `label` / `session_info` / `branch_summary` | 否 / 视情况 | 暂未使用 | 不展示 |
 
@@ -39,7 +39,7 @@
 | `ucode.step` | custom | `{ turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/telemetry` | 不展示 |
 | `ucode.permission-decision` | custom | `{ tool, subject, scope, decision, sourceSessionId?, sourceDescription? }` | `server/src/core/pool.ts` | 展示成审批记录 |
 | `ucode.compaction` | custom | `{ reason, outcome, tokensBefore?, tokensAfter?, keptFrom?, skip?, error?, at }`（`reason` 取 `manual` / `threshold` / `overflow`，`outcome` 取 `done` / `skipped` / `failed`） | `server/src/core/pool.ts` | 展示成压缩分隔行 |
-| `ucode.goal` | custom | `{ event, status?, cause?, turns?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `verdict` / `completed`） | `server/src/harness/goal` | 只展示 `completed`（目标完成细线） |
+| `ucode.goal` | custom | `{ event, status?, cause?, turns?, turnTokens?, turnToolCalls?, turnMs?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `budget` / `verdict` / `completed`）；`turnTokens` 是本轮用量增量（含本轮校验开销），`turnToolCalls` / `turnMs` 是本轮的调用数与耗时 | `server/src/harness/goal` | `completed` 并进它那一轮的分隔行，找不到开轮条目时才单独成线；其余不展示 |
 | `ucode.goal-prompt` | custom_message | 正文是注入的目标指令；`details` 为 `{ kind: kickoff \| continuation \| resume, turn? }` | `server/src/core/pool.ts`、`server/src/core/run.ts` | 展示成细线（目标启动 / 续跑 / 恢复） |
 | `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/core/run.ts` | 展示成细线（计划已批准） |
 | `ucode.plan-ignored` | custom | `{ at }` | `server/src/routes/messages` | 展示成「已忽略计划」 |
@@ -52,7 +52,7 @@
 | `ucode.memory-review` | custom | `{ file, title, at }` | `server/src/harness/memory` | 不展示 |
 
 `decision` 取值见契约的 `PERMISSION_DECISIONS`（`allow_once` / `allow_session` / `deny`）；
-`ucode.goal` 的 `cause` 取值见 `GOAL_PAUSE_CAUSES`。
+`ucode.goal` 的 `cause` 取值见 `GOAL_PAUSE_CAUSES`（`blocked` 由模型调 `goal_blocked` 报的受阻）。
 
 ## 约定
 

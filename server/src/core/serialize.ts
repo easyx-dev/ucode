@@ -332,7 +332,19 @@ const retryRecordOf = (data: unknown): RetryRecord | null => {
  */
 const goalRecordOf = (data: unknown): GoalRecord | null => {
   if (!isRecord(data)) return null;
-  const { event, status, cause, turns, verdict, tokensUsed, objective, at } = data;
+  const {
+    event,
+    status,
+    cause,
+    turns,
+    turnTokens,
+    turnToolCalls,
+    turnMs,
+    verdict,
+    tokensUsed,
+    objective,
+    at,
+  } = data;
   if (
     typeof event !== "string" ||
     !(GOAL_RECORD_EVENTS as readonly string[]).includes(event) ||
@@ -345,6 +357,9 @@ const goalRecordOf = (data: unknown): GoalRecord | null => {
     ...(status === "active" || status === "paused" || status === "completed" ? { status } : {}),
     ...(typeof cause === "string" ? { cause: cause as GoalPauseCause } : {}),
     ...(typeof turns === "number" ? { turns } : {}),
+    ...(typeof turnTokens === "number" ? { turnTokens } : {}),
+    ...(typeof turnToolCalls === "number" ? { turnToolCalls } : {}),
+    ...(typeof turnMs === "number" ? { turnMs } : {}),
     ...(isRecord(verdict) && typeof verdict.reason === "string"
       ? {
           verdict: {

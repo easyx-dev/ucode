@@ -247,6 +247,12 @@ export const GOAL_EVIDENCE_MAX_USER_TURNS = 3;
 /** 目标校验时交流文本的字符上限 */
 export const GOAL_EVIDENCE_MAX_CHARS = 12_000;
 
+/**
+ * 目标校验调用的用量条目类型（`usage` 条目的 `kind`）。
+ * 它不经过模型回合，得自己落一条才能进目标预算与全局统计。
+ */
+export const GOAL_VERIFY_USAGE_KIND = "goal_verify";
+
 /** pino 支持的日志级别 */
 export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "silent"] as const;
 

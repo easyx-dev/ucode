@@ -10,7 +10,9 @@ import type { WebsearchConfig } from "@ucode/contracts";
 
 import { parseCustomAgent } from "../../agents";
 import type { SubagentHooks } from "../../subagents";
-import { buildCustomTools, DEFAULT_BUILTIN_TOOLS } from "../index";
+import type { GoalToolHooks } from "../goal";
+import { GOAL_BLOCKED_TOOL } from "../goal";
+import { buildCustomTools, DEFAULT_BUILTIN_TOOLS, GOAL_TOOL_NAMES } from "../index";
 import type { QuestionHooks } from "../question";
 
 const readConfig = (): WebsearchConfig => ({ provider: "tavily", apiKey: "", baseUrl: "" });
@@ -45,6 +47,24 @@ const build = buildCustomTools({
   subagents,
 });
 const plan = buildCustomTools({ names: PLAN_NAMES, readWebsearchConfig: readConfig, question });
+
+const goal: GoalToolHooks = { complete: () => {}, block: () => {} };
+/** 有 active 目标时装配层会把这些名字并进可用集合（见 `session-config`） */
+const withGoal = buildCustomTools({
+  names: [...BUILD_NAMES, ...GOAL_TOOL_NAMES],
+  readWebsearchConfig: readConfig,
+  question,
+  subagents,
+  goal,
+});
+/** 角色白名单只声明其中一个：两个工具各按自己的名字判定，不该整对挂上 */
+const withBlockedOnly = buildCustomTools({
+  names: [...BUILD_NAMES, GOAL_BLOCKED_TOOL],
+  readWebsearchConfig: readConfig,
+  question,
+  subagents,
+  goal,
+});
 
 const namesOf = (tools: readonly { name: string }[]): string[] =>
   tools.map((tool) => tool.name).sort();
@@ -105,8 +125,23 @@ describe("buildCustomTools", () => {
     assert.deepEqual(agentOptions(tool).sort(), ["reviewer", "secret"]);
   });
 
+  it("目标结算工具只在注入钩子时注册", () => {
+    assert.ok(!namesOf(build).includes("goal_complete"), "无钩子不注册");
+    assert.deepEqual(
+      namesOf(withGoal).filter((name) => (GOAL_TOOL_NAMES as readonly string[]).includes(name)),
+      ["goal_blocked", "goal_complete"],
+    );
+  });
+
+  it("只声明一个目标工具时只挂那一个", () => {
+    assert.deepEqual(
+      namesOf(withBlockedOnly).filter((name) => name.startsWith("goal_")),
+      ["goal_blocked"],
+    );
+  });
+
   it("自研工具都带系统提示词片段", () => {
-    for (const tool of [...build, ...plan]) {
+    for (const tool of [...build, ...plan, ...withGoal, ...withBlockedOnly]) {
       assert.ok(tool.description.length > 0, `${tool.name} 缺少 description`);
       assert.ok(tool.promptSnippet, `${tool.name} 缺少 promptSnippet`);
     }

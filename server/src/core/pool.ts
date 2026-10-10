@@ -52,6 +52,7 @@ import {
 import type { SkillIndex } from "../harness/assets";
 import { matchSkillHit, matchSkillInvoke } from "../harness/assets/skill-hit";
 import type { GoalService } from "../harness/goal";
+import { parseGoalState } from "../harness/goal/state";
 import type { PromptImage } from "../harness/image";
 import type { MemoryService } from "../harness/memory";
 import type { PermissionRule, SessionAllowStore } from "../harness/permissions";
@@ -59,6 +60,7 @@ import { pruneToolOutputs } from "../harness/prune";
 import { assembleSession, contextBudgetFor, resolveSessionCwd } from "../harness/session-config";
 import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/subagents";
 import { StepTelemetry } from "../harness/telemetry";
+import type { GoalToolHooks } from "../harness/tools/goal";
 import type { UsageService } from "../harness/usage";
 import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
 import { logger } from "../lib/logger";
@@ -665,6 +667,7 @@ export class SessionPool {
       capability,
       ...(parentRules ? { parentRules } : {}),
       ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
+      ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
       agentRegistry: registry,
       websearch: this.websearch,
       permission: {
@@ -854,6 +857,28 @@ export class SessionPool {
 
   get(sessionId: string): AgentSession | undefined {
     return this.entries.get(sessionId)?.session;
+  }
+
+  /**
+   * 目标结算工具通道：只在会话有 active 目标时给工具，工具内部每次都重读记录再转发给 `GoalService`。
+   *
+   * 目标工具按「装配那一刻有无 active 目标」注册，完成 / 受阻后不会立即摘掉（状态守卫兜住迟到调用）；
+   * 重读是为了让工具拿到最新的身份 id 与状态，而不是装配时的快照。
+   */
+  private goalHooks(record: SessionRecord): GoalToolHooks | undefined {
+    if (parseGoalState(record.goalState)?.status !== "active") return undefined;
+    return {
+      complete: (summary) => {
+        const current = this.repository.find(record.id);
+        if (!current) return;
+        this.goals.completeByModel(current, summary, this.get(record.id));
+      },
+      block: (reason) => {
+        const current = this.repository.find(record.id);
+        if (!current) return;
+        this.goals.blockByModel(current, reason, this.get(record.id));
+      },
+    };
   }
 
   isRunning(sessionId: string): boolean {

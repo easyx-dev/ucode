@@ -36,6 +36,18 @@
 
 ### 新增
 
+- **目标模式的收口**（阶段 11 的后续，`68abc27` 之后的五项）：
+  - 新增模型侧结算工具 `goal_complete` / `goal_blocked`：调了即结算（工具优先），没调才跑服务端校验兜底；
+    `goal_blocked` 新增暂停原因 `blocked`。两个工具按目标状态**条件注册**（同记忆工具，见 `docs/modes-and-permissions.md`），
+    因此 `goals/set` 与恢复会在起轮前把会话重装一次（会话文件是权威，重建不丢上下文）。
+  - 新增 `POST /api/v1/goals/budget`：只改 token 上限（不动轮数与校验结果、不轮换 id、不起轮），
+    对应目标栏里点用量即可内联编辑（回车提交 / Esc 取消 / 留空即不限）。
+  - 消息区新增目标逐轮分隔行：目标注入与它那一轮的结论按条目顺序配对合成一条线（展开看判据与下一步），
+    目标栏的「第 N 轮」可展开同一份逐轮列表。目标记录（`ucode.goal`）新增 `turnTokens` / `turnToolCalls` /
+    `turnMs` 与 `event: "budget"`，条目登记见 `docs/session-entries.md`。
+  - 校验开销进账：校验调用的 `usage` 落成会话里的 `usage` 条目（`kind = goal_verify`），
+    先记账再算 `tokensUsed`，目标预算与全局统计因此都含这笔开销。
+
 - **模型请求重试的记录与展示**：回合级重试上限从 pi 默认的 3 提到 5（`RETRY_MAX_ATTEMPTS`，只改回合级、
   provider 层保持不重试），并把 `auto_retry_start` / `auto_retry_end` 落成 `ucode.retry` 条目：
   `start` 与最终失败下发展示为一条细线（带上等待时长与上游错误文本，纯文本截断），重试成功那条只落文件。
@@ -141,6 +153,11 @@
   未授权时首次触发顺带请求授权，被拒或不支持则静默降级。
 
 ### 变更
+
+- **目标模式的用量与准入口径**：目标的 `tokensUsed`（及全局用量）自此含校验调用的开销，与之前已落库的历史数据
+  口径不同（见 `plans/usage-stats-refactor.md` 的「用量口径」一行）；六个 `goals/*` 接口统一拒子会话（400，
+  与会话目标的主会话归属一致）；恢复目标时无进展计数归零（暂停期间的空等不再接着累计），
+  轮数 / `startedAt` / 最近一次校验结果保留。
 
 - **「本轮参数」不再展示**：模式 / 权限档位的设置点（`ucode.mode`）不再下发（`MessageDTO` 去掉
   `modeChange`，以及只服务于它的 `mode` / `permissionMode` 两个字段），客户端也不再渲染该细线。
@@ -270,6 +287,12 @@
 - 输入区编辑器上方的附件行（`packages/ui/src/business/composer/attachment-strip.tsx`）：附件改为内联 chip。
 
 ### 修复
+
+- **目标起轮失败时会把目标换回上一个**：`goals/set` / `goals/resume` 的失败分支拿的是请求开头那份会话快照
+  （`goalState` 还是写入前的值），而 `GoalService.pause` 只看传入状态是否 `active`：旧目标是 `active` 时
+  （如刚重启过服务、目标还没在跑）它会把旧 `objective` / 旧 `id` 写回去——刚设的新目标被静默覆盖，
+  界面上只看到一句「生成出错已暂停」；旧目标不是 `active` 时则什么都不写，注释里「别让目标停在 active」
+  的意图落空。改为暂停前重读一行。
 
 - **重复的 `ucode.mode` 设置点**：去重此前只看内存里那份上次值（实例创建时为空、重装后重置），
   于是新会话首轮必定写两条相同记录，服务重启 / 换模型 / 换权限档位导致实例重装后也会再写一条，

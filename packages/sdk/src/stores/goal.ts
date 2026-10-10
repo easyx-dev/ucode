@@ -28,6 +28,8 @@ export type GoalStore = {
   /** 从会话详情补一次目标（切换会话时用） */
   hydrate: (sessionId: string) => Promise<void>;
   set: (sessionId: string, input: GoalInput) => Promise<void>;
+  /** 只改预算；`tokenBudget` 传 null 即取消上限 */
+  setBudget: (sessionId: string, tokenBudget: number | null) => Promise<void>;
   pause: (sessionId: string) => Promise<void>;
   resume: (sessionId: string) => Promise<void>;
   clear: (sessionId: string) => Promise<void>;
@@ -57,7 +59,12 @@ export const createGoalStore = (deps: { apis: Apis; events: EventStream }): Goal
   ): Promise<void> => {
     try {
       const { goal } = await action();
-      write(sessionId, goal);
+      // 成功即清：ErrorToaster 靠对象身份判「新错误」，旧 error 留着会在它重挂载时再弹一次
+      store.setState((prev) => ({
+        ...prev,
+        bySession: { ...prev.bySession, [sessionId]: goal },
+        error: null,
+      }));
     } catch (error) {
       store.setState((prev) => ({ ...prev, error: asApiError(error) }));
     }
@@ -85,6 +92,8 @@ export const createGoalStore = (deps: { apis: Apis; events: EventStream }): Goal
     get: (sessionId) => (sessionId ? (store.getState().bySession[sessionId] ?? null) : null),
     hydrate,
     set: (sessionId, input) => apply(sessionId, () => deps.apis.goals.set({ sessionId, ...input })),
+    setBudget: (sessionId, tokenBudget) =>
+      apply(sessionId, () => deps.apis.goals.budget({ sessionId, tokenBudget })),
     pause: (sessionId) => apply(sessionId, () => deps.apis.goals.pause(sessionId)),
     resume: (sessionId) => apply(sessionId, () => deps.apis.goals.resume(sessionId)),
     clear: (sessionId) => apply(sessionId, () => deps.apis.goals.clear(sessionId)),

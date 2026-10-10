@@ -30,6 +30,8 @@ import {
   type RetryRecord,
   SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
+import { itemText, uidOf } from "./chat-item";
+import { buildGoalTurns, type GoalTurn } from "./goal-turns";
 import { PRESENT_PLAN_TOOL } from "./plan";
 import type { ChatItem } from "./types";
 
@@ -154,6 +156,13 @@ type GoalNode = {
   record: GoalRecord;
 };
 
+/** 一轮目标执行：注入行与它那一轮的结论合成的一条分隔行 */
+type GoalTurnNode = {
+  kind: "goalTurn";
+  key: string;
+  turn: GoalTurn;
+};
+
 export type ChatNode =
   | ContentNode
   | ActivityNode
@@ -162,10 +171,14 @@ export type ChatNode =
   | CompactionNode
   | InjectedNode
   | GoalNode
+  | GoalTurnNode
   | RetryNode;
 
-/** 能承载轮页脚的节点：压缩、合成输入与目标完成都不是回答，没有「本轮模型与耗时」可报 */
-type ChatFooterNode = Exclude<ChatNode, { kind: "compaction" | "injected" | "goal" | "retry" }>;
+/** 能承载轮页脚的节点：压缩、合成输入、目标完成与目标逐轮行都不是回答，没有「本轮模型与耗时」可报 */
+type ChatFooterNode = Exclude<
+  ChatNode,
+  { kind: "compaction" | "injected" | "goal" | "goalTurn" | "retry" }
+>;
 
 type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 
@@ -217,15 +230,6 @@ const questionItemsOf = (args: unknown): QuestionItem[] => {
     ];
   });
 };
-
-const itemText = (item: ChatItem): string =>
-  item.blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
-
-/**
- * 行 key 与轮标识的来源：`uid` 跨「乐观条目 → 权威条目」不变，而 `id` 会在 `message_end` 换成服务端 id。
- * 拿 `id` 当 key 的话，每次落定都会把整行卸载重建——生成中看得到的闪一下。
- */
-export const uidOf = (item: ChatItem): string => item.uid ?? item.id;
 
 /** ISO 时间 → 毫秒；缺失或非法返回 undefined */
 const msOf = (iso?: string): number | undefined => {
@@ -426,6 +430,9 @@ const summaryTextOf = (items: ChatItem[]): string => {
 export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
   const { results, callIds } = indexToolResults(items);
   const skillHits = indexSkillHits(items);
+  // 目标注入与它那一轮的结论配对：配对上的注入行、结论行都并进同一条分隔行
+  const goalTurns = buildGoalTurns(items);
+  const goalTurnByKey = new Map(goalTurns.turns.map((turn) => [turn.key, turn]));
   const nodes: ChatNode[] = [];
   // 摘要挂到**最后一条**记录上：一次会话可能压过多次，只有最新那次配得上前面的摘要
   const lastRecord = [...items].reverse().find((item) => compactionRecordOf(item));
@@ -455,8 +462,14 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
         });
         continue;
       }
-      // 合成输入自成一条细线：它是注入给模型的指令，不是用户发的消息
+      // 合成输入自成一条细线：它是注入给模型的指令，不是用户发的消息；
+      // 目标注入与它那一轮的结论配对时走逐轮分隔行，计划批准这类不配对
       if (isInjected(item)) {
+        const turn = goalTurnByKey.get(uidOf(item));
+        if (turn) {
+          nodes.push({ kind: "goalTurn", key: `goalTurn:${turn.key}`, turn });
+          continue;
+        }
         nodes.push({ kind: "injected", key: uidOf(item), item, text: itemText(item) });
         continue;
       }
@@ -469,8 +482,10 @@ export const buildChatNodes = (items: ChatItem[]): ChatNode[] => {
         nodes.push({ kind: "retry", key: uidOf(item), record: retryRecord });
         continue;
       }
-      // 其它目标记录（每轮校验、暂停原因）只留在会话文件里，不进消息区
+      // 其它目标记录（每轮校验、暂停原因）只留在会话文件里，不进消息区；
+      // 已归轮的连「目标完成」那条也不再单独成行（并进了它那一轮的分隔行）
       if (item.customType === GOAL_RECORD_CUSTOM_TYPE) {
+        if (goalTurns.consumed.has(uidOf(item))) continue;
         const completed = goalCompletionOf(item);
         if (completed) nodes.push({ kind: "goal", key: uidOf(item), record: completed });
         continue;
@@ -525,11 +540,12 @@ const markTurnEnd = (nodes: ChatNode[]): void => {
       turnStartMs = msOf(node.item.createdAt);
       continue;
     }
-    // 压缩、合成输入、目标完成与重试都不是回答，不参与轮末判定（拿它们当轮末会把页脚挂到细线上）
+    // 压缩、合成输入、目标逐轮行、目标完成与重试都不是回答，不参与轮末判定（拿它们当轮末会把页脚挂到细线上）
     if (
       node.kind === "compaction" ||
       node.kind === "injected" ||
       node.kind === "goal" ||
+      node.kind === "goalTurn" ||
       node.kind === "retry"
     ) {
       continue;

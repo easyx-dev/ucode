@@ -18,10 +18,14 @@
 
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
 内置三个，声明在 `server/src/harness/agents/profiles.ts`，工具名清单在 `server/src/harness/tools/names.ts`。
+工具集里有两个条件注册项：记忆工具与目标结算工具（`goal_complete` / `goal_blocked`）只在**会话有 active 目标**
+时挂上（还要是默认工具集的会话，即 `build`），只读模式与子会话都不注册——前者不该有「结算目标」这回事，
+后者不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复会先把会话池里的实例
+重装一次（会话文件是权威，重建不丢上下文）。
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
 | --- | --- | --- | --- | --- | --- |
-| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具） | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
+| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`） | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
 | `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
 | `ask` | 问答 | 只读集 + `subagent`（无 `present_plan`） | `deny` `edit` / `write` / `bash` | `medium` | 只读分析与回答 |
 

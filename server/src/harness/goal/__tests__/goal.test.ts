@@ -64,11 +64,51 @@ describe("目标状态机", () => {
     const resumed = resumeGoal(paused);
     assert.equal(resumed.status, "active");
     assert.equal(resumed.cause, null);
-    const advanced = advanceTurn(advanceTurn(base));
+    const advanced = advanceTurn(advanceTurn(base, 0), 0);
     assert.equal(advanced.turns, 2);
     const done = completeGoal(base, { achieved: true, reason: "ok", nextStep: "", at: "t" });
     assert.equal(done.status, "completed");
     assert.equal(done.cause, null);
+  });
+
+  it("续跑记下本轮起点，供算本轮用量与耗时", () => {
+    const state = startGoal("目标", null, "2026-01-01T00:00:00.000Z");
+    assert.equal(state.tokensAtTurnStart, 0);
+    assert.equal(state.turnStartedAt, "2026-01-01T00:00:00.000Z");
+    const advanced = advanceTurn(state, 1234, "2026-01-01T00:05:00.000Z");
+    assert.equal(advanced.tokensAtTurnStart, 1234);
+    assert.equal(advanced.turnStartedAt, "2026-01-01T00:05:00.000Z");
+  });
+
+  it("恢复只重置无进展计数，轮数与校验结果保留", () => {
+    const paused = pauseGoal(
+      {
+        ...startGoal("目标", null, "2026-01-01T00:00:00.000Z"),
+        turns: 3,
+        noProgress: 2,
+        lastText: "没有进展",
+        verification: { achieved: false, reason: "还差测试", nextStep: "跑测试", at: "t" },
+      },
+      "user",
+    );
+    const resumed = resumeGoal(paused, "2026-01-01T00:10:00.000Z");
+    assert.equal(resumed.status, "active");
+    assert.equal(resumed.noProgress, 0);
+    assert.equal(resumed.lastText, "");
+    assert.equal(resumed.turns, 3);
+    assert.equal(resumed.startedAt, paused.startedAt);
+    assert.equal(resumed.verification?.reason, "还差测试");
+    assert.equal(resumed.turnStartedAt, "2026-01-01T00:10:00.000Z");
+    assert.notEqual(resumed.id, paused.id);
+  });
+
+  it("存量目标缺新字段时按默认值解析，不当成无目标", () => {
+    const state = startGoal("旧目标", null);
+    const { tokensAtTurnStart: _a, turnStartedAt: _b, ...legacy } = state;
+    const parsed = parseGoalState(JSON.stringify(legacy));
+    assert.equal(parsed?.objective, "旧目标");
+    assert.equal(parsed?.tokensAtTurnStart, 0);
+    assert.equal(parsed?.turnStartedAt, "");
   });
 
   it("序列化往返一致，非法结构按无目标处理", () => {
@@ -138,6 +178,17 @@ describe("落定活动判定", () => {
 });
 
 describe("GoalService 落定处理", () => {
+  /** 一次校验调用花掉的 token；用量服务按「已落条目数 × 它」回总量，用来验算是否进账 */
+  const VERIFY_TOKENS = 42;
+  const usageOf = (total: number) => ({
+    input: total,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: total,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  });
+
   const makeService = (options: {
     state: ReturnType<typeof startGoal> | null;
     tokensUsed?: number;
@@ -173,8 +224,13 @@ describe("GoalService 落定处理", () => {
         stored = next;
       },
     } as unknown as SessionRepository;
+
+    // 校验调用的用量条目：记下来供断言，并计入总量（服务端就是这么算的）
+    const usages: Array<{ kind: string; provider: string; model: string; note?: string }> = [];
     const usage = {
-      usageOf: () => ({ totalTokens: options.tokensUsed ?? 0 }),
+      usageOf: () => ({
+        totalTokens: (options.tokensUsed ?? 0) + usages.length * VERIFY_TOKENS,
+      }),
     } as unknown as UsageService;
     const events = new SessionEventBus();
     const frames: Array<unknown> = [];
@@ -183,25 +239,50 @@ describe("GoalService 落定处理", () => {
 
     // 追加到会话文件的观测条目：断言「状态变迁有没有落盘」用
     const entries: Array<{ customType: string; data: Record<string, unknown> }> = [];
+    let verifyCalls = 0;
     const session = {
       sessionManager: {
         appendCustomEntry: (customType: string, data: Record<string, unknown>) => {
           entries.push({ customType, data });
           return `e${entries.length}`;
         },
+        appendUsage: (
+          kind: string,
+          provider: string,
+          model: string,
+          _usage: unknown,
+          note?: string,
+        ) => {
+          usages.push({ kind, provider, model, ...(note ? { note } : {}) });
+        },
       },
       messages: options.messages ?? [],
       model: { provider: "p", id: "m" },
       modelRuntime: {
-        completeSimple:
-          options.verify ??
-          (async () => ({
+        // 每次调用都计数：用来断言「模型侧已结算时不再跑校验」
+        completeSimple: async () => {
+          verifyCalls += 1;
+          if (options.verify) return options.verify();
+          return {
             content: [{ type: "text", text: options.verdict ?? '{"achieved": false}' }],
-          })),
+            provider: "p",
+            responseModel: "m",
+            usage: usageOf(VERIFY_TOKENS),
+          };
+        },
       },
     } as unknown as AgentSession;
 
-    return { service, session, state: () => parseGoalState(stored), frames, entries };
+    return {
+      service,
+      session,
+      state: () => parseGoalState(stored),
+      record: () => ({ ...record, goalState: stored }),
+      frames,
+      entries,
+      usages,
+      verifyCalls: () => verifyCalls,
+    };
   };
 
   it("达成时标记 completed 且不续跑，并留下一条目标记录", async () => {
@@ -317,7 +398,12 @@ describe("GoalService 落定处理", () => {
       release: () => release(),
       verify: async () => {
         await gate;
-        return { content: [{ type: "text", text }] };
+        return {
+          content: [{ type: "text", text }],
+          provider: "p",
+          responseModel: "m",
+          usage: usageOf(VERIFY_TOKENS),
+        };
       },
     };
   };
@@ -347,5 +433,120 @@ describe("GoalService 落定处理", () => {
     assert.equal(await pending, null);
     assert.equal(state()?.objective, "新目标");
     assert.equal(state()?.status, "active");
+  });
+
+  it("校验开销落成用量条目，并计入本轮用量与目标总量", async () => {
+    const { service, session, state, usages, entries } = makeService({
+      state: startGoal("目标", null),
+      tokensUsed: 100,
+      messages: asMessages([toolMessage()]),
+    });
+    await service.onSettled("s1", session);
+
+    assert.equal(usages.length, 1, "校验那一次调用要落一条用量");
+    assert.equal(usages[0]?.kind, "goal_verify");
+    assert.equal(usages[0]?.provider, "p");
+    assert.equal(usages[0]?.model, "m");
+
+    const verdict = entries.find((entry) => entry.data.event === "verdict");
+    assert.equal(verdict?.data.tokensUsed, 100 + VERIFY_TOKENS);
+    assert.equal(verdict?.data.turnTokens, 100 + VERIFY_TOKENS);
+    assert.equal(state()?.tokensAtTurnStart, 100 + VERIFY_TOKENS, "下一轮起点含校验开销");
+  });
+
+  it("未达成的校验记录带逐轮字段与校验结论", async () => {
+    const { service, session, entries } = makeService({
+      state: startGoal("目标", null),
+      tokensUsed: 10,
+      verdict: '{"achieved": false, "reason": "还差测试", "nextStep": "跑测试"}',
+      messages: asMessages([toolMessage()]),
+    });
+    await service.onSettled("s1", session);
+    const verdict = entries.find((entry) => entry.data.event === "verdict");
+    assert.equal(verdict?.data.turnToolCalls, 1);
+    assert.equal(verdict?.data.turns, 0, "轮号沿用记录里的 turns（注入条目同口径）");
+    assert.equal(typeof verdict?.data.turnMs, "number");
+    assert.deepEqual(verdict?.data.verdict, {
+      achieved: false,
+      reason: "还差测试",
+      nextStep: "跑测试",
+    });
+  });
+
+  it("模型侧结算后不再跑校验", async () => {
+    const { service, session, state, record, entries, verifyCalls } = makeService({
+      state: startGoal("目标", null),
+      messages: asMessages([toolMessage()]),
+    });
+    service.completeByModel(record(), "测试全绿", session);
+    assert.equal(state()?.status, "completed");
+    assert.equal(state()?.verification?.reason, "测试全绿");
+    assert.equal(entries[0]?.data.event, "completed");
+
+    // 工具结算后这一轮仍会走落定：状态守卫在跑校验之前就短路
+    await service.onSettled("s1", session);
+    assert.equal(verifyCalls(), 0, "已结算就不再调校验模型");
+  });
+
+  it("模型侧报告受阻时按 blocked 暂停并留下原因", () => {
+    const { service, state, record, session, entries } = makeService({
+      state: startGoal("目标", null),
+      messages: asMessages([toolMessage()]),
+    });
+    service.blockByModel(record(), " 缺少生产环境凭证 ", session);
+    assert.equal(state()?.status, "paused");
+    assert.equal(state()?.cause, "blocked");
+    assert.equal(entries[0]?.data.event, "pause");
+    assert.equal(entries[0]?.data.cause, "blocked");
+    const verdict = entries[0]?.data.verdict as { reason?: string } | undefined;
+    assert.equal(verdict?.reason, "缺少生产环境凭证");
+  });
+
+  it("迟到的模型侧结算不重复结算", () => {
+    const { service, state, record, entries } = makeService({
+      state: pauseGoal(startGoal("目标", null), "user"),
+    });
+    service.completeByModel(record(), "已经不算了");
+    assert.equal(state()?.status, "paused");
+    assert.equal(entries.length, 0, "非 active 时不落条目");
+  });
+
+  it("只改预算：轮数 / 校验结果 / 身份 id 都不动", () => {
+    const before = {
+      ...startGoal("目标", 100),
+      turns: 3,
+      verification: { achieved: false, reason: "还差测试", nextStep: "跑测试", at: "t" },
+    };
+    const { service, state, record, session, entries } = makeService({
+      state: before,
+      messages: asMessages([toolMessage()]),
+    });
+    service.setBudget(record(), 500, session);
+    assert.equal(state()?.tokenBudget, 500);
+    assert.equal(state()?.turns, 3);
+    assert.equal(state()?.id, before.id);
+    assert.equal(state()?.verification?.reason, "还差测试");
+    assert.equal(entries[0]?.data.event, "budget");
+
+    service.setBudget(record(), null, session);
+    assert.equal(state()?.tokenBudget, null, "传 null 即取消上限");
+  });
+
+  it("无目标时改预算返回 null，不落条目", () => {
+    const { service, record, entries } = makeService({ state: null });
+    assert.equal(service.setBudget(record(), 500), null);
+    assert.equal(entries.length, 0);
+  });
+
+  it("恢复时回填本轮起点用量，并把无进展计数归零", () => {
+    const { service, state, record } = makeService({
+      state: { ...pauseGoal(startGoal("目标", null), "user"), turns: 2, noProgress: 2 },
+      tokensUsed: 250,
+    });
+    service.resume(record());
+    assert.equal(state()?.status, "active");
+    assert.equal(state()?.turns, 2);
+    assert.equal(state()?.noProgress, 0);
+    assert.equal(state()?.tokensAtTurnStart, 250);
   });
 });

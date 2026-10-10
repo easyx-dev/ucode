@@ -24,6 +24,19 @@ export type GoalVerdict = {
   nextStep: string;
 };
 
+/** 一次校验调用的记账户：provider / model / usage 三者齐全才落账，缺一不记 */
+export type GoalVerifyUsage = {
+  provider: string;
+  model: string;
+  usage: AssistantAnswer["usage"];
+};
+
+/** 一次校验的完整产物：结论（可能是 null，解析失败）与这次调用的开销 */
+export type GoalVerificationRun = {
+  verdict: GoalVerdict | null;
+  usage: GoalVerifyUsage | null;
+};
+
 const VERIFY_SYSTEM_PROMPT = [
   "你在判定一个长期目标是否已经达成。只看可核对的实据：改动的文件、命令输出、测试结果、运行行为。",
   "计划、待办清单、宣言式的结论都不算达成；还有未完成的待办就应判未达成。",
@@ -32,6 +45,16 @@ const VERIFY_SYSTEM_PROMPT = [
   '严格只输出一个 JSON 对象，形如 {"achieved": false, "reason": "…", "nextStep": "…"}。',
   "未达成时 nextStep 写清下一步该做什么；达成时 nextStep 用空字符串。不要代码块或多余文字。",
 ].join("\n");
+
+/** 这次调用花掉的 token：provider / 模型 / usage 任一缺失就不记账，宁可少一笔也不记一笔错的 */
+const answerUsage = (answer: AssistantAnswer): GoalVerifyUsage | null => {
+  const { provider, responseModel, model, usage } = answer;
+  if (typeof provider !== "string" || provider.length === 0) return null;
+  const modelId = responseModel ?? model;
+  if (typeof modelId !== "string" || modelId.length === 0) return null;
+  if (typeof usage !== "object" || usage === null) return null;
+  return { provider, model: modelId, usage };
+};
 
 /** 从模型回复里取纯文本：正文可能是字符串或内容块数组 */
 const answerText = (answer: AssistantAnswer): string => {
@@ -171,8 +194,8 @@ export type GoalVerifyInput = {
   evidence: GoalEvidence;
 };
 
-/** 跑一次校验；调用失败或输出不可解析时返回 null（按未达成处理） */
-export const runGoalVerification = async (input: GoalVerifyInput): Promise<GoalVerdict | null> => {
+/** 跑一次校验；调用失败时抛出，输出不可解析时 `verdict` 为 null（按未达成处理） */
+export const runGoalVerification = async (input: GoalVerifyInput): Promise<GoalVerificationRun> => {
   const answer = await input.runtime.completeSimple(
     input.model,
     {
@@ -191,5 +214,5 @@ export const runGoalVerification = async (input: GoalVerifyInput): Promise<GoalV
     },
   );
 
-  return parseGoalVerdict(answerText(answer));
+  return { verdict: parseGoalVerdict(answerText(answer)), usage: answerUsage(answer) };
 };

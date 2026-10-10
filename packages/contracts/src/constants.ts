@@ -281,6 +281,7 @@ export const GOAL_RECORD_EVENTS = [
   "pause",
   "resume",
   "clear",
+  "budget",
   "verdict",
   "completed",
 ] as const;
@@ -298,9 +299,15 @@ export type GoalRecord = {
   cause?: GoalPauseCause;
   /** 目标激活后累计的轮数 */
   turns?: number;
+  /** 本轮的用量增量（token），含本轮校验开销；`verdict` 与 `completed` 都带 */
+  turnTokens?: number;
+  /** 本轮的工具调用次数；`verdict` 与 `completed` 都带 */
+  turnToolCalls?: number;
+  /** 本轮耗时（毫秒）；起止时间可解析时才带 */
+  turnMs?: number;
   /** 校验结论；`verdict` 与 `completed` 都带 */
   verdict?: { achieved: boolean; reason: string; nextStep: string };
-  /** 本轮的用量累计（token）；存储态只给当前值，历史需要自己带 */
+  /** 本轮的用量累计（token，含校验开销）；存储态只给当前值，历史需要自己带 */
   tokensUsed?: number;
   /** 目标正文；只在 `set` 时带，其余从存储态能看出 */
   objective?: string;
@@ -423,7 +430,7 @@ export type GoalStatus = (typeof GOAL_STATUSES)[number];
 
 /**
  * 目标暂停的原因：用户主动暂停 / 切走 build 模式 / 当前轮被中断 /
- * 连续无进展 / 达到轮数上限 / 达到 token 预算 / 生成出错。
+ * 连续无进展 / 达到轮数上限 / 达到 token 预算 / 生成出错 / 模型报告受阻。
  */
 export const GOAL_PAUSE_CAUSES = [
   "user",
@@ -433,6 +440,7 @@ export const GOAL_PAUSE_CAUSES = [
   "limit",
   "budget",
   "error",
+  "blocked",
 ] as const;
 
 export type GoalPauseCause = (typeof GOAL_PAUSE_CAUSES)[number];
