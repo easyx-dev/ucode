@@ -93,7 +93,7 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
 
   return (
     <div className="border-t border-border bg-muted/40 px-4 py-2">
-      <div className="mx-auto flex w-full max-w-3xl items-start gap-2 text-xs">
+      <div className="mx-auto flex w-full max-w-4xl items-start gap-2 text-xs">
         <Target
           className={cn(
             "mt-0.5 size-4 shrink-0",

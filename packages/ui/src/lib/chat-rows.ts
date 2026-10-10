@@ -42,8 +42,6 @@ export type ChatContentRow = ChatRowBase & {
 export type ChatActivityRow = ChatRowBase & {
   kind: "activity";
   node: ActivityNode;
-  /** 这一组正是本轮正在处理的那一组（思考还在流 / 有工具在跑），行尾要出加载指示 */
-  active?: boolean;
 };
 
 /** 提问行：一次提问与用户的答复，独立成段（不并进聚合行） */
@@ -175,9 +173,6 @@ export const buildChatRows = (items: ChatItem[], working?: boolean): ChatRow[] =
   });
 
   if (working) {
-    // 本轮正在处理的是末位聚合行：思考还在流（不一定是工具在跑）时也要出加载指示
-    const tail = rows[rows.length - 1];
-    if (tail?.kind === "activity") rows[rows.length - 1] = { ...tail, active: true };
     rows.push(workingRow(turnKey, turnStartedAt));
   }
   return rows;

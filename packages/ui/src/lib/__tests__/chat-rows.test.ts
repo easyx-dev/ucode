@@ -602,27 +602,11 @@ describe("buildChatRows 的生成中行", () => {
     assert.equal(last?.kind === "working" ? last.startedAt : undefined, AT);
   });
 
-  it("末位聚合行被标为正在进行（思考还在流也要出加载指示）", () => {
-    const rows = buildChatRows(
-      [userItem("u1", "问"), assistantItem("a1", [thinking("想一想")])],
-      true,
-    );
-
-    const [activity] = rowsOfKind(rows, "activity");
-    assert.equal(activity?.active, true);
-  });
-
-  it("生成中但不落在聚合行上时不标记（如末位是正文）", () => {
+  it("生成中但不落在聚合行上时只追加进行中行（如末位是正文）", () => {
     const rows = buildChatRows([userItem("u1", "问"), assistantItem("a1", [text("在写了")])], true);
 
     assert.deepEqual(kindsOf(rows), ["content", "content", "working"]);
     assert.equal(rowsOfKind(rows, "activity").length, 0);
-  });
-
-  it("不在生成中时聚合行不带标记", () => {
-    const rows = buildChatRows([userItem("u1", "问"), assistantItem("a1", [thinking("想完了")])]);
-
-    assert.equal(rowsOfKind(rows, "activity")[0]?.active, undefined);
   });
 
   it("生成中行跟着最后一轮，取的是那条用户消息的时刻", () => {

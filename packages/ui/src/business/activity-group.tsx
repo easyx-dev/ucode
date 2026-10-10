@@ -13,7 +13,6 @@ import { ChevronRight } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
-import { Spinner } from "../base/spinner";
 import type { ChatFooter, ChatLeg, ToolEntry } from "../lib/chat-nodes";
 import { durationLabel } from "../lib/time";
 import { summarizeToolNames } from "../lib/tool-view";
@@ -78,20 +77,17 @@ type ActivityGroupProps = {
   legs: ChatLeg[];
   /** 本轮以此收尾时的页脚 */
   footer?: ChatFooter;
-  /** 这一组正在被处理（思考还在流、或组内有工具在跑）：行尾要出加载指示 */
-  active?: boolean;
   /** 每次调用追加的内容（如子智能体内联进度） */
   renderExtra?: (entry: ToolEntry) => ReactNode;
   /** 从该条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
 };
 
-export function ActivityGroup({ legs, footer, active, renderExtra, onFork }: ActivityGroupProps) {
+export function ActivityGroup({ legs, footer, renderExtra, onFork }: ActivityGroupProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const only = legs.length === 1 ? legs[0] : undefined;
   const summary = useMemo(() => summaryOf(legs, t), [legs, t]);
-  const running = legs.some((leg) => leg.kind === "tool" && leg.entry.running);
   const footerNode = footer ? (
     <MessageFooter item={footer.item} durationMs={footer.durationMs} onFork={onFork} />
   ) : null;
@@ -112,7 +108,6 @@ export function ActivityGroup({ legs, footer, active, renderExtra, onFork }: Act
           <span className="truncate" title={summary}>
             {summary}
           </span>
-          {running || active ? <Spinner /> : null}
           <ChevronRight
             className={cn(
               "size-3.5 shrink-0 opacity-0 transition group-hover/activity:opacity-100 group-data-[state=open]:opacity-100",

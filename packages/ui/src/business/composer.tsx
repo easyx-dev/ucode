@@ -271,7 +271,7 @@ export function Composer({
 
   return (
     <div className="bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto w-full max-w-3xl space-y-2">
+      <div className="mx-auto w-full max-w-4xl space-y-2">
         {/* biome-ignore lint/a11y/noStaticElementInteractions: 整条容器都作粘贴 / 拖拽落点，真正的交互在内部编辑器 */}
         <div
           className="rounded-xl bg-muted/50"

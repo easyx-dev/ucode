@@ -84,7 +84,6 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
       <ActivityGroup
         legs={row.node.legs}
         footer={row.footer}
-        active={row.active}
         renderExtra={context.renderExtra}
         onFork={context.onFork}
       />

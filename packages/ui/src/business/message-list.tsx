@@ -233,7 +233,7 @@ export function MessageList({
         onScroll={handleScroll}
       >
         {rows.length === 0 ? (
-          <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-6">
+          <div className="mx-auto w-full max-w-4xl space-y-3 px-4 py-6">
             {loading ? (
               <>
                 <Skeleton className="h-12 w-2/3" />
@@ -246,7 +246,7 @@ export function MessageList({
           </div>
         ) : (
           <div
-            className="relative mx-auto w-full max-w-3xl"
+            className="relative mx-auto w-full max-w-4xl"
             style={{ height: virtualizer.getTotalSize() }}
           >
             {virtualizer.getVirtualItems().map((item) => {
