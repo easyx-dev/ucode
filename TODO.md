@@ -13,9 +13,24 @@
 
 ## 暂缓（等明确指令再启动）
 
-- **插件机制**：方案见 [`plans/plugins.md`](./plans/plugins.md)。
-- **中继服务**：方案见 [`plans/relay.md`](./plans/relay.md)，前置的服务化与鉴权已落地。
+- **中继服务**：方案见 [`plans/relay.md`](./plans/relay.md)，前置的服务化与鉴权已落地；
+  插件平台的内置资产云同步也挂在这条上（接口约定已写进该文）。
 - **内置 TODO 工具 / wiki**：暂无实现计划。
+
+---
+
+## 需求 · 插件平台（架构定稿，待实施）
+
+**目标**：插件是一等公民——产品功能以插件形态实现。宿主提供一级接缝（模式、提示词、界面插槽、
+事件、统一调用端点、会话生命周期钩子、插件状态存储），内置插件与第三方插件共用同一套清单、接缝与 API，
+差别只在来源与信任。
+
+**方案**：[`plans/plugins.md`](./plans/plugins.md)（平台架构、宿主 API、迁移路线）、
+[`plans/plugin-format.md`](./plans/plugin-format.md)（包格式与 Claude / ZCode 兼容）、
+[`plans/plugin-market.md`](./plans/plugin-market.md)（市场、拉取、版本检查与更新）。
+
+**待办要点**：按 `plugins.md` 第十二节的八步实施；迁移顺序 `plan` → `goal`；
+迁移的完成判据是内核硬编码清空（该文第十一节）；市场按 `plugin-market.md` 第十节的三步推进。
 
 ---
 

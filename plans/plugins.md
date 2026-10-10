@@ -1,437 +1,338 @@
-# 插件机制（方案）
+# 插件平台（方案）
 
-> 状态：**暂缓**（方案归档，收到明确指令再启动）。本文只描述设计与改动点，不含实现代码。
+> 状态：**架构定稿，未实施**。先把设计写成文档，再按第十三节的依赖顺序动代码。
 >
-> 目标：给 ucode 一套插件机制。插件格式与 Claude Code / ZCode **同形**——一个插件可打包
-> skills / commands / agents / hooks / bin / MCP，支持从市场安装与启停；ucode 只读自己的插件根，
-> 不读他方安装目录、不做格式转换。
+> 配套文档：[`plugin-format.md`](./plugin-format.md)（包格式、组件与 Claude / ZCode 兼容）、
+> [`plugin-market.md`](./plugin-market.md)（来源、拉取、解包、版本检查与更新）、
+> [`relay.md`](./relay.md)（内置资产云同步的中继侧接口约定）。
+>
+> 本文取代本文件此前的「插件机制 v1」稿（原文已由本次重写替换）：那一版的落位与接缝多处与
+> 当前代码不符，逐条修正见第九节。
 
-## 一、目标与范围
+## 一、定位
 
-**做**
+插件是一等公民——不是给内核打补丁的扩展点，而是产品功能的**第一实现方式**。目标模式、计划模式
+这类今天写在 `server/src/harness/` 里的功能，今后以插件形态实现与演进。
 
-- 插件格式与清单：`.ucode-plugin/plugin.json`，兼容识别 `.zcode-plugin/plugin.json` 与
-  `.claude-plugin/plugin.json`。
-- 插件根与发现、启用状态、会话按启用集失效重建。
-- 组件适配：skills / commands / agents / hooks / bin / MCP。
-- pi TS 扩展（ucode 专属能力，需逐插件信任）。
-- 市场：github / git / url / npm / 本地目录；安装 / 卸载 / 更新 / 启停 / 配置。
-- 契约域、路由、设置页 Plugins 分页、`/` 菜单与 agent 选择器透出。
+三条原则：
 
-**不做（v1）**
+1. **宿主是唯一入口**：插件不 import 内核模块，只声明能力并调用宿主 API（`PluginContext`）。
+2. **同一套接缝**：内置插件与第三方插件共用同一份清单、同一套接缝、同一套 API、同一套生命周期；
+   差别只在**来源**（随包 / 云同步 / 第三方）与**信任门槛**。
+3. **声明式优先**：界面贡献先走声明（宿主渲染），跨 web / 桌面 / TUI 一致，且第三方插件无法往
+   客户端注入任意 JS；原生 React 组件只对随包内置插件开放。
 
-- 读他方安装目录（`~/.claude`、`~/.zcode` 等）与其 settings。
-- 安装时格式转换；预置他方市场。
-- `settings.json`(agent) / monitors / themes / output-styles / lsp / workflows / channels /
-  `dependencies` / `types` 等组件的执行（按「注册但不执行」出诊断）。
-- 命令级工具收窄与模型覆盖（`commands` 的 `allowed-tools` / `model` / `skills`）。
-- 非 command 型 hook（http / mcp_tool / prompt / agent）。
-- 插件间依赖解析（`dependencies` 出诊断忽略）。
-- `bin/` 的 Windows 语义（先 Unix）。
+## 二、分层与边界
 
-## 二、已锁定的决策
-
-1. **格式锚点**：以 Claude Code 插件格式的形状为准，清单落在 ucode 自己的 `.ucode-plugin/plugin.json`。
-2. **清单三档识别**：`.ucode-plugin` → `.zcode-plugin` → `.claude-plugin`，第一个命中生效；
-   同包多清单并存取第一个、其余记诊断，不报错。市场目录同理（`marketplace.json`）。
-3. **不读他方目录、不做转换**：不扫 `~/.claude` / `~/.zcode`；读的是插件包内部清单，就地解析。
-4. **插件根**：用户级 `$APP_HOME/plugins/`；项目级 `<cwd>/.ucode/plugins/`，**需显式启用**。
-5. **v1 组件**：skills / commands / agents / hooks / bin / MCP；pi TS 扩展作为 ucode 专属扩展点。
-6. **命名**：界面/引用显示名 `<plugin>:<name>`；pi 底层 token `<plugin>-<name>`（合法字符集）。
-7. **可执行性**：hooks 子进程与 pi TS 扩展都允许；TS 扩展逐插件信任。
-8. **bin/**：不改工具链路，走 pi `SettingsManager` 的 `shellCommandPrefix` 追加 PATH。
-9. **变量**：canonical `${UCODE_PLUGIN_ROOT}`，兼容 `${CLAUDE_PLUGIN_ROOT}` / `${ZCODE_PLUGIN_ROOT}`。
-10. **MCP 命名**：服务器名 `plugin_<plugin>_<server>`，工具名对齐 `mcp__plugin_<plugin>_<server>__<tool>`。
-11. **市场**：ucode 自己添加来源（github / git / url / npm / 本地目录），不预置他方市场。
-12. **状态**：`$APP_HOME/app/plugins.json`；项目级 `<cwd>/.ucode/plugins.json`。
-13. **agent 模型别名**：`sonnet` / `opus` / `haiku` / `inherit` 不识别时忽略、回落会话默认模型。
-14. **移植友好兼容**：变量别名与 MCP 工具名对齐，使移植插件时 hook matcher 与文档引用不用改。
-
-## 三、插件格式
-
-### 3.1 目录
-
-```
-my-plugin/
-├── .ucode-plugin/plugin.json   # 唯一清单；也识别 .zcode-plugin / .claude-plugin 下的同名文件
-├── skills/<name>/SKILL.md
-├── commands/*.md
-├── agents/*.md
-├── hooks/hooks.json
-├── bin/<executable>
-├── extensions/                 # pi TS 扩展（ucode 专属，可选）
-└── .mcp.json
-```
-
-### 3.2 清单字段
-
-v1 支持的键（与 Claude/ZCode 同名同义）：
-
-| 字段 | 类型 | 说明 |
+| 层 | 职责 | 不许越界 |
 | --- | --- | --- |
-| `name` | string | 必填，`^[a-z0-9][a-z0-9._-]{0,127}$`，命名空间与身份 |
-| `displayName` | string | 界面显示名，缺省用 `name` |
-| `version` | string | 版本，缺省 `0.0.0` |
-| `description` | string | 一行说明 |
-| `author` | string \| `{name,email?,url?}` | 作者 |
-| `homepage` / `repository` / `license` / `keywords` | string / string[] | 元数据 |
-| `skills` | path \| path[] | **叠加**默认 `skills/` |
-| `commands` | path \| path[] \| object | **替换**默认 `commands/`；object 支持内联 `content` |
-| `agents` | path \| path[] | **替换**默认 `agents/` |
-| `hooks` | path \| object \| array | 与 `hooks/hooks.json` **合并** |
-| `mcpServers` | path \| object \| array | 与 `.mcp.json` **合并** |
-| `extensions` | path \| path[] | pi TS 扩展，**叠加**默认 `extensions/` |
-| `userConfig` | object | 需要用户填写的配置项 |
+| 内核 kernel | 会话生命周期与装配顺序、权限最终裁决、DB 与迁移、鉴权、事件总线、日志、宿主本身 | 不承载具体功能；目标模式这类能力不应留在核心里 |
+| 宿主 host | 插件发现、清单校验、能力授权、加载与装配、运行期调度、诊断、状态存储、API 暴露 | 不实现业务功能，只提供接缝 |
+| 插件 plugin | 清单 + 声明式贡献 + 可选代码（TS 模块）与资源文件 | 不 import 内核模块，只调宿主 API |
+| 应用层 apps | web / desktop / TUI：订阅插件事件、渲染声明式贡献、按 `componentId` 挂原生组件 | 不替插件实现业务逻辑 |
 
-**注册但不执行**（识别、出诊断、不影响其它组件）：`settings`、`channels`、`lspServers`、
-`outputStyles`、`workflows`、`experimental`、`dependencies`、`types`。
-未知顶层键剥离并告警。
+这条边界不是审美选择。`goal` 的现状正好说明问题：它的状态机、提示词、阈值、UI 组件本来就能留在
+插件内，真正卡住的是内核没给编排钩子与存储槽位——`startInjectedRun` 是 `SessionPool` 私有方法
+（`server/src/core/pool.ts:339`）、落定后的编排写死在 `agent_settled` 监听里（`pool.ts:790-828`）、
+目标状态是专用列且占用了第 4 号迁移（`server/src/db/index.ts:46-48`）。
 
-### 3.3 路径规则
+## 三、插件模型
 
-- 相对插件根，必须以 `./` 开头（`skills` 另接受 `"."` 指插件根）。
-- 必须落在插件根内；含 `..` 或越界一律拒绝该组件并出诊断。
-- 路径不存在同样拒绝并诊断。
+- **清单**：三档兼容识别（`.<slug>-plugin/plugin.json` → `.zcode-plugin/plugin.json` →
+  `.claude-plugin/plugin.json`），ucode 专属键放可选字段；字段表、路径规则、变量、组件格式与
+  兼容降级表见 [`plugin-format.md`](./plugin-format.md)。
+- **组件两类**：
+  - **资源型**：skills / commands / agents / hooks / bin / MCP / TS 扩展；
+  - **功能型**：`modes`（主模式）、`tools`（自定义工具）、`slots`（界面贡献）、`actions`
+    （可被调用的动作）、`permissionRules`、`sessionHooks`、`storage`、`events`。
+- **生命周期**：发现 → 清单校验 → **能力授权** → 加载 → 装配注入 → 运行（动作 / 钩子 / 事件）→
+  停用 / 卸载 → 相关会话按启用集指纹重建。
+- **作用域**：用户级 `$APP_HOME/plugins/`；项目级 `<cwd>/.<slug>/plugins/`，**默认不启用**。
+- **命名**：显示名 `<plugin>:<name>`、底层 token `<plugin>-<name>`；规则与冲突处理见
+  [`plugin-format.md`](./plugin-format.md) 第八节。
 
-### 3.4 变量
+## 四、宿主 API（`PluginContext`）
 
-| 变量 | 解析为 | 兼容别名 |
+| API 组 | 能力名 | 作用域 | 信任要求 |
+| --- | --- | --- | --- |
+| `assets.register*`（skills / commands / agents 路径申报与改名） | 隐式 | 插件 | — |
+| `modes.register`（主模式：工具集 / 权限规则 / 档位 / 推荐思考档 / 提示词 / 选择器条目） | `modes` | 会话 | — |
+| `tools.register`（声明自定义工具，实现仍在插件代码内） | `tools` | 会话 | 代码执行 |
+| `slots.contribute`（声明式界面贡献） | `slots` | 全局 | — |
+| `actions.register`（插件动作，经统一端点调用） | `actions` | 全局 | — |
+| `events.emit`（`plugin_event` 会话帧） | `events` | 会话 | — |
+| `storage.kv`（global / project / session 三档） | `storage` | 三档 | — |
+| `session.on*`（`assemble` / `onTurnSettled` / `injectTurn` / `onDispose` / `onModeChange`） | `sessionHooks` | 会话 | 代码执行 |
+| `model.completeSimple` + `usage.query`（旁路模型调用与区间用量） | `model` / `usage` | 会话 | 代码执行 |
+| `log` / `diagnostics` | 隐式 | 插件 | — |
+
+运行期检查而非仅启用时提示：**未声明的能力调用直接拒绝**。权限相关有两条硬约束——插件注册的
+权限规则与权限扩展的 `deny` 取并集（**只能收紧**）；模式自带的权限档位只能落在不放宽的一侧
+（`default` / `auto`，不得默认给 `full`）。
+
+## 五、一级接缝
+
+### 5.1 主模式
+
+| 现状缺口 | 目标形态 |
+| --- | --- |
+| 插件目录不在角色发现链里（`harness/agents/custom.ts:208-231` 只认 `.ucode/agents` 与 `$APP_HOME/agents`） | 发现链纳入插件根，`AgentSource` 增 `plugin` |
+| 自定义角色的权限规则被写死清空（`custom.ts:173`） | 由 `modes.permissions` 提供，走既有 `AgentProfile.capability.permissions` 与 `parentModeRules`（`harness/agents/capability.ts:103-107`） |
+| 无 `excludeTools`（`capability.ts:69` 的 primary 路径恒为 `[]`） | 角色能力补该字段，插件声明经工具名白名单收敛 |
+| 无权限档位字段（`AgentProfile` 无此项，`session-config.ts:171` 只读会话行） | 加模式级默认档位，取值顺序：会话行 > 模式默认 > 全局默认，且默认落在不放宽侧 |
+| 能力上限无约束（`primaryCapability` 拿全量声明） | 插件模式的能力必须 ⊆ 内核默认集，`KNOWN_TOOL_NAMES`（`harness/tools/names.ts:57`）之外的声明一律拒绝 |
+| 提示词只有三个内置 slug（`harness/prompt/locales/zh-CN.ts:102-113`，未知 slug 得空串） | 插件自带正文 + 分节，装配时并入 |
+
+会话参数本身不必改：`sessions.mode` 已是字符串 slug，契约只校验形态（`packages/contracts/src/sessions/input.ts:16-20`），
+存在性查注册表（`capability.ts:40-43`）；`$APP_HOME/agents/*.md` 今天就能覆盖内置模式
+（`custom.ts:244-270`）。
+
+### 5.2 界面
+
+- **选择器改数据源**：`packages/ui/src/business/mode-picker.tsx:14,27,53` 现在读契约常量
+  `SESSION_MODES` 且 `ICONS` 只认三个 slug；改为消费注册表（`agents/list` 一类的视图，含
+  `displayName` / `description` / `icon` 回落）。`@ucode/sdk` 需补 agents store（今天只有
+  `packages/sdk/src/apis.ts:260-264` 的无状态方法，无 store、无 hook）。
+- **插槽**：`session-header` / `composer-top` / `composer-toolbar` / `message-row` / `panel` /
+  `settings-section` / `command`。声明式贡献由宿主用既有基础组件渲染原语：表单字段（文本 / 多行 /
+  选择 / 开关 / 数字）、列表、文本、状态条、按钮（触发 `plugins/invoke`）、链接、分隔。
+- **原生组件**：按 `componentId` 查前端注册表，仅随包内置插件可用（前端代码随产物编译）。
+- 明确不做：第三方往 web 注入任意 JS；TUI 与 web 的一致性靠声明式贡献保证。
+
+### 5.3 数据
+
+| 项 | 现状 | 目标 |
 | --- | --- | --- |
-| `${UCODE_PLUGIN_ROOT}` | 插件安装目录绝对路径 | `${CLAUDE_PLUGIN_ROOT}`、`${ZCODE_PLUGIN_ROOT}` |
-| `${UCODE_PLUGIN_DATA}` | `$APP_HOME/app/plugins/data/<plugin>`，首次引用时创建 | `${CLAUDE_PLUGIN_DATA}` |
-| `${UCODE_PROJECT_DIR}` | 会话 cwd | `${CLAUDE_PROJECT_DIR}` |
-| `${user_config.KEY}` | `userConfig` 的已存值 | — |
+| 会话事件帧 | `EVENT_NAMES` 是封闭枚举（`packages/contracts/src/events.ts:29-53`），`data` 已是 `unknown`（`:63`） | 增 `plugin_event`，载荷 `{ pluginId, kind, data }`；客户端按 `pluginId` / `kind` 订阅 |
+| 控制帧 | 判别联合 `ServerControlEvent`（`events.ts:79-83`） | 增 `plugin_changed`（插件列表 / 状态变更） |
+| 会话条目 | DTO 按白名单透传（`core/serialize.ts:404-460`），条目类型必须与文档双向登记（`scripts/verify/checks/session-entries.ts:24-30`） | 插件条目以插件 id 前缀注册到运行期注册表，内核条目仍走静态登记 |
+| 存储 | 功能自带专用列（如 `session.goal_state`，第 4 号迁移） | 统一 `plugin_state` 表（`pluginId` + 作用域 + key → JSON），迁移归内核；会话删除时清理会话作用域 |
 
-解析字段：hook 的 `command` / `args`、MCP 的 `command` / `args` / `env` / `url` / `headers`、
-skill / command / agent 的 Markdown 正文（仅非敏感值）。shell 形式的 hook `command` 与 MCP
-`headersHelper` 拒绝 `${user_config.*}`（值会被 shell 再解析）。
+### 5.4 调用面
 
-### 3.5 市场清单 `marketplace.json`
+插件动作经**统一端点**调用：`POST /api/v1/plugins/invoke`，载荷 `{ pluginId, action, payload }`。
+理由：`scripts/verify/checks/api-docs.ts:29-37` 的端点校验只认静态 `router.post("…")`，动态挂载的
+插件路由过不了校验；统一端点还能一次收齐鉴权、封套、请求校验与日志。`invoke` 需登记进
+`docs/api.md` 的动作表（那是封闭词表）。
 
-```json
-{
-  "name": "my-market",
-  "description": "…",
-  "pluginRoot": "plugins",
-  "plugins": [
-    { "name": "hello", "source": "./hello", "version": "1.0.0", "category": "demo", "tags": ["…"] },
-    { "name": "from-github", "source": { "source": "github", "repo": "owner/repo", "path": "p", "ref": "main" } }
-  ]
-}
-```
+### 5.5 编排（会话生命周期钩子）
 
-`source` 形式：相对路径字符串 / `{source:"directory",path}` / `{source:"github",repo,path?,ref?}` /
-`{source:"git",url,path?,ref?}` / `{source:"url",url,headers?}` / `{source:"npm",package}`。
-
-### 3.6 组件格式
-
-- **skills**：`skills/<name>/SKILL.md`，frontmatter `name` / `description` /
-  `disable-model-invocation`，与 pi Agent Skills 规范一致。
-- **commands**：`commands/*.md`，frontmatter `description` / `argument-hint`，正文支持 pi 的
-  `$ARGUMENTS` / `$1` / `${1:-默认}` 替换。
-- **agents**：`agents/*.md`，frontmatter `name` / `description` / `model` / `tools` /
-  `disallowedTools`，正文是系统提示词。
-- **hooks**：`hooks/hooks.json`，顶层 `"hooks"` 包裹事件表；事件 `SessionStart` /
-  `UserPromptSubmit` / `PreToolUse` / `PermissionRequest` / `PostToolUse` / `PostToolUseFailure` /
-  `Stop`；handler `type: "command"`（shell 字符串）或 `"process"`（argv），字段 `command` /
-  `args` / `env` / `timeout` / `async` / `statusMessage`。
-- **MCP**：`.mcp.json` 的 `mcpServers` 映射，条目 `type: stdio|http|sse` + `command` / `args` /
-  `env` / `cwd` / `url` / `headers` / `enabled`。
-- **bin**：`bin/` 下的可执行文件，启用插件期间进入会话 bash 的 PATH。
-
-## 四、兼容边界与降级清单
-
-| 项 | ucode 处理 |
-| --- | --- |
-| 清单三档位置 | 支持；多清单并存取第一个，其余诊断 |
-| Claude 的 `settings` / `channels` / `lspServers` / `outputStyles` / `workflows` / `experimental` | 注册但不执行，诊断 |
-| `dependencies`（跨市场依赖） | 诊断忽略 |
-| `commands` 的 `allowed-tools` / `model` / `skills` | 诊断忽略（当普通命令） |
-| `agents` 的 `effort` / `maxTurns` / `memory` / `background` / `isolation` / `color` | 诊断忽略 |
-| `agents` 的 `model` 别名（sonnet/opus/haiku/inherit） | 忽略，回落会话默认模型 |
-| hook 的 `http` / `mcp_tool` / `prompt` / `agent` 型 handler | 诊断忽略 |
-| `PermissionRequest` 事件 | pi 无独立权限事件，v1 不实现（诊断） |
-| 冒号命名 | 仅显示层；插件正文里的 `/plugin:name` 不会被 pi 展开（已知限制） |
-| `bin/` 的 Windows 语义 | v1 按 Unix 处理 |
-
-## 五、架构与代码接缝
-
-### 5.1 模块
-
-新增 `server/src/agent/plugins/`：
-
-| 文件 | 职责 |
-| --- | --- |
-| `manifest.ts` | 三档定位清单、路径规则、字段校验，产出规范化描述 |
-| `market.ts` | 解析 `marketplace.json`、来源解析与拉取（github/git/url/npm/本地） |
-| `registry.ts` | 扫描插件根 + 读 `plugins.json` 状态，产出「已启用插件描述」 |
-| `sanitize.ts` | 插件 / 组件名 → 显示名与底层 token，跨插件去重 |
-| `adapters/skills.ts` | 申报技能路径与改名 |
-| `adapters/commands.ts` | 申报命令路径与改名 |
-| `adapters/agents.ts` | Claude frontmatter → ucode 角色（工具名映射、能力收敛） |
-| `adapters/hooks.ts` | hooks 解析、事件映射、子进程执行 |
-| `adapters/mcp.ts` | MCP 合并、变量替换、`registerMcpServer` |
-| `adapters/bin.ts` | 计算 bin 目录并生成 `shellCommandPrefix` |
-| `extension.ts` | 装配一个内联 pi 扩展：`resources_discover` + 注册 MCP + 注册 hooks |
-| `index.ts` | 对外 API：列举、装配输入、状态读写 |
-
-### 5.2 会话装配注入
-
-- `agent/session-config.ts` 的 `createSessionLoader`：
-  - `extensionFactories` 增加 `createPluginsExtension(pluginContext)`。
-  - 该扩展在 `resources_discover` 里返回插件 skills / prompts 路径；
-    `session_start` 后 `registerMcpServer` 注册插件 MCP；装载时 `pi.on` 注册 hook 事件。
-  - `extensions`（清单键或目录）走 loader 的 `additionalExtensionPaths`，仅信任的插件。
-- `agent/session-config.ts` 的 `buildSessionOptions`：
-  - `settingsManager.applyOverrides({ shellCommandPrefix })` 追加插件 `bin/` PATH
-    （在 `reload()` 之后，与现有 `defaultTools` 覆盖同一处）。
-- 资源改名（`<plugin>:<name>` → `<plugin>-<name>`）通过 loader 的 `skillsOverride` /
-  `promptsOverride` 完成；角色注册表在 `agent/agents` 加载后合并插件子角色。
-- `agent/assets` 的 `/` 菜单列举复用同一份插件解析结果，透出 `displayName` / `plugin` / `invoke`。
-
-### 5.3 生效与失效
-
-- 计算「启用集指纹」= 排序后的启用插件 id + version（用户级 + 项目级）。
-- 会话池记录每个会话装配时的指纹；安装 / 卸载 / 启停 / 更新后，指纹变化的会话被回收，
-  下次访问重建。
-- 插件解析结果缓存 key = 指纹 + cwd，避免每会话重复扫盘。
-
-## 六、组件适配细则
-
-### 6.1 skills / commands
-
-- 底层名：`<pluginToken>-<componentToken>`；显示名：`<manifest.name>:<componentName>`。
-- commands 的 object 内联定义与子目录扁平化（`commands/db/migrate.md` → `plugin:db:migrate`
-  显示名、扁平化为一个合法 token）。
-- 只透传 pi 认的 `description` / `argument-hint` / 正文；其余 frontmatter 字段出诊断。
-
-### 6.2 agents
-
-Claude agent frontmatter → ucode 角色：
-
-| Claude 字段 | ucode 处理 |
-| --- | --- |
-| `name` | 显示名与 slug 来源（加插件前缀） |
-| `description` | 直接映射 |
-| `model` | 别名忽略，回落默认；其余原样交给 `resolveModelRef` |
-| `tools` | 经工具名映射表收敛为白名单；未知项诊断丢弃 |
-| `disallowedTools` | 收敛为 `excludeTools`（需给 ucode 角色能力补该字段） |
-| 其余 | 诊断忽略 |
-
-工具名映射（Claude → pi）：
-
-```
-Bash→bash  Read→read  Edit→edit  Write→write  Glob→find  Grep→grep  LS→ls
-WebFetch→webfetch  WebSearch→websearch  Task→subagent
-```
-
-插件 agents 一律按 subagent 落位（Claude 插件不定义主模式角色），slug 用
-`<pluginToken>-<agentToken>`，仍需满足 ucode 的 slug 规则与长度上限。
-
-### 6.3 hooks
-
-事件映射：
-
-| Claude/ZCode | pi 事件 | 决策落点 |
+| 钩子 | 用途 | 现状对应物 |
 | --- | --- | --- |
-| SessionStart | `session_start` | 首轮上下文注入（advisory） |
-| UserPromptSubmit | `input` / `before_agent_start` | 可 transform 文本 / 追加上下文 |
-| PreToolUse | `tool_call` | 可收紧：`{block, reason}` |
-| PermissionRequest | —（v1 不实现） | — |
-| PostToolUse | `tool_result` | 可替换结果内容 |
-| PostToolUseFailure | `tool_result`（`isError`） | 可注释错误 |
-| Stop | `agent_end` / `agent_settled` | 仅通知 / 清理 |
+| `assemble` | 注入工具、工具钩子、提示词片段 | `harness/session-config.ts` 的装配链（`:218` `assembleSession`） |
+| `onTurnSettled` | 一轮落定后运行编排（判定、续跑、清理） | `pool.ts:790-828` 的 `agent_settled` 监听 |
+| `injectTurn` | 服务端注入一轮（不占用户队列） | `pool.ts:339` `startInjectedRun`（私有） |
+| `onDispose` | 实例回收时释放插件资源 | `pool.ts:1066` `goals.forget` |
+| `onModeChange` | 模式切换时的暂停 / 恢复语义 | `routes/sessions/index.ts:229-235` |
 
-执行口径：
+硬约束：钩子不得打断进行中的一轮，回收沿用「活跃者标脏、空闲者立即丢弃」的既有语义
+（`core/pool.ts:1094` `recycleForConfigChange` 与 `core/recycle.ts` 的 `planRecycle`）。
 
-- stdin 收一行 JSON，字段模仿 Claude（`hook_event_name` / `tool_name` / `tool_input` /
-  `tool_response` / `prompt` / `cwd` / `session_id` 等）。
-- stdout 可选 JSON（`decision` / `reason` / `hookSpecificOutput.additionalContext` 等）；
-  exit 2 视为阻断（stderr 作 reason），其它非 0 记日志不阻断。
-- `matcher` 对工具名做正则匹配；`timeout` 默认 60s；`async: true` 只对通知类事件生效。
-- 环境变量：`UCODE_PLUGIN_ROOT` / `UCODE_PLUGIN_DATA` / `UCODE_PROJECT_DIR` /
-  `UCODE_PLUGIN_OPTION_<KEY>`，并兼容 `CLAUDE_*` / `ZCODE_*` 别名。
-- **安全边界**：hook 只能收紧、不能放宽 ucode 权限引擎。`PreToolUse` 的 block 与权限扩展的
-  deny 取并集；注册顺序保证权限扩展先判定。放宽型 `permissionDecision: allow` 仅对本来
-  `ask` 的调用生效，对 `deny` 无效。
+## 六、内核锁死清单
 
-### 6.4 MCP
+插件永远碰不到的东西：会话生命周期与装配顺序、权限引擎的最终裁决与 `deny` 优先级、DB 迁移与
+schema、鉴权与凭证、事件总线的投递顺序与 seq 语义、日志与进程边界。插件想做而落在这张表里的事，
+说明接缝设计不足，而不是给插件开后门。
 
-- 读 `.mcp.json` 与清单 `mcpServers`，做变量替换后 `pi.registerMcpServer(name, config)` 注册。
-- `name = plugin_<pluginToken>_<server>`；显示层为 `plugin:<plugin>:<server>`，设置页只读分组
-  「插件 MCP」。
-- 与用户自己的 `$APP_HOME/agent/mcp.json` 分组展示；同名以用户配置优先（出诊断）。
+## 七、内置插件与内置资产
 
-### 6.5 bin
+### 7.1 内置资产机制
 
-- 会话装配时收集启用插件的 `bin/` 目录（存在且含可执行文件）。
-- `shellCommandPrefix` = `export PATH="$PATH:<dir1>:<dir2>"` + 换行；路径含空格做 shell 转义。
-- **追加在 `$PATH` 之后**，不遮蔽系统命令；只作用于会话 bash 工具，不改 server 进程 PATH。
+内置资产是内置插件的子集（纯声明形态），两者共用一套注册与物化机制。
 
-### 6.6 pi TS 扩展
+- **真身与来源分离**：真身 `{ id, kind, version, files }` 与来源无关；来源 `packaged`（随包）或
+  `cloud`（中继下发）。
+- **单一注册表**：`kind` ∈ `prompt` / `skill` / `tool` / `plugin`。现有 `BUILTIN_PROMPT_COMMANDS`
+  （`server/src/harness/assets/builtin.ts:19` 的 `/review`）迁入为 `kind: "prompt"`。
+- **统一来源与优先级**：来源恒标 `builtin`、优先级**恒为最低**（磁盘 / 用户同名者胜出）；插件侧
+  `PLUGIN_SOURCES` 从一开始就含 `builtin`。
+- **物化只给需要磁盘真身的类型**：
 
-- 清单 `extensions` 键或默认 `extensions/` 目录，走 loader 的 `additionalExtensionPaths`。
-- 逐插件信任：未在 `plugins.json` 的 `trustedExtensions` 中的插件不加载，出诊断并在设置页提示。
-- 在 server 进程内执行，启用即等于授予代码执行信任。
+  | kind | 接入方式 | 理由 |
+  | --- | --- | --- |
+  | `prompt` | 内存合成 `PromptTemplate`（现状） | pi 的模板是内存对象，`builtin:<name>` 合成路径即可 |
+  | `skill` | 物化到 `$APP_HOME/app/builtin/skills/<id>/SKILL.md` | pi 的 `Skill` 只有 `filePath`（`dist/core/skills.d.ts:9-16`），模型靠 `read` 取正文，命中记录也认这个路径 |
+  | `plugin` | 物化到 `$APP_HOME/app/builtin/plugins/<id>/`，由插件 registry 以隐式启用项加载 | 插件包天然是目录形态 |
+  | `tool` | 代码注册（`harness/tools` + 能力清单 + 权限规则），注册表只登记元数据 | 工具是代码不是文件 |
 
-## 七、命名空间与命名规则
+- **物化语义**：幂等（内容相同跳过）、升级按内容覆盖、不做哈希目录名（否则命中记录里的路径每次
+  升级都变）；物化相位早于第一次装配与 `/` 菜单列举。
+- **云同步口子**：注册表对外只暴露 `resolveBuiltinAssets()`——先取随包集合，配置了中继且云端清单
+  可用时按 id 用云端版本替换；拉取失败或离线**静默回落**随包版本，服务不因中继不可达而失败
+  （与 `server/src/env.ts` 那套「缺失即报错」明确区分：云同步是可选增强）。状态记
+  `$APP_HOME/app/builtin/manifest.json`（`id` / `kind` / `version` / `sha256` / `origin` /
+  `fetchedAt`），随包资产今天也写。中继侧接口约定见 [`relay.md`](./relay.md)。
 
-```
-显示名（UI / 引用）   my-plugin:review
-pi 底层 token         my-plugin-review
-```
+### 7.2 内置插件形态
 
-- sanitize：小写；非 `[a-z0-9-]` 替换为 `-`；折叠连续 `-`；去首尾 `-`；数字开头补前缀。
-- token = `<pluginToken>-<componentToken>`；跨插件冲突时追加 `-<6位hash>`。
-- 插件 agents 的 slug 需满足 ucode 规则（小写字母开头、`[a-z0-9-]`、长度上限）。
-- MCP 服务器名用下划线形式 `plugin_<plugin>_<server>`（与 Claude 工具名前缀对齐）。
+内置插件 = **声明**（物化到 `$APP_HOME/app/builtin/plugins/<id>/`）+ **代码**（随包编译的模块，
+向宿主注册）。用户可禁用、不可卸载；升级随包或云同步覆盖。首个内置插件将是 `plan`（见第十节）。
 
-## 八、市场与安装
+### 7.3 两个内置技能
 
-### 8.1 目录布局
+| 技能 | 用途 | 真身 | 物化 |
+| --- | --- | --- | --- |
+| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/assets/builtin/skills/plugin-create/{SKILL.md,references/…}` | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
+| `plugin-review` | 审计第三方插件：清单与路径越界、hook 命令（shell 注入、`${user_config}` 落在 shell 里、curl 管道执行）、`bin/` 内容、MCP 配置（command / url / headers 里的 token）、TS 扩展的代码执行面、试图放宽权限、网络与写盘范围；输出按「阻断 / 警告 / 提示」分级 | 同上的 `plugin-review/` | 同上的物化 |
 
-```
-$APP_HOME/plugins/
-├── marketplaces/<market>/        # 市场仓库 clone / 解包
-└── cache/<pluginId>/             # 安装后的插件副本（本地源可登记原路径）
-$APP_HOME/app/plugins/data/<plugin>/   # ${UCODE_PLUGIN_DATA}
-```
+调用方式 `/skill:plugin-create`、`/skill:plugin-review`，来源标 `builtin`；`plugin-review` 的描述要
+写明「审计第三方插件」，与内置命令 `/review`（审查代码改动）区分。正文真身用 Markdown 文件 +
+esbuild `loader: { ".md": "text" }` 内联（正文长且含代码块，写成 JS 模板串易错）；零构建改动的替代
+是照 `builtin.ts` 写 TS 常量。命名冲突：插件的组件 token 是 `<plugin>-<name>`，**两个内置技能名视作
+已占用**，冲突时插件侧追加 `-<6位hash>`。
 
-### 8.2 状态文件 `plugins.json`
+### 7.4 插件开发文档
 
-```json
-{
-  "marketplaces": [{ "name": "my-market", "source": { "…": "…" } }],
-  "installed": [
-    { "id": "my-market/hello", "name": "hello", "version": "1.0.0", "path": "…", "enabled": true }
-  ],
-  "config": { "my-market/hello": { "api_key": "…" } },
-  "trustedExtensions": ["my-market/hello"]
-}
-```
+真身与内置技能同源，避免两处维护：`docs/plugin-authoring.md` 由 `plugin-create` 的技能真身拼出
+（脚本生成 + `pnpm verify` 比对，与 `docs/api-reference.md` 同一套做法）；`docs/plugins.md` 手写
+（用户向：安装、启停、兼容降级表、安全边界、已知限制）。`pnpm check` 加一条「技能正文 ⇄ 仓库文档」
+一致性校验。
 
-项目级 `<cwd>/.ucode/plugins.json` 只承载启用覆盖：
+## 八、信任、能力与安全
 
-```json
-{ "enabled": ["my-market/hello"] }
-```
+- **能力授权**：清单声明 `capabilities`，启用时展示并落 `plugins.json` 的 grants；升级引入新能力
+  重新确认；运行期未声明即拒绝。
+- **执行类组件**（hooks / bin / TS 扩展 / 自带工具 / 会话钩子）逐插件信任；随包内置插件视为可信；
+  **云同步下发的可执行内容需签名 + 显式信任**，只接受配置的中继域，逐文件 sha256 校验。
+- **权限**：插件规则只收紧（与 `deny` 取并集）；模式档位不放宽；涉及命令执行的组件与 `bash`
+  同权限档，只读模式不给；边界以 [`modes-and-permissions.md`](../docs/modes-and-permissions.md) 为准。
+- **隔离**：项目级插件默认不启用；`storage.kv` 按作用域校验，插件读不到其它插件与其它会话的数据。
+- **Windows**：`bin/` 与路径处理的平台语义要在实施时明确（此前记为「先 Unix」，插件平台不能留这个
+  含糊，落地前定策）。
 
-**项目级插件默认不启用**，必须显式写入该文件或在设置页开启。
+## 九、相对旧稿的修正（代码事实）
 
-### 8.3 安装流程
+| 旧稿写法 | 实际 |
+| --- | --- |
+| `server/src/agent/plugins/` | `server/src/agent/` 不存在；装配层是 `harness/session-config.ts`（`:146` `createSessionLoader`、`:218` `assembleSession`、`:314` `buildSessionOptions`）。落位见第十四节 |
+| 在 `resources_discover` 里申报 skills / prompts | 该事件在 `session_start` 后由 `bindExtensions` 触发，而绑定只在 `mode === "build" && usesDefaultToolSet`（`core/pool.ts:737`）；plan / ask 会话拿不到。改为**装配期**注入 loader 的 `additionalSkillPaths` / `additionalPromptTemplatePaths` / `skillsOverride` / `promptsOverride`（`session-config.ts:185-188`） |
+| bin 走 `settingsManager.applyOverrides({ shellCommandPrefix })` | 自研 shell 扩展已整体覆盖内置 bash，该设置不生效（`harness/shell/index.ts:1-8`）。改为往会话 bash 的 spawn env 注入 PATH（`harness/shell/env.ts` 的范式，`path.delimiter`，追加在末尾不遮蔽系统命令） |
+| 插件 MCP 用 `pi.registerMcpServer` | 现状不用它，只有 `createMcpExtension({ loadConfig })`（`harness/mcp/index.ts:29`）。插件 MCP 合并进那个 `loadConfig`，命名 `plugin_<plugin>_<server>`，`mcp.json` 同名优先；配置路径是 `$APP_HOME/harness/mcp.json`（`env.ts:128`），不是旧稿写的 `$APP_HOME/agent/mcp.json` |
+| 「启用集指纹 + 回收」 | 现状只有「配置代次 + stale」（`pool.ts:1094`，唯一调用点是配置保存 `app.ts:232`）。装配时把指纹记进 `SessionEntry`，`ensure()` 比对不一致即重建；活跃轮次沿用 `planRecycle` 的标脏语义 |
+| hooks 只在 build 模式 | `pool.ts:737` 的条件要按「本次装配是否挂了需要绑定的扩展」判定：`assembleSession` 返回 `needsBind`（plugins 扩展不带 MCP，不会激活 codemode、不会绕过只读白名单） |
+| `${UCODE_PLUGIN_ROOT}` 等字面量 | brand 校验扫 `server/src` 命中品牌名即报错（`packages/brand/scripts/verify.ts:100-113`）。清单目录、项目级目录、变量名全部从 `brand.slug` 派生（`CLAUDE_*` / `ZCODE_*` 别名保持字面量） |
+| `$APP_HOME/harness/extensions` 自动加载 | 会话 loader 未设 `noExtensions`，pi 会扫 `<agentDir>/extensions` 自动加载——这是绕过信任模型的既存通道，定策关掉，TS 扩展统一走插件信任清单（变更记 `CHANGELOG`） |
+| 动作名 `marketplace/add`、`enable`、`disable`、`configure` | `docs/api.md` 的动作是封闭词表，这些都不在表内。复用既有动作：`plugins/list` / `create` / `update` / `delete` / `refresh`；市场用 `marketplace/list` / `create` / `delete` / `refresh`；插件动作调用登记新动作 `invoke` |
+| 插件 agents 一律落 subagent | 与「用插件实现计划模式 / 目标模式」冲突。改为：`modes` 是定义主模式的正式通道，`agents/*.md` 里 `mode: <slug>` 仍兼容（Claude 插件只有 agents），两者合并进同一注册表 |
 
-1. 解析来源 → 拉取到 `marketplaces/` 或 `cache/`（github/git clone、url 下载、npm 解包、
-   本地目录登记）。
-2. 定位清单（三档），校验字段与组件路径。
-3. 写入 `plugins.json`，默认启用；返回插件视图。
-4. 更新：市场条目 `version` 与插件 `plugin.json` `version` 对比；不一致提示可更新。
+## 十、迁移路线（按依赖顺序，不设版本边界）
 
-## 九、契约与接口
+| 序 | 动作 | 完成判据 |
+| --- | --- | --- |
+| 1 | 宿主 + 接缝骨架 + 资源型组件 | 第三方（Claude / ZCode 格式）插件能装、能启停、不支持字段有诊断 |
+| 2 | 模式接缝 + 界面贡献 → **`plan` 迁成内置插件** | `plan` 行为对等；内核里 `mode === "plan"` 的分支消失；选择器改读注册表 |
+| 3 | 编排钩子 + 统一存储 / 事件 / 插槽 → **`goal` 迁成内置插件** | 目标模式行为对等；`mode === "build"` 的三处硬编码消失；插件禁用后会话不崩 |
+| 4 | 其余功能按同一套接缝迁（工作台面板、记忆、命令与技能索引等） | 每迁一块，`harness/` 少一个专用子系统 |
 
-### 9.1 契约（`packages/contracts/src/plugins/`）
+迁移期间功能不得回退：新旧两套并存时，以插件声明的结果为准，内核里的旧分支先保留、等对等后再删。
 
-- `input.ts`：`pluginsListInputSchema`、`marketplaceAddInputSchema`、`marketplaceRemoveInputSchema`、
-  `marketplaceRefreshInputSchema`、`pluginInstallInputSchema`、`pluginUninstallInputSchema`、
-  `pluginSetEnabledInputSchema`、`pluginConfigureInputSchema`。
-- `output.ts`：`PluginView`（`id` / `name` / `displayName` / `version` / `description` / `source` /
-  `enabled` / `components`）、`PluginMarketplaceView`、`PluginListResponse`、`PluginComponentView`
-  （`kind` / `name` / `displayName` / `count`）。
-- 既有契约扩展：`CommandAssetSource` 增 `"plugin"`；`PromptCommandView` / `SkillCommandView` 增
-  `displayName` / `plugin?` / `invoke`；`AgentView` 增 `displayName?` / `plugin?`。
-- `envelope.ts` 新错误码：`plugin_not_found`、`plugin_manifest_invalid`、`plugin_component_invalid`、
-  `marketplace_invalid`、`plugin_source_invalid`、`plugin_install_failed`、`plugin_requires_trust`。
+## 十一、必须消失的内核硬编码（迁移的量化目标）
 
-### 9.2 路由（`server/src/routes/plugins/`）
+| 位置 | 现在 | 迁完后 |
+| --- | --- | --- |
+| `harness/session-config.ts:297` | 记忆工具按 `mode === "build"` | 由插件声明的作用域决定 |
+| `core/pool.ts:719` | `bindExtensions` 按 `mode === "build"` | 按装配返回的 `needsBind` |
+| `routes/sessions/index.ts:233` | 切走 `build` 即暂停目标 | 由目标插件自己订阅 `onModeChange` |
+| `harness/agents/profiles.ts:72` | `Record<SessionMode, …>` 锁死三个模式 | 注册表查询 |
+| `harness/agents/capability.ts:92` | `isReadOnlyCapability` 只认「整批 deny 写工具」 | 能力标记（`reads` / `writes` / `plans`）由声明给出 |
+| `packages/ui/.../mode-picker.tsx:14,27,53` | 常量列表 + 三个硬编码图标 | 注册表数据 + 图标回落 |
+| `packages/ui/src/lib/mode.ts:5-31` | 三个内置 slug 的文案 | 注册表提供的 `displayName` / `description` |
 
-```
-POST /api/v1/plugins/list
-POST /api/v1/plugins/marketplace/add | remove | refresh
-POST /api/v1/plugins/install | uninstall | enable | disable | configure
-```
+## 十二、实施顺序
 
-出参统一 `ok()` / `fail()`；响应生产点显式标注契约类型。
+1. **合同先落**：契约（`plugins` / `marketplace` 域 + 既有视图扩展 + 错误码 + i18n）、
+   `plugins.json` 状态、`harness/plugins/{manifest,registry,sanitize}` 与单测。
+2. **资源接入**：装配期注入 skills / commands / agents + 改名 + `/` 菜单与选择器透出 + 会话按指纹
+   重建 + Claude / ZCode 真实形状夹具。
+3. **执行类组件**：hooks（事件映射、block 与 `deny` 取并集、matcher、timeout）、bin（spawn env）、
+   插件 MCP（`loadConfig` 合并）、TS 扩展（信任清单）、`noExtensions` 关闭。
+4. **内置资产**：注册表 + 物化 + `manifest.json` + 来源分层与回落；`plugin-create` /
+   `plugin-review` 两个技能 + `/review` 迁入 + `docs/plugin-authoring.md` 生成与一致性校验。
+5. **宿主与接缝**：`PluginContext`、能力授权、`slots` / `actions` / `events` / `storage`、
+   `plugins/invoke`、`plugin_event` / `plugin_changed` 帧。
+6. **界面**：设置页 Plugins 分页（列表、详情、组件、诊断、启停、配置、本地目录登记、信任开关）、
+   `/` 菜单插件项、agent 选择器、模式选择器改数据源。
+7. **迁移**：`plan` → `goal`（第十节的 2 / 3 步）。
+8. **市场**：见 [`plugin-market.md`](./plugin-market.md)。
 
-### 9.3 SDK / i18n
+每步收尾跑一次 `pnpm check` 与对应验收（要收窄范围用 `--filter`，不要在一轮里反复全量跑），
+做完停下等 review。
 
-- `@ucode/sdk` 增 `plugins` 域 store（列举、安装、启停、配置）。
-- `packages/i18n` 补错误码文案与设置页文案（中英齐平）。
+## 十三、测试与验收
 
-## 十、前端
-
-- 设置页新增 **Plugins** 分页：市场列表、插件列表与详情（组件列表）、安装 / 卸载 / 启停 /
-  配置 `userConfig`、TS 扩展信任开关、刷新与更新提示。
-- `/` 菜单：插件提供的命令与技能并入现有分组，带插件来源标识；`invoke` 用底层 token 序列化。
-- agent 选择器：插件子角色带 `<plugin>:<name>` 展示。
-- 已启用但加载失败的插件展示诊断原因。
-
-## 十一、信任与安全
-
-- 安装与启用均需显式操作；启用前展示插件将执行的内容（hooks / MCP / bin / TS 扩展）。
-- 项目级插件默认不启用，避免 clone 即执行代码。
-- TS 扩展逐插件信任；未信任不加载。
-- hooks / MCP / bin 都以 server 权限运行，文档与 UI 明确提示。
-- 与 `TODO.md` P0（`/api/v1` 无鉴权、默认监听所有网卡）联动：插件管理接口纳入同一安全整改，
-  整改前不要把服务暴露到不可信网络。
-
-## 十二、测试方案
-
-server 侧 `node:test`，放同级 `__tests__/`。
+`server/src/harness/plugins/__tests__/`，`node:test`，沿用现有夹具写法。
 
 | 编号 | 用例 | 预期 |
 | --- | --- | --- |
 | PLG-01 | 三档清单定位与并存 | 取第一个，其余记诊断 |
 | PLG-02 | 路径规则 | `./` 前缀、越界 / `..` / 不存在拒绝并诊断 |
 | PLG-03 | 不支持字段 | 注册但不执行，出诊断，其它组件正常 |
-| PLG-04 | sanitize / 命名 | 显示名与底层 token 正确，跨插件冲突加 hash |
-| PLG-05 | skills / commands 改名 | `skillsOverride` / `promptsOverride` 后名称正确 |
+| PLG-04 | sanitize / 命名 | 显示名与底层 token 正确；跨插件冲突与内置技能名冲突都加 hash |
+| PLG-05 | skills / commands 改名 | `skillsOverride` / `promptsOverride` 后名称正确，且不覆盖内置命令 |
 | PLG-06 | agent frontmatter 翻译 | 工具名映射、`disallowedTools`、model 别名回落 |
-| PLG-07 | hook 事件映射 | PreToolUse block、PostToolUse 改内容、exit 2 语义 |
-| PLG-08 | MCP 变量替换与命名 | 服务器名 `plugin_<plugin>_<server>`，变量解析正确 |
-| PLG-09 | bin PATH | `shellCommandPrefix` 追加在 `$PATH` 之后 |
+| PLG-07 | hook 事件映射 | PreToolUse block、PostToolUse 改内容、exit 2 语义、与 `deny` 并集 |
+| PLG-08 | MCP 变量替换与命名 | 服务器名 `plugin_<plugin>_<server>`，与用户 `mcp.json` 同名时用户优先 |
+| PLG-09 | bin PATH | 注入 spawn env，追加在 `$PATH` 之后 |
 | PLG-10 | 市场解析 | 各来源形式解析正确；版本对比 |
 | PLG-11 | 状态读写 | `plugins.json` 增删改与项目级启用覆盖 |
-| PLG-12 | 会话失效 | 启用集指纹变化后会话被回收重建 |
+| PLG-12 | 会话失效 | 启用集指纹变化后相关会话被重建 |
+| PLG-13 | 模式注册 | 插件模式进注册表、能力上限收敛、权限规则只收紧 |
+| PLG-14 | 能力授权 | 未声明能力调用被拒；升级新增能力要重新确认 |
+| PLG-15 | 内置资产 | 物化幂等、升级覆盖、名冲突与 frontmatter 校验、`manifest.json` 写入、云端不可达回落 |
+| PLG-16 | 界面贡献 | 声明式贡献进插槽数据；第三方 `componentId` 被拒 |
+| PLG-17 | 动作调用 | `plugins/invoke` 的路由、校验、错误封套与鉴权 |
+| PLG-18 | 插件条目与帧 | 插件条目注册与前缀规则；`plugin_event` 下发与订阅 |
 
-L4 / L5：`pnpm smoke` 加一条「启用含 skill 的插件后模型可调用」；浏览器走查设置页安装 / 启停、
-`/` 菜单插件项、插件子角色选择。
+L4 / L5：`pnpm smoke` 加一条「启用含 skill 的插件后模型可调用」；浏览器走查设置页整套、`/` 菜单
+插件项、模式选择器、插槽渲染、`plugin-review` 技能可被调用。
 
-## 十三、验收
+## 十四、落位与接口
 
-- 三种清单位置都能被识别；不支持字段出诊断且不影响其它组件。
-- skills / commands / agents 正确透出到 `/` 菜单与选择器，命名符合显示名与底层 token 约定。
-- hooks 在对应事件触发，PreToolUse 可阻断；MCP 服务器连接且工具名与 Claude 对齐；bin 进入 PATH。
-- 市场可添加 / 移除 / 刷新，插件可安装 / 卸载 / 启停 / 配置；项目级插件需显式启用。
-- 启停后相关会话按新启用集重建。
-- `pnpm check` 全绿；`docs/api.md` 与契约一致。
+```
+server/src/harness/plugins/     manifest.ts  registry.ts  sanitize.ts  adapters/{skills,commands,agents,hooks,mcp,bin}.ts  host.ts  extension.ts  index.ts
+server/src/plugins/             状态读写（plugins.json）、来源登记、市场解析与版本比对
+server/src/harness/assets/builtin/  registry.ts  materialize.ts  skills/plugin-create/…  skills/plugin-review/…  prompts（/review 迁入）
+packages/contracts/src/plugins/     input.ts  output.ts
+packages/contracts/src/marketplace/ input.ts  output.ts
+```
 
-## 十四、风险与边界
+- 契约域只有 `input.ts` / `output.ts`，导出要在 `packages/contracts/src/index.ts` 手写两行。
+- 错误码只加实际会返回的：`plugin_not_found` / `plugin_manifest_invalid` /
+  `plugin_component_invalid` / `plugin_source_invalid` / `plugin_requires_trust` / `marketplace_invalid`；
+  每个都必须同步 `packages/i18n` 的 `error-messages.ts` 与 `domain` 文案（否则 typecheck 失败）。
+- 既有枚举扩展：`COMMAND_ASSET_SOURCES`、`AGENT_SOURCES` 增 `plugin`；`PromptCommandView` /
+  `SkillCommandView` / `AgentView` 增 `displayName` / `plugin` / `invoke`（按需）。
+- 路由注册在 `server/src/index.ts:81-101`，并在 `scripts/api-docs/endpoints.ts` 登记、`generate.ts`
+  的 `DOMAIN_LABELS` 补中文标题、`pnpm api:docs` 重生成 `docs/api-reference.md`。
+- SDK：`apis.ts` 加域、`stores/plugins.ts`、`client.ts` 三处、`index.ts` 导出、`hooks/use-plugins.ts`。
+- 设置页：`packages/ui/src/lib/settings-section.ts`、`business/settings/settings-sections.tsx`、
+  `settings-panel.tsx` 分发 + 新页组件。
 
-- **代码执行**：hooks / MCP / TS 扩展 / bin 都以 server 权限运行，信任模型必须到位。
-- **无鉴权**：与 P0 联动，整改前不得暴露。
-- **兼容降级**：冒号命名、命令级工具收窄、非 command 型 hook、agent model 别名等为降级项，
-  需在 `docs/plugins.md` 的兼容表说明。
-- **插件热更**：会话池长驻，必须按指纹失效，否则插件变更对旧会话不可见。
-- **`userConfig` 密钥**：v1 明文存 `plugins.json`（0600），后续再做安全存储。
+## 十五、风险与边界
 
-## 十五、落地顺序
+- **代码执行面**：hooks / bin / MCP / TS 扩展 / 插件工具都以 server 权限运行，信任模型必须到位；
+  云同步下发的可执行内容风险最高。
+- **声明式界面的表达力上限**：状态条、配置表单、按钮、列表够用；消息流内部深度耦合的 UI
+  （如目标模式的逐轮细线）要么由内核提供更丰富的原语，要么留在原生内置插件里。
+- **插件 API 不做向后兼容**（项目处于开发初期，不维护兼容）：清单必须有 `apiVersion`，宿主对
+  不匹配**拒绝加载并出诊断**，不静默降级。
+- **性能**：插件发现与装配结果按启用集指纹缓存，避免每会话扫盘；钩子不得引入每步的额外往返。
+- **热更**：会话池长驻，指纹失效必须可靠，否则插件变更对旧会话不可见。
+- **`userConfig` 密钥**：状态文件 0600，明文存储；敏感值的安全存储另行排期。
 
-1. 契约（`plugins/` 域 + 既有视图扩展 + 错误码 + i18n）+ `plugins.json` 状态 +
-   `agent/plugins/` 骨架（manifest / registry / sanitize）+ 单测。
-2. `resources_discover` 扩展 + skills / commands / agents 适配 + `/` 菜单与选择器透出。
-3. MCP 注册 + hooks 桥接。
-4. bin/（`shellCommandPrefix`）。
-5. 市场安装 / 更新 + 设置页 UI + 会话失效重建。
-6. pi TS 扩展 + 信任模型 + `docs/plugins.md` + `CHANGELOG.md`。
-7. `pnpm check` + `pnpm build` + `agent-browser` 走查 + `pnpm smoke`，停下等 review。
+## 十六、需要同步的文档
 
-## 十六、后续路线
-
-- 命令级能力（`allowed-tools` / `model` / `skills`）与 `PermissionRequest` 事件。
-- 非 command 型 hook（http / mcp_tool / prompt / agent）。
-- 插件间 `dependencies` 与跨市场依赖。
-- 支持组件：`output-styles` / `themes` / `monitors` / `lsp` / `workflows`。
-- `userConfig` 敏感值的安全存储。
-- 与 Claude Code / ZCode 市场的互操作（导入导出，而非运行期读取）。
+| 文档 | 改动 |
+| --- | --- |
+| `docs/plugins.md`（新） | 用户向：安装、启停、兼容降级表、安全边界、已知限制 |
+| `docs/plugin-authoring.md`（生成） | 面向插件作者，由 `plugin-create` 真身生成并校验 |
+| `docs/api.md` | 动作表登记 `invoke`，插件与市场域 |
+| `docs/api-reference.md` | `pnpm api:docs` 重生成 |
+| `docs/session-entries.md` | 插件条目规则（前缀注册） |
+| `docs/modes-and-permissions.md` | 插件定义模式后，「模式从哪来」的口径更新 |
+| `AGENTS.md` | 目录约定加 `server/src/plugins/`、`harness/plugins/`、`harness/assets/builtin/`；`$APP_HOME` 布局加 `plugins/` 与 `app/plugins.json`、`app/builtin/` |
+| `CHANGELOG.md` | 未发布段（接口、目录、`noExtensions` 行为变更） |
+| `plans/{agent-tools-and-modes,stage-11-goal,input-commands-skills}.md` | 标注「后续以插件形态实现」，迁移后再改正文 |
 
 ## 十七、复盘
 
