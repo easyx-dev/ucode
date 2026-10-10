@@ -9,12 +9,13 @@ import { describe, it } from "node:test";
 import { SESSION_MODES } from "@ucode/contracts";
 
 import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../../constants";
-import { DEFAULT_PERMISSION_RULES } from "../../permissions";
+import { DEFAULT_PERMISSION_RULES, decidePermission } from "../../permissions";
 import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../../tools/names";
 import {
   type AgentRegistry,
   agentRules,
   effectiveToolNames,
+  isReadOnlyCapability,
   PRIMARY_PROFILES,
   parentModeRules,
   parseCustomAgent,
@@ -35,24 +36,58 @@ describe("角色注册表", () => {
     }
   });
 
-  it("build 用默认集（内置 + 扩展），plan / ask 只读且含 subagent", () => {
+  it("plan / ask 与 build 用同一套工具声明，只读性落在规则上", () => {
     const build = PRIMARY_PROFILES.build.capability.toolSelection;
     assert.equal(build.kind, "defaultTools");
-    if (build.kind === "defaultTools") {
-      for (const name of [...DEFAULT_BUILTIN_TOOLS, ...DEFAULT_EXTENSION_TOOLS]) {
-        assert.ok(build.defaultTools.includes(name), `build 默认集缺少 ${name}`);
-      }
+    const declared = build.kind === "defaultTools" ? build.defaultTools : [];
+    for (const name of [...DEFAULT_BUILTIN_TOOLS, ...DEFAULT_EXTENSION_TOOLS]) {
+      assert.ok(declared.includes(name), `build 默认集缺少 ${name}`);
     }
 
+    // 切模式不再改工具表（否则模型会照上一轮的旧表回答）；plan 只多一个 present_plan
     for (const mode of ["plan", "ask"] as const) {
       const selection = PRIMARY_PROFILES[mode].capability.toolSelection;
-      assert.equal(selection.kind, "allowlist");
-      if (selection.kind !== "allowlist") continue;
-      for (const name of ["edit", "write", "bash"]) {
-        assert.ok(!selection.tools.includes(name), `${mode} 不应有 ${name}`);
-      }
-      assert.ok(selection.tools.includes("subagent"), `${mode} 应能委派子智能体`);
+      assert.equal(selection.kind, "defaultTools");
+      if (selection.kind !== "defaultTools") continue;
+      const expected = mode === "plan" ? [...declared, "present_plan"] : declared;
+      assert.deepEqual([...selection.defaultTools].sort(), [...expected].sort());
     }
+  });
+
+  it("只读模式靠规则断掉写盘 / 执行，不靠收窄工具集", () => {
+    const rules = parentModeRules("plan");
+    for (const name of ["edit", "write", "bash"]) {
+      assert.ok(
+        rules.some((rule) => rule.tool === name && rule.action === "deny" && rule.pattern === "*"),
+        `plan 应 deny ${name}`,
+      );
+    }
+    // 判断「能不能落盘」看规则：两个只读模式为真，编码为假
+    assert.equal(isReadOnlyCapability(primaryCapability("plan")), true);
+    assert.equal(isReadOnlyCapability(primaryCapability("ask")), true);
+    assert.equal(isReadOnlyCapability(primaryCapability("build")), false);
+  });
+
+  it("只读判定要三个工具都断掉：只禁一个不算只读", () => {
+    const build = primaryCapability("build");
+    const deny = (tool: string) => ({ tool, pattern: "*", action: "deny" as const });
+    // 只断 bash：还有 edit / write 能落盘，不该因此拿不到扩展与目标结算工具
+    assert.equal(isReadOnlyCapability({ ...build, permissions: [deny("bash")] }), false);
+    // 限定对象的 deny 也不算全断
+    assert.equal(
+      isReadOnlyCapability({
+        ...build,
+        permissions: [{ tool: "write", pattern: "src/*", action: "deny" }],
+      }),
+      false,
+    );
+    assert.equal(
+      isReadOnlyCapability({
+        ...build,
+        permissions: [deny("edit"), deny("write"), deny("bash")],
+      }),
+      true,
+    );
   });
 
   it("子角色都是 subagent", () => {
@@ -134,16 +169,31 @@ describe("能力交集", () => {
     assert.ok(names.includes("edit") && names.includes("bash"));
   });
 
-  it("general 在 plan 父下被交集收窄为只读，不能越权", () => {
+  it("general 在 plan 父下保留默认集，但要越权会被父规则拦住", () => {
     const capability = resolveSubagentCapability(
       subagentProfile("general"),
       primaryCapability("plan"),
     );
+    assert.equal(capability.toolSelection.kind, "defaultTools");
     const names = effectiveToolNames(capability);
-    for (const name of ["edit", "write", "bash", "subagent", "present_plan"]) {
+    // 子会话的工具声明不再被交集收窄（与父工具表一致），递归与计划提交仍被排除
+    for (const name of ["edit", "write", "bash"]) {
+      assert.ok(names.includes(name), `plan 下的 general 应仍声明 ${name}`);
+    }
+    for (const name of ["subagent", "present_plan"]) {
       assert.ok(!names.includes(name), `plan 下的 general 不应有 ${name}`);
     }
-    assert.ok(names.includes("read"));
+    // 真正的闸门：装配层把父会话模式的规则一并交给子会话，判定取较严者
+    // （端到端行为见 permissions/__tests__/extension.test 的「父会话模式的 deny 仍然拦住子会话」）
+    for (const tool of ["edit", "write", "bash"] as const) {
+      const verdict = decidePermission(
+        parentModeRules("plan"),
+        tool,
+        tool === "bash" ? { command: "rm -rf ." } : { path: "/work/src/a.ts" },
+        "/work",
+      );
+      assert.equal(verdict.action, "deny", `plan 父下 ${tool} 应被拦下`);
+    }
   });
 
   it("子角色规则含 subagent 禁递归，主角色规则里没有", () => {
@@ -167,7 +217,9 @@ describe("能力交集", () => {
       ),
       false,
     );
-    assert.equal(usesDefaultToolSet(primaryCapability("plan")), false);
+    // 计划与编码同为默认集（只读与否看规则），扩展工具靠 isReadOnlyCapability 排除
+    assert.equal(usesDefaultToolSet(primaryCapability("plan")), true);
+    assert.equal(isReadOnlyCapability(primaryCapability("plan")), true);
   });
 
   it("父一侧施加的是模式规则：默认规则只留在子会话自己的规则里", () => {

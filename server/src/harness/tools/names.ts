@@ -35,10 +35,16 @@ export const READ_ONLY_TOOLS = [
 /** 子智能体工具名；primary 把它暴露给模型，子会话恒不注册（防递归） */
 export const SUBAGENT_TOOL_NAME = "subagent";
 
+/** 计划模式的收尾工具名：只在计划模式注册，调用即提交方案、本轮结束 */
+export const PRESENT_PLAN_TOOL_NAME = "present_plan";
+
+/** 会写盘 / 执行命令的工具名：只读角色用规则把它们整批断掉（见 `harness/agents/profiles`） */
+export const WRITE_TOOLS = ["edit", "write", "bash"] as const;
+
 /** 子会话永远拿不到的工具：递归、计划提交、记忆写入与目标结算（子会话不该结算父目标） */
 export const SUBAGENT_EXCLUDED_TOOLS = [
   SUBAGENT_TOOL_NAME,
-  "present_plan",
+  PRESENT_PLAN_TOOL_NAME,
   "remember",
   "forget",
   ...GOAL_TOOL_NAMES,
@@ -53,7 +59,7 @@ export const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...DEFAULT_EXTENSION_TOOLS,
   ...CUSTOM_TOOL_NAMES,
   ...READ_ONLY_TOOLS,
-  "present_plan",
+  PRESENT_PLAN_TOOL_NAME,
   "tool_search",
   ...MEMORY_TOOL_NAMES,
   ...GOAL_TOOL_NAMES,

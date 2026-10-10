@@ -44,17 +44,21 @@ describe("语言目录", () => {
     }
   });
 
-  it("工具使用分节随可用工具变化：只读模式不出现写盘 / 执行相关指引", () => {
+  it("工具使用分节随可用工具变化：只读模式的声明与编码一致，约束交给模式文案", () => {
     const build = buildFullPrompt({ mode: "build" });
     assert.ok(build.includes("codemode"), "build 工具说明应含 codemode");
     assert.ok(build.includes("edit 用最小且唯一"), "build 工具说明应含 edit 用法");
 
+    // 只读模式的工具声明与编码一致（切模式不改工具表），所以工具说明照旧列出；
+    // 「本模式下会被阻断」写在模式约束里，两者必须一致再说同一件事
     for (const mode of ["plan", "ask"] as const) {
       const prompt = buildFullPrompt({ mode });
-      for (const hint of ["codemode", "edit 用最小且唯一", "write 只用于新建"]) {
-        assert.ok(!prompt.includes(hint), `${mode} 不应出现「${hint}」`);
-      }
+      assert.ok(prompt.includes("edit 用最小且唯一"), `${mode} 工具说明应含 edit 用法`);
       assert.ok(prompt.includes("检索与阅读用"), `${mode} 应保留只读检索指引`);
+      assert.ok(
+        catalog.modeConstraints[mode].includes("write / edit / bash 的调用会被直接阻断"),
+        `${mode} 模式约束应声明写盘 / 执行被阻断`,
+      );
     }
   });
 });

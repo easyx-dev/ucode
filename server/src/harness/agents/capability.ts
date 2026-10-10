@@ -12,7 +12,8 @@ import {
 
 import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../constants";
 import type { PermissionRule } from "../permissions";
-import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS } from "../tools/names";
+import { evaluateRules } from "../permissions";
+import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS } from "../tools/names";
 import type { AgentRegistry } from "./custom";
 import {
   ALL_PROFILES,
@@ -78,6 +79,20 @@ export const primaryToolNames = (slug: string, registry?: AgentRegistry): string
 /** 是否为「继承默认工具集」的能力：扩展工具（codemode / MCP）对它可见 */
 export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
   capability.toolSelection.kind === "defaultTools";
+
+/**
+ * 写盘 / 执行是否被规则**整批**断掉（只读角色：plan / ask / explore）。
+ *
+ * 只读与工具选择是两件事：plan / ask 与 build 共用同一套工具声明，只读性完全落在规则上
+ * （`deny` 不受权限档位影响），所以判断「能不能落盘」要看规则，不能看 `toolSelection`。
+ *
+ * 「整批」是三个工具都要被断掉（用空对象判定，即不限目标的全量 deny）：只断 `bash` 而留着
+ * `edit` / `write` 的能力不是只读，不该因此拿不到扩展与目标结算工具。
+ */
+export const isReadOnlyCapability = (capability: ResolvedCapability): boolean =>
+  WRITE_TOOLS.every(
+    (tool) => evaluateRules(capability.permissions, { tool, subject: "" }).action === "deny",
+  );
 
 /**
  * 父会话施加到子会话上的规则：只取模式声明的那部分，即「父会话的能力上限」。

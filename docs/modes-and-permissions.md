@@ -7,27 +7,38 @@
 
 一条工具调用要过两道独立的闸门：
 
-1. **准入（会话模式）**：`build` / `plan` / `ask` 或自定义 primary agent 决定**工具集**、
-   提示词倾向，以及一组 `deny` 规则。只读模式在这里把写盘与执行能力整个拿掉。
+1. **准入（会话模式）**：`build` / `plan` / `ask` 或自定义 primary agent 决定提示词倾向、**工具声明**
+   与一组 `deny` 规则。只读模式（`plan` / `ask`）的工具声明与 `build` 一致，只读性完全由 `deny` 规则
+   在调用时落地（见下节「只读为什么不收窄工具集」）。
 2. **审批（会话权限档位）**：`default` / `auto` / `full` 只决定判定结果是 `ask` 时**弹审批还是自动放行**。
    它不改变工具集，也**永远不突破 `deny`**。
 
-所以档位只能「放宽询问」，不能「授予能力」：在只读模式下把档位调到 `full` 也改不了文件、跑不了命令。
+所以档位只能「放宽询问」，不能「授予能力」：在只读模式下把档位调到 `full`，`write` / `edit` / `bash`
+照样被阻断（`deny` 不参与放宽）。
 
 ## 会话模式
 
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
 内置三个，声明在 `server/src/harness/agents/profiles.ts`，工具名清单在 `server/src/harness/tools/names.ts`。
 工具集里有两个条件注册项：记忆工具与目标结算工具（`goal_complete` / `goal_blocked`）只在**会话有 active 目标**
-时挂上（还要是默认工具集的会话，即 `build`），只读模式与子会话都不注册——前者不该有「结算目标」这回事，
-后者不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复会先把会话池里的实例
-重装一次（会话文件是权威，重建不丢上下文）。
+时挂上，且仅限**未断写盘**的默认集会话（即 `build`；判定见 `isReadOnlyCapability`）——只读模式不该有
+「结算目标」这回事，子会话不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复
+会先把会话池里的实例重装一次（会话文件是权威，重建不丢上下文）。
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
 | --- | --- | --- | --- | --- | --- |
 | `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`） | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
-| `plan` | 计划 | 只读集：`read` / `grep` / `find` / `ls` / `webfetch` / `websearch` / `question` + `present_plan` + `subagent` | `deny` `edit` / `write` / `bash` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
-| `ask` | 问答 | 只读集 + `subagent`（无 `present_plan`） | `deny` `edit` / `write` / `bash` | `medium` | 只读分析与回答 |
+| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write` / `bash` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
+| `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | `deny` `edit` / `write` / `bash` | `medium` | 只读分析与回答 |
+
+### 只读为什么不收窄工具集
+
+只读模式不再把写盘 / 执行工具从声明里拿掉，而是声明照旧、靠 `deny` 规则在 `tool_call` 上阻断。
+原因是「切模式会换工具表」会制造一个我们踩过的坑：pi 把工具声明写进会话文件（`toolsAdded` /
+`toolsRemoved`）并在后续请求里回放，切换模式就成了工具表的突变；模型会把上一轮的旧工具表当成事实，
+之后每轮都照旧表回答（“我没有 write”），即使这一轮已经声明了—`prompt` 也改不过来这一点。
+声明保持不变、只读落在规则上，就没有「旧表」这回事，同时保住三个闸门：工具调用（含 codemode 的嵌套调用）、
+子会话（父会话模式规则一并施加，取较严者）、以及不受权限档位影响的 `deny`。
 
 ### 思考档位
 
@@ -49,10 +60,12 @@
 新建会话时请求里没给档位的话，取所属项目**最近一次选择**的档位（没记住即 `auto`）——项目按 cwd 归口，
 见 [`docs/api.md`](./api.md)「项目」。
 
-- 只读模式**直接禁 `bash`**，不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
+- 只读模式**直接 `deny` `bash`**，不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
+  它落在规则层（不是从工具表里去掉），所以连同 `codemode` 的嵌套调用与子会话一起拦住。
 - 自定义 primary agent 可覆盖同名内置项或另取新名；`mode` 是字符串 slug，服务端按角色注册表校验。
-- 子智能体是独立的 subagent 角色（`general` / `explore`），能力 =「父会话 ∩ 角色定义」，工具取交集、
-  权限取较严者，保证只读父会话不会被委派越权（见 [`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
+- 子智能体是独立的 subagent 角色（`general` / `explore`），能力 =「父会话 ∩ 角色定义」；工具取交集、
+  权限取较严者（`general` 这类 `inherit` 在默认集父下保留默认集，不再被收窄成只读），**只读父会话靠
+  父模式的规则拦住子会话**（见 [`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
   父一侧施加的只是**父会话模式的规则**（`parentModeRules`，即该模式 `capability.permissions` 里的 `ask` /
   `deny`）：全局默认规则与会话授权在子会话自己的规则里已有一份，父一侧重复施加会把它们（以及技能目录放行）
   重新打回审批——用户在父会话放行过的范围，子会话里照样弹窗。
@@ -144,8 +157,9 @@ MCP 工具没有命中显式规则时，按服务器声明的 annotations 兜底
 
 ## 安全边界
 
-- 本仓库**没有 OS 级沙箱**：`cwd` 与工具白名单都不是安全边界（pi 的 `security.md` 明示 cwd 不阻止命令访问其他路径）。
-  对外只承诺「**只读工具集**」，不承诺「只读权限」。
+- 本仓库**没有 OS 级沙箱**：`cwd` 与只读规则都不是安全边界（pi 的 `security.md` 明示 cwd 不阻止命令访问其他路径）。
+  对外承诺的是「**只读模式下调不了写盘 / 执行工具**」：它由权限引擎在 `tool_call` 上 `deny`（含 codemode 的
+  嵌套调用与子会话），而不是靠工具不存在；切到编码模式后 `bash` 能做什么仍然不受限。
 - `deny` 只是应用层拦截，不是内核约束；档位与「恒允」都只能在这个层内放宽 `ask`。
 - 服务默认无 HTTP 鉴权且监听所有网卡，背后的 agent 带 `read` / `write` / `edit` / `bash` 权限。
   **不要把服务暴露到公网或不可信网络**，见 [`README.md`](../README.md) 的安全提示与 [`TODO.md`](../TODO.md)。

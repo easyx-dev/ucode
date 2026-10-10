@@ -2,7 +2,7 @@
  * 记忆工具：remember / forget，让模型按用户的明确指令直接增删项目记忆。
  *
  * 只在 build 模式注册（见 `session-config`）：写入记忆是持久化副作用，与写盘能力同档；
- * plan / ask 保持只读工具集，自动回顾不受影响。
+ * plan / ask 这类只读模式不注册（它们的工具声明与 build 一致，记忆工具不在其中），自动回顾不受影响。
  */
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";

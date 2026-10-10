@@ -314,9 +314,10 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8888/search?q=test&fo
 
 ## 会话模式与权限
 
-会话模式（`build` / `plan` / `ask`，或自定义 primary agent）决定工具集与提示词倾向，只读模式直接禁写盘与执行；
+会话模式（`build` / `plan` / `ask`，或自定义 primary agent）决定工具声明与提示词倾向；只读模式
+（`plan` / `ask`）的声明与编码一致，靠权限规则在调用时阻断写盘与执行——这样切模式不会改变模型的工具表。
 会话权限档位（`default` / `auto` / `full`）只决定命中 `ask` 时弹审批还是自动放行，
-**不改变工具集、也不突破 `deny`**（`.env` 阻断、只读模式的写 / 执行阻断在任何档位都生效）。
+**不改变工具声明、也不突破 `deny`**（`.env` 阻断、只读模式的写 / 执行阻断在任何档位都生效）。
 档位是会话属性，入口在输入区底部工具栏。
 
 完整语义（权限引擎与默认规则、越界目录、技能目录与 MCP 兜底、审批与「本会话恒允」、安全边界、
@@ -515,10 +516,11 @@ apps/desktop/
   内存会话随之重装——空闲的立即回收、正在生成的本轮跑完再回收，都不会打断当前这一轮。
   重建失败（如 provider 落不了地）时磁盘、运行时与会话都保持原状。
 - **模型注入不落盘**：provider 目录与 apiKey 通过 pi 的 `registerProvider` / `setRuntimeApiKey` 注入内存，不生成 `harness/models.json`；`config.json` 是模型配置的唯一事实源。
-- **工具集在装配层收口**：内置工具走 `tools` 白名单（pi 的该字段是白名单，自研工具漏进去就会被过滤掉），
-  `webfetch` / `websearch` 走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。
+- **工具集在装配层收口**：工具声明由模式给（`build` / `plan` / `ask` 都走 pi 的 `defaultTools`，`plan` 多一个
+  `present_plan`），自研工具走 `customTools`；`grep` / `find` / `ls` 直接用 pi 内置实现，不自己写。
+  只读模式靠权限规则断掉写盘 / 执行，不从声明里拿掉（见 [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md)）。
   **本服务只启用这份固定工具集**：pi 扩展（`$APP_HOME/harness/extensions`、项目 `.pi/extensions`）或 pi 包
-  注册的工具不在白名单里，不会生效。
+  注册的工具不在清单里，不会生效。
 - **外部内容不入信任链**：`webfetch` 只抓公网地址（回环 / 私网 / 链路本地一律拒绝，重定向逐跳校验），
   并用 `<fetched>` / `<search_results>` 边界包裹返回内容，正文里的同名标签先中和（否则页面能「闭合」边界），
   工具说明里声明「那是数据不是指令」。

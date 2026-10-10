@@ -29,6 +29,7 @@ import {
   agentRules,
   allSubagents,
   effectiveToolNames,
+  isReadOnlyCapability,
   loadAgentRegistry,
   primaryCapability,
   primaryProfile,
@@ -173,9 +174,10 @@ const createSessionLoader = async (
     request: input.permission.request,
   };
   const memoryFile = input.memory?.indexFile(input.cwd) ?? null;
-  // MCP / tool_search 只在「默认工具集」的会话里挂：白名单会话（plan / ask / explore，以及自定义只读角色）
-  // 本就够不着扩展工具，连了也是白连；MCP 还会激活 codemode，绕过只读白名单（见 harness/mcp）
-  const withExtensions = usesDefaultToolSet(capability);
+  // MCP / tool_search 只在「全权」会话里挂：默认集 **且** 没被规则断掉写盘 / 执行。
+  // 只读模式（plan / ask）与白名单角色（explore、自定义只读角色）都不挂：MCP 会激活 codemode，
+  // 而 MCP 工具名是动态的，只读判定兜不住它（见 harness/mcp）
+  const withExtensions = usesDefaultToolSet(capability) && !isReadOnlyCapability(capability);
   const mcp = withExtensions ? mcpExtension(input.harnessDir ?? env.harnessDir) : undefined;
   // tool_search 只注册、默认不激活：默认集会话出现 deferred MCP 服务器时由 MCP 扩展自动激活
   const discoveryExtension = withExtensions ? [createToolSearchExtension()] : [];
@@ -233,9 +235,12 @@ export const assembleSession = async (
       (name !== "question" || Boolean(input.question)) &&
       (name !== SUBAGENT_TOOL_NAME || Boolean(input.subagents)),
   );
-  // 目标结算工具按目标状态条件注册（同记忆工具）：仅默认工具集的会话挂得上，
-  // plan / ask 这类白名单会话不该有「结算目标」这回事
-  const goalToolNames = input.goal && usesDefaultToolSet(capability) ? GOAL_TOOL_NAMES : [];
+  // 目标结算工具按目标状态条件注册（同记忆工具）：只在「全权」会话里挂——
+  // plan / ask 这类只读模式不该有「结算目标」这回事
+  const goalToolNames =
+    input.goal && usesDefaultToolSet(capability) && !isReadOnlyCapability(capability)
+      ? GOAL_TOOL_NAMES
+      : [];
   const toolNames = [...new Set([...baseToolNames, ...goalToolNames])];
   const override = overrideOf(input.record);
   // 角色声明的模型（自定义角色 frontmatter）必须可解析：静默回落默认模型会把配置错误藏起来

@@ -219,15 +219,21 @@ describe("buildSessionOptions 工具装配", () => {
     assert.ok(!tools.includes("present_plan"), "build 不应有 present_plan");
   });
 
-  it("TS-02 plan / ask 走只读白名单：不含 codemode 与写盘 / 执行工具", async () => {
+  it("TS-02 plan / ask 与 build 同工具表（含写盘 / codemode），只读靠规则而非收窄声明", async () => {
     for (const mode of ["plan", "ask"] as const) {
       const { tools, allTools } = await snapshotOf(mode);
       for (const name of ["codemode", "bash", "edit", "write"]) {
-        assert.ok(!tools.includes(name), `${mode} 不应启用 ${name}，实际：${tools.join(", ")}`);
+        assert.ok(tools.includes(name), `${mode} 应照常声明 ${name}，实际：${tools.join(", ")}`);
       }
-      assert.ok(!allTools.includes("tool_search"), `${mode} 不应注册 tool_search`);
       assert.ok(tools.includes("webfetch"), `${mode} 应保留联网工具`);
       assert.ok(tools.includes("question"), `${mode} 应保留提问工具`);
+      assert.equal(
+        tools.includes("present_plan"),
+        mode === "plan",
+        `${mode} 的 present_plan 应只给计划模式`,
+      );
+      // 扩展工具仍只挂全权会话：MCP 工具名是动态的，只读判定兜不住它
+      assert.ok(!allTools.includes("tool_search"), `${mode} 不应注册 tool_search`);
     }
   });
 
@@ -333,7 +339,11 @@ describe("buildSessionOptions 系统提示词", () => {
     const build = (await snapshotOf("build", "custom")).systemPrompt;
     const ask = (await snapshotOf("ask", "custom")).systemPrompt;
     assert.ok(build.includes("codemode"), "build 工具说明应含 codemode");
-    assert.ok(!ask.includes("codemode"), "ask 提示词不应提到 codemode");
+    assert.ok(ask.includes("codemode"), "ask 与 build 同工具表，说明里同样会提到 codemode");
+    assert.ok(
+      ask.includes("write / edit / bash 的调用会被直接阻断"),
+      "只读模式的约束文案随模式拼入，与声明的工具表不矛盾",
+    );
   });
 });
 
@@ -360,12 +370,15 @@ describe("buildSessionOptions 子智能体装配", () => {
     assert.ok(!allTools.includes("subagent"), "子会话不应注册 subagent（禁递归）");
   });
 
-  it("SUB-01 plan 父派 general：被交集收窄为只读", async () => {
+  it("SUB-01 plan 父派 general：工具声明照旧（含写盘），越权由父规则拦住", async () => {
     const { tools } = await snapshotOf("plan", "custom", undefined, childOf("plan", "general"));
-    for (const name of ["edit", "write", "bash", "subagent"]) {
-      assert.ok(!tools.includes(name), `plan 下的 general 不应启用 ${name}`);
+    // 工具表不再被交集收窄（切模式 / 派子会话都不改模型的工具表），
+    // 只读性由父会话模式的 `deny` 规则在 `tool_call` 上落地，见 permissions/__tests__/extension.test
+    for (const name of ["edit", "write", "bash"]) {
+      assert.ok(tools.includes(name), `plan 下的 general 应仍声明 ${name}`);
     }
-    assert.ok(tools.includes("read"));
+    assert.ok(!tools.includes("subagent"), "子会话不应启用 subagent（禁递归）");
+    assert.ok(!tools.includes("present_plan"), "子会话不应有 present_plan");
   });
 
   it("SUB-01 build 父派 general：保留写盘能力，但无 subagent", async () => {
