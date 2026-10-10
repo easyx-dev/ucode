@@ -116,8 +116,19 @@
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
 | `pnpm start` | `NODE_ENV=production node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
-| `pnpm dev` | server `:19688` + web `:5173` 同时启动 |
+| `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
+
+**起 dev 前显式覆盖 `APP_HOME`**：服务的取值顺序是「显式环境变量 > `service.json` > `.env`」，
+所以从已导出 `APP_HOME` 的 shell 里起 dev（生产实例自己起的会话、桌面端进程都会导出）会绕过 `.env`，
+直接写到那个目录——dev 命令本身不区分环境，别指望 `.env` 兜底：
+
+```bash
+APP_HOME=.tmp/.ucode APP_HOST=127.0.0.1 APP_PORT=<dev 端口，即 .env 里声明的那个> pnpm dev
+```
+
+`~/.ucode`（以及任何非 `.tmp/` 的 `APP_HOME`）一律当作生产数据目录：不手工改、不拿来跑 dev / 验证；
+要试就换一个 `APP_HOME`。
 
 `pnpm check` 是提交前的强制入口，一轮里只跑一次：它要把 biome / typecheck / test / verify 全跑一遍，
 在一轮里反复全量跑会直接排进会话耗时前排（实测一轮里 102 步、8.8 分钟）。要收窄范围用 `--filter`
