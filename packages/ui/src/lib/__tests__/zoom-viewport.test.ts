@@ -1,14 +1,22 @@
 /**
- * 图表预览视口换算的单测：纯函数、无 DOM，覆盖缩放夹取、围绕指针缩放、平移累加与适配窗口的边界。
+ * 可缩放预览视口换算的单测：纯函数、无 DOM，覆盖缩放夹取、围绕指针缩放、平移累加与适配窗口的边界。
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyWheel, clampScale, fitToViewport, panBy, zoomAtPoint } from "../diagram-viewport";
+import { applyWheel, clampScale, fitToViewport, panBy, zoomAtPoint } from "../zoom-viewport";
 
-test("缩放夹在 0.25 与 4 之间，非法值退回 1", () => {
+test("缩放夹在 0.25 与 16 之间，非法值退回 1", () => {
   assert.equal(clampScale(0.1), 0.25);
-  assert.equal(clampScale(10), 4);
+  assert.equal(clampScale(100), 16);
   assert.equal(clampScale(Number.NaN), 1);
+});
+
+test("边界随当前比例放宽：越界值不被拉回，只挡住继续越界", () => {
+  assert.equal(clampScale(0.03, 0.03), 0.03);
+  assert.equal(clampScale(0.01, 0.03), 0.03);
+  assert.equal(clampScale(23.6, 23.6), 23.6);
+  assert.equal(clampScale(30, 23.6), 23.6);
+  assert.equal(clampScale(5, 23.6), 5);
 });
 
 test("围绕指针缩放时，指针下的内容坐标不动", () => {
@@ -21,8 +29,20 @@ test("围绕指针缩放时，指针下的内容坐标不动", () => {
 
 test("缩放越界时按夹取后的比例摆位", () => {
   const next = zoomAtPoint({ scale: 1, translateX: 0, translateY: 0 }, { x: 10, y: 10 }, 100);
-  assert.equal(next.scale, 4);
-  assert.equal(next.translateX, 10 - 10 * 4);
+  assert.equal(next.scale, 16);
+  assert.equal(next.translateX, 10 - 10 * 16);
+});
+
+test("适配到越界比例后，一次滚轮缩放不会把比例拉回边界", () => {
+  const transform = fitToViewport({
+    contentHeight: 10,
+    contentWidth: 10,
+    viewportHeight: 300,
+    viewportWidth: 300,
+  });
+  assert.equal(transform.scale, 23.6);
+  assert.equal(zoomAtPoint(transform, { x: 0, y: 0 }, transform.scale * 0.85).scale, 23.6 * 0.85);
+  assert.equal(zoomAtPoint(transform, { x: 0, y: 0 }, transform.scale * 1.18).scale, 23.6);
 });
 
 test("平移只累加位移，不动缩放", () => {
@@ -57,6 +77,24 @@ test("内容带偏移时换算到内容坐标系", () => {
   });
   assert.equal(next.scale, 1.36);
   assert.equal(next.translateX, (200 - 100 * 1.36) / 2 - 20 * 1.36);
+});
+
+test("适配窗口不受交互缩放的上下限夹取：小内容放大到铺满、大内容缩到放下", () => {
+  const small = fitToViewport({
+    contentHeight: 10,
+    contentWidth: 10,
+    viewportHeight: 300,
+    viewportWidth: 300,
+  });
+  assert.equal(small.scale, 23.6);
+
+  const large = fitToViewport({
+    contentHeight: 4000,
+    contentWidth: 8000,
+    viewportHeight: 300,
+    viewportWidth: 300,
+  });
+  assert.equal(large.scale, 0.0295);
 });
 
 test("尺寸拿不到时给 1:1，不产生 NaN", () => {

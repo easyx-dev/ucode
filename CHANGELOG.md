@@ -46,6 +46,9 @@
 - **表格与正文图片支持全屏查看**：三者共用同一个全屏外壳（`business/fullscreen-dialog.tsx`，走 `openDialog`），
   窄屏铺满、桌面 `90vw × 86vh`；表格另将 streamdown 自带的外层容器（`border + bg-sidebar + p-2`）整份换掉，
   描边与滚动只由 `.md-content table` 一层负责，不再卡片套卡片。入口统一为点内容本身或右上角悬浮按钮。
+  图片预览（含输入区附件 token、消息里的图片 token）统一走 `openImagePreview` 一个入口，并与图表共用
+  可缩放视口（`business/zoomable-preview.tsx`）：拖拽平移、滚轮平移、`Ctrl` 加滚轮与加减号键缩放、
+  比例下拉与「适配窗口」「重置缩放」。
 
 - **代码块支持复制**：块级代码右上角新增悬浮复制按钮，复制的是源码原文（不从高亮后的 DOM 取）；
   成功后图标换成对勾并保持 1.5s，与消息页脚的复制共用 `business/copy-action.tsx`。

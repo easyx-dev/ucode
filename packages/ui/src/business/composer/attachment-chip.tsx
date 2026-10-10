@@ -9,8 +9,8 @@ import { NodeViewWrapper, useEditorState } from "@tiptap/react";
 import { useTranslation } from "react-i18next";
 
 import { attachmentOrdinalInDoc, type ComposerNode } from "../../lib/composer-document";
-import { useAttachmentPreview } from "../attachment-preview";
 import { AttachmentToken } from "../attachment-token";
+import { openImagePreview } from "../image-preview-dialog";
 
 /** 节点名；`docToPayload` 与编辑器命令都按它找附件节点 */
 export const ATTACHMENT_NODE = "attachmentMention";
@@ -22,7 +22,6 @@ export function AttachmentChipView({ node, editor }: NodeViewProps) {
   const name = typeof node.attrs.name === "string" ? node.attrs.name : "";
   const kind = node.attrs.kind === "image" ? "image" : "file";
   const key = id || tempId;
-  const { open, dialog } = useAttachmentPreview();
   // 序号按文档顺序现算而不是写进 attrs：删掉第一张图，第二张立刻变成 `图片1`
   const ordinal = useEditorState({
     editor,
@@ -42,7 +41,7 @@ export function AttachmentChipView({ node, editor }: NodeViewProps) {
           title={name || t("图片预览")}
           onMouseDown={(event) => {
             event.preventDefault();
-            open({ id, name });
+            openImagePreview({ alt: name, source: id });
           }}
         >
           {token}
@@ -50,7 +49,6 @@ export function AttachmentChipView({ node, editor }: NodeViewProps) {
       ) : (
         <span title={name}>{token}</span>
       )}
-      {dialog}
     </NodeViewWrapper>
   );
 }

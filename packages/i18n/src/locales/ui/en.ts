@@ -226,7 +226,9 @@ export default {
   表格预览: "Table preview",
   "表格全屏预览：表格自己横向滚动":
     "Table fullscreen preview: the table scrolls horizontally on its own",
-  "图片全屏预览：按容器等比缩放": "Image fullscreen preview: scaled to fit the viewport",
+  图片全屏预览: "Image fullscreen preview",
+  "图片全屏预览：拖拽平移，Ctrl 加滚轮缩放":
+    "Image fullscreen preview: drag to pan, Ctrl + scroll to zoom",
   "无法添加附件：{{names}}": "Could not add attachments: {{names}}",
   "改写这条消息，Enter 发送，Shift+Enter 换行":
     "Edit this message. Enter to send, Shift+Enter for a new line.",

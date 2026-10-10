@@ -9,9 +9,8 @@ import { cn } from "cn";
 import { Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAttachmentUrl } from "../hooks/use-attachment-url";
-import { openDialog } from "../lib/dialog";
 import { FullscreenToolbarButton } from "./fullscreen-dialog";
-import { ImagePreviewDialog } from "./image-preview-dialog";
+import { openImagePreview } from "./image-preview-dialog";
 
 export function AttachmentImage({
   alt,
@@ -33,9 +32,7 @@ export function AttachmentImage({
   }
 
   const open = (): void => {
-    void openDialog((close) => (
-      <ImagePreviewDialog alt={alt} onClose={() => close()} src={source} />
-    ));
+    openImagePreview({ alt, source });
   };
 
   return (

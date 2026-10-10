@@ -19,9 +19,9 @@ import { resolveFromCwd } from "../lib/path";
 import { clockLabel } from "../lib/time";
 import type { ChatItem, EditMessagePayload, MessageBlock } from "../lib/types";
 import { useWorkbench } from "../provider/workbench";
-import { useAttachmentPreview } from "./attachment-preview";
 import { AttachmentToken } from "./attachment-token";
 import { CopyAction } from "./copy-action";
+import { openImagePreview } from "./image-preview-dialog";
 import { MessageEditForm } from "./message-edit-form";
 import { ForkAction } from "./message-footer";
 
@@ -69,22 +69,14 @@ function ContextChip({ path }: { path: string }) {
 }
 
 /** 正文里的图片：token 点击开弹层看原图，与编辑器里的图片 token 共用预览 */
-function InlineImage({
-  id,
-  index,
-  onOpen,
-}: {
-  id: string;
-  index: number;
-  onOpen: (target: { id: string }) => void;
-}) {
+function InlineImage({ id, index }: { id: string; index: number }) {
   const { t } = useTranslation();
   return (
     <button
       type="button"
       className="mx-0.5 align-baseline"
       title={t("图片预览")}
-      onClick={() => onOpen({ id })}
+      onClick={() => openImagePreview({ source: id })}
     >
       <AttachmentToken kind="image" index={index} />
     </button>
@@ -122,7 +114,6 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const preview = useAttachmentPreview();
   const canFork = Boolean(onFork) && !item.live;
   const canEdit = Boolean(onEdit) && !item.live;
 
@@ -213,7 +204,6 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
                 key={`${item.id}-media-${index}`}
                 id={block.id}
                 index={imageBlocks.indexOf(block) + 1}
-                onOpen={preview.open}
               />
             ) : (
               <AttachmentTokenLink
@@ -261,7 +251,6 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
                   key={`${item.id}-seg-${index}`}
                   id={imageBlocks[segment.index - 1]?.id ?? ""}
                   index={segment.index}
-                  onOpen={preview.open}
                 />
               ) : null,
             )}
@@ -285,8 +274,6 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
         {canEdit ? <EditAction onClick={() => setEditing(true)} /> : null}
         <CopyAction text={original} />
       </div>
-
-      {preview.dialog}
     </div>
   );
 }
