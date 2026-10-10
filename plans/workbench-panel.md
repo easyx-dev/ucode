@@ -17,15 +17,17 @@
 ## 分层
 
 ```
-packages/contracts      fs/read、git/*（请求 zod + 响应类型）
+packages/contracts      fs/read、git/*（请求 zod + 响应类型，含展开未变更区域用的 git/contents）
 server/lib/file-content 读文件内容（二进制嗅探、内联上限、截断）
-server/lib/git          git 执行底座 + status/diff/log 解析（零依赖，调系统 git）
-server/routes/{fs,git}  路由（fs 域加一条，git 域新增四项）
+server/lib/git          git 执行底座 + status/diff/log/contents 解析（零依赖，调系统 git）
+server/routes/{fs,git}  路由（fs 域加一条，git 域新增五项）
 packages/sdk            apis.fs.read / apis.git.*
-packages/ui/lib         preview（类别分派）、shiki（高亮）、panel-layout（栏宽）
-packages/ui/hooks       use-async-data（key + reloadToken 取数形态）、use-workbench-data、use-highlighted-lines
+packages/ui/lib         preview（类别分派）、shiki（高亮）、panel-layout（栏宽）、git-marks / git-groups（标记与分组）、
+                        git-patch（hunk → patch 文本）、workbench-docs（标签）
+packages/ui/hooks       use-async-data（key + reloadToken 取数形态）、use-workbench-data、use-workbench-docs、
+                        use-git-review、use-highlighted-lines
 packages/ui/provider    WorkbenchProvider（面板状态在预设、动作经 context 下发）
-packages/ui/business/workbench  面板 / 文件树 / 预览宿主 / 渲染器 / git 三层视图
+packages/ui/business/workbench  活动栏 / 侧栏 / 编辑器区 / 文件树 / 各类渲染器 / git 三层视图
 packages/ui/base        resizable（shadcn 生成的分栏容器 / 面板 / 分隔条）
 ```
 
@@ -60,7 +62,9 @@ diff 由服务端解析成结构化 hunk（`lib/git/diff.ts`），客户端不�
 
 **面板状态在预设里受控，动作经 context 下发。** 对话区的组件（工具行、消息、命令面板）与面板隔着
 多层组件，因此 `WorkbenchProvider` 只暴露只读快照 + 动作；`useWorkbench()` 在没有 Provider 时
-返回 `null`，消息区组件可以脱离工作台单独复用。
+返回 `null`，消息区组件可以脱离工作台单独复用。面板内部是「活动栏 + 侧栏 + 编辑器区」三区，
+打开的文档（文件预览 / diff / 提交详情）在预设里以标签集合的形式交给编辑器区，
+版式与交互见 [`workbench-panel-layout.md`](./workbench-panel-layout.md)。
 
 **刷新靠三个入口，不轮询。** 服务端没有文件变更推送，所以：手动刷新按钮、打开面板时拉一次、
 每轮对话结束（`agent_settled`）后刷新——agent 刚改过的文件要出现在变更列表里。
@@ -71,7 +75,9 @@ diff 由服务端解析成结构化 hunk（`lib/git/diff.ts`），客户端不�
 - 未跟踪文件的行数不给（git 不统计），diff 用 `git diff --no-index /dev/null <file>` 比出全文新增。
 - 单层目录超过 200 项只渲染前 200 项（`node_modules` 能上万项）；预览默认最多渲染 5000 行；
   高亮阈值 3000 行 / 200KB。
-- 预览区最多同时开 8 个文件 tab，超出时关掉最早的。
+- 编辑器区最多同时开 8 个标签（文件预览 / diff / 提交详情混算），超出丢最早的那个。
+- 未变更区域的展开依赖 `git/contents`：两侧原文超 1MB 或二进制时那些区域展不开，其余照常显示
+  （展开步长 40 行，由 `@git-diff-view/react` 定）。
 - 未绑定目录的会话落在 `$APP_HOME/workspace/<id>`：该目录若落在某个仓库内（开发时 `APP_HOME` 常在仓库里）
   就显示那个仓库的改动，否则（生产默认 `~/.ucode`）给空态。
 - 分栏用 shadcn 的 `Resizable`（`react-resizable-panels`）：尺寸按像素、每栏各记一份，
@@ -79,8 +85,9 @@ diff 由服务端解析成结构化 hunk（`lib/git/diff.ts`），客户端不�
 
 ## 验证
 
-- 单测：`server/src/lib/git/__tests__/git.test.ts`（真实临时仓库上跑 status / diff / log / show、
+- 单测：`server/src/lib/git/__tests__/git.test.ts`（真实临时仓库上跑 status / diff / log / show / contents、
   路径与 hash 校验）、`server/src/lib/file-content/__tests__/file-content.test.ts`、
-  `packages/ui/src/lib/__tests__/{preview,shiki,path,panel-layout}.test.ts`。
+  `packages/ui/src/lib/__tests__/{preview,shiki,path,panel-layout,git-marks,git-groups,git-tree,git-patch,diff-prefs,workbench-docs}.test.ts`。
 - `pnpm check`（biome + typecheck + test + verify）。
-- 手工：`pnpm dev` 开 `:5173`，验三栏拖拽、目录树、预览（含高亮与深色模式）、git 改动与历史。
+- 手工：`pnpm dev` 开 `:5173`，验活动栏切视图、侧栏拖宽 / 收起、多标签、双栏 diff、折叠与全部展开收起、
+  文件树的 git 装饰、目录树、预览（含高亮与深色模式）、git 改动与历史；缩到 768px 以下验窄屏互斥。

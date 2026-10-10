@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import {
   ERROR_CODES,
+  type GitContentsInput,
+  type GitContentsResponse,
   type GitDiffInput,
   type GitDiffResponse,
   type GitLogInput,
@@ -12,6 +14,7 @@ import {
   type GitShowResponse,
   type GitStatusInput,
   type GitStatusResponse,
+  gitContentsInputSchema,
   gitDiffInputSchema,
   gitLogInputSchema,
   gitShowInputSchema,
@@ -27,6 +30,7 @@ import {
   resolveRepoPath,
   runDiff,
 } from "../../lib/git";
+import { readDiffContents } from "../../lib/git/contents";
 import { parseFileDiff } from "../../lib/git/diff";
 import { readCommit, readLog } from "../../lib/git/log";
 import { readRepositoryStatus } from "../../lib/git/status";
@@ -110,6 +114,14 @@ export const createGitRoute = () => {
     const input: GitLogInput = c.req.valid("json");
     const repoRoot = requireRepositoryRoot(input.path);
     const result: GitLogResponse = await readLog(repoRoot, input.limit, input.skip);
+    return c.json(ok(result));
+  });
+
+  router.post("/contents", jsonBody(gitContentsInputSchema), async (c) => {
+    const input: GitContentsInput = c.req.valid("json");
+    const repoRoot = requireRepositoryRoot(input.path);
+    const file = resolveRepoPath(repoRoot, input.file);
+    const result: GitContentsResponse = await readDiffContents(repoRoot, { ...input, file });
     return c.json(ok(result));
   });
 

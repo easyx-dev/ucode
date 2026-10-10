@@ -243,6 +243,10 @@
   `commit`（该提交 vs 其父提交，需同时给 `commit`）。返回**结构化的 hunk**
   （`{ path, oldPath?, status, binary, additions, deletions, hunks[{ header, lines[{ kind, oldLine, newLine, text }] }], truncated }`），
   由服务端解析 unified diff，客户端不做文本解析；未跟踪文件按「全文新增」生成。
+- `git/contents`：同一个文件**对比两侧的原文**（`file` / `source` / `commit` 语义与 `git/diff` 完全一致），
+  给编辑器展开未变更区域用。返回 `{ path, old?: { text?, binary, truncated }, new?: { text?, binary, truncated } }`：
+  该侧不存在（新增文件的旧侧 / 删除文件的新侧）时整个字段缺省；二进制或超出内联上限（1MB）时
+  只给标志不给 `text`。
 - `git/log`：提交历史，倒序分页（`limit` / `skip`），每条含 `hash` / `shortHash` / `subject` /
   `authorName` / `authoredAt` / `refs`。
 - `git/show`：单次提交的元信息与改动文件列表（不含 diff 正文），单个文件的 diff 走 `git/diff` 的

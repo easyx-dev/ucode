@@ -2,7 +2,10 @@ import { cn } from "cn";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type * as React from "react";
 
-/** 抽屉式弹层：复用 Dialog 原语，从左侧或右侧滑入（移动端侧栏与工作台面板用） */
+/** 抽屉式弹层：复用 Dialog 原语，从左侧或右侧滑入（移动端侧栏与工作台面板用）
+ *
+ * 窄屏下铺满屏幕宽度：抽屉里放的是列表与编辑器，留一条窄缝只会白白挤掉内容。
+ */
 function Sheet({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="sheet" {...props} />;
 }
@@ -29,7 +32,7 @@ function SheetContent({
         data-slot="sheet-content"
         // 只留入场动画：退场若用 `data-closed:animate-out`，Radix Presence 会在动画结束前一直挂着节点
         className={cn(
-          "fixed inset-y-0 z-50 flex h-full w-72 max-w-[85vw] flex-col bg-sidebar shadow-lg outline-none",
+          "fixed inset-y-0 z-50 flex h-full w-full flex-col bg-sidebar shadow-lg outline-none",
           "data-open:animate-in",
           side === "left"
             ? "left-0 border-r border-border data-open:slide-in-from-left"

@@ -437,6 +437,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "git",
+    action: "contents",
+    method: "POST",
+    input: "gitContentsInputSchema",
+    requestType: "GitContentsInput",
+    output: "GitContentsResponse",
+    summary: "单文件对比两侧的原文（展开未变更区域用）",
+  },
+  {
+    domain: "git",
     action: "log",
     method: "POST",
     input: "gitLogInputSchema",

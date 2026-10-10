@@ -98,7 +98,7 @@ function PathLabel({ path, range }: { path: string; range?: string }) {
           onClick={(event) => {
             // 工具行本身可展开，路径点击不应该顺带把行打开 / 收起
             event.stopPropagation();
-            workbench.openPreview(resolveFromCwd(workbench.cwd, path));
+            workbench.openFile(resolveFromCwd(workbench.cwd, path));
           }}
         >
           {text}

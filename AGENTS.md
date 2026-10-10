@@ -141,11 +141,19 @@ APP_HOME=.tmp/.ucode APP_HOST=127.0.0.1 APP_PORT=<dev 端口，即 .env 里声�
 根 `pnpm test` 走 `pnpm -r test`，只跑声明了 `test` 脚本的包；给某个包加了测试就要一并补脚本，
 否则 `scripts/verify` 的 tests 校验会报错（用例不会被静默跳过）。
 
-UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机已装 `agent-browser`
-（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开 `http://127.0.0.1:19688`，
-或 `pnpm dev` 后开 `:5173`。harness 自带的浏览器能力已撤（过于局限，改由插件提供，见 `TODO.md`）。
-两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接 `ERR_UNSAFE_PORT`，换端口即可；
-弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，否则坐标会落到遮罩上把弹层关掉。
+UI 改动**按需**在真实浏览器里看，不是每个改动都要看——走查留给「静态检查盖不住、而且这次真的动了」的部分：
+
+- 要看：布局与分栏、滚动与吸顶、新交互（右键菜单、拖拽、快捷键）、响应式断点、第三方组件的首次接入、
+  以及一块界面**第一次**落地。
+- 不用看：纯逻辑与文案、数值微调（间距 / 颜色 / 字号改一个值）、已经看过的那块再调一处像素；
+  改动只落在这一类时，跑完 `pnpm check` 即可。
+- 要看的改动**合并成一次走查**（一轮里最多一次），不要每改一个文件就开浏览器。
+
+本机已装 `agent-browser`（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开
+`http://127.0.0.1:19688`，或 `pnpm dev` 后开 `:5173`。harness 自带的浏览器能力已撤（过于局限，
+改由插件提供，见 `TODO.md`）。两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接
+`ERR_UNSAFE_PORT`，换端口即可；弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，
+否则坐标会落到遮罩上把弹层关掉。
 
 走查成本几乎全在调用次数上（每调一次都要起进程连浏览器），所以按这几条来：
 
@@ -155,7 +163,7 @@ UI 改动除 `pnpm check` 外，还要在真实浏览器里看一眼——本机
   `wait "<选择器>" --state visible|hidden`、`wait --fn "…"`。
 - 交互用 `snapshot -i` 给出的 `@eN` ref，不要手写 CSS 选择器——选择器脆，失败重试会变成一堆多余的往返。
   页面变了要重新 snapshot，但同一次调用里完成。
-- 一批改动只走查一次，不要每改一个文件就开一次浏览器。
+- 同一屏里的几个交互（切视图 → 开菜单 → 看结果）串成一条命令一次做完，别拆成多次调用。
 
 安全边界：不要用 `--auto-connect` / `--profile` 复用本机 Chrome 的登录态（那等于把全部登录态交给
 agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里明文写口令，命令会原样落进会话 JSONL。
@@ -265,8 +273,12 @@ agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里�
 同样适用本文件的命名、行数、颜色 token 与格式化规则。
 
 - 唯一豁免：不要求写文件级注释（都是对 Radix 的薄封装）
-- 新增基础组件用 CLI 在 `packages/ui`（配置见 `packages/ui/components.json`）生成；生成后把 `@/` 导入改成
-  包内相对路径、`@/lib/utils` 改成从 `cn` 包导入，再按本仓库规则整理。对已改过的组件再跑 CLI 会覆盖改动，需手工合并
+- 新增基础组件用 CLI 在 `packages/ui`（配置见 `packages/ui/components.json`）生成。本包 tsconfig 没配 `@/*` 的
+  paths，CLI 会把 aliases 当字面路径，产物落在 `packages/ui/@/base/<name>.tsx`：先生成、再挪到
+  `src/base/<name>.tsx`，然后把 `@/` 导入改成包内相对路径、图标占位组件（`IconPlaceholder`）换成 `lucide-react`、
+  去掉本项目没定义的 style 专用类（如 `cn-menu-*` / `cn-rtl-flip`）、`"use client"` 也去掉（本包 rsc: false），
+  最后按本仓库规则整理。CLI 写入过就会一直报 “Skipped 1 file”（包括文件已删时），
+  这时用 `npx shadcn@latest view <name>` 取源码手写。对已改过的组件再跑 CLI 会覆盖改动，需手工合并
 
 ### 已知边界
 

@@ -1,6 +1,7 @@
-/** 工作台取数：文件内容与 git 的四个只读接口，统一走 `useAsyncData` 的 key + reloadToken 形态 */
+/** 工作台取数：文件内容与 git 的五个只读接口，统一走 `useAsyncData` 的 key + reloadToken 形态 */
 import type {
   FsReadResponse,
+  GitContentsResponse,
   GitDiffResponse,
   GitDiffSource,
   GitLogResponse,
@@ -39,20 +40,47 @@ export function useGitStatus(path: string | null, reloadToken = 0): AsyncData<Gi
   );
 }
 
+/** 单文件 diff 的参数：来源与是否指定提交都进缓存键，换任一维都要重取 */
+export type GitDiffTarget = {
+  path: string;
+  file: string;
+  source: GitDiffSource;
+  commit?: string;
+};
+
+const targetKey = (target: GitDiffTarget | null): string =>
+  target
+    ? `${target.path}\u0000${target.file}\u0000${target.source}\u0000${target.commit ?? ""}`
+    : "";
+
 export function useGitDiff(
-  input: { path: string; file: string; source: GitDiffSource; commit?: string } | null,
+  target: GitDiffTarget | null,
   reloadToken = 0,
 ): AsyncData<GitDiffResponse> {
   const client = useClient();
-  const key = input
-    ? `${input.path}\u0000${input.file}\u0000${input.source}\u0000${input.commit ?? ""}`
-    : "";
   const load = useCallback(() => {
     // i18n-ignore: 组件已保证传参非空，这里只是防御，不会渲染给用户
-    if (!input) return Promise.reject(new Error("没有选中文件"));
-    return client.apis.git.diff(input);
-  }, [client, input]);
-  return useAsyncData(key, load, reloadToken);
+    if (!target) return Promise.reject(new Error("没有选中文件"));
+    return client.apis.git.diff(target);
+  }, [client, target]);
+  return useAsyncData(targetKey(target), load, reloadToken);
+}
+
+/**
+ * 对比两侧的原文：编辑器展开「未变更区域」时按行号从这里切片。
+ * 参数与 `useGitDiff` 同一套，但要单独取——diff 的结构化 hunk 仍由服务端解析。
+ */
+export function useGitContents(
+  target: GitDiffTarget | null,
+  reloadToken = 0,
+): AsyncData<GitContentsResponse> {
+  const client = useClient();
+  const load = useCallback(() => {
+    // i18n-ignore: 组件已保证传参非空，这里只是防御，不会渲染给用户
+    if (!target) return Promise.reject(new Error("没有选中文件"));
+    return client.apis.git.contents(target);
+  }, [client, target]);
+  return useAsyncData(`contents\u0000${targetKey(target)}`, load, reloadToken);
 }
 
 export function useGitLog(

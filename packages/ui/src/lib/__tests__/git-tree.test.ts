@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { GitFileChange } from "@ucode/contracts";
-
-import { buildChangeTree, countFiles } from "../git-tree";
+import { entryOf, type GitChangeEntry } from "../git-marks";
+import { buildChangeTree, countFiles, marksOf } from "../git-tree";
 
 const file = (path: string, status: GitFileChange["status"] = "modified"): GitFileChange => ({
   path,
@@ -66,5 +66,31 @@ describe("buildChangeTree", () => {
     const tree = buildChangeTree([]);
     assert.deepEqual(tree.children, []);
     assert.equal(countFiles(tree), 0);
+  });
+
+  it("目录下出现过的标记去重后按展示顺序排", () => {
+    const tree = buildChangeTree([
+      entryOf(file("src/a.ts", "modified"), "unstaged"),
+      entryOf(file("src/b.ts", "added"), "untracked"),
+      entryOf(file("src/c.ts", "modified"), "staged"),
+    ]);
+    const src = tree.children[0];
+    assert.ok(src);
+    assert.deepEqual(
+      marksOf(src, (entry: GitChangeEntry) =>
+        entry.origin === "untracked" ? "untracked" : entry.file.status,
+      ),
+      ["untracked", "modified"],
+    );
+  });
+
+  it("文件节点的标记是它自己那一个", () => {
+    const tree = buildChangeTree([entryOf(file("a.ts", "added"), "staged")]);
+    const leaf = tree.children[0];
+    assert.ok(leaf);
+    assert.deepEqual(
+      marksOf(leaf, (entry: GitChangeEntry) => entry.file.status),
+      ["added"],
+    );
   });
 });

@@ -61,7 +61,7 @@ function ContextChip({ path }: { path: string }) {
       type="button"
       className={`${CHIP_CLASS} font-mono hover:text-foreground`}
       title={t("预览 {{path}}", { path })}
-      onClick={() => workbench.openPreview(resolveFromCwd(workbench.cwd, path))}
+      onClick={() => workbench.openFile(resolveFromCwd(workbench.cwd, path))}
     >
       {label}
     </button>

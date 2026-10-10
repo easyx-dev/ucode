@@ -70,6 +70,27 @@ export type GitFileDiff = {
 
 export type GitDiffResponse = GitFileDiff;
 
+/**
+ * 对比一侧的文件内容。`text` 只在「文本且未超内联上限」时给出：二进制与超限都由标志说明，
+ * 该侧根本不存在（新增文件的旧侧、删除文件的新侧）则整个字段缺省。
+ */
+export type GitFileVersion = {
+  text?: string;
+  binary: boolean;
+  /** 是否因超出内联上限而未给内容 */
+  truncated: boolean;
+};
+
+/** 单个文件对比两侧的原文；编辑器展开未变更区域时按行号从中切片 */
+export type GitContentsResponse = {
+  /** 仓库相对路径 */
+  path: string;
+  /** 对比基准一侧 */
+  old?: GitFileVersion;
+  /** 对比目标一侧 */
+  new?: GitFileVersion;
+};
+
 export type GitCommitSummary = {
   hash: string;
   shortHash: string;

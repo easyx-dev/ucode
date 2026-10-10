@@ -179,7 +179,6 @@ export function CommandPalette({
       {
         id: "op:workbench",
         label: t("切换工作台"),
-        hint: t("改动 / 文件"),
         icon: PanelsTopLeft,
         run: onToggleWorkbench,
       },

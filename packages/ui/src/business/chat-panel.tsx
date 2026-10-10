@@ -34,7 +34,6 @@ import {
 import { ChatHeader } from "./chat-header";
 import { Composer } from "./composer";
 import { DecisionPanel } from "./decision-panel";
-import { DirectoryDialog } from "./directory-dialog";
 import { GoalBar } from "./goal-bar";
 import { MessageList } from "./message-list";
 import { PermissionRequest } from "./permission-request";
@@ -147,7 +146,6 @@ export function ChatPanel({
   onFeedbackPlan,
 }: ChatPanelProps) {
   const { t } = useTranslation();
-  const [directoryOpen, setDirectoryOpen] = useState(false);
   /** 发送 / 编辑重发被受理后自增，交给消息列表把视口拉回最新一行 */
   const [sentTick, setSentTick] = useState(0);
   // 目标栏的逐轮列表与消息区的「目标续跑」分隔行同源；只保留本次目标开始之后的轮次
@@ -291,20 +289,12 @@ export function ChatPanel({
         onToggleWorkbench={onToggleWorkbench}
         workbenchOpen={workbenchOpen}
         onRenameSession={onRenameSession}
-        // 草稿阶段还没有目录可看
-        onOpenDirectory={session ? () => setDirectoryOpen(true) : undefined}
         onBackToParent={onBackToParent}
         onOpenForkSource={onOpenSession}
         forkedFromName={forkedFromName}
         usage={usage}
         context={context}
         onOpenUsage={onOpenUsage}
-      />
-
-      <DirectoryDialog
-        open={directoryOpen}
-        onOpenChange={setDirectoryOpen}
-        path={session?.cwd ?? null}
       />
 
       {chat.error ? (

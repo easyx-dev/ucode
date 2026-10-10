@@ -58,6 +58,7 @@
 | POST | `/api/v1/fs/read` | 读取单个文件的内容（文本内联，二进制给 base64） |
 | POST | `/api/v1/git/status` | 仓库状态与分组的变更列表（只读） |
 | POST | `/api/v1/git/diff` | 单文件的结构化 diff（工作区 / index / 某次提交） |
+| POST | `/api/v1/git/contents` | 单文件对比两侧的原文（展开未变更区域用） |
 | POST | `/api/v1/git/log` | 提交历史（倒序分页） |
 | POST | `/api/v1/git/show` | 单次提交的元信息与改动文件列表 |
 | POST | `/api/v1/mcp/list` | 列出已配置的 MCP 服务器 |
@@ -1051,6 +1052,27 @@
 | `hunks` | [GitHunk](#githunk)[] | 是 | — |
 | `truncated` | boolean | 是 | — |
 
+### POST /api/v1/git/contents
+
+单文件对比两侧的原文（展开未变更区域用）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `path` | string（长度≥1） | 是 | — | — |
+| `file` | string（长度≥1） | 是 | — | — |
+| `source` | "worktree" \| "staged" \| "commit" | 否 | `worktree` | — |
+| `commit` | string（长度≥1） | 否 | — | `source` 为 `commit` 时的提交 hash；其他来源忽略 |
+
+**响应类型**：`GitContentsResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `path` | string | 是 | 仓库相对路径 |
+| `old` | [GitFileVersion](#gitfileversion) | 否 | 对比基准一侧 |
+| `new` | [GitFileVersion](#gitfileversion) | 否 | 对比目标一侧 |
+
 ### POST /api/v1/git/log
 
 提交历史（倒序分页）
@@ -1666,6 +1688,14 @@
 | --- | --- | --- | --- |
 | `header` | string | 是 | — |
 | `lines` | [GitDiffLine](#gitdiffline)[] | 是 | — |
+
+### GitFileVersion
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | string | 否 | — |
+| `binary` | boolean | 是 | — |
+| `truncated` | boolean | 是 | 是否因超出内联上限而未给内容 |
 
 ### GitCommitSummary
 

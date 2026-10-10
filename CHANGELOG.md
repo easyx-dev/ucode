@@ -36,6 +36,34 @@
 
 ### 新增
 
+- **SVG 预览支持切到源码**：工具条上的「预览 / 源码」切换现在对 SVG 也出现（原先只有 markdown）——
+  预览仍是 `<img>` 渲染，源码走文本渲染器按 XML 高亮（`lib/preview.ts` 的 `isTextImage` 判定）。
+
+- **树行支持右键复制路径**：文件树的文件与目录、git 变更树的文件与目录，右键都出「复制相对路径 / 复制路径」
+  （相对路径按各自的根算：会话工作目录 / 仓库根），筛选结果列表的行同样带菜单；唤出菜单时该行呈选中态；
+  菜单抽在 `business/workbench/path-context-menu.tsx` 由两处共用，item 用光标手型（`base/context-menu.tsx`）。
+
+- **「全部改动」堆叠视图**：代码管理视图的工具条多一个入口（`Layers` 图标），把所有变更文件的 diff
+  堆叠成一份文档——每块带文件头（状态、路径、增删）与折角，块内容进入视口才取数，几十个文件也不会
+  把本地服务打满；展示方式与换行偏好跟单文件 diff 共用同一组 localStorage 键。
+
+- **`POST /api/v1/git/contents`**：返回单个文件**对比两侧的原文**（`file` / `source` / `commit` 参数与
+  `git/diff` 同义），给编辑器的「展开未变更区域」用。响应 `{ path, old?: { text?, binary, truncated },
+  new?: { text?, binary, truncated } }`：该侧不存在（新增文件的旧侧 / 删除文件的新侧）时字段缺省；
+  二进制或超出内联上限（1MB）时只给标志不给 `text`（0 字节的空文件给空文本，不算该侧缺失）。
+  服务端从 git 对象读侧先问大小再读内容，不让大文件撞上执行缓冲上限。
+
+- **工作台的 diff 支持双栏与折叠**：工具条有「统一 / 双栏」切换（默认双栏，偏好落盘 `<slug>-diff-mode`）、
+  自动换行开关（默认关，落盘 `<slug>-diff-wrap`）与「全部展开 / 全部收起」。
+
+- **git diff 的渲染改用 `@git-diff-view/react`**（`packages/ui` 新增依赖）：Split / Unified、行号、
+  hunk 折叠与未变更区域的逐步展开都由它提供，自己那套铺行与折叠（`lib/diff-blocks.ts`、`lib/diff-rows.ts`）
+  随之删除；服务端的结构化 hunk 还原成 patch 文本喂给它（`lib/git-patch.ts`），两侧原文（`git/contents`）
+  供它算未变更区域。它是 CSS 变量驱动的主题，配色在 `styles/theme.css` 里整组改写成语义 token，
+  没有引入第二套颜色；代码高亮用项目现成的 shiki（自写适配器 `lib/shiki-diff.ts`，因为官方的 shiki
+  适配层把主题写死成 github 两套），着色值仍是 `var(--code-*)`；行号区不再半透明（库在统一模式给的
+  0.5 透明度被覆盖）。
+
 - **内容区 markdown 支持 Mermaid 渲染**：对话正文、md 文件预览、压缩摘要三处改用同一个渲染入口
   （`packages/ui/src/business/message-response.tsx`，解析与流式交给 `streamdown`）。`mermaid` 代码块渲染成图：
   文档里首次出现图表才按需下载 mermaid，全页串行渲染；图源不完整或语法不在支持范围时回落成代码块，
@@ -170,6 +198,28 @@
   未授权时首次触发顺带请求授权，被拒或不支持则静默降级。
 
 ### 变更
+
+- **标签条支持右键菜单**（关闭标签 / 关闭其他 / 关闭全部），新增 `base/context-menu.tsx`；
+
+- **提交详情改用堆叠**：点历史里的提交直接铺出该提交各文件的 diff（与「全部改动」同一套卡片、
+  同样进入视口才取数），不再只列文件名；卡片抽到 `business/workbench/diff-stack.tsx` 由两处共用，
+  随之移除 `openCommitFile` / `commitFileDoc`。
+
+- **工作台侧栏头部收成一行**：文件树（根名 + 筛选 + 刷新）与代码管理（改动 / 历史 + 增删合计 + 堆叠 / 刷新）  都只占一行——绝对路径挪到根名的悬停提示，分支与 `↑↓` 换成改动的增删合计（窄侧栏时合计让位）；
+  活动栏里代码管理排到第一位，面板默认视图也是它。
+
+- **工作台改成 VSCode 式的「活动栏 + 侧栏 + 编辑器区」**：面板内部从「两个常驻标签 + 树列」改版，
+  活动栏（40px）切侧栏看什么（项目文件 / 源代码管理，点当前视图即收起侧栏），侧栏（180–360）可整列收起，
+  编辑器区改成多标签文档（文件预览 / diff / 提交详情各占一格，上限 8 个，关标签即返回）。
+  面板默认宽度 420 → 640、下限 320 → 400，且展开时按窗口夹取，窄窗口不再把对话区压破；
+  移动端两个抽屉铺满屏幕宽度，面板内退化为侧栏 / 编辑器互斥。
+  `provider/workbench.tsx` 的 API 换成「视图 + 文档标签 + 打开动作」；删 `panel-tabs` / `review-content`，
+  新增 `lib/diff-rows.ts`、`lib/diff-blocks.ts`、`lib/git-groups.ts`、`lib/git-marks.ts`、`lib/workbench-docs.ts`
+  与 `hooks/use-workbench-docs.ts`。
+
+- **git 变更树收敛成「已暂存 / 未暂存」两组**：未跟踪与冲突都并入未暂存（都还没进 index），
+  靠字母标记区分——未跟踪 `U`、冲突 `!`；`/git/status` 的四个桶不变。目录行补上其下出现过的状态字母集。
+  文件树同步接上 git 装饰：改过的文件名用状态色并在右侧给字母徽标，目录按「其下最重的标记」着色（VSCode 的资源管理器形态）。
 
 - **markdown 渲染底座换成 streamdown**：移除 `react-markdown` / `remark-gfm`，改用 `streamdown` +
   `@streamdown/cjk`（中文标点与断行）+ `@streamdown/mermaid`；web / desktop 的 chunk 分组同步跟进。
@@ -310,6 +360,9 @@
   版式与取舍见 `plans/workbench-panel-layout.md`。
 
 ### 移除
+
+- 对话区头部的「目录」按钮与其对话框（`business/directory-dialog.tsx`）：工作目录现在由工作台的文件树
+  呈现，这个只读浏览入口已成重复；相关文案（`目录` / `暂无文件` / 目录说明）一并移除。
 
 - 输入区编辑器上方的附件行（`packages/ui/src/business/composer/attachment-strip.tsx`）：附件改为内联 chip。
 

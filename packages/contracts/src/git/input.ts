@@ -25,6 +25,18 @@ export const gitDiffInputSchema = z.object({
   context: z.number().int().min(0).max(200).default(3),
 });
 
+/**
+ * 单个文件对比两侧的原文。`file` / `source` / `commit` 与 `git/diff` 完全同义，只是这里给整份文本
+ * 而不是差异——编辑器要展开「未变更区域」时得看那些行本身。
+ */
+export const gitContentsInputSchema = z.object({
+  path: z.string().min(1),
+  file: z.string().min(1),
+  source: z.enum(GIT_DIFF_SOURCES).default("worktree"),
+  /** `source` 为 `commit` 时的提交 hash；其他来源忽略 */
+  commit: z.string().min(1).optional(),
+});
+
 /** 提交历史：按时间倒序分页 */
 export const gitLogInputSchema = z.object({
   path: z.string().min(1),
@@ -44,5 +56,7 @@ export type GitDiffInput = z.infer<typeof gitDiffInputSchema>;
 export type GitDiffRequest = z.input<typeof gitDiffInputSchema>;
 export type GitLogInput = z.infer<typeof gitLogInputSchema>;
 export type GitLogRequest = z.input<typeof gitLogInputSchema>;
+export type GitContentsInput = z.infer<typeof gitContentsInputSchema>;
+export type GitContentsRequest = z.input<typeof gitContentsInputSchema>;
 export type GitShowInput = z.infer<typeof gitShowInputSchema>;
 export type GitShowRequest = z.input<typeof gitShowInputSchema>;

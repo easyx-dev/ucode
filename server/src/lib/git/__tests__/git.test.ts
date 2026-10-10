@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { ERROR_CODES } from "@ucode/contracts";
-
+import { FS_READ_TEXT_MAX_BYTES } from "../../../constants";
 import { AppError } from "../../response";
 import {
   findRepositoryRoot,
@@ -22,6 +22,7 @@ import {
   resolveRepoPath,
   runGit,
 } from "..";
+import { readDiffContents } from "../contents";
 import { parseFileDiff } from "../diff";
 import { readCommit, readLog } from "../log";
 import { readRepositoryStatus } from "../status";
@@ -210,6 +211,107 @@ describe("git 底座与解析", { skip: !GIT_AVAILABLE }, () => {
     assert.deepEqual(
       show.files.map((file) => [file.path, file.status]),
       [["sub/b.txt", "modified"]],
+    );
+  });
+
+  it("contents：工作区 / 已暂存 / 提交三种来源都给对比两侧的原文", async (t) => {
+    t.after(() => {
+      rmSync(join(repo, "newfile.txt"), { force: true });
+      git("reset", "-q");
+      git("checkout", "--", ".");
+      git("clean", "-qfd");
+    });
+
+    writeFileSync(join(repo, "a.txt"), "one\ntwo\nthree\n");
+    const worktree = await readDiffContents(repo, {
+      path: repo,
+      file: "a.txt",
+      source: "worktree",
+    });
+    assert.equal(worktree.old?.text, "one\ntwo\n", "工作区的基准是 index");
+    assert.equal(worktree.new?.text, "one\ntwo\nthree\n");
+
+    writeFileSync(join(repo, "newfile.txt"), "s\n");
+    git("add", "newfile.txt");
+    const staged = await readDiffContents(repo, {
+      path: repo,
+      file: "newfile.txt",
+      source: "staged",
+    });
+    assert.equal(staged.old, undefined, "新增文件在 HEAD 里没有旧侧");
+    assert.equal(staged.new?.text, "s\n", "已暂存的基准是 HEAD、目标是 index");
+
+    const head = git("rev-parse", "HEAD").trim();
+    const committed = await readDiffContents(repo, {
+      path: repo,
+      file: "a.txt",
+      source: "commit",
+      commit: head,
+    });
+    assert.equal(committed.new?.text, "one\ntwo\n");
+    assert.equal(committed.old?.text, "one\ntwo\n");
+  });
+
+  it("contents：未跟踪文件只有工作区一侧，二进制只给标志", async (t) => {
+    t.after(() => {
+      rmSync(join(repo, "fresh.txt"), { force: true });
+      rmSync(join(repo, "blob.bin"), { force: true });
+    });
+
+    writeFileSync(join(repo, "fresh.txt"), "new\n");
+    const untracked = await readDiffContents(repo, {
+      path: repo,
+      file: "fresh.txt",
+      source: "worktree",
+    });
+    assert.equal(untracked.old, undefined, "未跟踪文件在 index 里没有条目");
+    assert.equal(untracked.new?.text, "new\n");
+
+    writeFileSync(join(repo, "blob.bin"), Buffer.from([0x00, 0x01, 0x02]));
+    const binary = await readDiffContents(repo, {
+      path: repo,
+      file: "blob.bin",
+      source: "worktree",
+    });
+    assert.equal(binary.new?.binary, true);
+    assert.equal(binary.new?.text, undefined, "二进制不给文本");
+  });
+
+  it("contents：超出内联上限的文本只标 truncated", async (t) => {
+    const big = join(repo, "big.txt");
+    writeFileSync(big, "a".repeat(FS_READ_TEXT_MAX_BYTES + 10));
+    t.after(() => rmSync(big, { force: true }));
+
+    const contents = await readDiffContents(repo, {
+      path: repo,
+      file: "big.txt",
+      source: "worktree",
+    });
+    assert.equal(contents.new?.truncated, true);
+  });
+
+  it("contents：0 字节的文件给空文本，不算这一侧缺失", async (t) => {
+    writeFileSync(join(repo, "empty.txt"), "");
+    git("add", "empty.txt");
+    t.after(() => {
+      rmSync(join(repo, "empty.txt"), { force: true });
+      git("reset", "-q");
+    });
+
+    const staged = await readDiffContents(repo, {
+      path: repo,
+      file: "empty.txt",
+      source: "staged",
+    });
+    assert.equal(staged.old, undefined, "HEAD 里没有这个文件");
+    assert.equal(staged.new?.text, "");
+    assert.equal(staged.new?.binary, false);
+  });
+
+  it("contents：source 为 commit 缺 hash 时按非法请求拒绝", async () => {
+    await assert.rejects(
+      () => readDiffContents(repo, { path: repo, file: "a.txt", source: "commit" }),
+      (error: unknown) => error instanceof AppError && error.code === ERROR_CODES.invalidRequest,
     );
   });
 });

@@ -2,8 +2,8 @@
  * 单文件内容区：顶部工具条（预览 / 源码、文件大小）+ 渲染器。
  *
  * 内容形态以 `fs/read` 的判定为准：服务端说二进制而该类型没有二进制渲染器时落到占位。
- * 渲染模式按标签本地保存（`key` 换文件即重挂载），markdown 默认预览、其余只有源码一种形态，
- * 因此工具条上的切换只在 markdown 上出现——不做无意义的假开关。
+ * 渲染模式按标签本地保存（`key` 换文件即重挂载）：markdown 与 SVG 有两种形态（文档 / 图片 vs 原文 / 源码），
+ * 其余只有源码一种，因此工具条上的切换只在它们身上出现——不做无意义的假开关。
  */
 import type { FsReadResponse } from "@ucode/contracts";
 import { Braces, Eye, FileWarning, ImageOff, RotateCw } from "lucide-react";
@@ -15,7 +15,7 @@ import { Spinner } from "../../base/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../base/tooltip";
 import { useFileContent } from "../../hooks/use-workbench-data";
 import { baseName } from "../../lib/path";
-import { formatBytes, imageMimeOf, previewKindOf } from "../../lib/preview";
+import { formatBytes, imageMimeOf, isTextImage, previewKindOf } from "../../lib/preview";
 import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 import { MarkdownPreview } from "./markdown-preview";
 import { PanelEmpty } from "./panel-empty";
@@ -23,8 +23,9 @@ import { TextPreview } from "./text-preview";
 
 type RenderMode = "preview" | "source";
 
-/** 只有 markdown 同时有两种形态：预览是文档、源码是原文 */
-const supportsRenderModes = (path: string): boolean => previewKindOf(path) === "markdown";
+/** 有两种形态的：markdown（文档 / 原文）与 SVG（图片 / 源码） */
+const supportsRenderModes = (path: string): boolean =>
+  previewKindOf(path) === "markdown" || isTextImage(path);
 
 /** 顶部工具条：左侧渲染模式切换、右侧文件大小 */
 function Toolbar({
@@ -95,6 +96,26 @@ function Content({
   const size = formatBytes(content.size);
 
   if (kind === "image") {
+    // SVG 是文本图片：源码形态与 markdown 的「源码」一致，交给同一套文本渲染器（按 xml 高亮）
+    if (isTextImage(path) && mode === "source") {
+      return content.text === undefined ? (
+        <PanelEmpty
+          icon={<FileWarning className="size-7" />}
+          title={content.truncated ? t("文件太大，未内联内容") : t("二进制文件，无法预览")}
+          hint={`${baseName(path)} · ${size}`}
+        />
+      ) : (
+        <>
+          <TextPreview path={path} text={content.text} />
+          {content.truncated ? (
+            <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+              {t("内容过大，已按上限截断")}
+            </p>
+          ) : null}
+        </>
+      );
+    }
+
     // SVG 这类基于文本的图片服务端按文本下发，两条路都要认；文本截断时不拼（截断的 SVG 是坏的）
     const src = content.base64
       ? `data:${imageMimeOf(path)};base64,${content.base64}`

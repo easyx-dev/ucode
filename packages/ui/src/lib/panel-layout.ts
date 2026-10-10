@@ -4,7 +4,9 @@
  * 尺寸一律用**像素**（`react-resizable-panels` 把数字当像素、字符串当百分比）：侧栏就该是 288px，
  * 不随窗口宽度缩放。库的 `defaultLayout` 只在「键数与当前面板数相等」时才生效，而收起某栏时
  * 面板数会变，所以这里不用它——改为每个面板各自用 `defaultSize` 恢复自己记住的宽度，
- * 布局变更时按 DOM 实测像素落盘。占剩余空间的对话区与预览区不入库。
+ * 布局变更时按 DOM 实测像素落盘。占剩余空间的对话区与编辑器区不入库。
+ *
+ * 外层三栏（会话侧栏 | 对话区 | 工作台）与工作台内部的（文件侧栏 | 编辑器）各是一组，分开记忆。
  */
 import { brand } from "@ucode/brand/values";
 
@@ -13,7 +15,8 @@ export type PanelSpec = {
   id: string;
   default: number;
   min: number;
-  max: number;
+  /** 宽度上限（像素）；缺省即不设上限——能拉多宽由相邻面板的下限决定 */
+  max?: number;
 };
 
 /** 面板 id：同时充当布局键与 DOM id */
@@ -21,41 +24,52 @@ export const PANEL_IDS = {
   sidebar: `${brand.slug}-sidebar`,
   chat: `${brand.slug}-chat`,
   workbench: `${brand.slug}-workbench`,
-  tree: `${brand.slug}-file-tree`,
-  preview: `${brand.slug}-preview`,
+  workbenchSidebar: `${brand.slug}-workbench-sidebar`,
+  workbenchEditor: `${brand.slug}-workbench-editor`,
 } as const;
-
-/** 标签与内容区的 DOM id：带品牌前缀，避免与页面其它元素撞名 */
-export const PANEL_TAB_ID = (tab: string): string => `${brand.slug}-workbench-tab-${tab}`;
-
-export const PANEL_TABPANEL_ID = `${brand.slug}-workbench-tabpanel`;
 
 /** 分隔条的 DOM id：便于定位与自动化验证（库本身不要求 id） */
 export const HANDLE_IDS = {
   sidebar: `${brand.slug}-sidebar-handle`,
   workbench: `${brand.slug}-workbench-handle`,
-  tree: `${brand.slug}-file-tree-handle`,
+  workbenchSidebar: `${brand.slug}-workbench-sidebar-handle`,
 } as const;
 
 export const SIDEBAR_PANEL: PanelSpec = { id: PANEL_IDS.sidebar, default: 288, min: 200, max: 400 };
 
+/**
+ * 工作台不设宽度上限：屏幕越宽越该能把它拉宽，拉到哪里为止交给对话区的下限。
+ * 默认宽度取 VSCode 面板的尺度——里面还要再分「文件侧栏 | 编辑器」，窄了预览区就没法看。
+ */
 export const WORKBENCH_PANEL: PanelSpec = {
   id: PANEL_IDS.workbench,
-  default: 420,
-  min: 320,
-  max: 1200,
+  default: 640,
+  min: 400,
 };
 
 /** 对话区的宽度下限：再窄就读不下正文，拖拽到此为止 */
 export const CHAT_MIN_WIDTH = 400;
 
-/** 文件标签里左侧目录树的宽度 */
-export const FILE_TREE_PANEL: PanelSpec = { id: PANEL_IDS.tree, default: 200, min: 140, max: 360 };
+/** 工作台内部的文件侧栏：默认宽度按「树行 + 头部一行控件」的量给，上限兜住「别把编辑器挤没」 */
+export const WORKBENCH_SIDE_PANEL: PanelSpec = {
+  id: PANEL_IDS.workbenchSidebar,
+  default: 275,
+  min: 180,
+  max: 360,
+};
 
-/** 外层三栏与文件标签各自的分栏成员 */
+/** 外层三栏与工作台内部各自的分栏成员 */
 export const WORKSPACE_PANELS: readonly PanelSpec[] = [SIDEBAR_PANEL, WORKBENCH_PANEL];
 
-export const FILE_PANELS: readonly PanelSpec[] = [FILE_TREE_PANEL];
+export const WORKBENCH_SIDE_PANELS: readonly PanelSpec[] = [WORKBENCH_SIDE_PANEL];
+
+/** 展开工作台时它能用多少宽度：窗口减去会话侧栏与对话区下限 */
+export const workbenchAvailableWidth = (viewportWidth: number, sidebarWidth: number): number =>
+  viewportWidth - sidebarWidth - CHAT_MIN_WIDTH;
+
+/** 默认宽度按可用空间夹取：窗口不够宽时退到下限，别把对话区压破 */
+export const fitPanelDefault = (spec: PanelSpec, available: number): number =>
+  Math.max(spec.min, Math.min(spec.default, available));
 
 /** 一次布局：面板 id → 像素宽；占剩余空间的面板不出现在这里 */
 export type PanelLayout = Record<string, number>;

@@ -5,6 +5,7 @@
  * 应用层只需提供导航 props。需要更细的组合时自行用 `@ucode/ui/business/*` 拼装。
  */
 import { brand } from "@ucode/brand";
+import type { GitCommitSummary } from "@ucode/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ import { useSessionNotices } from "../hooks/use-session-notices";
 import { useSessionUsage } from "../hooks/use-session-usage";
 import { useSessions } from "../hooks/use-sessions";
 import { useStatus } from "../hooks/use-status";
+import { useWorkbenchDocs } from "../hooks/use-workbench-docs";
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../lib/builtin-commands";
 import { compactionNoticeMessage } from "../lib/compaction";
 import { textToDoc } from "../lib/composer-document";
@@ -45,11 +47,13 @@ import { textPayload } from "../lib/composer-payload";
 import type { GoalCommand } from "../lib/goal-command";
 import {
   CHAT_MIN_WIDTH,
+  fitPanelDefault,
   HANDLE_IDS,
   PANEL_IDS,
   SIDEBAR_PANEL,
   WORKBENCH_PANEL,
   WORKSPACE_PANELS,
+  workbenchAvailableWidth,
 } from "../lib/panel-layout";
 import { lastTurnPresentedPlan } from "../lib/plan";
 import { projectOf, projectSeedOf } from "../lib/project";
@@ -63,7 +67,8 @@ import type {
   SessionSummary,
   ThinkingPreference,
 } from "../lib/types";
-import { WorkbenchProvider, type WorkbenchTab } from "../provider/workbench";
+import { changeDoc, changesDoc, commitDoc, fileDoc } from "../lib/workbench-docs";
+import { type ChangeTarget, WorkbenchProvider, type WorkbenchView } from "../provider/workbench";
 
 export type WorkspaceLayoutProps = {
   /** 当前选中的会话；null 表示草稿态（新建） */
@@ -124,9 +129,9 @@ export function WorkspaceLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
   const [workbenchOpen, setWorkbenchOpen] = useState(readWorkbenchOpen);
-  const [workbenchTab, setWorkbenchTab] = useState<WorkbenchTab>("changes");
-  const [treeVisible, setTreeVisible] = useState(true);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
+  // 侧栏视图与是否展开：都不落盘——面板收起后再打开回到默认视图（代码管理，最常看）
+  const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("changes");
+  const [workbenchSidebarVisible, setWorkbenchSidebarVisible] = useState(true);
   const [workbenchSheetOpen, setWorkbenchSheetOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -135,6 +140,20 @@ export function WorkspaceLayout({
   const panels = usePanelLayout("workspace", WORKSPACE_PANELS);
 
   const configured = models.data?.configured ?? false;
+  // 编辑器区的文档标签：工作目录变化即整体清空（见 use-workbench-docs）
+  const workbenchCwd = activeSession?.cwd ?? workspacesDir;
+  const docs = useWorkbenchDocs(workbenchCwd);
+  /** 展开工作台时的默认宽度按窗口夹取：窄窗口下 640 会把对话区压破（记忆值优先） */
+  const workbenchPanelSpec = useMemo(
+    () => ({
+      ...WORKBENCH_PANEL,
+      default: fitPanelDefault(
+        WORKBENCH_PANEL,
+        workbenchAvailableWidth(window.innerWidth, SIDEBAR_PANEL.default),
+      ),
+    }),
+    [],
+  );
   const chat = useChat(activeId, { onSessionCreated: setActiveId });
   // 回到前台 / 网络恢复时主动校准一次连接：后台错过的收尾帧靠定时器看门狗收敛不了（见 useConnectionResync）
   const hasActiveRun =
@@ -193,36 +212,97 @@ export function WorkspaceLayout({
     if (!isDesktop) setWorkbenchSheetOpen(true);
   }, [applyWorkbenchOpen, isDesktop]);
 
-  /** 打开某个文件的预览：展开面板、切到「文件」标签 */
-  const openPreview = useCallback(
+  /** 打开某个文件的预览：面板未展开就展开（侧栏视图不动，标签自己表达打开了什么） */
+  const openFile = useCallback(
     (path: string) => {
-      setActiveFile(path);
-      setWorkbenchTab("files");
+      docs.open(fileDoc(path));
       showWorkbench();
     },
-    [showWorkbench],
+    [docs.open, showWorkbench],
+  );
+
+  /** 打开某个工作区变更的 diff */
+  const openChange = useCallback(
+    ({ file, staged }: ChangeTarget) => {
+      if (!workbenchCwd) return;
+      docs.open(changeDoc(workbenchCwd, file, staged));
+      showWorkbench();
+    },
+    [docs.open, showWorkbench, workbenchCwd],
+  );
+
+  /** 打开某次提交的详情 */
+  const openCommit = useCallback(
+    (commit: GitCommitSummary) => {
+      if (!workbenchCwd) return;
+      docs.open(commitDoc(workbenchCwd, commit));
+      showWorkbench();
+    },
+    [docs.open, showWorkbench, workbenchCwd],
+  );
+
+  /** 切换工作台：窄屏下工作台是抽屉，一律唤出；只有桌面才谈得上收起 */
+  const toggleWorkbench = useCallback(() => {
+    if (!isDesktop) {
+      showWorkbench();
+      return;
+    }
+    if (workbenchOpen) applyWorkbenchOpen(false);
+    else showWorkbench();
+  }, [applyWorkbenchOpen, isDesktop, showWorkbench, workbenchOpen]);
+
+  /** 打开「全部改动」：面板未展开就展开，所有变更文件的 diff 堆叠到同一份文档里 */
+  const openChanges = useCallback(() => {
+    if (!workbenchCwd) return;
+    docs.open(changesDoc(workbenchCwd));
+    showWorkbench();
+  }, [docs.open, showWorkbench, workbenchCwd]);
+
+  /** 活动栏：点当前视图即收起侧栏，点另一个视图即切换并展开 */
+  const selectWorkbenchView = useCallback(
+    (view: WorkbenchView) => {
+      setWorkbenchSidebarVisible((visible) => (view === workbenchView ? !visible : true));
+      setWorkbenchView(view);
+    },
+    [workbenchView],
   );
 
   /** 工作台的动作面：面板状态在预设里受控，业务组件只经这里拿动作 */
   const workbenchApi = useMemo(
     () => ({
-      tab: workbenchTab,
-      selectTab: setWorkbenchTab,
-      treeVisible,
-      toggleTree: () => setTreeVisible((prev) => !prev),
-      activeFile,
-      openPreview,
+      view: workbenchView,
+      selectView: selectWorkbenchView,
+      sidebarVisible: workbenchSidebarVisible,
+      toggleSidebar: () => setWorkbenchSidebarVisible((prev) => !prev),
+      docs: docs.docs,
+      activeDocId: docs.activeDocId,
+      selectDoc: docs.select,
+      closeDoc: docs.close,
+      closeOtherDocs: docs.closeOthers,
+      closeAllDocs: docs.closeAll,
+      openFile,
+      openChange,
+      openCommit,
+      openChanges,
       collapse: () => applyWorkbenchOpen(false),
-      cwd: activeSession?.cwd ?? workspacesDir,
+      cwd: workbenchCwd,
     }),
     [
-      activeFile,
-      activeSession?.cwd,
       applyWorkbenchOpen,
-      openPreview,
-      treeVisible,
-      workbenchTab,
-      workspacesDir,
+      docs.activeDocId,
+      docs.close,
+      docs.closeAll,
+      docs.closeOthers,
+      docs.docs,
+      docs.select,
+      openChange,
+      openCommit,
+      openChanges,
+      openFile,
+      selectWorkbenchView,
+      workbenchCwd,
+      workbenchSidebarVisible,
+      workbenchView,
     ],
   );
 
@@ -566,11 +646,7 @@ export function WorkspaceLayout({
                     else setSidebarOpen(true);
                   }}
                   sidebarCollapsed={sidebarCollapsed}
-                  onToggleWorkbench={() => {
-                    // 桌面端已展开就收起；否则展开到默认标签。移动端一律唤出抽屉
-                    if (workbenchOpen) applyWorkbenchOpen(false);
-                    else showWorkbench();
-                  }}
+                  onToggleWorkbench={toggleWorkbench}
                   workbenchOpen={workbenchOpen}
                   onRenameSession={activeSession ? () => requestRename(activeSession) : undefined}
                   onFork={forkFrom}
@@ -605,9 +681,8 @@ export function WorkspaceLayout({
                 <ResizableHandle id={HANDLE_IDS.workbench} className="w-2" />
                 <ResizablePanel
                   id={WORKBENCH_PANEL.id}
-                  defaultSize={panels.defaultSizeOf(WORKBENCH_PANEL)}
+                  defaultSize={panels.defaultSizeOf(workbenchPanelSpec)}
                   minSize={WORKBENCH_PANEL.min}
-                  maxSize={WORKBENCH_PANEL.max}
                   className="min-w-0"
                 >
                   <div className="flex h-full w-full md:py-2 md:pr-2">
@@ -685,11 +760,8 @@ export function WorkspaceLayout({
             onOpenWorkspace={pickDirectory}
             onOpenSettings={openSettings}
             onToggleSidebar={toggleSidebar}
-            onToggleWorkbench={() => {
-              if (workbenchOpen) applyWorkbenchOpen(false);
-              else showWorkbench();
-            }}
-            onOpenFile={openPreview}
+            onToggleWorkbench={toggleWorkbench}
+            onOpenFile={openFile}
           />
 
           <Toaster position="top-center" />

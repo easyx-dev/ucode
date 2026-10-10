@@ -20,7 +20,7 @@ const IMAGE_EXTENSIONS = new Set([
   "bmp",
   "ico",
   "avif",
-  // SVG 交给 `<img>` 渲染：图片标签里不执行脚本，比当文本看更符合预期
+  // SVG 默认也走 `<img>`（图片标签里不执行脚本）；它是文本图片，另给「源码」形态
   "svg",
 ]);
 
@@ -47,6 +47,12 @@ export const previewKindOf = (path: string): PreviewKind => {
   if (DOCUMENT_EXTENSIONS.has(extension)) return "document";
   return "text";
 };
+
+/**
+ * 可当文本看的图片：目前只有 SVG（它本质是 XML）。
+ * 预览宿主据此给它多一个「源码」形态——与 markdown 的预览 / 源码是同一回事。
+ */
+export const isTextImage = (path: string): boolean => extensionOf(path) === "svg";
 
 /** 图片预览的 MIME；`fs/read` 只给 base64 字节，data URL 需要它 */
 const IMAGE_MIME: Record<string, string> = {

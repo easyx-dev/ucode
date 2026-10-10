@@ -1,0 +1,43 @@
+/**
+ * 侧栏：按活动栏选中的视图渲染项目文件树或代码管理（变更树 / 提交历史）。
+ *
+ * 两个视图共用同一份仓库状态（`useGitReview` 在面板这一层持有）：文件树的 git 装饰与变更树来自
+ * 同一次 status 请求，切视图不会各拉一遍。没有工作目录时两视图都给同一个占位。
+ */
+import { FileQuestionMark } from "lucide-react";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+
+import type { GitReview } from "../../hooks/use-git-review";
+import { buildGitMarks } from "../../lib/git-marks";
+import { useWorkbench } from "../../provider/workbench";
+import { FileTree } from "./file-tree";
+import { PanelEmpty } from "./panel-empty";
+import { ReviewTree } from "./review-tree";
+
+export function WorkbenchSidebar({
+  review,
+  /** 编辑器里正打开的普通文件；文件树据此高亮 */
+  activeFile,
+}: {
+  review: GitReview;
+  activeFile: string | null;
+}) {
+  const { t } = useTranslation();
+  const workbench = useWorkbench();
+  const cwd = workbench?.cwd ?? null;
+  const marks = useMemo(() => buildGitMarks(review.status.data ?? null), [review.status.data]);
+
+  if (!workbench) return null;
+  if (!cwd) {
+    return (
+      <PanelEmpty icon={<FileQuestionMark className="size-7" />} title={t("当前没有工作目录")} />
+    );
+  }
+
+  return workbench.view === "files" ? (
+    <FileTree root={cwd} activeFile={activeFile} marks={marks} />
+  ) : (
+    <ReviewTree review={review} cwd={cwd} />
+  );
+}

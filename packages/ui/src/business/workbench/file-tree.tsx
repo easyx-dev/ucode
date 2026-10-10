@@ -5,6 +5,9 @@
  * 筛选输入走服务端的 `fs/search`（全库、尊重 .gitignore、带缓存），结果是一份扁平列表——
  * 懒加载的树只知道自己展开过的目录，拿它过滤会让「筛选文件」看起来时灵时不灵。
  * 单层条目超过 `MAX_ENTRIES` 时只渲染前若干条并提示——`node_modules` 这类目录能有上万项。
+ *
+ * 有仓库状态时给行加 git 装饰（名字着色 + 字母徽标，目录用其下最重的标记着色），
+ * 与 VSCode 的资源管理器一致：改动过的文件在树里一眼可辨，不必切到代码管理视图。
  */
 import type { FsEntry } from "@ucode/contracts";
 import { cn } from "cn";
@@ -13,13 +16,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../base/button";
+import { ContextMenu, ContextMenuTrigger } from "../../base/context-menu";
 import { Input } from "../../base/input";
 import { Spinner } from "../../base/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../base/tooltip";
 import { fileIconOf } from "../../lib/file-icons";
+import { type GitMark, type GitMarks, markLetter, markTone } from "../../lib/git-marks";
 import { baseName, toRelativePath } from "../../lib/path";
 import { useClient } from "../../provider";
 import { useWorkbench } from "../../provider/workbench";
+import { PathContextMenu } from "./path-context-menu";
 
 /** 单层最多渲染的条目数 */
 const MAX_ENTRIES = 200;
@@ -36,7 +42,23 @@ type TreeState = {
 
 const emptyTree = (): TreeState => ({ children: new Map(), loading: new Set() });
 
-export function FileTree({ root, activeFile }: { root: string; activeFile: string | null }) {
+/** 行上的装饰：有变更时名字用状态色，并在右侧补一个字母徽标 */
+const nameToneOf = (mark: GitMark | undefined, active: boolean): string => {
+  if (mark) return markTone(mark);
+  return active ? "font-medium text-foreground" : "text-muted-foreground";
+};
+
+export function FileTree({
+  root,
+  activeFile,
+  marks,
+}: {
+  root: string;
+  /** 编辑器里正打开的普通文件；用于高亮 */
+  activeFile: string | null;
+  /** 仓库装饰；没有仓库时为 null */
+  marks: GitMarks | null;
+}) {
   const { t } = useTranslation();
   const client = useClient();
   const workbench = useWorkbench();
@@ -128,19 +150,24 @@ export function FileTree({ root, activeFile }: { root: string; activeFile: strin
 
   const renderDir = (dir: string, depth: number): React.ReactNode => {
     const all = tree.children.get(dir) ?? [];
+    const total = Math.min(all.length, MAX_ENTRIES);
     return (
-      <>
-        {all.slice(0, MAX_ENTRIES).map((entry) => {
+      <div>
+        {all.slice(0, MAX_ENTRIES).map((entry, index) => {
           const isDir = entry.type === "directory";
           const isOpen = isDir && expanded.has(entry.path);
           return (
             <div key={entry.path}>
               <TreeRow
                 entry={entry}
+                root={root}
                 depth={depth}
+                position={index}
+                total={total}
                 open={isOpen}
                 active={entry.path === activeFile}
-                onSelect={() => (isDir ? toggle(entry) : workbench?.openPreview(entry.path))}
+                mark={isDir ? marks?.dirs.get(entry.path) : marks?.files.get(entry.path)}
+                onSelect={() => (isDir ? toggle(entry) : workbench?.openFile(entry.path))}
               />
               {isOpen ? renderDir(entry.path, depth + 1) : null}
             </div>
@@ -151,47 +178,40 @@ export function FileTree({ root, activeFile }: { root: string; activeFile: strin
             {t("仅列出前 {{value}} 项，共 {{total}} 项", { value: MAX_ENTRIES, total: all.length })}
           </p>
         ) : null}
-      </>
+      </div>
     );
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-col">
-      <div className="shrink-0 px-2 pt-2 pb-1.5">
-        <p className="truncate px-0.5 pb-1.5 text-xs font-medium text-foreground" title={root}>
-          {baseName(root) || root}
-        </p>
-        <div className="relative">
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {/* 与代码管理的头部同高（36px）：切视图时列表不会跳 */}
+      <div className="flex h-9 shrink-0 items-center gap-1.5 px-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            placeholder={t("筛选文件")}
-            className="h-7 pl-7 text-xs"
+            placeholder={t("在「{{name}}」中筛选文件", { name: baseName(root) || root })}
+            className="h-6 pl-7 text-xs"
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1 px-2 pb-1">
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-          {root}
-        </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="size-5 shrink-0"
+              className="size-6 shrink-0"
               title={t("刷新目录")}
               onClick={() => setTree(emptyTree())}
             >
-              <RefreshCw className="size-3" />
+              <RefreshCw className="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("刷新目录")}</TooltipContent>
         </Tooltip>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto py-1">
+      <div className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={t("项目文件")}>
         {tree.loading.has(root) && !tree.children.has(root) ? (
           <div className="flex justify-center py-3">
             <Spinner className="text-muted-foreground" />
@@ -204,27 +224,14 @@ export function FileTree({ root, activeFile }: { root: string; activeFile: strin
           ) : (
             <>
               {matches.map((entry) => (
-                <button
+                <FlatRow
                   key={entry.path}
-                  type="button"
-                  className={cn(
-                    "flex h-7 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs",
-                    entry.path === activeFile
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60",
-                  )}
-                  title={entry.path}
-                  onClick={() => workbench?.openPreview(entry.path)}
-                >
-                  {(() => {
-                    const Icon = fileIconOf(entry.path);
-                    return <Icon className="size-3.5 shrink-0" />;
-                  })()}
-                  <span className="shrink-0 truncate">{entry.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground/70">
-                    {toRelativePath(root, entry.path)}
-                  </span>
-                </button>
+                  entry={entry}
+                  root={root}
+                  active={entry.path === activeFile}
+                  mark={marks?.files.get(entry.path)}
+                  onSelect={() => workbench?.openFile(entry.path)}
+                />
               ))}
               {matchesTruncated ? (
                 <p className="px-2 py-1 text-[11px] text-muted-foreground">
@@ -244,40 +251,118 @@ export function FileTree({ root, activeFile }: { root: string; activeFile: strin
 /** 一行：目录只有折叠箭头（对齐图里「不画文件夹图标」的做法），文件按类型给图标 */
 function TreeRow({
   entry,
+  root,
   depth,
+  position,
+  total,
   open,
   active,
+  mark,
   onSelect,
 }: {
   entry: FsEntry;
+  root: string;
   depth: number;
+  position: number;
+  total: number;
   open: boolean;
   active: boolean;
+  mark: GitMark | undefined;
   onSelect: () => void;
 }) {
   const isDir = entry.type === "directory";
   const Icon = isDir ? null : fileIconOf(entry.path);
 
   return (
-    <button
-      type="button"
-      style={{ paddingLeft: `${depth * 14 + 10}px` }}
-      className={cn(
-        "flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs",
-        active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60",
-      )}
-      title={entry.path}
-      onClick={onSelect}
-    >
-      {isDir ? (
-        <ChevronRight
-          className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")}
-        />
-      ) : (
-        <span className="w-3.5 shrink-0" aria-hidden />
-      )}
-      {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
-      <span className="truncate">{entry.name}</span>
-    </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <button
+          type="button"
+          role="treeitem"
+          aria-level={depth + 1}
+          aria-posinset={position + 1}
+          aria-setsize={total}
+          {...(isDir ? { "aria-expanded": open } : {})}
+          style={{ paddingLeft: `${depth * 14 + 10}px` }}
+          className={cn(
+            "flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs",
+            nameToneOf(mark, active),
+            !mark && active ? "bg-muted" : "hover:bg-muted/60",
+            // 右键唤出菜单的那一刻也算选中：菜单要作用在哪一行得看得见
+            "data-[state=open]:bg-muted",
+          )}
+          title={entry.path}
+          onClick={onSelect}
+        >
+          {isDir ? (
+            <ChevronRight
+              className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")}
+            />
+          ) : (
+            <span className="w-3.5 shrink-0" aria-hidden />
+          )}
+          {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+          <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+          {mark ? <MarkBadge mark={mark} /> : null}
+        </button>
+      </ContextMenuTrigger>
+      <PathContextMenu path={entry.path} root={root} />
+    </ContextMenu>
+  );
+}
+
+/** 筛选结果是扁平列表，行里补一段相对路径，省得同名文件分不清 */
+function FlatRow({
+  entry,
+  root,
+  active,
+  mark,
+  onSelect,
+}: {
+  entry: FsEntry;
+  root: string;
+  active: boolean;
+  mark: GitMark | undefined;
+  onSelect: () => void;
+}) {
+  const Icon = fileIconOf(entry.path);
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <button
+          type="button"
+          // 筛选结果是扁平的一层节点，仍走 tree/treeitem 语义：容器的 children 得是同一种角色
+          role="treeitem"
+          aria-level={1}
+          className={cn(
+            "flex h-7 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs",
+            nameToneOf(mark, active),
+            !mark && active ? "bg-muted" : "hover:bg-muted/60",
+            // 右键唤出菜单的那一刻也算选中
+            "data-[state=open]:bg-muted",
+          )}
+          title={entry.path}
+          onClick={onSelect}
+        >
+          <Icon className="size-3.5 shrink-0" />
+          <span className="shrink-0 truncate">{entry.name}</span>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground/70">
+            {toRelativePath(root, entry.path)}
+          </span>
+          {mark ? <MarkBadge mark={mark} /> : null}
+        </button>
+      </ContextMenuTrigger>
+      <PathContextMenu path={entry.path} root={root} />
+    </ContextMenu>
+  );
+}
+
+/** 状态徽标：字母右对齐，颜色取标记自己的色调 */
+function MarkBadge({ mark }: { mark: GitMark }) {
+  return (
+    <span className={cn("ml-auto shrink-0 font-mono text-[11px]", markTone(mark))} aria-hidden>
+      {markLetter(mark)}
+    </span>
   );
 }

@@ -1,15 +1,16 @@
-/** 提交历史：列表（自带分页取数）与单次提交详情（元信息 + 改动文件） */
+/** 提交历史：列表（自带分页取数）与单次提交详情（元信息 + 各文件的 diff 堆叠） */
 import type { GitCommitSummary } from "@ucode/contracts";
-import { ChevronLeft } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../base/button";
 import { Spinner } from "../../base/spinner";
+import { useDiffPreferences } from "../../hooks/use-diff-prefs";
 import { useGitCommit, useGitLog } from "../../hooks/use-workbench-data";
 import { relativeTimeLabel } from "../../lib/time";
+import { DiffDisplayControls } from "./diff-controls";
+import { DiffStack, type DiffStackItem } from "./diff-stack";
 import { GitCommitList } from "./git-commit-list";
-import { GitCounts, GitStatusMark } from "./git-marks";
+import { GitCounts } from "./git-marks";
 
 /** 一次拉取的提交条数；「加载更多」按这个步长翻页 */
 const PAGE_SIZE = 30;
@@ -47,47 +48,67 @@ export function CommitHistory({
   );
 }
 
-/** 单次提交：元信息 + 改动文件列表；点文件交给上层切到 diff */
+/** 单次提交：元信息 + 该提交各文件的 diff，用与「全部改动」同一套堆叠卡片 */
 export function CommitDetail({
   path,
   commit,
   reloadToken,
-  onSelectFile,
-  onBack,
 }: {
   path: string;
   commit: GitCommitSummary;
   reloadToken: number;
-  onSelectFile: (file: string) => void;
-  onBack: () => void;
 }) {
   const { t } = useTranslation();
   const { data, error, loading } = useGitCommit(path, commit.hash, reloadToken);
   const detail = data?.commit;
+  const { mode, wrap, selectMode, toggleWrap } = useDiffPreferences();
+
+  const files = data?.files ?? [];
+  const items: DiffStackItem[] = useMemo(
+    () =>
+      files.map((file) => ({
+        file: file.path,
+        mark: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+        target: { path, file: file.path, source: "commit", commit: commit.hash },
+      })),
+    [commit.hash, files, path],
+  );
+  const totals = useMemo(
+    () =>
+      files.reduce(
+        (sum, file) => ({
+          additions: sum.additions + (file.additions ?? 0),
+          deletions: sum.deletions + (file.deletions ?? 0),
+        }),
+        { additions: 0, deletions: 0 },
+      ),
+    [files],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-start gap-1 border-b border-border px-2 py-1.5">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="mt-0.5 size-6 shrink-0"
-          title={t("返回提交列表")}
-          onClick={onBack}
-        >
-          <ChevronLeft className="size-3.5" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-foreground" title={detail?.subject ?? commit.subject}>
-            {detail?.subject || commit.subject || t("（无标题）")}
-          </p>
-          <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="font-mono">{commit.shortHash}</span>
-            <span className="truncate">{commit.authorName}</span>
-            <span className="shrink-0">{relativeTimeLabel(commit.authoredAt)}</span>
-          </p>
-        </div>
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
+        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+          {commit.shortHash}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs" title={detail?.subject ?? commit.subject}>
+          {detail?.subject || commit.subject || t("（无标题）")}
+        </span>
+        <GitCounts additions={totals.additions} deletions={totals.deletions} />
+        <DiffDisplayControls
+          mode={mode}
+          wrap={wrap}
+          onSelectMode={selectMode}
+          onToggleWrap={toggleWrap}
+        />
       </div>
+
+      <p className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+        <span className="truncate">{commit.authorName}</span>
+        <span className="shrink-0">{relativeTimeLabel(commit.authoredAt)}</span>
+      </p>
 
       {detail?.body ? (
         <pre className="max-h-32 shrink-0 overflow-auto border-b border-border px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -95,33 +116,20 @@ export function CommitDetail({
         </pre>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto py-1">
+      <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 [&>div:first-child]:pt-2">
         {loading && !data ? (
           <div className="flex justify-center py-4">
             <Spinner className="text-muted-foreground" />
           </div>
         ) : error ? (
-          <p className="px-3 py-2 text-xs text-muted-foreground">{error.message}</p>
-        ) : (data?.files.length ?? 0) === 0 ? (
-          <p className="px-3 py-2 text-xs text-muted-foreground">{t("这个提交没有改动文件")}</p>
+          <p className="px-1 py-2 text-xs text-muted-foreground">{error.message}</p>
+        ) : items.length === 0 ? (
+          <p className="px-1 py-2 text-xs text-muted-foreground">{t("这个提交没有改动文件")}</p>
         ) : (
-          data?.files.map((file) => (
-            <button
-              key={file.path}
-              type="button"
-              className="flex h-7 w-full items-center gap-2 px-3 text-left hover:bg-muted/60"
-              onClick={() => onSelectFile(file.path)}
-            >
-              <GitStatusMark status={file.status} />
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                {file.path}
-              </span>
-              <GitCounts additions={file.additions} deletions={file.deletions} />
-            </button>
-          ))
+          <DiffStack items={items} mode={mode} wrap={wrap} reloadToken={reloadToken} />
         )}
         {data?.truncated ? (
-          <p className="px-3 py-2 text-xs text-muted-foreground">{t("变更过多，仅列出前一部分")}</p>
+          <p className="px-1 py-2 text-xs text-muted-foreground">{t("变更过多，仅列出前一部分")}</p>
         ) : null}
       </div>
     </div>

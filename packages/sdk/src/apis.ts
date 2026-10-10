@@ -25,6 +25,8 @@ import type {
   FsReadResponse,
   FsSearchRequest,
   FsSearchResponse,
+  GitContentsRequest,
+  GitContentsResponse,
   GitDiffRequest,
   GitDiffResponse,
   GitLogRequest,
@@ -235,6 +237,9 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 单文件 diff；`source` 选工作区 / index / 某次提交 */
       diff: (body: GitDiffRequest) => transport.post<GitDiffResponse>("git/diff", body),
       log: (body: GitLogRequest) => transport.post<GitLogResponse>("git/log", body),
+      /** 同一个文件对比两侧的原文（展开未变更区域用）；参数与 `diff` 同义 */
+      contents: (body: GitContentsRequest) =>
+        transport.post<GitContentsResponse>("git/contents", body),
       show: (body: GitShowRequest) => transport.post<GitShowResponse>("git/show", body),
     },
     commands: {

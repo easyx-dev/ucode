@@ -1,7 +1,12 @@
 /*
  * 共享 UI 的设计 token 与基础样式：语义 token、base 层与 markdown 渲染。
  * 由各端在 tailwind 入口 `@import "@ucode/ui/theme.css"` 引入，并用 `@source` 指向本包源码。
+ *
+ * 第三方 diff 视图的样式也在这里引入：它自带一套 `--diff-*` 配色，文件末尾用语义 token 整组改写，
+ * 所以引入必须排在覆盖规则之前。
  */
+@import "@git-diff-view/react/styles/diff-view.css";
+
 @custom-variant dark (&:is(.dark *));
 
 /*
@@ -312,4 +317,46 @@
 }
 .md-content .md-mermaid-viewport svg {
   @apply h-auto max-w-none;
+}
+
+/*
+ * diff 视图（@git-diff-view/react）：库把配色收敛成一组 `--diff-*` 变量，这里整组改写成语义 token，
+ * 深浅色由 token 自己跟随，不再分 light / dark 两套。选择器与库同级（wrapper + `[data-theme]` + `.diff-style-root`），
+ * 靠本文件排在库样式之后取胜。语法高亮（`.hljs-*`）不启用：diff 只给增删底色，
+ * 与「不叠语法高亮」的口径一致（见 DESIGN.md「面板内部」），要开时再补一组 `--code-*` 映射。
+ */
+.diff-tailwindcss-wrapper[data-theme] .diff-style-root {
+  --diff-border--: var(--border);
+  --diff-plain-content--: var(--card);
+  --diff-expand-content--: var(--muted);
+  --diff-empty-content--: var(--muted);
+  --diff-plain-lineNumber--: var(--muted);
+  --diff-expand-lineNumber--: var(--muted);
+  --diff-plain-lineNumber-color--: var(--muted-foreground);
+  --diff-expand-lineNumber-color--: var(--muted-foreground);
+  --diff-hunk-content--: var(--accent);
+  --diff-hunk-content-color--: var(--muted-foreground);
+  --diff-hunk-lineNumber--: var(--accent);
+  --diff-hunk-lineNumber-hover--: var(--ring);
+  --diff-add-content--: color-mix(in oklch, var(--success) 15%, transparent);
+  --diff-add-content-highlight--: color-mix(in oklch, var(--success) 35%, transparent);
+  /* 行号格不混透明底：半透明叠在行底色上会串色，压成实色边界才看得准 */
+  --diff-add-lineNumber--: color-mix(in oklch, var(--success) 25%, var(--card));
+  --diff-del-content--: color-mix(in oklch, var(--destructive) 15%, transparent);
+  --diff-del-content-highlight--: color-mix(in oklch, var(--destructive) 35%, transparent);
+  --diff-del-lineNumber--: color-mix(in oklch, var(--destructive) 25%, var(--card));
+  --diff-add-widget--: var(--primary);
+  --diff-add-widget-color--: var(--primary-foreground);
+}
+
+/* 库把行文字直接写成黑 / 白，这里按语义前景色盖回去 */
+.diff-tailwindcss-wrapper[data-theme] [data-state="diff"],
+.diff-tailwindcss-wrapper[data-theme] [data-state="plain"],
+.diff-tailwindcss-wrapper[data-theme] [data-state="hunk"] {
+  color: var(--foreground);
+}
+
+/* 库在统一模式把行号整块设成 0.5 透明，这里按语义色实底显示 */
+.diff-tailwindcss-wrapper .opacity-\[0\.5\] {
+  opacity: 1;
 }

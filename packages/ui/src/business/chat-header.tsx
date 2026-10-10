@@ -1,7 +1,6 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
 import {
   ChevronLeft,
-  FolderOpen,
   Gauge,
   GitFork,
   PanelLeftClose,
@@ -26,8 +25,6 @@ type ChatHeaderProps = {
   models: ModelsResponse | null;
   onReloadModels: () => void;
   onOpenSettings: () => void;
-  /** 打开会话的工作目录；还没有会话时不传 */
-  onOpenDirectory?: () => void;
   /** 子会话视图返回父会话；主会话不传 */
   onBackToParent?: () => void;
   /** 打开本会话分叉自的源会话 */
@@ -92,7 +89,6 @@ export function ChatHeader({
   models,
   onReloadModels,
   onOpenSettings,
-  onOpenDirectory,
   onBackToParent,
   onOpenForkSource,
   forkedFromName,
@@ -184,19 +180,6 @@ export function ChatHeader({
               {context?.estimated ? t("压缩后为估算值，新一轮回答后回到实测") : t("使用统计")}
             </TooltipContent>
           </Tooltip>
-        ) : null}
-
-        {onOpenDirectory ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-            title={t("目录")}
-            onClick={onOpenDirectory}
-          >
-            <FolderOpen className="size-3.5" />
-            {t("目录")}
-          </Button>
         ) : null}
 
         {models && !models.configured ? (

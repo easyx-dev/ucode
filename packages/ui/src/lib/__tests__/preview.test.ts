@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { extensionOf, formatBytes, imageMimeOf, previewKindOf } from "../preview";
+import { extensionOf, formatBytes, imageMimeOf, isTextImage, previewKindOf } from "../preview";
 
 describe("extensionOf", () => {
   it("取小写扩展名，认不出时给空串", () => {
@@ -11,6 +11,19 @@ describe("extensionOf", () => {
     assert.equal(extensionOf("/a/b/Dockerfile"), "");
     assert.equal(extensionOf("/a/b/.gitignore"), "");
     assert.equal(extensionOf("a."), "");
+  });
+});
+
+describe("isTextImage", () => {
+  it("SVG 是文本图片（预览之外还能给源码）", () => {
+    assert.equal(isTextImage("/a/logo.svg"), true);
+    assert.equal(isTextImage("/a/LOGO.SVG"), true);
+  });
+
+  it("其余图片与普通文本都不是", () => {
+    assert.equal(isTextImage("/a/shot.png"), false);
+    assert.equal(isTextImage("/a/shot.webp"), false);
+    assert.equal(isTextImage("/a/main.ts"), false);
   });
 });
 
