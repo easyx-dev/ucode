@@ -277,6 +277,8 @@ export function ChatPanel({
         "flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:my-2 md:rounded-xl md:border md:border-border",
         // 工作台展开时这段间隙由分隔条充当，收起时卡片得自己留出来，否则右圆角会贴到窗口边缘
         workbenchOpen ? undefined : "md:mr-2",
+        // 侧栏收起时它整个不参与分栏，左侧间隙同理由卡片自己留（分隔条已随侧栏一起消失）
+        sidebarCollapsed ? "md:ml-2" : undefined,
       )}
     >
       <ChatHeader
