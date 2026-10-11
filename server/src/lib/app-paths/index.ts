@@ -5,7 +5,6 @@
  * 环境文件按 `NODE_ENV` 选择（生产 `.env.prod` / 其余 `.env`），统一从 cwd 向上查找。
  */
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 /** 从 start 向上查找含 pnpm-workspace.yaml 的仓库根；找不到返回 undefined */
@@ -29,12 +28,11 @@ export const resourceRoot = repoRoot ?? resolve(import.meta.dirname, "..");
 export const envFileName = (): string =>
   process.env.NODE_ENV === "production" ? ".env.prod" : ".env";
 
-/** 展开开头的 `~`（只处理 `~` 与 `~/`，`~user` 交给后续解析报不存在） */
-export const expandHome = (input: string): string => {
-  if (input === "~") return homedir();
-  if (input.startsWith("~/")) return resolve(homedir(), input.slice(2));
-  return input;
-};
+/**
+ * 展开开头的 `~`（只处理 `~` 与 `~/`，`~user` 交给后续解析报不存在）。
+ * 与 `utils/path` 共用同一份实现：`~` 展开全仓只应有一套口径。
+ */
+export { expandHome } from "../../utils/path";
 
 /** 加载环境文件前 process.env 里已有的键（CLI 参数 / shell 变量），用于区分「显式设置」与「.env 默认」 */
 let presetKeys: ReadonlySet<string> = new Set();

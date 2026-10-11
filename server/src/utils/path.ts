@@ -26,7 +26,7 @@ export const ancestorDirs = (cwd: string, stopAt: readonly string[] = []): strin
 };
 
 /** 展开开头的 `~`；只处理 `~` 与 `~/`，`~user` 交给 realpath 报「不存在」 */
-const expandHome = (input: string): string => {
+export const expandHome = (input: string): string => {
   if (input === "~") return homedir();
   if (input.startsWith("~/")) return resolve(homedir(), input.slice(2));
   return input;
