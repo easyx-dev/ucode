@@ -7,16 +7,24 @@ import type { AppConfig } from "@ucode/contracts";
 export type ConfigChangeKind = "lazy" | "runtime";
 
 /**
+ * 运行期读取、改它不必重建运行时的字段；其余字段一律按 `runtime` 处理。
+ * 白名单方向是刻意的：装配期新增字段时漏登记只会多重建一次，不会静默漏掉重建。
+ */
+const LAZY_FIELDS = ["websearch"] as const;
+
+/** 去掉 lazy 字段后的配置，用于比较「真正与运行时 / 会话装配相关的那部分」 */
+const runtimeRelevant = (config: AppConfig): Record<string, unknown> => {
+  const rest: Record<string, unknown> = { ...config };
+  for (const field of LAZY_FIELDS) delete rest[field];
+  return rest;
+};
+
+/**
  * 按「变更后的配置」与「当前配置」对比 —— 客户端提交的是全量 patch，从 patch 里出现了哪些
  * 字段看不出真实改动。
  *
  * 只有联网搜索是运行期读取（自研 websearch 工具在调用时读闭包），改它不必重建运行时；
  * provider 目录、默认模型与记忆开关都在会话装配时读入，必须重建。
- * 装配期新增字段时必须加进下面的比较，漏掉会静默归为 `lazy`。
  */
 export const classifyConfigChange = (next: AppConfig, current: AppConfig): ConfigChangeKind =>
-  isDeepStrictEqual(next.providers, current.providers) &&
-  next.defaultModel === current.defaultModel &&
-  isDeepStrictEqual(next.memory, current.memory)
-    ? "lazy"
-    : "runtime";
+  isDeepStrictEqual(runtimeRelevant(next), runtimeRelevant(current)) ? "lazy" : "runtime";
