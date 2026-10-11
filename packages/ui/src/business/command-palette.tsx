@@ -53,7 +53,7 @@ type CommandPaletteProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sessions: SessionSummary[];
-  /** 文件检索根目录（当前会话 cwd 或助理工作区）；null 时不搜文件 */
+  /** 文件检索根目录（当前会话 cwd / 草稿选中的目录，都没有时为助理工作区）；null 时不搜文件 */
   fileRoot: string | null;
   /** 是否有当前会话：与 `/` 菜单同口径，草稿态隐藏需要会话才能执行的命令 */
   hasSession: boolean;

@@ -140,8 +140,13 @@ export function WorkspaceLayout({
   const panels = usePanelLayout("workspace", WORKSPACE_PANELS);
 
   const configured = models.data?.configured ?? false;
+  /**
+   * 当前工作目录：已有会话用它自己的工作目录；草稿态还没有会话，用草稿里选中的目录——
+   * 「在某个项目里新建」时工作台与命令面板的文件检索都该落在那个项目上，而不是助理工作区。
+   */
+  const draftCwd = activeId ? null : (composer.drafts[NEW_SESSION_KEY]?.cwd ?? null);
   // 编辑器区的文档标签：工作目录变化即整体清空（见 use-workbench-docs）
-  const workbenchCwd = activeSession?.cwd ?? workspacesDir;
+  const workbenchCwd = activeSession?.cwd ?? draftCwd ?? workspacesDir;
   const docs = useWorkbenchDocs(workbenchCwd);
   /** 展开工作台时的默认宽度按窗口夹取：窄窗口下 640 会把对话区压破（记忆值优先） */
   const workbenchPanelSpec = useMemo(
@@ -768,7 +773,7 @@ export function WorkspaceLayout({
             open={paletteOpen}
             onOpenChange={setPaletteOpen}
             sessions={sessionsView}
-            fileRoot={activeSession?.cwd ?? workspacesDir}
+            fileRoot={workbenchCwd}
             hasSession={activeId !== null}
             onSelectSession={setActiveId}
             onRunBuiltin={runBuiltin}
