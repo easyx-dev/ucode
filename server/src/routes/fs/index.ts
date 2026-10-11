@@ -99,6 +99,12 @@ type SearchCandidate = { rel: string; entry: FsEntry };
 /** 候选按 base 缓存的时间；输入 `@` 时每个按键都会查一次，缓存避免重复跑 fd */
 const SEARCH_CACHE_MS = 10_000;
 
+/**
+ * 缓存条数上限。不同 base（项目目录）会一直累积，每个 base 最多近 2 万候选，
+ * 长驻进程里 `@` 补全跨多个项目时会持续吃内存，故按最近使用淘汰。
+ */
+const SEARCH_CACHE_MAX = 32;
+
 const searchCache = new Map<string, { at: number; items: SearchCandidate[]; truncated: boolean }>();
 
 /** fd 输出里可能混入的提示行（结果截断 / 无结果） */
@@ -146,7 +152,15 @@ const candidatesOf = async (
   base: string,
 ): Promise<{ items: SearchCandidate[]; truncated: boolean }> => {
   const cached = searchCache.get(base);
-  if (cached && Date.now() - cached.at < SEARCH_CACHE_MS) return cached;
+  if (cached) {
+    if (Date.now() - cached.at < SEARCH_CACHE_MS) {
+      // 命中即移到末尾：容量上限按最近使用淘汰
+      searchCache.delete(base);
+      searchCache.set(base, cached);
+      return cached;
+    }
+    searchCache.delete(base);
+  }
 
   let items: SearchCandidate[] = [];
   let truncated = false;
@@ -157,6 +171,10 @@ const candidatesOf = async (
   }
   const result = { at: Date.now(), items, truncated };
   searchCache.set(base, result);
+  if (searchCache.size > SEARCH_CACHE_MAX) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest !== undefined) searchCache.delete(oldest);
+  }
   return result;
 };
 
