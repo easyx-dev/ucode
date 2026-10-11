@@ -1,4 +1,5 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
+import { cn } from "cn";
 import {
   ChevronLeft,
   Gauge,
@@ -10,7 +11,7 @@ import {
   RefreshCw,
   Settings2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
 import { Button } from "../base/button";
@@ -41,6 +42,17 @@ type ChatHeaderProps = {
   onToggleSidebar?: () => void;
   /** 侧栏当前是否收起；决定切换按钮的图标 */
   sidebarCollapsed?: boolean;
+  /**
+   * 无标题栏窗口顶部那条的高度（px）：> 0 时这一行就是标题条，整行可拖（内部控件自动排除）
+   */
+  titleBarInset?: number;
+  /**
+   * 自绘窗口控件的横向占位宽度（px，仅无标题栏窗口需要）：侧栏收起时它正好落在头部左端，
+   * 头部得右移这么多把位置让出来
+   */
+  windowControlsWidth?: number;
+  /** 自绘窗口控件的宿主节点：挂在这一行里（这一行就是拖拽区，控件是它的后代才点得动） */
+  windowControls?: ReactNode;
   /** 展开工作台（右侧第三栏）；移动端唤出抽屉 */
   onToggleWorkbench?: () => void;
   /** 工作台当前是否展开 */
@@ -97,6 +109,9 @@ export function ChatHeader({
   onOpenUsage,
   onToggleSidebar,
   sidebarCollapsed,
+  titleBarInset = 0,
+  windowControlsWidth = 0,
+  windowControls,
   onToggleWorkbench,
   workbenchOpen,
   onRenameSession,
@@ -104,7 +119,21 @@ export function ChatHeader({
   const { t } = useTranslation();
 
   return (
-    <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+    <header
+      data-slot="chat-header"
+      className={cn(
+        "flex items-center gap-2 border-b border-border px-4 py-2.5",
+        // 无标题栏窗口里这行就是标题条：整行可拖（里面的按钮由 `.window-drag button` 排除）
+        titleBarInset > 0 && "window-drag",
+      )}
+      // 让开自绘窗口控件：只在收起侧栏时头部才占据窗口左端（展开时那边是侧栏）
+      style={
+        sidebarCollapsed && windowControlsWidth > 0
+          ? { paddingLeft: windowControlsWidth }
+          : undefined
+      }
+    >
+      {windowControls}
       {onToggleSidebar ? (
         <Button
           variant="ghost"

@@ -5,7 +5,8 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "node scripts/build-main.mjs && concurrently -n renderer,electron -c cyan,magenta \"vite\" \"electron .\"",
+    "dev": "node scripts/build-main.mjs && concurrently -k -n renderer,electron -c cyan,magenta \"vite\" \"DESKTOP_RENDERER_URL=http://localhost:5174 electron .\"",
+    "start": "pnpm build && electron .",
     "build:main": "node scripts/build-main.mjs",
     "build": "vite build && node scripts/build-main.mjs",
     "test": "node --import tsx --test \"src/**/__tests__/**/*.test.ts\"",
@@ -18,6 +19,7 @@
     "@ucode/sdk": "workspace:*",
     "@ucode/ui": "workspace:*",
     "i18next": "^26.4.2",
+    "lucide-react": "^0.545.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.15",

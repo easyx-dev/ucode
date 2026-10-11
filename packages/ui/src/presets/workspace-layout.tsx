@@ -6,7 +6,7 @@
  */
 import { brand } from "@ucode/brand";
 import type { GitCommitSummary } from "@ucode/contracts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../base/resizable";
@@ -71,6 +71,18 @@ import { changeDoc, changesDoc, commitDoc, fileDoc } from "../lib/workbench-docs
 import { type ChangeTarget, WorkbenchProvider, type WorkbenchView } from "../provider/workbench";
 
 export type WorkspaceLayoutProps = {
+  /**
+   * 无标题栏窗口顶部为自绘窗口控件让出的高度（px）：加在侧栏顶部（内容整体下移），
+   * 空出的那条由布局与壳层各自的拖拽区接管。web 与带系统标题栏的窗口都不传（默认 0）。
+   */
+  titleBarInset?: number;
+  /** 红绿灯的横向占位宽度（px，仅无标题栏窗口需要）：侧栏收起时对话区头部按它右移 */
+  windowControlsWidth?: number;
+  /**
+   * 自绘窗口控件的宿主节点（仅无标题栏窗口传）：布局把它挂到覆盖它的那条拖拽区里——
+   * 展开时是侧栏顶部那一条，收起时是对话区头部（`no-drag` 只对同一子树生效，挂错地方点不动）
+   */
+  windowControls?: ReactNode;
   /** 当前选中的会话；null 表示草稿态（新建） */
   sessionId: string | null;
   onSelectSession: (sessionId: string | null) => void;
@@ -106,6 +118,9 @@ const readWorkbenchOpen = (): boolean => {
 };
 
 export function WorkspaceLayout({
+  titleBarInset = 0,
+  windowControlsWidth = 0,
+  windowControls,
   sessionId: activeId,
   onSelectSession: setActiveId,
   settingsSection,
@@ -138,6 +153,40 @@ export function WorkspaceLayout({
   const isDesktop = useIsDesktop();
   // 外层三栏一组：侧栏与工作台各自记住宽度，对话区占剩余
   const panels = usePanelLayout("workspace", WORKSPACE_PANELS);
+
+  /**
+   * 自绘窗口控件的纵向位置：展开时它落在侧栏顶部空区，中线取对话区头部那行的控件中线再减去
+   * 内容卡距窗口顶的间距（点属窗口镶边，不该被内容卡的上留白推下去，那一段就是外壳容器
+   * `p-shell-inset` 的顶边留白）；收起时它就在头部那一行里，中线直接取那行的控件中线（跟行对齐）。
+   * 两种情况都是实测值，写到 `<html>` 上交给壳层，壳层的拖拽条读数定位——两边都不需要知道对方的几何。
+   */
+  useEffect(() => {
+    if (titleBarInset === 0) return;
+    const header = document.querySelector('[data-slot="chat-header"]');
+    // 卡片就是头部的父节点，它距窗口顶的那一段就是要减掉的间距
+    const card = header?.parentElement;
+    if (!header || !card) return;
+    // 对齐目标是头部里「真控件」的中线：要排掉窗口控件自己（它也挂在头部里，量它会自我引用）
+    const anchor =
+      Array.from(header.querySelectorAll("button")).find(
+        (button) => !button.closest("[data-window-controls]"),
+      ) ?? header;
+    const overSidebar = isDesktop && !sidebarCollapsed;
+    const publish = (): void => {
+      const rect = anchor.getBoundingClientRect();
+      const centered = rect.top + rect.height / 2;
+      const line = overSidebar ? centered - card.getBoundingClientRect().top : centered;
+      document.documentElement.style.setProperty("--window-controls-center", `${line}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(header);
+    observer.observe(anchor);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--window-controls-center");
+    };
+  }, [isDesktop, sidebarCollapsed, titleBarInset]);
 
   const configured = models.data?.configured ?? false;
   /**
@@ -579,6 +628,12 @@ export function WorkspaceLayout({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggleSidebar]);
 
+  /**
+   * 对话区头部此时是否占据窗口左端：桌面端看侧栏是否收起，窄屏看抽屉（侧栏不常驻，头部始终在窗左）。
+   * 自绘窗口控件的归属就按它分：占据左端时挂在头部，否则挂在侧栏顶部那条里。
+   */
+  const headerOwnsLeftEdge = isDesktop ? sidebarCollapsed : !sidebarOpen;
+
   // 分叉来源会话名：从当前列表取，取不到（已归档 / 未加载）则退化为 id
   const forkSourceId = activeSession?.forkedFromId ?? null;
   const forkSourceName = forkSourceId
@@ -622,7 +677,8 @@ export function WorkspaceLayout({
   return (
     <TooltipProvider>
       <WorkbenchProvider value={workbenchApi}>
-        <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+        {/* 四周留白见 DESIGN.md「间距与尺寸」：外壳容器统一留，内容卡不再自己留 margin */}
+        <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground md:p-shell-inset">
           {/* 桌面端三栏分栏；窄屏只有对话区，侧栏与工作台走下方抽屉 */}
           <ResizablePanelGroup
             id={`${PANEL_IDS.sidebar}-group`}
@@ -638,8 +694,24 @@ export function WorkspaceLayout({
                   maxSize={SIDEBAR_PANEL.max}
                   className="min-w-0"
                 >
-                  <div className="flex h-full w-full">
+                  <div
+                    className="relative flex h-full w-full"
+                    style={{ paddingTop: titleBarInset }}
+                  >
                     <SessionSidebar {...sidebarProps} />
+                    {/*
+                      侧栏顶部那条既是拖拽区也是窗口控件的宿主：控件挂在它里面（而不是另起一个覆盖层），
+                      `-webkit-app-region` 的 `no-drag` 只对同一子树生效，挂成兄弟子树会被这条拖拽区吃掉点击。
+                      不加 `aria-hidden`：里面的窗口控件带 aria-label，是这条里唯一可读的内容
+                    */}
+                    {titleBarInset > 0 ? (
+                      <div
+                        className="window-drag absolute inset-x-0 top-0"
+                        style={{ height: titleBarInset }}
+                      >
+                        {windowControls}
+                      </div>
+                    ) : null}
                   </div>
                 </ResizablePanel>
                 <ResizableHandle id={HANDLE_IDS.sidebar} className="-ml-3" />
@@ -667,7 +739,18 @@ export function WorkspaceLayout({
                     if (isDesktop) toggleSidebar();
                     else setSidebarOpen((prev) => !prev);
                   }}
-                  sidebarCollapsed={isDesktop ? sidebarCollapsed : !sidebarOpen}
+                  sidebarCollapsed={headerOwnsLeftEdge}
+                  titleBarInset={titleBarInset}
+                  /*
+                    判据是「无标题栏」而不是桌面断点：非 macOS 传进来的 titleBarInset 为 0，
+                    这三颗点一次都不该渲染（那是系统控件的地盘）；窄屏侧栏不常驻，让位区也跟着不在了
+                  */
+                  windowControlsWidth={
+                    titleBarInset > 0 && headerOwnsLeftEdge ? windowControlsWidth : 0
+                  }
+                  windowControls={
+                    titleBarInset > 0 && headerOwnsLeftEdge ? windowControls : undefined
+                  }
                   onToggleWorkbench={toggleWorkbench}
                   workbenchOpen={isDesktop ? workbenchOpen : workbenchSheetOpen}
                   onRenameSession={activeSession ? () => requestRename(activeSession) : undefined}
@@ -699,16 +782,16 @@ export function WorkspaceLayout({
 
             {isDesktop && workbenchOpen ? (
               <>
-                {/* 命中区即两栏之间的间距：工作台侧收窄一点（8px），与卡片自身的 m-2 对齐 */}
-                <ResizableHandle id={HANDLE_IDS.workbench} className="w-2" />
+                {/* 两栏之间只留 `--shell-inset`（与外壳四周同宽）：命中区仍占 8px，靠 `-ml-1` 叠进对话区右边缘 */}
+                <ResizableHandle id={HANDLE_IDS.workbench} className="-ml-1 w-2" />
                 <ResizablePanel
                   id={WORKBENCH_PANEL.id}
                   defaultSize={panels.defaultSizeOf(workbenchPanelSpec)}
                   minSize={WORKBENCH_PANEL.min}
                   className="min-w-0"
                 >
-                  <div className="flex h-full w-full md:py-2 md:pr-2">
-                    <div className="flex h-full w-full overflow-hidden bg-card md:rounded-xl md:border md:border-border">
+                  <div className="flex h-full w-full">
+                    <div className="flex h-full w-full overflow-hidden bg-card md:rounded-md md:border md:border-border">
                       <WorkbenchPanel />
                     </div>
                   </div>
@@ -756,6 +839,7 @@ export function WorkspaceLayout({
             onOpenChange={setUsageOpen}
             onOpenSession={setActiveId}
             context={sessionUsage.context}
+            titleBarInset={titleBarInset}
           />
 
           {settingsSection ? (
@@ -763,6 +847,7 @@ export function WorkspaceLayout({
               section={settingsSection}
               onSectionChange={setSettingsSection}
               onClose={() => setSettingsSection(null)}
+              titleBarInset={titleBarInset}
               onSaved={() => {
                 void models.reload();
               }}

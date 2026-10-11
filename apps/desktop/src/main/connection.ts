@@ -1,8 +1,10 @@
 /**
  * 服务连接解析：定位 `$APP_HOME/app/service.json` 并读出端点与凭证。
  *
- * 与 server 的 `env.ts` 同源约定——读仓库 `.env`，`APP_HOME` 缺省落在 `~/<appHomeDirname>`，
- * 相对路径按仓库根解析。文件由服务独占写、客户端只读，读得到即本机身份证明
+ * 与 server 的 `env.ts` 同源约定——按 `NODE_ENV` 读仓库 `.env`（`production` 时读 `.env.prod`），
+ * `APP_HOME` 缺省落在 `~/<appHomeDirname>`，相对路径按仓库根解析。同一个应用既能连开发实例、
+ * 也能连生产实例，区别只在启动时的 `NODE_ENV`（`pnpm dev:desktop` / `pnpm start:desktop`）。
+ * 文件由服务独占写、客户端只读，读得到即本机身份证明
  * （见 plans/service-and-auth.md）。凭证只留在主进程，不进渲染层。
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -24,11 +26,15 @@ const findRepoRoot = (start: string): string | undefined => {
 
 const repoRoot = findRepoRoot(import.meta.dirname);
 
+/** 当前应加载的环境文件名：生产 `.env.prod`，其余 `.env`（与 `server/src/env.ts` 同口径） */
+export const envFileName = (): string =>
+  process.env.NODE_ENV === "production" ? ".env.prod" : ".env";
+
 if (repoRoot) {
   try {
-    process.loadEnvFile(resolve(repoRoot, ".env"));
+    process.loadEnvFile(resolve(repoRoot, envFileName()));
   } catch {
-    // 没有 .env 时全部使用默认值
+    // 环境文件缺失时按未设置处理：`APP_HOME` 回落到默认目录，跑生产实例时那边会写 `service.json`
   }
 }
 

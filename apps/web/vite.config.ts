@@ -48,7 +48,9 @@ export default defineConfig(({ command, mode }) => {
       brandHtml(),
     ],
     server: {
+      // 端口固定：多开的 dev 实例不能顺延到 5174——那是桌面端渲染层的端口（见 apps/desktop/vite.config.ts）
       port: 5173,
+      strictPort: true,
       proxy: APP_PORT
         ? { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true } }
         : undefined,

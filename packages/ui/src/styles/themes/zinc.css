@@ -17,10 +17,11 @@ html[data-theme="zinc"] {
   --theme-line: var(--color-zinc-950);
 }
 
+/* 深色：与默认主题同一套反转——外壳比内容卡亮一档，卡落到 zinc 最深的一档 */
 html.dark[data-theme="zinc"] {
-  --theme-shell: var(--color-zinc-900);
+  --theme-shell: var(--color-zinc-800);
   --theme-panel: var(--color-zinc-700);
-  --theme-raised: var(--color-zinc-800);
+  --theme-raised: var(--color-zinc-900);
   --theme-solid: var(--color-zinc-700);
   --theme-text: var(--color-zinc-200);
   --theme-primary: var(--color-zinc-50);

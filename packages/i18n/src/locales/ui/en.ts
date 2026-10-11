@@ -702,6 +702,11 @@ export default {
   "服务凭证无效，请重启服务后重试。":
     "The service credential is invalid. Restart the service and try again.",
 
+  // Desktop shell（无标题栏窗口里自绘的窗口控件）
+  关闭窗口: "Close window",
+  最小化窗口: "Minimize window",
+  缩放窗口: "Zoom window",
+
   // Workbench（右侧第三栏：活动栏 + 侧栏 + 编辑器区）
   工作台: "Workbench",
   收起工作台: "Collapse workbench",

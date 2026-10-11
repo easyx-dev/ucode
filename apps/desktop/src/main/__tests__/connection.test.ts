@@ -6,7 +6,7 @@ import { test } from "node:test";
 
 import { appHomeDirname } from "@ucode/brand/values";
 
-import { resolveHomeDir, toServiceConnection } from "../connection.ts";
+import { envFileName, resolveHomeDir, toServiceConnection } from "../connection.ts";
 
 test("toServiceConnection：回环地址原样使用", () => {
   assert.deepEqual(toServiceConnection({ host: "127.0.0.1", port: 2048, serviceToken: "t" }), {
@@ -44,4 +44,19 @@ test("resolveHomeDir：`~` 展开为用户主目录（.env.prod 写的就是这�
   assert.equal(resolveHomeDir("~ "), homedir());
   // 不展开的话会拼成 `<仓库根>/~/…`，表现为「未找到服务注册文件」而连不上服务
   assert.ok(!resolveHomeDir(withTilde).includes("/~/"), "不应把 `~` 当普通目录名");
+});
+
+test("envFileName：生产读 .env.prod，其余读 .env", () => {
+  const original = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    assert.equal(envFileName(), ".env.prod");
+    process.env.NODE_ENV = "development";
+    assert.equal(envFileName(), ".env");
+    delete process.env.NODE_ENV;
+    assert.equal(envFileName(), ".env");
+  } finally {
+    if (original === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = original;
+  }
 });

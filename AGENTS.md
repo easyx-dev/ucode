@@ -118,8 +118,8 @@
 | `pnpm start` | `NODE_ENV=production node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`）+ web `:5173` 同时启动 |
-| `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
-| `pnpm start:desktop` | 构建桌面端后由 Electron 直接加载产物（`file://`，不起渲染层服务；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
+| `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层固定 `:5174`，`strictPort`；`/api/*` 由 Vite 代理转给 `.env` 里的 `APP_PORT`）。服务需另行启动，不需要为桌面端配 `APP_CORS_ORIGIN`。开发形态会独立开一窗 DevTools，`⌘⌥I` / `F12` 切换（生产不自动开）。端口被占时渲染层直接报错、electron 随之退出（`concurrently -k`），不会再连上别的 dev server |
+| `pnpm start:desktop` | 构建桌面端后由 Electron 以应用内协议 `app://desktop` 加载产物（不起渲染层服务、与接口同源；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
 
 **起 dev 前显式覆盖 `APP_HOME`**：服务的取值顺序是「显式环境变量 > `service.json` > `.env`」，
 所以从已导出 `APP_HOME` 的 shell 里起 dev（生产实例自己起的会话、桌面端进程都会导出）会绕过 `.env`，
@@ -280,8 +280,9 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
 - `apps/web/`（Vite + React）与 `apps/desktop/`（Electron）都是薄外壳：界面与逻辑在 `@ucode/ui` /
   `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/lib/app-i18n`）、client 装配与导航状态。
-  桌面端主进程从 `$APP_HOME/app/service.json` 取端点与 `serviceToken`，对发往服务 `/api/v1` 的请求
-  注入 `Authorization: Bearer`——凭证只留在主进程，渲染层拿不到；渲染层只接收 `baseUrl`。
+  桌面端主进程从 `$APP_HOME/app/service.json` 取端点与 `serviceToken`：渲染层与接口同源
+  （生产走 `app://desktop` 协议、开发走 Vite 代理，`/api/*` 由主进程转发时注入 `Authorization: Bearer`）
+  ——因此不需要服务端为它放开跨域，凭证也不进渲染层，渲染层只需要知道服务是否已注册。
 - `packages/i18n/`（`@ucode/i18n`）是跨端 i18n 运行时与共享文案的单一事实源：house i18next 配置
   （`createI18n`）、协议级通用文案（`common`）、错误码文案（`domain`）、产品界面文案
   （`ui`，web / Electron / TUI 共用），以及 `error-messages.ts` 的「`ERROR_CODES` → 文案 key」映射。

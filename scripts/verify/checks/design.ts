@@ -69,8 +69,14 @@ const RULES: Rule[] = [
   { test: /\bduration-(?!100\b|150\b|200\b)\d+/, message: "时长只有 100 / 150 / 200ms 三档" },
   { test: /\bease-(?!out\b|linear\b)\w+/, message: "缓动只用 ease-out（线性扫光类动效除外）" },
 
-  // 层级
-  { test: /\bz-(?!10\b|20\b|50\b)\d+/, message: "层级只用 z-10 / z-20 / z-50" },
+  // 层级：数字档位只允许 10/20/50
+  { test: /\bz-(?!10\b|20\b|50\b)\d+/, message: "层级数字档位只用 z-10 / z-20 / z-50" },
+  // 命名档位单独一条：上面那条只认数字，`z-chrome` 这类名字会整个漏过去。
+  // 排掉 `index`：`z-index` 不是类名，是注释里写层级时难免出现的词
+  {
+    test: /(?:^|[\s"'`])z-(?!chrome\b|index\b)[a-z][a-z-]*(?=[\s"'`]|$)/,
+    message: "层级命名档位只有 z-chrome（见 DESIGN.md「层级」）",
+  },
 
   // 绝对尺寸：禁任意值（百分比与视口单位是相对约束，放行）
   {

@@ -1,22 +1,34 @@
 /**
- * Electron 主进程：窗口生命周期、服务凭证注入、连接与系统通知的 IPC。
+ * Electron 主进程：窗口生命周期、渲染层协议、连接与系统通知的 IPC。
  *
- * 只连本机已运行的服务：从 `$APP_HOME/app/service.json` 读端点与 `serviceToken`，
- * 对发往该服务 API 的请求注入 Bearer；未运行 / 凭证失效时由渲染层给出可读提示。
+ * 只连本机已运行的服务：从 `$APP_HOME/app/service.json` 读端点与 `serviceToken`，由主进程转给渲染层
+ * （生产走 `app://` 协议处理器、开发走 Vite 代理并在请求头加 Bearer，见 `proxy.ts`）——
+ * 渲染层与接口同源，因此没有跨域，凭证也不进渲染层；未运行 / 凭证失效时由渲染层给出可读提示。
  */
 import { resolve } from "node:path";
 
 import { app, BrowserWindow, ipcMain, session } from "electron";
 
+import { isFrameless } from "../shared/chrome.ts";
 import { readServiceConnection, serviceFilePath } from "./connection.ts";
 import { registerNotificationIpc } from "./notification.ts";
+import { installRendererProtocol, RENDERER_ORIGIN, registerRendererScheme } from "./proxy.ts";
+import { registerWindowControlsIpc, watchWindowFocus } from "./window-controls.ts";
 
-const rendererDevUrl = process.env.DESKTOP_RENDERER_URL ?? "http://localhost:5174";
+/**
+ * 未声明时加载 `app://` 下的构建产物（生产形态）；开发时声明为 Vite 服务地址。
+ * 两个来源的渲染层不会同时用：声明了就不读盘上的产物，避免跑着旧界面却以为在看新代码。
+ */
+const rendererDevUrl = process.env.DESKTOP_RENDERER_URL;
+const rendererDist = resolve(import.meta.dirname, "../dist");
 
-/** 只给服务 API 注入 Bearer：fetch / SSE / 附件 `<img>` 都经此带上凭证，凭证不进渲染层 */
-const installAuthInjection = (baseUrl: string, token: string): void => {
+/**
+ * 开发形态的令牌注入：渲染层由 Vite（`:5174`）提供、`/api/*` 经 Vite 代理转给服务，
+ * 这条路不经过 `app://` 处理器，只能在这里加头。生产形态由处理器加，不需要这个监听。
+ */
+const installDevAuthInjection = (origin: string, token: string): void => {
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: [`${baseUrl}/api/v1/*`] },
+    { urls: [`${origin}/api/*`] },
     (details, callback) => {
       callback({
         requestHeaders: { ...details.requestHeaders, Authorization: `Bearer ${token}` },
@@ -30,9 +42,10 @@ const installAuthInjection = (baseUrl: string, token: string): void => {
  * 只在启动时装一次的话，「先开桌面端、后起服务」以及刷新窗口都拿不到授权，只能重启应用。
  * `onBeforeSendHeaders` 重复注册会替换旧监听，不会叠加。
  */
-const refreshAuthInjection = (): void => {
-  const connection = readServiceConnection();
-  if (connection) installAuthInjection(connection.baseUrl, connection.token);
+const refreshDevAuthInjection = (): void => {
+  if (!rendererDevUrl) return;
+  const service = readServiceConnection();
+  if (service) installDevAuthInjection(rendererDevUrl, service.token);
 };
 
 /** 开发时渲染层的 Vite 服务可能晚于 electron 就绪，重试到可用为止 */
@@ -47,6 +60,24 @@ const loadRenderer = async (window: BrowserWindow, url: string): Promise<void> =
   }
 };
 
+/**
+ * 开发形态把 DevTools 放出来：加载完就独立开窗，⌘⌥I（Windows / Linux 也认 F12）随时收回或再唤出。
+ * 只在开发形态装：生产跑的是构建产物，不需要也不该默认多一个窗口。
+ */
+const installDevTools = (window: BrowserWindow): void => {
+  window.webContents.on("did-finish-load", () =>
+    window.webContents.openDevTools({ mode: "detach" }),
+  );
+  window.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    // 用 `code` 而不是 `key`：macOS 上 ⌥I 会产出死键字符，`key` 拿不到 "i"
+    const shortcut = (input.meta || input.control) && input.alt && input.code === "KeyI";
+    if (!shortcut && input.code !== "F12") return;
+    event.preventDefault();
+    window.webContents.toggleDevTools();
+  });
+};
+
 const createWindow = (): void => {
   const window = new BrowserWindow({
     width: 1280,
@@ -54,6 +85,10 @@ const createWindow = (): void => {
     minWidth: 960,
     minHeight: 600,
     show: false,
+    // 自绘的窗口控件与标题条要在失焦时也一次点得动：macOS 默认会吃掉未聚焦窗口的第一次点击
+    ...(isFrameless(process.platform)
+      ? { titleBarStyle: "hiddenInset" as const, acceptFirstMouse: true }
+      : {}),
     webPreferences: {
       preload: resolve(import.meta.dirname, "preload.cjs"),
       contextIsolation: true,
@@ -62,24 +97,36 @@ const createWindow = (): void => {
     },
   });
   window.once("ready-to-show", () => window.show());
+  // 系统红绿灯收起后，关窗 / 最小化 / 缩放由界面上的三颗点经 IPC 触发
+  if (isFrameless(process.platform)) {
+    window.setWindowButtonVisibility(false);
+    watchWindowFocus(window);
+  }
 
-  if (app.isPackaged) {
-    void window.loadFile(resolve(import.meta.dirname, "../dist/index.html"));
-  } else {
+  // 打包后不受 `DESKTOP_RENDERER_URL` 影响：分发的应用只跑自己带的那份渲染层
+  if (rendererDevUrl && !app.isPackaged) {
+    installDevTools(window);
     void loadRenderer(window, rendererDevUrl);
+  } else {
+    void window.loadURL(`${RENDERER_ORIGIN}/index.html`);
   }
 };
 
 ipcMain.handle("desktop:connection", () => {
-  // 渲染层的首个请求就是取连接，在这之前先按最新注册文件装好注入
-  refreshAuthInjection();
-  const connection = readServiceConnection();
-  return { baseUrl: connection?.baseUrl ?? null, servicePath: serviceFilePath() };
+  // 渲染层的首个请求就是取连接，在这之前先按最新注册文件装好开发形态的注入
+  refreshDevAuthInjection();
+  return {
+    registered: readServiceConnection() !== null,
+    servicePath: serviceFilePath(),
+  };
 });
 
+registerRendererScheme();
 registerNotificationIpc();
+registerWindowControlsIpc();
 
 app.whenReady().then(() => {
+  installRendererProtocol(rendererDist, readServiceConnection);
   createWindow();
 
   app.on("activate", () => {

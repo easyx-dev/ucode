@@ -1,7 +1,7 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
 import { cn } from "cn";
 import { Bot } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import type { ChatController } from "../hooks/use-chat";
@@ -69,6 +69,17 @@ type ChatPanelProps = {
   onToggleSidebar?: () => void;
   /** 侧栏是否收起 */
   sidebarCollapsed?: boolean;
+  /**
+   * 无标题栏窗口顶部那条的高度（px）：> 0 时顶部就是标题条，对话区头部整行可拖
+   */
+  titleBarInset?: number;
+  /**
+   * 自绘窗口控件的横向占位宽度（px，仅无标题栏窗口需要）：侧栏收起时它就在对话区头部左端，
+   * 头部得右移这么多把位置让出来；0 表示不用让。
+   */
+  windowControlsWidth?: number;
+  /** 自绘窗口控件的宿主节点：收起侧栏时挂到头部（头部是拖拽区，控件得是它的后代） */
+  windowControls?: ReactNode;
   /** 展开 / 收起工作台（右侧第三栏）；移动端唤出抽屉 */
   onToggleWorkbench?: () => void;
   /** 工作台是否展开 */
@@ -124,6 +135,9 @@ export function ChatPanel({
   onOpenSession,
   onToggleSidebar,
   sidebarCollapsed,
+  titleBarInset,
+  windowControlsWidth,
+  windowControls,
   onToggleWorkbench,
   workbenchOpen,
   onRenameSession,
@@ -273,13 +287,9 @@ export function ChatPanel({
 
   return (
     <main
-      className={cn(
-        "flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:my-2 md:rounded-xl md:border md:border-border",
-        // 工作台展开时这段间隙由分隔条充当，收起时卡片得自己留出来，否则右圆角会贴到窗口边缘
-        workbenchOpen ? undefined : "md:mr-2",
-        // 侧栏收起时它整个不参与分栏，左侧间隙同理由卡片自己留（分隔条已随侧栏一起消失）
-        sidebarCollapsed ? "md:ml-2" : undefined,
-      )}
+      // 四周留白都由外壳容器留（见 DESIGN.md「间距与尺寸」），网格与卡片的间隙交给分隔条；
+      // 贴窗口的卡取 `rounded-md`：与窗口自身的圆角相称（见 DESIGN.md「圆角」）
+      className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:rounded-md md:border md:border-border"
     >
       <ChatHeader
         session={session}
@@ -288,6 +298,9 @@ export function ChatPanel({
         onOpenSettings={onOpenSettings}
         onToggleSidebar={onToggleSidebar}
         sidebarCollapsed={sidebarCollapsed}
+        titleBarInset={titleBarInset}
+        windowControlsWidth={windowControlsWidth}
+        windowControls={windowControls}
         onToggleWorkbench={onToggleWorkbench}
         workbenchOpen={workbenchOpen}
         onRenameSession={onRenameSession}

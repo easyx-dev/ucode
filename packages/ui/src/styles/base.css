@@ -24,6 +24,17 @@
     font-variant-numeric: tabular-nums;
   }
   /*
+   * 无标题栏窗口的拖拽区：桌面壳把它铺在窗口顶部那片为系统窗口控件留出的空位上，让整块能拖动窗口。
+   * 定义在共享样式里是因为铺它的那两条（侧栏顶部、对话区头部）由布局决定；其他端无效果。
+   */
+  .window-drag {
+    -webkit-app-region: drag;
+  }
+  /* 拖拽区里的控件（自绘的窗口控件）不参与拖动，否则点下去只会拖窗口 */
+  .window-drag button {
+    -webkit-app-region: no-drag;
+  }
+  /*
    * 全局滚动条：细窄圆头、颜色全走语义 token（`.dark` 下自动跟随）。
    * Firefox 认标准属性，Chrome / Electron 认 ::-webkit-scrollbar 那一套，两者都要写。
    */

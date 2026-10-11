@@ -29,9 +29,17 @@ type UsagePanelProps = {
   onOpenSession: (sessionId: string) => void;
   /** 当前会话的上下文占用；没有会话或取不到时为空 */
   context?: ContextUsage | null;
+  /** 无标题栏窗口顶部留给系统窗口控件的高度（px）；带系统标题栏的窗口不需要（默认 0） */
+  titleBarInset?: number;
 };
 
-export function UsagePanel({ open, onOpenChange, onOpenSession, context }: UsagePanelProps) {
+export function UsagePanel({
+  open,
+  onOpenChange,
+  onOpenSession,
+  context,
+  titleBarInset = 0,
+}: UsagePanelProps) {
   const { t } = useTranslation();
   const [range, setRange] = useState<RangeValue>("30");
   const { data, loading, error } = useUsage(open, DAYS_OF[range]);
@@ -58,7 +66,8 @@ export function UsagePanel({ open, onOpenChange, onOpenSession, context }: Usage
           {t("从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。")}
         </DialogDescription>
 
-        <div className="flex h-full min-h-0 flex-col">
+        {/* 留白加在这一层：面板自身的 `p-0!` 是 `!important`，内联 padding 会被它压掉 */}
+        <div className="flex h-full min-h-0 flex-col" style={{ paddingTop: titleBarInset }}>
           <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border pr-12 pl-4 md:pl-8">
             <h2 className="font-heading text-base font-medium">{t("使用统计")}</h2>
             <div className="ml-auto flex items-center gap-2">

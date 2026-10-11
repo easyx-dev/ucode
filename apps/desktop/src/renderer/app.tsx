@@ -7,6 +7,8 @@ import { useSessions } from "@ucode/ui/hooks/use-sessions";
 import type { SettingsSectionId } from "@ucode/ui/lib/settings-section";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useEffect, useRef, useState } from "react";
+import { WindowControls } from "./components/window-controls";
+import { titleBarInset, windowControlsWidth } from "./lib/window-chrome";
 
 export function DesktopApp() {
   const { sessions, loading } = useSessions();
@@ -27,6 +29,9 @@ export function DesktopApp() {
 
   return (
     <WorkspaceLayout
+      titleBarInset={titleBarInset()}
+      windowControlsWidth={windowControlsWidth()}
+      windowControls={<WindowControls />}
       sessionId={sessionId}
       onSelectSession={setSessionId}
       settingsSection={settingsSection}

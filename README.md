@@ -71,21 +71,20 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 只连**已运行**的本机服务（按启动时的 `NODE_ENV` 选择连开发还是生产实例）：
 
 - 渲染层来源：开发时由 `:5174` 的 Vite dev server 提供（启动脚本声明 `DESKTOP_RENDERER_URL`，改代码即时生效）；
-  生产时由 Electron 以 `file://` 直接加载构建好的 `dist/index.html`，不起渲染层服务——与打包后的加载方式一致。
+  生产形态由 Electron 以应用内协议 `app://desktop/` 加载构建产物：页面与接口同源，不起渲染层服务。
 - 窗口：macOS 去掉系统标题栏，系统红绿灯也一并隐藏，改由界面自绘三颗窗口控件（关 / 最小化 / 缩放，`windowControl` IPC）；
-  点固定在左端，中线由布局实测（`--window-controls-center`：头部那行控件的中线减去内容卡距顶的间距），展开时落在侧栏顶部、
-  收起时落在对话区头部（头部右移 80px）；悬停露出操作符号，窗口失焦置灰。详见
+  控件挂在**覆盖它的那条拖拽区**里（展开时是侧栏顶部、收起时是对话区头部；`no-drag` 只对同一子树生效，
+  挂成兄弟子树就会被拖拽区吃掉点击），中线由布局实测；悬停露出操作符号，窗口失焦置灰，
+  标题条在失焦时也一次点得动（`acceptFirstMouse`）。详见
   [`docs/design-surfaces.md`](./docs/design-surfaces.md)「应用骨架」。其他平台保留系统边框与系统控件。
 - 界面：自带 Vite + React 渲染层，复用 `@ucode/ui` 的组件与 `@ucode/sdk`；会话 / 设置状态只在本窗口内（不走 URL）。
-- 免登录：主进程读 `$APP_HOME/app/service.json` 拿 `serviceToken`，对发往服务 `/api/v1` 的请求注入
-  `Authorization: Bearer`（fetch / SSE / 附件图片都带上），**凭证不进渲染层**；渲染层只拿 `baseUrl`。
-- 跨域：渲染层是独立 Web 来源，服务端得放行它——dev 的来源是 `http://localhost:5174`（连开发实例，写 `.env`），
-  `file://` 的来源是 `null`（连生产实例，写 `.env.prod`：`APP_CORS_ORIGIN=null`）。白名单只决定请求发不发得出去，
-  凭证是 `serviceToken`（只由主进程注入，渲染层拿不到）。未找到服务或凭证失效时，界面给出可读提示，
-  并显示出找不到的注册文件路径。
+- 免登录且无跨域：主进程读 `$APP_HOME/app/service.json` 拿 `serviceToken`，渲染层的 `/api/*` 与页面同源——
+  生产由 `app://` 协议处理器转给服务并注入 `Authorization: Bearer`（fetch / SSE / 附件图片都经此），
+  开发由 Vite 代理转发、令牌仍由主进程加在请求头上。**凭证不进渲染层，也不需要服务端为桌面端开 `APP_CORS_ORIGIN`。**
 - 启动：先起服务，再按场合二选一——开发用 `pnpm dev` + `pnpm dev:desktop`，生产用 `pnpm start` + `pnpm start:desktop`
-  （后者先构建桌面端，再由 Electron 直接加载产物）。`start:desktop` 带 `NODE_ENV=production`，即读 `.env.prod`
+  （后者先构建桌面端，再由 Electron 加载产物）。`start:desktop` 带 `NODE_ENV=production`，即读 `.env.prod`
   的 `APP_HOME`（`~/.ucode`），故连的是生产实例；`dev:desktop` 读 `.env`，连开发实例。
+- 调试：开发形态自动独立开一窗 DevTools（`⌘⌥I` 或 `F12` 随时收回 / 再唤出），生产形态不开。
 
 > 尚未做：安装包（内置服务运行时）、服务发现与自动拉起、按 `compatRange` 的版本兼容决策；留待打包阶段。
 
@@ -505,7 +504,8 @@ apps/web/src/
 apps/desktop/
   src/main/index.ts        # Electron 主进程：窗口、服务凭证注入（webRequest）、连接 IPC
   src/main/connection.ts   # 读 $APP_HOME/app/service.json → { baseUrl, token }
-  src/preload/index.ts     # 把 baseUrl 暴露给渲染层（凭证不经预载）
+  src/main/proxy.ts        # `app://desktop` 协议：页面与 `/api/*` 同源，转发时注入令牌
+  src/preload/index.ts     # 把「服务是否已注册」暴露给渲染层（凭证不经预载）
   src/renderer/            # 渲染层外壳：入口、i18n 接线、client 装配、窗口内导航
   vite.config.ts           # 渲染层（端口 5174）
   scripts/build-main.mjs   # esbuild 打 main（ESM）/ preload（CJS）

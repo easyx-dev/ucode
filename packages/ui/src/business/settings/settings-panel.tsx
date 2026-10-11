@@ -20,6 +20,8 @@ import { useSettingsSectionMeta } from "./settings-sections";
 import { SettingsWebsearch } from "./settings-websearch";
 
 type SettingsPanelProps = {
+  /** 无标题栏窗口顶部留给系统窗口控件的高度（px）；带系统标题栏的窗口不需要（默认 0） */
+  titleBarInset?: number;
   section: SettingsSectionId;
   onSectionChange: (section: SettingsSectionId) => void;
   /** 关闭设置：丢弃未保存的草稿并回工作区 */
@@ -107,7 +109,13 @@ function SectionContent({
   }
 }
 
-export function SettingsPanel({ section, onSectionChange, onClose, onSaved }: SettingsPanelProps) {
+export function SettingsPanel({
+  titleBarInset = 0,
+  section,
+  onSectionChange,
+  onClose,
+  onSaved,
+}: SettingsPanelProps) {
   const { t } = useTranslation();
   const draft = useConfigDraft(true);
   const { saving, testingKey, save, test } = useConfigSave(draft, onSaved);
@@ -133,7 +141,11 @@ export function SettingsPanel({ section, onSectionChange, onClose, onSaved }: Se
           )}
         </DialogDescription>
 
-        <div className="flex h-full min-h-0 min-w-0 flex-col md:flex-row">
+        {/* 留白加在这一层：面板自身的 `p-0!` 是 `!important`，内联 padding 会被它压掉 */}
+        <div
+          className="flex h-full min-h-0 min-w-0 flex-col md:flex-row"
+          style={{ paddingTop: titleBarInset }}
+        >
           <SettingsNav
             section={section}
             onSectionChange={onSectionChange}

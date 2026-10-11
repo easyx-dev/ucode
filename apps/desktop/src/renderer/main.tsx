@@ -17,9 +17,11 @@ import {
   ServiceUnavailable,
   type ServiceUnavailableReason,
 } from "./components/service-unavailable";
+import { WindowDragStrip } from "./components/window-drag-strip";
 import "./index.css";
 // 副作用引入：在任何组件渲染前完成 i18next 初始化
 import i18n from "./lib/i18n";
+import { isFramelessWindow } from "./lib/window-chrome";
 
 const container = document.getElementById("root");
 // i18n-ignore: 开发者错误，不面向用户
@@ -28,7 +30,12 @@ if (!container) throw new Error("#root 不存在");
 const root = createRoot(container);
 const translate = i18n.t as unknown as Translate;
 
-/** 外壳：品牌元素 + 主题 + 当前内容 */
+/**
+ * 外壳：品牌元素 + 主题 + 当前内容。
+ *
+ * 拖拽宿主与窗口控件不在这一层：工作区里由布局挂在侧栏顶部或对话区头部（见 `app.tsx`），
+ * 只有「服务不可用」态才由这里渲染一块（见下面 `unavailable`）。
+ */
 const renderShell = (content: ReactNode): void => {
   root.render(
     <StrictMode>
@@ -38,30 +45,41 @@ const renderShell = (content: ReactNode): void => {
   );
 };
 
+/**
+ * 不可用态：没有工作区，没人当拖拽宿主，这里自己铺一块，否则这几颗点同样会点不动。
+ * 三条路径（未注册 / 连不上 / 运行期凭证失效）都走这里，少一条就会让那屏既没有窗口控件也拖不动窗口。
+ */
+const unavailable = (reason: ServiceUnavailableReason, servicePath: string): ReactNode => (
+  <>
+    {isFramelessWindow() ? <WindowDragStrip /> : null}
+    <ServiceUnavailable reason={reason} servicePath={servicePath} />
+  </>
+);
+
 const renderUnavailable = (reason: ServiceUnavailableReason, servicePath: string): void => {
-  renderShell(<ServiceUnavailable reason={reason} servicePath={servicePath} />);
+  renderShell(unavailable(reason, servicePath));
 };
 
 /**
  * 工作区门禁：运行期 401（服务重启换了 token）会把 auth 置为匿名，
  * 此时回到不可用态，而不是留在工作区持续报错。
  */
-function AuthenticatedWorkspace({ servicePath }: { servicePath: string }) {
+function AuthenticatedWorkspace({ servicePath }: { servicePath: string }): ReactNode {
   const auth = useAuth();
-  if (auth.status !== "authenticated") {
-    return <ServiceUnavailable reason="unauthorized" servicePath={servicePath} />;
-  }
+  if (auth.status !== "authenticated") return unavailable("unauthorized", servicePath);
   return <DesktopApp />;
 }
 
 const bootstrap = async (): Promise<void> => {
   const connection = await window.desktop.connection();
-  if (!connection.baseUrl) {
+  if (!connection.registered) {
     renderUnavailable("missing", connection.servicePath);
     return;
   }
 
-  const client = createClient({ baseUrl: connection.baseUrl, translate });
+  // 同源：接口走渲染层自己的来源（开发由 Vite 代理、生产由 `app://` 协议处理器转给服务），
+  // 所以不需要知道服务的地址，baseUrl 是空串（相对路径）
+  const client = createClient({ baseUrl: "", translate });
 
   // 先用未认证的 info 探活：`auth.load` 会把网络错误也当成匿名，
   // 单看它会把「服务没起」误报成「凭证无效」

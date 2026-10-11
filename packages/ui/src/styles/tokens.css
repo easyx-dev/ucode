@@ -21,11 +21,24 @@
  * 换配色风格时换引用的调色板即可，色阶本身不需要我们维护。
  */
 :root {
+  /*
+   * 自建底料：深色要「外壳比内容卡亮一档」，Tailwind 内置档位里没有这一对
+   * （neutral-900 偏暗、neutral-800 偏亮），按设计稿定死。
+   * 字面色值只允许出现在这里，主题层与语义层一律引用。
+   */
+  --palette-shell-dark: #2b2b2b;
+  --palette-raised-dark: #161616;
+
   /* 运行时参数：由外观设置写入 html 的行内样式，这里是默认值 */
   --font-size-base: 14px;
   --density: 1;
   /* 间距与尺寸的唯一基准，随密度缩放。定义在 :root 而非 @theme，供间距映射与高度层共用 */
   --base-unit: calc(0.25rem * var(--density));
+  /*
+   * 内容卡（对话区 / 工作台）与窗口四周边缘的间距：留白由三栏外壳容器的 padding 统一承担。
+   * 随密度走，且单独成变量——需要精确纵向定位的地方（桌面端窗口控件的中线）直接引用它。
+   */
+  --shell-inset: var(--base-unit);
   --radius: 0.75rem;
   --leading-base: 1.5;
   /*
@@ -70,11 +83,14 @@
   --theme-shadow-strong: 12;
 }
 
-/* 深色：同样的分层关系（更深的外壳 + 稍亮的面），反色面翻转为近白 */
+/*
+ * 深色：分层关系与浅色相反——外壳比内容卡亮一档（浅色是「灰壳 + 白卡」，深色是「灰壳 + 更暗的卡」），
+ * 反色面翻转为近白。外壳与卡取自建底料，见上面的 `--palette-*`。
+ */
 .dark {
-  --theme-shell: var(--color-neutral-900);
+  --theme-shell: var(--palette-shell-dark);
   --theme-panel: var(--color-neutral-700);
-  --theme-raised: var(--color-neutral-800);
+  --theme-raised: var(--palette-raised-dark);
   --theme-solid: var(--color-neutral-700);
   --theme-text: var(--color-neutral-200);
   --theme-text-faint: 30;
@@ -183,6 +199,16 @@
   --git-deleted: var(--color-red-600);
   --git-renamed: var(--color-blue-600);
 
+  /*
+   * 系统窗口控件（无标题栏窗口里自绘的三颗点）：固定色，不进主题层、不随深浅翻转——
+   * 它们是系统语义（关 / 最小化 / 缩放），跟着配色主题变反而会被认错。
+   */
+  --window-control-close: var(--color-red-500);
+  --window-control-minimize: var(--color-amber-400);
+  --window-control-zoom: var(--color-green-500);
+  /* 点上的符号：固定深色（点在深浅主题下都是同一组亮色，符号得压在上面看得清） */
+  --window-control-foreground: var(--color-neutral-950);
+
   /* 遮罩：只为压暗背景，不参与深浅翻转（深色下更重） */
   --overlay: color-mix(
     in oklab,
@@ -265,11 +291,15 @@
 
   /* 间距与尺寸：唯一基准 --base-unit，随密度缩放。所有 gap / p / h / w 都是它的整数倍 */
   --spacing: var(--base-unit);
+  /* 外壳留白：内容卡与窗口上下边缘的间距（见 DESIGN.md「间距与尺寸」） */
+  --spacing-shell-inset: var(--shell-inset);
   /* 图标：跟随字号（图形是文字的一部分），四档与字号档位同比例 */
   --spacing-icon-xs: calc(var(--font-size-base) * 6 / 7);
   --spacing-icon-sm: var(--font-size-base);
   --spacing-icon-base: calc(var(--font-size-base) * 8 / 7);
   --spacing-icon-lg: calc(var(--font-size-base) * 10 / 7);
+  /* 窗口控件的点：固定 14px，不随密度与字号走——它仿的是系统标题栏按钮（见 DESIGN.md「间距与尺寸」） */
+  --spacing-window-control: 0.875rem;
 
   /* 圆角：基准 --radius 派生四档，不随字号与密度变化 */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -322,4 +352,14 @@
   --color-git-untracked: var(--git-untracked);
   --color-git-deleted: var(--git-deleted);
   --color-git-renamed: var(--git-renamed);
+  --color-window-control-close: var(--window-control-close);
+  --color-window-control-minimize: var(--window-control-minimize);
+  --color-window-control-zoom: var(--window-control-zoom);
+  --color-window-control-foreground: var(--window-control-foreground);
+
+  /*
+   * 层级：系统窗口镶边（自绘窗口控件与拖拽条）常驻在应用所有层之上——
+   * 它扮演的是系统标题栏，弹层（`z-50`）也不应该遮住它，否则窗口就没法关、拖、缩了。
+   */
+  --z-index-chrome: 60;
 }

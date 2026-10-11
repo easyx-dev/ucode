@@ -61,11 +61,35 @@
 
 - **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用
   `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 缩放，
-  `windowControl` IPC），固定在左端，中线由布局用 `ResizeObserver` 实测并经 `--window-controls-center` 报给壳层
-  （对话区头部那行控件的中线再减去内容卡距顶的间距、随密度字号自动跟上），展开时落在侧栏顶部、收起时落在对话区头部（头部右移 80px），
-  其余空处为拖拽区；卡片自己的 `md:my-2` 不变。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-focus`）。
+  `windowControl` IPC，`lucide-react` 画符号），固定在左端，中线由布局实测并经 `--window-controls-center` 报给壳层：
+  展开时落在侧栏顶部（取头部那行控件的中线再减去内容卡距顶的间距）、收起时落在对话区头部（直接取那行的控件中线，与行对齐）；
+  点直径 14px、横向占 86px。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-focus`）。
   控件与拖拽条在最上层（新增 `z-chrome` 层级 + `window-control-*` 色），弹层遮罩不遮它们。
   常量在 `apps/desktop/src/shared/chrome.ts`。其他平台保留系统边框与系统控件。
+
+- **桌面端开发形态放出 DevTools**：`pnpm dev:desktop` 下渲染层加载完自动独立开一窗 DevTools，
+  `⌘⌥I` / `F12` 随时收回或再唤出（`before-input-event`，用 `code` 匹配——macOS 上 ⌥I 会产出死键字符）；
+  生产形态不开。
+
+- **窗口控件在没有工作区的屏幕上也摆正**：中线变量由布局实测写入、工作区卸载时清掉，于是「服务不可用」这类
+  没有工作区的屏幕读的是回退值——之前回退成 `0`，三颗点贴在窗口边上；现回退到顶部让位区的中间（`TITLE_BAR_INSET / 2`）。
+
+- **dev 端口不再串台**：`apps/web` 的 vite 加 `strictPort`（多开的 `pnpm dev` 实例不会再顺延抢到 `:5174`——
+  那是桌面端渲染层的端口，抢到后 `pnpm dev:desktop` 的 electron 会连上 web 的 dev server，看起来就像 web），
+  桌面端的 `dev` 脚本加 `concurrently -k`（渲染层起不来时 electron 随之退出，不再留一个误导的窗口）。
+
+- **桌面端改为同源，不再需要 `APP_CORS_ORIGIN`**：新增 `apps/desktop/src/main/proxy.ts`——生产形态把渲染层挂在应用内协议
+  `app://desktop/` 下，页面与 `/api/*` 同源，`/api/*` 由主进程转给本机服务并注入 `serviceToken`（SSE 一并走流式响应）；
+  开发形态由 `apps/desktop/vite.config.ts` 的 Vite 代理转发（目标取 `.env` 的 `APP_PORT`），令牌仍由主进程加在请求头上。
+  于是服务端不需要为桌面端放开跨域，凭证也不再靠渲染层侧的来源区分；`desktop:connection` 只回报「服务是否已注册」，
+  渲染层的 `baseUrl` 变成空串（相对路径）。已实测：两种形态都不设 `APP_CORS_ORIGIN` 也能加载工作区（含 `events` 流）。
+
+- **桌面端标题条：控件改为挂在拖拽区里**：`-webkit-app-region` 的 `no-drag` 只对**同一子树**生效，
+  之前自绘的三颗点是拖拽区的「兄弟子树」，被侧栏顶部/对话区头部那两条拖拽区吃掉点击（展开时点不动，
+  上一轮又把头部也变成拖拽区，于是两态都点不动）。现由布局收一个 `windowControls` 节点，
+  把控件挂到覆盖它的那条拖拽区里（展开时侧栏顶部、收起时对话区头部；服务不可用态由壳层自己渲染一块），
+  对话区头部在无标题栏窗口下整行可拖；另开 `acceptFirstMouse`——macOS 默认会把未聚焦窗口的第一次点击
+  只当作激活，导致自绘的点与按钮「点一下没反应」。
 
 - **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 缩放符号）。
 
@@ -107,6 +131,14 @@
 - **文档**：`DESIGN.md` 重写为设计系统（token 四层、运行时外观参数、颜色 / 排版 / 间距尺寸 / 圆角 /
   阴影层级 / 动效 / 渐变 / 反馈 / 状态 / 无障碍 / 响应式 / 第三方接入 / 配色主题 / 新增 token 流程），
   界面规格（三栏骨架、消息区、输入区、工作台、空态与设置）移到新增的 `docs/design-surfaces.md`。
+
+- **深色分层反转，内容卡改为贴窗口**：深色下外壳取 `#2b2b2b`、内容卡与浮层取 `#161616`（与浅色相反——
+  卡比壳更暗）。这对灰在 Tailwind 调色板里没有对应档位，改用 `tokens.css` 新增的自建底料
+  `--palette-shell-dark` / `--palette-raised-dark` 表达（全仓库唯一写死色值处）。内容卡的四周留白
+  改由三栏骨架最外层的外壳容器统一留（`md:p-shell-inset`；新增 `--shell-inset`，1 档 = 4px，
+  旧写法是卡片自己的 `my-2` 与按栏开合各留的 `ml-2` / `mr-2` / `pr-2`，间距减半；对话区与工作台之间的间隙
+  也收到同一档，分隔条用 `w-2 -ml-1` 保住 8px 命中区），
+  这两张贴窗口的卡圆角由 `rounded-xl` 收到 `rounded-md`，与无标题栏窗口自身的圆角相称。
 
 ### 修复
 

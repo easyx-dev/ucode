@@ -10,7 +10,9 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 - **黑白单色品牌**：没有彩色品牌色。品牌感来自灰度分层、排版层级与克制的圆角，而不是色相。
 - **颜色只用于表达状态与数据**：功能色与图表色是惟一的彩色出口。
-- **灰度外壳 + 白色内容卡**：`background` 是外壳底色，`card` / `popover` 是浮在其上的面；两者刻意不同值，这是整个视觉语言的基础。
+- **外壳 + 内容卡两级**：`background` 是外壳底色，`card` / `popover` 是内容与浮层的面；两者刻意不同值，
+  且深浅两色下**方向相反**——浅色是灰壳 + 白卡（卡亮于壳），深色是灰壳 + 更暗的卡（卡暗于壳）。
+  这是整个视觉语言的基础。
 - **低装饰**：默认无阴影、无渐变、无彩色光晕；分隔靠留白与极浅描边。
 - 界面文字统一简体中文。
 
@@ -56,14 +58,17 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 底料全部来自 Tailwind 内置调色板变量（`--color-neutral-*` 等），语义层用 `var()` 与 `color-mix(in oklab, …)` 组装；
 组件里禁止写调色板 utility 与调色板变量。深浅由主题层翻转，语义层不重复。
+深色外壳与内容卡那一对灰在 Tailwind 内置档位里没有对应值（`neutral-900` 偏暗、`neutral-800` 偏亮），
+因此在 `tokens.css` 里自建两个底料（`--palette-shell-dark` / `--palette-raised-dark`）——
+**全仓库只有那一处允许写字面色值**，主题层与语义层一律引用它们。
 
 ### 表面与文本
 
 | token | 用途 | 浅色 | 深色 |
 | --- | --- | --- | --- |
-| `background` | 外壳、主区底色 | `neutral-50` | `neutral-900` |
-| `card` | 内容卡与面板 | `white` | `neutral-800` |
-| `popover` | 弹层、下拉、对话框、输入框 | `white` | `neutral-800` |
+| `background` | 外壳、主区底色 | `neutral-50` | `#2b2b2b`（自建底料） |
+| `card` | 内容卡与面板 | `white` | `#161616`（自建底料） |
+| `popover` | 弹层、下拉、对话框、输入框 | `white` | `#161616`（自建底料） |
 | `muted` | 次级面板底、悬停与嵌入块 | `neutral-100` | `neutral-700` |
 | `secondary` | 次级实底（次按钮、次级徽标） | `neutral-200` | `neutral-700` |
 | `foreground` | 主文本 | `neutral-800` | `neutral-200` |
@@ -99,8 +104,10 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `link` | 可点击的链接与文件引用 |
 | `chart-1..5` | 图表色，按蓝绿主导排序（蓝 / 青绿 / 琥珀 / 紫 / 青），同一图表按序取色 |
 | `git-modified` / `git-added` / `git-untracked` / `git-deleted` / `git-renamed` | 文件树的 git 状态色，独立一族，不借 diff 与警告色 |
+| `window-control-close` / `-minimize` / `-zoom` / `-foreground` | 无标题栏窗口里自绘窗口控件的三颗点及其上的符号；固定色，不进主题层也不随深浅翻转（它们是系统语义，跟着配色主题变会被认错） |
 
 - 功能色只表达状态，不用于装饰；不要为了「更醒目」而借用失败/成功色。
+- 窗口控件色不复用 `destructive` / `warning` / `success`：它们表达的是「系统窗口怎么操作」，与状态语义无关。
 - diff 的增删底色由 `success` / `destructive` 合成（`third-party.css` 里整组改写库变量），不新增独立 token。
 
 ### 高度层
@@ -144,6 +151,10 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 - 控件高度：`h-6`(24) / `h-7`(28) / `h-8`(32，默认) / `h-9`(36)；方形图标按钮同宽同高。
 - 行高表（随密度缩放）：主区列表行 36 · 工作台列表行 28 · 工具行 32 · 标签条 36 · 活动栏 40。
 - 图标：`size-icon-xs`(12) / `-sm`(14) / `-base`(16，默认) / `-lg`(20)，由字号派生；更大的图形（空态插图、头像）用间距档。
+- 窗口控件的点：`size-window-control`(14) 固定值，不随密度与字号走——它仿的是系统标题栏按钮，属于系统镶边。
+- 内容卡与窗口四周边缘的间距 `--shell-inset`（1 档，密度默认下 4px）：由三栏骨架最外层的外壳容器统一留
+  （`md:p-shell-inset`），内容卡自己**不写 margin**——留白归外层，需要精确纵向定位的地方（桌面端窗口控件的中线）
+  可直接引用这个变量。
 - 内容区高度上限用间距档表达（如 `max-h-105` = 420px），避免任意值。
 
 ## 圆角
@@ -153,6 +164,8 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 取档只看**容器嵌套层级**，不看组件重要性：
 
 - 第一个圆角容器一律 `rounded-xl`；嵌套时逐级降为 `lg → md → sm`（`sm` 为下限）。
+- 例外：贴窗口边缘的内容卡（对话区、工作台）用 `rounded-md`——它们的圆角要与无标题栏窗口自身的圆角相称，
+  取 `xl`（16.8px）会在窗口角上露出错位的月牙。
 - 控件（按钮、输入框、选择器）默认 `rounded-lg`；落在 `rounded-lg` 父容器里降为 `md`，落在 `rounded-md` / `sm` 里降为 `sm`。
 - 布局容器、分隔条、包装层不算一层。
 - `rounded-full` 只用于刻意的胶囊与圆形；禁任意值与 `rounded-2xl` 及以上。
@@ -164,6 +177,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `10` | 局部浮起（图表提示、吸顶的编辑器工具条） |
 | `20` | 粘性条 |
 | `50` | 弹层与遮罩（下拉、菜单、选择、提示、对话框、抽屉） |
+| `chrome` | 系统窗口镶边：无标题栏窗口里的自绘窗口控件与拖拽条。它扮的是系统标题栏，在应用所有层之上——弹层打开的遮罩也不得盖住它，否则窗口关不掉也拖不动 |
 
 - 同层多个浮层靠渲染顺序（Portal 顺序）决定，不再加数字。
 - toast 由 sonner 自管（其 toaster 的 z-index 远高于上面的档位），不参与本表。
