@@ -52,14 +52,14 @@ export class TitleService {
 
   /** 落定兜底：并行那次失败或没产出时，用完整的首条交流再试一次 */
   private generate(sessionId: string, session: AgentSession): void {
+    // 只补一次：无论能否生成都先清掉待补标记，避免会话归档后该 id 常驻
+    this.retryable.delete(sessionId);
     if (!this.canGenerate(sessionId)) return;
     const model = session.model;
     if (!model) return;
     const exchange = firstExchange(session.messages);
     if (!exchange) return;
 
-    // 只补一次：不论这次成败都不再重试
-    this.retryable.delete(sessionId);
     this.run(sessionId, session, model, exchange);
   }
 
