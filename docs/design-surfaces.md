@@ -114,8 +114,11 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 
 - 层级只有两档：正文 `text-sm leading-prose`，代码块与表格 `text-xs`；标题不与正文拉开字号，靠字重。
 - 标题 `mt-5 mb-2`（首个元素不带上边距）；h1 用 `text-lg`、h2 用 `text-base`、h3 及以下 `text-sm`。
-- 表格**自己滚**：`block w-max max-w-full overflow-x-auto`；表头 `bg-muted/50`，单元格 `px-3 py-1.5` 且顶对齐。
-  **不要再套一层容器卡片**（streamdown 自带的表格容器已由 `business/markdown-table.tsx` 整份替换）。
+- 表格是一张**卡片**：卡片画在 `table` 自身（`rounded-lg border border-border` + `w-max max-w-full overflow-x-auto`），
+  三处 `.md-content` 入口（对话正文、md 预览、全屏表格预览）因此长得一样；
+  分隔只用横线（表头下一条 `thead tr:last-child th`、行间若干 `tbody tr:not(:last-child) td`），末行不画，交给卡片下边框收尾；
+  表头不着色、字色弱一档（`text-foreground-subtle`），单元格 `px-3 py-2`；宽表仍然只滚表格自身。
+  streamdown 默认那层「卡片 + 独立滚动容器」已由 `business/markdown-table.tsx` 整份替换，不要把它加回来。
 - 正文图片：本站附件先取字节转 blob 再渲染（`business/attachment-image.tsx`）；外层用 `span`，因为正文里的图片常落在 `<p>` 里。
 - 列表标记用 `text-foreground-subtle`；GFM 任务列表去掉圆点。
 - 行内 code 与代码块都只换底色（`bg-muted`）不换色相；行内 code 取 `text-xs`，与正文的差距由底色承担。

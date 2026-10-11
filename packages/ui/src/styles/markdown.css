@@ -66,23 +66,34 @@
   @apply bg-transparent p-0;
 }
 /*
- * 表格自己滚：宽表不但撑破列宽，还会把整段对话变成横向滚动区。
- * 因此表格按内容宽度渲染（w-max）、上限不超过列宽（max-w-full），超出时只滚表格自身。
+ * 表格：卡片里自己横向滚，分隔只靠横线（表头下一条、行间若干），不画网格。
+ * 卡片画在 `table` 自身而不是外层容器上：`.md-content` 有三处入口（对话正文、md 预览、全屏表格预览），
+ * 只有画在这一层才三处一致（`markdown-table.tsx` 的外层 div 只负责全屏按钮的定位）。
+ * 单元格自带的 border / nowrap / 字号由下面几条盖回本仓库口径（streamdown 的 `divide-y` 落在 `:where()` 里，
+ * 零优先级，这里显式关掉，行线改由 `td` 表达，末行不画，交给卡片下边框收尾）。
  */
 .md-content table {
-  @apply block w-max max-w-full overflow-x-auto border-collapse text-xs;
+  @apply block w-max max-w-full overflow-x-auto rounded-lg border border-border border-collapse text-xs;
 }
 .md-content th,
 .md-content td {
-  /* streamdown 给单元格带了自己的字号与 nowrap，这里按本仓库口径盖回去 */
-  @apply border border-border px-3 py-1.5 text-left align-top text-xs whitespace-normal;
+  @apply border-0 px-3 py-2 text-left align-top text-xs whitespace-normal;
 }
+.md-content tbody tr {
+  @apply border-0;
+}
+.md-content tbody tr:not(:last-child) td {
+  @apply border-b border-border;
+}
+.md-content thead tr:last-child th {
+  @apply border-b border-border;
+}
+/* 表头不着色也不加重：与正文靠一条横线和弱一档的字色分开，避免顶上多出一条色块 */
 .md-content thead {
-  /* 表头底色只由 th 提供，避免与 streamdown 的 thead 底色叠成两层 */
   @apply bg-transparent;
 }
 .md-content th {
-  @apply bg-muted/50 font-medium;
+  @apply font-medium text-foreground-subtle;
 }
 .md-content hr {
   @apply my-4 border-border;
