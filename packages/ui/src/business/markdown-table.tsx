@@ -1,7 +1,7 @@
 /**
  * Markdown 表格：去掉 streamdown 自带的外层卡片，宽表自己横向滚动，并提供全屏查看。
  *
- * streamdown 默认把表格套进 `border + bg-sidebar + p-2` 的容器里，而本仓库的 `.md-content table` 已经
+ * streamdown 默认把表格套进 `border + bg-background + p-2` 的容器里，而本仓库的 `.md-content table` 已经
  * 自带描边与滚动，两层叠起来就是「卡片套卡片」；所以这里整份替换掉它的 `table` 渲染器，顺手把外层
  * 容器与它的内建控件一起去掉（全屏改由下面这个按钮提供）。
  */

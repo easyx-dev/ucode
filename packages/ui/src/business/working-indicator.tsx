@@ -42,7 +42,7 @@ export function WorkingIndicator({
   const label = elapsed !== undefined && elapsed >= MIN_VISIBLE_MS ? durationLabel(elapsed) : "";
 
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+    <div className="flex items-center gap-2 text-xs text-foreground-subtle">
       <Spinner />
       {compacting ? t("正在压缩上下文…") : t("工作中")}
       {label ? <span className="tabular-nums">{label}</span> : null}

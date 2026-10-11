@@ -28,7 +28,7 @@ export function PermissionRequest({ request, onRespond }: PermissionRequestProps
       />
 
       <div className="space-y-2 px-3 py-2.5">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground-subtle">
           {t("agent 想调用「{{tool}}」，操作对象：", { tool: request.tool })}
         </p>
 
@@ -39,7 +39,7 @@ export function PermissionRequest({ request, onRespond }: PermissionRequestProps
 
       <div className="flex items-center gap-2 px-3 pb-3">
         {/* 范围写在按钮同排：它决定「本会话恒允」到底放行了什么 */}
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-xs text-foreground-subtle">
           {t("授权范围：{{scope}}", { scope: request.scope })}
         </span>
         <Button variant="ghost" size="sm" onClick={() => onRespond(request.requestId, "deny")}>

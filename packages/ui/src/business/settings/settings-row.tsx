@@ -13,7 +13,7 @@ export function SettingsGroup({
   return (
     <div
       className={cn(
-        "divide-y divide-border overflow-hidden rounded-xl ring-1 ring-foreground/10",
+        "divide-y divide-border overflow-hidden rounded-xl ring-1 ring-border-strong",
         className,
       )}
     >
@@ -46,7 +46,7 @@ export function SettingsRow({ title, description, control, dense, className }: S
       <div className="min-w-0 space-y-1">
         <div className="text-sm font-medium">{title}</div>
         {description ? (
-          <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="text-xs leading-relaxed text-foreground-subtle">{description}</p>
         ) : null}
       </div>
       <div className="shrink-0">{control}</div>

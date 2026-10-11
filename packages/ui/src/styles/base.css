@@ -1,0 +1,59 @@
+/*
+ * 基础层：全局默认值、可点击手型、滚动条与动效兜底。
+ * 只放「任何组件都该遵守」的规则，组件自己的视觉留在组件里。
+ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    /* 全局字距：基准变量，局部用 tracking-* 覆盖 */
+    letter-spacing: var(--tracking-base);
+  }
+  /* Tailwind v4 起按钮默认 cursor: default；可点击控件统一回正手型（禁用态除外） */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  /* 数字类信息（耗时、用量、行号）在表格与列表中不抖动 */
+  .tabular-figures {
+    font-variant-numeric: tabular-nums;
+  }
+  /*
+   * 全局滚动条：细窄圆头、颜色全走语义 token（`.dark` 下自动跟随）。
+   * Firefox 认标准属性，Chrome / Electron 认 ::-webkit-scrollbar 那一套，两者都要写。
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: var(--border);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--foreground-subtle);
+  }
+}
+
+/*
+ * 呼吸类动画在减弱动效偏好下一律关闭（颜色过渡与加载指示的旋转保留：
+ * 前者不引起前庭不适，后者是必要的状态信号）。位移类动效由组件自己兜底。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+}

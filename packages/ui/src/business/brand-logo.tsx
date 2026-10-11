@@ -4,7 +4,7 @@ import { brandAssets } from "@ucode/brand";
 import { cn } from "cn";
 
 type BrandLogoProps = {
-  /** 尺寸与对齐类，透传到图片（如 `size-5`） */
+  /** 尺寸与对齐类，透传到图片（如 `size-icon-lg`） */
   className?: string;
 };
 

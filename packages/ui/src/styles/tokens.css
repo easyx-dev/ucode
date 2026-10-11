@@ -1,0 +1,325 @@
+/*
+ * 设计 token：运行时参数 → 主题层 → 语义层 → Tailwind 映射。
+ *
+ * 四层的引用方向单向，组件只允许用最后一层映射出的工具类：
+ *   1. 参数：外观设置写入的基准（字号、密度、字体族、圆角）——`--font-size-base` 等
+ *   2. 主题层：`--theme-*`，配色主题唯一可覆盖的一层（见 `themes/`）
+ *   3. 语义层：`--background` / `--state-hover` / `--foreground-subtle` 等，组件唯一可用的名字
+ *   4. 映射层：`@theme` 把语义层变成 `bg-background` 这类工具类
+ *
+ * 口径与取值表见 DESIGN.md。几条硬约束：
+ * - 语义层的值永远是 `var()` / `color-mix()` / `calc()`，不写字面量色值；
+ * - 深色只改主题层，语义层定义一次，跟随 `.dark` 自动解析；
+ * - 改字号只动 `--font-size-base`，改密度只动 `--density`，绝不改 `html` 的 font-size。
+ */
+
+/* 深色模式：`next-themes` 在 `<html>` 上加 `.dark`，全部深色规则都走这个变体 */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * 调色板底料复用 Tailwind 内置的 `--color-<调色板>-<档>`，不自造色值：
+ * 换配色风格时换引用的调色板即可，色阶本身不需要我们维护。
+ */
+:root {
+  /* 运行时参数：由外观设置写入 html 的行内样式，这里是默认值 */
+  --font-size-base: 14px;
+  --density: 1;
+  /* 间距与尺寸的唯一基准，随密度缩放。定义在 :root 而非 @theme，供间距映射与高度层共用 */
+  --base-unit: calc(0.25rem * var(--density));
+  --radius: 0.75rem;
+  --leading-base: 1.5;
+  /*
+   * 全局字距：绝对值（px），不随字号缩放。
+   * 中英混排下默认给一点点正字距，汉字之间不会显得拥挤；改它一处即全局生效，
+   * 局部要拉开（如快捷键提示的全大写小标签）用 `tracking-widest` 单独覆盖。
+   */
+  --tracking-base: 0.4px;
+  --duration-base: 150ms;
+  --font-ui-base: "Geist Variable";
+  /* 中文回退：界面与等宽两套栈共用，避免等宽字体里缺中文字形时落到宋体 */
+  --font-cjk-fallback: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC";
+  --font-ui: var(--font-ui-base), var(--font-cjk-fallback), sans-serif;
+  /*
+   * 等宽：只用系统字体，不打包 webfont。
+   * 保留各平台西文等宽字体并在通用 `monospace` 前显式插入 CJK 无衬线字体：
+   * Windows 的 Consolas 不含中文字形，直接落到通用 monospace 会让中文变成宋体。
+   * 代价是中文与 ASCII 不是 2:1 严格对齐（代码注释里的中文会与上下行错位）；
+   * 要消除这一点只能内置 CJK 等宽字体（Sarasa Mono SC / Maple Mono CN），单字重就是几 MB，暂不引入。
+   */
+  --font-mono-stack:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    var(--font-cjk-fallback), monospace;
+
+  /* 主题层（浅色）：配色主题唯一允许覆盖的一组变量 */
+  --theme-shell: var(--color-neutral-50);
+  --theme-panel: var(--color-neutral-100);
+  --theme-raised: var(--color-white);
+  --theme-solid: var(--color-neutral-200);
+  --theme-text: var(--color-neutral-800);
+  /* 次级 / 更弱文本的不透明度（百分比数字，配合 color-mix 使用） */
+  --theme-text-soft: 60;
+  --theme-text-faint: 40;
+  --theme-primary: var(--color-neutral-900);
+  --theme-primary-fg: var(--color-neutral-50);
+  --theme-ring: var(--color-neutral-400);
+  /* 叠加基准色与描边强度：状态层、描边、分组外框都由这一对派生 */
+  --theme-line: var(--color-neutral-950);
+  --theme-line-soft: 10;
+  --theme-overlay: 40;
+  --theme-shadow-soft: 8;
+  --theme-shadow-strong: 12;
+}
+
+/* 深色：同样的分层关系（更深的外壳 + 稍亮的面），反色面翻转为近白 */
+.dark {
+  --theme-shell: var(--color-neutral-900);
+  --theme-panel: var(--color-neutral-700);
+  --theme-raised: var(--color-neutral-800);
+  --theme-solid: var(--color-neutral-700);
+  --theme-text: var(--color-neutral-200);
+  --theme-text-faint: 30;
+  --theme-primary: var(--color-neutral-50);
+  --theme-primary-fg: var(--color-neutral-900);
+  --theme-ring: var(--color-neutral-500);
+  --theme-line: var(--color-white);
+  --theme-overlay: 60;
+  --theme-shadow-soft: 40;
+  --theme-shadow-strong: 60;
+}
+
+/*
+ * 深色下功能色取 500 档（较亮），前景必须是深色：亮底配白字对比度只有 2:1 上下。
+ * 浅色下反之（600 档底配白字），所以这四个前景只在深色里覆盖。
+ */
+.dark {
+  --destructive-foreground: var(--color-neutral-950);
+  --success-foreground: var(--color-neutral-950);
+  --warning-foreground: var(--color-neutral-950);
+  --info-foreground: var(--color-neutral-950);
+}
+
+/*
+ * 语义层：定义一次，深浅与主题都由它引用的主题层决定。
+ * 组件只能用这一层；新增语义前先确认现有语义表达不了（见 DESIGN.md「准入」）。
+ */
+:root {
+  /* 表面：外壳 / 内容卡 / 浮层 / 次级底 / 次级实底 */
+  --background: var(--theme-shell);
+  --foreground: var(--theme-text);
+  --card: var(--theme-raised);
+  --card-foreground: var(--theme-text);
+  --popover: var(--theme-raised);
+  --popover-foreground: var(--theme-text);
+  --muted: var(--theme-panel);
+  --secondary: var(--theme-solid);
+  --secondary-foreground: var(--theme-text);
+
+  /* 文本层级：主 / 次级 / 最弱 */
+  --foreground-subtle: color-mix(
+    in oklab,
+    var(--theme-text) calc(var(--theme-text-soft) * 1%),
+    transparent
+  );
+  --foreground-subtlest: color-mix(
+    in oklab,
+    var(--theme-text) calc(var(--theme-text-faint) * 1%),
+    transparent
+  );
+
+  /* 描边：常规与浮层（更强一档） */
+  --border: color-mix(in oklab, var(--theme-line) calc(var(--theme-line-soft) * 1%), transparent);
+  --border-strong: color-mix(
+    in oklab,
+    var(--theme-line) calc(var(--theme-line-soft) * 1.5%),
+    transparent
+  );
+  --ring: var(--theme-ring);
+
+  /* 交互态：叠加式，落在任何表面上都能保持同一层关系 */
+  --state-hover: color-mix(
+    in oklab,
+    var(--theme-line) calc(var(--theme-line-soft) * 0.5%),
+    transparent
+  );
+  --state-selected: color-mix(
+    in oklab,
+    var(--theme-line) calc(var(--theme-line-soft) * 0.8%),
+    transparent
+  );
+  --state-active: color-mix(
+    in oklab,
+    var(--theme-line) calc(var(--theme-line-soft) * 1.2%),
+    transparent
+  );
+
+  /* 主色：浅色近黑、深色近白 */
+  --primary: var(--theme-primary);
+  --primary-foreground: var(--theme-primary-fg);
+
+  /* 功能色：只表达状态，不参与品牌 */
+  --destructive: var(--color-red-600);
+  --destructive-foreground: var(--color-white);
+  --success: var(--color-green-600);
+  --success-foreground: var(--color-white);
+  --warning: var(--color-amber-600);
+  --warning-foreground: var(--color-white);
+  --info: var(--color-blue-600);
+  --info-foreground: var(--color-white);
+
+  /* 链接：与信息色同源，避免各处直接借图表色 */
+  --link: var(--color-blue-600);
+
+  /* 图表：按蓝绿主导排序，同一图表内按序取色 */
+  --chart-1: var(--color-blue-600);
+  --chart-2: var(--color-teal-600);
+  --chart-3: var(--color-amber-500);
+  --chart-4: var(--color-violet-600);
+  --chart-5: var(--color-cyan-600);
+
+  /* git 文件状态：独立一族，不借 diff 与警告色 */
+  --git-modified: var(--color-amber-600);
+  --git-added: var(--color-green-600);
+  --git-untracked: var(--color-green-600);
+  --git-deleted: var(--color-red-600);
+  --git-renamed: var(--color-blue-600);
+
+  /* 遮罩：只为压暗背景，不参与深浅翻转（深色下更重） */
+  --overlay: color-mix(
+    in oklab,
+    var(--color-neutral-950) calc(var(--theme-overlay) * 1%),
+    transparent
+  );
+
+  /* 高度层：offset / blur 用 --base-unit 表达，随密度走；颜色来自主题的阴影强度 */
+  --shadow-soft: color-mix(
+    in oklab,
+    var(--color-neutral-950) calc(var(--theme-shadow-soft) * 1%),
+    transparent
+  );
+  --shadow-strong: color-mix(
+    in oklab,
+    var(--color-neutral-950) calc(var(--theme-shadow-strong) * 1%),
+    transparent
+  );
+  --elevation-raised: 0 calc(var(--base-unit) * 0.25) calc(var(--base-unit) * 0.5)
+    var(--shadow-soft);
+  --elevation-popover: 0 var(--base-unit) calc(var(--base-unit) * 3) var(--shadow-soft);
+  --elevation-dialog: 0 calc(var(--base-unit) * 3) calc(var(--base-unit) * 8) var(--shadow-strong);
+  --elevation-edge: 0 calc(var(--base-unit) * -0.25) calc(var(--base-unit) * 0.5) var(--shadow-soft);
+
+  /* 语法高亮：只给 shiki 的内联着色用，取值全部来自上面的语义层 */
+  --code-foreground: var(--foreground);
+  --code-background: transparent;
+  --code-comment: var(--foreground-subtle);
+  --code-punctuation: var(--foreground-subtle);
+  --code-keyword: var(--chart-4);
+  --code-string: var(--chart-2);
+  --code-number: var(--chart-3);
+  --code-function: var(--chart-1);
+  --code-type: var(--chart-5);
+  --code-tag: var(--chart-4);
+  --code-property: var(--foreground);
+  --code-variable: var(--foreground);
+  --code-link: var(--link);
+  --code-invalid: var(--destructive);
+}
+
+/*
+ * 映射层：语义层 → Tailwind 工具类。深度色与主题通过变量在运行时解析，
+ * 所以这里的值必须保持 `var()` / `calc()` 形式，不能写成算好的字面量。
+ */
+@theme {
+  /* 字体：界面字体可由设置更换（栈由 --font-ui 组装），等宽固定为系统字体栈。
+     这两个变量需要被第三方（mermaid 采 --font-sans 取色与字体）读到，故不做 inline 化 */
+  --font-sans: var(--font-ui);
+  --font-heading: var(--font-ui);
+  --font-mono: var(--font-mono-stack);
+
+  /* 字号：五档，全部由基准派生（14px 基准下为 12 / 14 / 16 / 18 / 20）。
+     行高用 em 表达相对比例，这样基准变化时行距比例不变 */
+  --text-xs: calc(var(--font-size-base) * 6 / 7);
+  --text-xs--line-height: 1.333em;
+  --text-sm: var(--font-size-base);
+  --text-sm--line-height: 1.4286em;
+  --text-base: calc(var(--font-size-base) * 8 / 7);
+  --text-base--line-height: 1.5em;
+  --text-lg: calc(var(--font-size-base) * 9 / 7);
+  --text-lg--line-height: 1.556em;
+  --text-xl: calc(var(--font-size-base) * 10 / 7);
+  --text-xl--line-height: 1.4em;
+
+  /* 图表字号：独立三档，不受五档约束，只用于轴、刻度、图例与热力图标签 */
+  --text-chart-axis: calc(var(--font-size-base) * 5 / 7);
+  --text-chart-axis--line-height: 1.4em;
+  --text-chart-label: calc(var(--font-size-base) * 6 / 7);
+  --text-chart-label--line-height: 1.333em;
+  --text-chart-value: var(--font-size-base);
+  --text-chart-value--line-height: 1.4286em;
+
+  /* 行高：密集 UI / 长文正文。默认行高由各字号自带的 em 值承担，不另设工具类 */
+  --leading-tight: calc(var(--leading-base) - 0.25);
+  --leading-prose: calc(var(--leading-base) + 0.25);
+
+  /* 字距：全局基准，`tracking-normal` 与继承到的基础字距保持同一个值 */
+  --tracking-normal: var(--tracking-base);
+
+  /* 间距与尺寸：唯一基准 --base-unit，随密度缩放。所有 gap / p / h / w 都是它的整数倍 */
+  --spacing: var(--base-unit);
+  /* 图标：跟随字号（图形是文字的一部分），四档与字号档位同比例 */
+  --spacing-icon-xs: calc(var(--font-size-base) * 6 / 7);
+  --spacing-icon-sm: var(--font-size-base);
+  --spacing-icon-base: calc(var(--font-size-base) * 8 / 7);
+  --spacing-icon-lg: calc(var(--font-size-base) * 10 / 7);
+
+  /* 圆角：基准 --radius 派生四档，不随字号与密度变化 */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* 高度层：四档，语义见 DESIGN.md */
+  --shadow-raised: var(--elevation-raised);
+  --shadow-popover: var(--elevation-popover);
+  --shadow-dialog: var(--elevation-dialog);
+  --shadow-edge: var(--elevation-edge);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-foreground-subtlest: var(--foreground-subtlest);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-state-hover: var(--state-hover);
+  --color-state-selected: var(--state-selected);
+  --color-state-active: var(--state-active);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-link: var(--link);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-git-modified: var(--git-modified);
+  --color-git-added: var(--git-added);
+  --color-git-untracked: var(--git-untracked);
+  --color-git-deleted: var(--git-deleted);
+  --color-git-renamed: var(--git-renamed);
+}

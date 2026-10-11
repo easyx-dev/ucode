@@ -34,14 +34,14 @@ function ThinkingRow({ text, thinkingMs }: { text: string; thinkingMs?: number }
 
   return (
     <Collapsible className="group/thought" open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex h-8 items-center gap-2 text-left text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
+      <CollapsibleTrigger className="flex h-8 items-center gap-2 text-left text-xs text-foreground-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
         <span>{t("思考过程")}</span>
         {thinkingMs !== undefined ? (
           <span className="shrink-0 tabular-nums">{durationLabel(thinkingMs)}</span>
         ) : null}
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 opacity-0 transition group-hover/thought:opacity-100 group-data-[state=open]:opacity-100",
+            "size-icon-sm shrink-0 opacity-0 transition group-hover/thought:opacity-100 group-data-[state=open]:opacity-100",
             open && "rotate-90",
           )}
         />
@@ -104,13 +104,13 @@ export function ActivityGroup({ legs, footer, renderExtra, onFork }: ActivityGro
   return (
     <div className="group">
       <Collapsible className="group/activity" open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex h-8 max-w-full items-center gap-2 text-left text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
+        <CollapsibleTrigger className="flex h-8 max-w-full items-center gap-2 text-left text-xs text-foreground-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
           <span className="truncate" title={summary}>
             {summary}
           </span>
           <ChevronRight
             className={cn(
-              "size-3.5 shrink-0 opacity-0 transition group-hover/activity:opacity-100 group-data-[state=open]:opacity-100",
+              "size-icon-sm shrink-0 opacity-0 transition group-hover/activity:opacity-100 group-data-[state=open]:opacity-100",
               open && "rotate-90",
             )}
           />

@@ -241,10 +241,16 @@ export function WorkspaceLayout({
     [docs.open, showWorkbench, workbenchCwd],
   );
 
-  /** 切换工作台：窄屏下工作台是抽屉，一律唤出；只有桌面才谈得上收起 */
+  /**
+   * 切换工作台。
+   * 窄屏下工作台是抽屉，开关由 `workbenchSheetOpen` 管，同一个按钮就应当开关它——
+   * 「一律唤出」会让按钮在抽屉已开时显示「收起」却收不起来。
+   */
   const toggleWorkbench = useCallback(() => {
     if (!isDesktop) {
-      showWorkbench();
+      setWorkbenchSheetOpen((prev) => !prev);
+      // 抽屉用过一次就记住「工作台已启用」，桌面端切回来时依旧可见
+      applyWorkbenchOpen(true);
       return;
     }
     if (workbenchOpen) applyWorkbenchOpen(false);
@@ -274,6 +280,7 @@ export function WorkspaceLayout({
       selectView: selectWorkbenchView,
       sidebarVisible: workbenchSidebarVisible,
       toggleSidebar: () => setWorkbenchSidebarVisible((prev) => !prev),
+      setSidebarVisible: setWorkbenchSidebarVisible,
       docs: docs.docs,
       activeDocId: docs.activeDocId,
       selectDoc: docs.select,
@@ -284,7 +291,15 @@ export function WorkspaceLayout({
       openChange,
       openCommit,
       openChanges,
-      collapse: () => applyWorkbenchOpen(false),
+      /**
+       * 收起整个面板。
+       * 窄屏下工作台是抽屉，开关由 `workbenchSheetOpen` 单独管——只改 `workbenchOpen` 是看不见效果的，
+       * 活动栏的「收起面板」在移动端点了没反应就是这个原因。
+       */
+      collapse: () => {
+        applyWorkbenchOpen(false);
+        if (!isDesktop) setWorkbenchSheetOpen(false);
+      },
       cwd: workbenchCwd,
     }),
     [
@@ -295,11 +310,13 @@ export function WorkspaceLayout({
       docs.closeOthers,
       docs.docs,
       docs.select,
+      isDesktop,
       openChange,
       openCommit,
       openChanges,
       openFile,
       selectWorkbenchView,
+      setWorkbenchSidebarVisible,
       workbenchCwd,
       workbenchSidebarVisible,
       workbenchView,
@@ -641,13 +658,13 @@ export function WorkspaceLayout({
                   onOpenSettings={openSettings}
                   onOpenSession={setActiveId}
                   onToggleSidebar={() => {
-                    // 桌面端切换收起，移动端唤出抽屉
+                    // 桌面端切换收起，窄屏开关抽屉（与按钮上显示的图标保持一致）
                     if (isDesktop) toggleSidebar();
-                    else setSidebarOpen(true);
+                    else setSidebarOpen((prev) => !prev);
                   }}
-                  sidebarCollapsed={sidebarCollapsed}
+                  sidebarCollapsed={isDesktop ? sidebarCollapsed : !sidebarOpen}
                   onToggleWorkbench={toggleWorkbench}
-                  workbenchOpen={workbenchOpen}
+                  workbenchOpen={isDesktop ? workbenchOpen : workbenchSheetOpen}
                   onRenameSession={activeSession ? () => requestRename(activeSession) : undefined}
                   onFork={forkFrom}
                   onEdit={editMessage}

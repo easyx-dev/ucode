@@ -66,9 +66,9 @@ export function SessionSidebar({
   const localUserName = t("本地用户");
 
   return (
-    <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="flex h-full w-full flex-col bg-background text-foreground">
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-        <BrandLogo className="size-5" />
+        <BrandLogo className="size-icon-lg" />
         <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
       </div>
 
@@ -107,7 +107,7 @@ export function SessionSidebar({
         </Avatar>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{localUserName}</span>
         <Button variant="ghost" size="icon-sm" title={t("设置")} onClick={onOpenSettings}>
-          <Settings2 className="size-4" />
+          <Settings2 className="size-icon-base" />
         </Button>
       </div>
     </aside>

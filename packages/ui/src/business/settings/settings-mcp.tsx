@@ -30,19 +30,19 @@ export function SettingsMcp() {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-foreground-subtle">
           {t(
             "接入 MCP（Model Context Protocol）服务器，为 agent 增加外部工具；改动写入本机配置文件，新会话生效。",
           )}
         </p>
         <Button variant="outline" size="sm" onClick={openAdd}>
-          <Plus className="size-4" />
+          <Plus className="size-icon-base" />
           {t("添加服务器")}
         </Button>
       </div>
 
       {data && data.servers.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
           {t("还没有配置 MCP 服务器。")}
         </p>
       ) : null}
@@ -50,16 +50,16 @@ export function SettingsMcp() {
       {data?.servers.map((server) => (
         <div
           key={server.name}
-          className="flex items-center justify-between gap-4 rounded-xl bg-popover px-4 py-3 ring-1 ring-foreground/10"
+          className="flex items-center justify-between gap-4 rounded-xl bg-popover px-4 py-3 ring-1 ring-border-strong"
         >
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-medium">{server.name}</span>
               {server.enabled ? null : (
-                <span className="shrink-0 text-xs text-muted-foreground">{t("已停用")}</span>
+                <span className="shrink-0 text-xs text-foreground-subtle">{t("已停用")}</span>
               )}
             </div>
-            <p className="truncate font-mono text-xs text-muted-foreground">
+            <p className="truncate font-mono text-xs text-foreground-subtle">
               {targetSummary(server)}
             </p>
           </div>
@@ -69,7 +69,7 @@ export function SettingsMcp() {
             aria-label={t("编辑")}
             onClick={() => openEdit(server)}
           >
-            <Pencil className="size-4" />
+            <Pencil className="size-icon-base" />
           </Button>
         </div>
       ))}
@@ -78,14 +78,14 @@ export function SettingsMcp() {
         <div className="space-y-1 rounded-xl border border-destructive/40 px-3 py-2">
           <p className="text-xs font-medium text-destructive">{t("配置文件有无法解析的条目：")}</p>
           {data.errors.map((error) => (
-            <p key={error} className="font-mono text-xs break-all text-muted-foreground">
+            <p key={error} className="font-mono text-xs break-all text-foreground-subtle">
               {error}
             </p>
           ))}
         </div>
       ) : null}
 
-      <p className="text-[11px] break-all text-muted-foreground">
+      <p className="text-xs break-all text-foreground-subtle">
         {t("配置文件：{{path}}", { path: data?.configPath ?? "" })}
       </p>
 

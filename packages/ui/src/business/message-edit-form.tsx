@@ -87,7 +87,7 @@ export function MessageEditForm({
   return (
     <div className="flex justify-end">
       <div className="w-full max-w-[85%] space-y-1.5">
-        <div className="rounded-xl bg-popover ring-1 ring-foreground/10 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="rounded-xl bg-popover ring-1 ring-border-strong focus-within:ring-2 focus-within:ring-ring/50">
           <ComposerEditor
             ref={form.editorRef}
             initialDoc={form.docRef.current}
@@ -106,7 +106,7 @@ export function MessageEditForm({
           </p>
         ) : null}
         {warning ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-foreground-subtle">
             {t("发送后将移除这条消息之后的内容（仍保留在会话记录中）。")}
           </p>
         ) : null}

@@ -62,7 +62,7 @@ export function UsagePanel({ open, onOpenChange, onOpenSession, context }: Usage
           <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border pr-12 pl-4 md:pl-8">
             <h2 className="font-heading text-base font-medium">{t("使用统计")}</h2>
             <div className="ml-auto flex items-center gap-2">
-              {loading ? <Spinner className="size-4 text-muted-foreground" /> : null}
+              {loading ? <Spinner className="size-icon-base text-foreground-subtle" /> : null}
               <SegmentedControl
                 label={t("使用统计")}
                 value={range}
@@ -74,13 +74,13 @@ export function UsagePanel({ open, onOpenChange, onOpenSession, context }: Usage
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-foreground-subtle">
                 {t("从本机会话记录汇总的 token 用量；不含模型成本，子会话与分叉会话一并计入。")}
               </p>
 
               {loading && !data ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-                  <Spinner className="size-4" />
+                <div className="flex items-center gap-2 py-8 text-sm text-foreground-subtle">
+                  <Spinner className="size-icon-base" />
                   {t("加载中…")}
                 </div>
               ) : null}

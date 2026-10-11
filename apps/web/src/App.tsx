@@ -129,8 +129,8 @@ function ServiceUnreachable({ onRetry }: { onRetry: () => void }) {
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-4 text-center">
-      <p className="text-sm text-muted-foreground">{t("连接服务失败，请确认服务已启动。")}</p>
-      {reason ? <p className="text-xs text-muted-foreground">{reason}</p> : null}
+      <p className="text-sm text-foreground-subtle">{t("连接服务失败，请确认服务已启动。")}</p>
+      {reason ? <p className="text-xs text-foreground-subtle">{reason}</p> : null}
       <Button size="sm" variant="outline" onClick={onRetry}>
         {t("重试")}
       </Button>

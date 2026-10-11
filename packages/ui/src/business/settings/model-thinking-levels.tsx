@@ -47,21 +47,21 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
   return (
     <div className="w-full space-y-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">{t("推理等级映射")}</span>
+        <span className="text-xs text-foreground-subtle">{t("推理等级映射")}</span>
         <Button
           variant="ghost"
           size="sm"
-          className="ml-auto h-6 px-2 text-[11px]"
+          className="ml-auto h-6 px-2 text-xs"
           onClick={addRow}
           disabled={unused.length === 0}
         >
-          <Plus className="size-3" />
+          <Plus className="size-icon-xs" />
           {t("添加等级")}
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-foreground-subtle">
           {t("未指定时按厂商默认处理，7 个档位都能用。")}
         </p>
       ) : (
@@ -98,7 +98,7 @@ export function ModelThinkingLevels({ model, onChange }: ModelThinkingLevelsProp
                 onClick={() => removeRow(level)}
                 title={t("删除该档映射")}
               >
-                <Trash2 className="size-3.5 text-destructive" />
+                <Trash2 className="size-icon-sm text-destructive" />
               </Button>
             </div>
           ))}

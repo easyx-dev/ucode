@@ -26,6 +26,11 @@ export type WorkbenchApi = {
   /** 侧栏是否展开（收起后编辑器区占满） */
   sidebarVisible: boolean;
   toggleSidebar: () => void;
+  /**
+   * 直接设为某个可见性。
+   * 窄屏的「打开文档即切到编辑器 / 返回箭头切回侧栏」需要一个目标态，`toggleSidebar` 表达不了。
+   */
+  setSidebarVisible: (visible: boolean) => void;
   /** 编辑器区打开的文档与激活项 */
   docs: readonly WorkbenchDoc[];
   activeDocId: string | null;

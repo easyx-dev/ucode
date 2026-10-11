@@ -10,7 +10,7 @@
 - **packages/brand/**：`@ucode/brand`，品牌名与 logo / favicon 的单一来源，B 端定制只改这里
 - 会话正文沿用 pi 的 JSONL；`$APP_HOME/app/app.db`（SQLite）保存应用自己的会话元数据与索引
 
-项目规范：设计系统见 [`DESIGN.md`](./DESIGN.md)，数据库 / 接口 / 组件规范见 [`docs/`](./docs)；
+项目规范：设计系统见 [`DESIGN.md`](./DESIGN.md)，界面规格与数据库 / 接口 / 组件规范见 [`docs/`](./docs)；
 仓库级约定与验证命令见 [`AGENTS.md`](./AGENTS.md)。
 
 ---
@@ -398,7 +398,7 @@ SSE 的事件名固定为 `message`，真正的类型在 `data` 的 JSON 里：
 ## 结构
 
 ```
-DESIGN.md                  # 设计系统（品牌 / 主题 / token / 深浅色）
+DESIGN.md                  # 设计系统（token 体系 / 外观参数 / 颜色与排版口径）
 .env.example               # 开发环境变量模板（复制为 .env）
 .env.prod.example          # 生产环境变量模板（复制为 .env.prod）
 docs/
@@ -406,8 +406,9 @@ docs/
   api.md                   # 接口与字段规范
   api-reference.md         # 接口参考（由 pnpm api:docs 生成，勿手改）
   components.md            # 组件规范
+  design-surfaces.md       # 界面规格（三栏骨架 / 消息区 / 输入区 / 工作台 / 设置）
 scripts/api-docs/          # 接口参考生成器（endpoints 清单 + 生成 + 校验）
-scripts/verify/            # 约定校验（migrations / contracts / api-docs / tokens / brand / i18n / manifest），由 pnpm check 调用
+scripts/verify/            # 约定校验（migrations / contracts / api-docs / tokens / design / themes / brand / i18n / manifest），由 pnpm check 调用
 scripts/build-cli.mjs      # esbuild 把 server + CLI 打成 dist/ucode.js（供 pnpm start 运行）
 packages/contracts/
   src/
@@ -527,7 +528,7 @@ apps/desktop/
 - **未落盘的草稿会话**：pi 只在产生 assistant 回复后才写文件，所以新建会话的名字/模型先落在 SQLite 的草稿行（`persisted = 0`），首次回复后索引对齐。
 - **schema 演进**：`db/index.ts` 用 `PRAGMA user_version` 记录版本，新增迁移时递增 `SCHEMA_VERSION` 并补一条 DDL；开发初期允许破坏性变更，删本地 `app.db` 重建即可。
 - **删除会话**：先停用运行中的资源（`pool.dispose` / `events.remove`），再删 SQLite 行，最后删 JSONL 文件；顺序不能颠倒，见 `docs/database.md`。
-- **主题**：`next-themes` + `.dark` class，浅色 / 深色 / 跟随系统三态；首屏由 `index.html` 的内联脚本定色以避免闪白。颜色与圆角全部走语义 token（`DESIGN.md`），`scripts/verify` 会拦下裸色值。
+- **主题与外观**：`next-themes` + `.dark` class 管深浅三态；字号基准、界面密度、界面字体、代码字体与配色主题由设置写入 `<html>` 的行内变量（`localStorage` 持久化，键由品牌派生），首屏由 `index.html` 的内联脚本预先应用以避免闪动。颜色、圆角、字号与尺寸全部走语义 token（`DESIGN.md`），`scripts/verify` 会拦下裸色值与越界档位。
 
 ## 验证
 
@@ -537,9 +538,10 @@ pnpm test      # 各包单元测试（Node 内置 node:test，`src/**/__tests__/
 pnpm verify    # 只跑约定校验（scripts/verify）
 ```
 
-约定校验覆盖六项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
-业务组件不得出现裸色值或非语义颜色 utility、i18n 目录范围与冗余合规且禁止硬编码中文、源码禁止硬编码品牌名、
-有测试用例的包必须声明 `test` 脚本。对应规范见 `docs/`、`AGENTS.md` 与 `DESIGN.md`。
+约定校验覆盖八项：SQLite 迁移版本必须从 1 起连续、契约字段必须 camelCase 且 `*Request` 有配对的 `*Input`、
+业务组件不得出现裸色值或非语义颜色 utility 且语义层只能引用调色板与 `color-mix`、设计档位（字号 / 图标 / 圆角 / 阴影 /
+层级 / 时长 / 透明度）必须落在白名单内、配色主题必须覆盖全部主题层变量且与清单一致、i18n 目录范围与冗余合规且
+禁止硬编码中文、源码禁止硬编码品牌名、有测试用例的包必须声明 `test` 脚本。对应规范见 `docs/`、`AGENTS.md` 与 `DESIGN.md`。
 
 ## 冒烟测试
 

@@ -114,7 +114,7 @@ export function SessionList({
 
   /** 分类内的空态 / 加载提示 */
   const placeholder = (text: string) => (
-    <p className="px-2 py-1 text-xs text-muted-foreground">{loading ? t("加载中…") : text}</p>
+    <p className="px-2 py-1 text-xs text-foreground-subtle">{loading ? t("加载中…") : text}</p>
   );
 
   return (
@@ -139,7 +139,7 @@ export function SessionList({
                     title={isProjects ? t("打开工作区") : t("新建会话")}
                     onClick={isProjects ? onOpenWorkspace : onCreateAssistant}
                   >
-                    <Plus className="size-4" />
+                    <Plus className="size-icon-base" />
                   </Button>
                 }
               >

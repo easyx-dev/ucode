@@ -16,11 +16,11 @@ export function ForkAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      className="shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
       title={t("从此分叉")}
       onClick={onClick}
     >
-      <GitFork className="size-3.5" />
+      <GitFork className="size-icon-sm" />
     </button>
   );
 }
@@ -61,7 +61,7 @@ export function MessageFooter({ item, durationMs, onFork }: MessageFooterProps) 
 
   return (
     <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={full}>
+      <span className="min-w-0 flex-1 truncate text-xs text-foreground-subtle" title={full}>
         {[item.model, duration].filter(Boolean).join(" · ")}
       </span>
       {answer ? <CopyAction text={answer} /> : null}

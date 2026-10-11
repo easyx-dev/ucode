@@ -30,7 +30,7 @@ export function TextPreview({ path, text }: { path: string; text: string }) {
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: 代码行没有自然 id，行号即身份
           <div key={index} className="flex whitespace-pre">
-            <span className="sticky left-0 w-12 shrink-0 select-none bg-card pr-3 text-right text-muted-foreground/50">
+            <span className="sticky left-0 w-12 shrink-0 select-none bg-card pr-3 text-right text-foreground-subtlest">
               {index + 1}
             </span>
             <span className="min-w-0 flex-1">
@@ -50,7 +50,7 @@ export function TextPreview({ path, text }: { path: string; text: string }) {
         );
       })}
       {truncated ? (
-        <p className="px-3 py-2 text-muted-foreground">
+        <p className="px-3 py-2 text-foreground-subtle">
           {t("仅显示前 {{value}} 行", { value: PREVIEW_MAX_LINES })}
         </p>
       ) : null}

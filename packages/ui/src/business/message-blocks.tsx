@@ -27,7 +27,7 @@ export function AttachmentLink({
   const { url: source, failed } = useAttachmentUrl(id);
   const label = (
     <>
-      {withIcon ? <FileText className="size-3 shrink-0" /> : null}
+      {withIcon ? <FileText className="size-icon-xs shrink-0" /> : null}
       {name}
     </>
   );
@@ -57,7 +57,7 @@ export function BlockView({ block, live }: { block: MessageBlock; live?: boolean
       <AttachmentLink
         id={block.id}
         name={block.name}
-        className="my-1 inline-flex items-center rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+        className="my-1 inline-flex items-center rounded-md border border-border px-2 py-1 text-xs text-foreground-subtle"
       />
     );
   }

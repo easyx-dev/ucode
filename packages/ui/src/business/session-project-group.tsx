@@ -48,9 +48,9 @@ export function SessionProjectGroup({
           <button
             type="button"
             title={path ?? undefined}
-            className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <Folder className="size-4 shrink-0 text-muted-foreground" />
+            <Folder className="size-icon-base shrink-0 text-foreground-subtle" />
             <span className="truncate text-sm">{name}</span>
             {hasUnread ? <span className="size-1.5 shrink-0 rounded-full bg-info" /> : null}
           </button>
@@ -63,7 +63,7 @@ export function SessionProjectGroup({
           title={t("重命名项目")}
           onClick={onRename}
         >
-          <Pencil className="size-3.5" />
+          <Pencil className="size-icon-sm" />
         </Button>
 
         <Button
@@ -73,14 +73,14 @@ export function SessionProjectGroup({
           title={t("新建会话")}
           onClick={onCreate}
         >
-          <Plus className="size-4" />
+          <Plus className="size-icon-base" />
         </Button>
       </div>
 
       <CollapsibleContent>
         <div className="space-y-0.5 pb-1">
           {sessions.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("暂无会话")}</p>
+            <p className="px-2 py-1.5 text-xs text-foreground-subtle">{t("暂无会话")}</p>
           ) : (
             sessions.map((session) => renderItem(session))
           )}

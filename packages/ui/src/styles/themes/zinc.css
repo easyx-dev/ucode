@@ -1,0 +1,30 @@
+/*
+ * 冷灰主题：把灰度底料从 neutral 换成 zinc（略带蓝的灰），结构、功能色、图表色与尺寸全不变。
+ *
+ * 配色主题只允许覆盖主题层（`--theme-*`），且必须给出浅色与深色两块：
+ * 深色块写成 `html.dark[data-theme="…"]`，否则会被 `.dark` 的默认主题层盖回去。
+ * 新增主题照这份文件复制，改 id 与调色板即可；覆盖完整性由 `scripts/verify` 的 themes 校验兜底。
+ */
+html[data-theme="zinc"] {
+  --theme-shell: var(--color-zinc-50);
+  --theme-panel: var(--color-zinc-100);
+  --theme-raised: var(--color-white);
+  --theme-solid: var(--color-zinc-200);
+  --theme-text: var(--color-zinc-800);
+  --theme-primary: var(--color-zinc-900);
+  --theme-primary-fg: var(--color-zinc-50);
+  --theme-ring: var(--color-zinc-400);
+  --theme-line: var(--color-zinc-950);
+}
+
+html.dark[data-theme="zinc"] {
+  --theme-shell: var(--color-zinc-900);
+  --theme-panel: var(--color-zinc-700);
+  --theme-raised: var(--color-zinc-800);
+  --theme-solid: var(--color-zinc-700);
+  --theme-text: var(--color-zinc-200);
+  --theme-primary: var(--color-zinc-50);
+  --theme-primary-fg: var(--color-zinc-900);
+  --theme-ring: var(--color-zinc-500);
+  --theme-line: var(--color-white);
+}

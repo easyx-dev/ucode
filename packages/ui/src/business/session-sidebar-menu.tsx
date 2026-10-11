@@ -85,12 +85,12 @@ export function SessionSidebarMenu({
           type="button"
           disabled={item.disabled}
           onClick={item.onClick}
-          className="flex h-10 w-full items-center gap-3 rounded-lg px-2 text-left text-sm outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+          className="flex h-10 w-full items-center gap-3 rounded-lg px-2 text-left text-sm outline-none transition-colors hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
         >
-          <item.icon className="size-4 shrink-0 text-muted-foreground" />
+          <item.icon className="size-icon-base shrink-0 text-foreground-subtle" />
           <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
           {item.shortcut ? (
-            <span className="shrink-0 text-xs text-muted-foreground">{item.shortcut}</span>
+            <span className="shrink-0 text-xs text-foreground-subtle">{item.shortcut}</span>
           ) : null}
         </button>
       ))}

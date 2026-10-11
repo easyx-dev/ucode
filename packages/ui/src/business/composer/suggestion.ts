@@ -37,21 +37,21 @@ export const createSuggestionRenderer = (onActiveChange?: (active: boolean) => v
       if (item.group !== lastGroup) {
         lastGroup = item.group;
         const heading = document.createElement("div");
-        heading.className = "px-2 py-1 text-[11px] text-muted-foreground";
+        heading.className = "px-2 py-1 text-xs text-foreground-subtle";
         heading.textContent = item.group;
         container?.appendChild(heading);
       }
       const row = document.createElement("button");
       row.type = "button";
       row.className = `flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm ${
-        index === selected ? "bg-muted text-foreground" : "text-foreground/90"
+        index === selected ? "bg-muted text-foreground" : "text-foreground-subtle"
       }`;
       const name = document.createElement("span");
       name.textContent = item.label;
       row.appendChild(name);
       if (item.hint) {
         const hint = document.createElement("span");
-        hint.className = "ml-auto text-xs text-muted-foreground";
+        hint.className = "ml-auto text-xs text-foreground-subtle";
         hint.textContent = item.hint;
         row.appendChild(hint);
       }
@@ -90,7 +90,7 @@ export const createSuggestionRenderer = (onActiveChange?: (active: boolean) => v
       selected = 0;
       container = document.createElement("div");
       container.className =
-        "fixed z-50 max-h-64 w-80 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-md";
+        "fixed z-50 max-h-64 w-80 overflow-auto rounded-lg border border-border bg-popover p-1 shadow-popover";
       document.body.appendChild(container);
       render();
       place();

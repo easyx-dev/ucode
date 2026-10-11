@@ -86,6 +86,22 @@ export default {
   浅色: "Light",
   深色: "Dark",
   跟随系统: "System",
+  配色主题: "Color theme",
+  "换一组颜色，字体、字号与圆角不受影响。":
+    "Swap the color palette; fonts, text size, and radius stay as they are.",
+  冷灰: "Zinc",
+  界面字号: "Text size",
+  "控制文字与图标的大小；间距与控件高度由界面密度决定。":
+    "Controls the size of text and icons; spacing and control heights come from density.",
+  界面密度: "Density",
+  "控制间距、控件高度与栏宽；不影响文字大小。":
+    "Controls spacing, control heights, and panel widths; text size is unaffected.",
+  紧凑: "Compact",
+  宽松: "Comfortable",
+  界面字体: "Interface font",
+  "界面文字使用的字体，选中后按需加载并立即生效。":
+    "Font used for interface text. Loaded on demand and applied immediately.",
+  系统默认: "System default",
   语言: "Language",
   "界面语言，切换后立即生效并记住选择。":
     "Interface language. Changes take effect immediately and are remembered.",

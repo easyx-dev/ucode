@@ -19,7 +19,7 @@ export function WelcomePanel({ configured, onOpenSettings }: WelcomePanelProps) 
     return (
       <section className="flex flex-col items-center gap-3 py-12 text-center">
         <h2 className="text-xl font-semibold">{t("还没有配置模型")}</h2>
-        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+        <p className="max-w-md text-sm leading-relaxed text-foreground-subtle">
           {t("填入一个 OpenAI 兼容端点（baseUrl / apiKey / 模型 id）后即可开始对话。")}
         </p>
         <Button onClick={onOpenSettings}>{t("打开设置")}</Button>

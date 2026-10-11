@@ -21,7 +21,7 @@ export function UsageTip({ tip }: { tip: HoverTip | null }) {
     <div
       role="tooltip"
       className={cn(
-        "pointer-events-none absolute z-10 -translate-x-1/2 rounded-md bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground ring-1 ring-foreground/10 shadow-sm",
+        "pointer-events-none absolute z-10 -translate-x-1/2 rounded-md bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground ring-1 ring-border-strong shadow-raised",
         tip.below ? "" : "-translate-y-full",
       )}
       style={{ left: tip.x, top: tip.below ? tip.y + 10 : tip.y - 4 }}

@@ -28,7 +28,9 @@ export function AttachmentImage({
   const { url: source, failed } = useAttachmentUrl(url);
   if (!source) {
     // 取不到字节（会话失效 / 字节已不在）时给一行说明，别让消息里的图凭空消失
-    return failed ? <span className="text-xs text-muted-foreground">{t("图片不可用")}</span> : null;
+    return failed ? (
+      <span className="text-xs text-foreground-subtle">{t("图片不可用")}</span>
+    ) : null;
   }
 
   const open = (): void => {

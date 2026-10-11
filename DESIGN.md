@@ -1,322 +1,270 @@
-# 设计规范
+# 设计系统
 
-ucode 对话界面的视觉系统。实现落位：`packages/ui/src/styles/theme.css`（token）与 `packages/ui/src/components/`（组件）；
+ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./packages/ui/src/styles/tokens.css)，
+基础组件在 `packages/ui/src/base/`，业务组件的视觉取值见 [`docs/design-surfaces.md`](./docs/design-surfaces.md)。
 各端在 tailwind 入口 `@import "@ucode/ui/theme.css"` 并用 `@source` 扫描包内 className。
+
+规范靠 `pnpm check` 兜底：`scripts/verify` 的 `tokens`（颜色）、`design`（尺寸与档位）、`themes`（配色主题）三项会拦下越界写法。
 
 ## 定位与气质
 
-- **黑白单色品牌**：没有彩色品牌色。品牌感来自灰度分层、排版层级与克制的圆角，而不是色相
-- **颜色只用于表达状态与数据**：功能色（成功 / 警告 / 危险 / 信息）与图表色是惟一的彩色出口
-- **灰度外壳 + 白色内容卡**：`background` 是外壳底色，`card` / `popover` 是浮在其上的白面；
-  两者刻意不同值，这是整个视觉语言的基础，不要抹平
-- **低装饰**：默认无阴影、无渐变、无彩色光晕；分隔主要靠留白与极浅的描边
-- 界面文字统一简体中文
+- **黑白单色品牌**：没有彩色品牌色。品牌感来自灰度分层、排版层级与克制的圆角，而不是色相。
+- **颜色只用于表达状态与数据**：功能色与图表色是惟一的彩色出口。
+- **灰度外壳 + 白色内容卡**：`background` 是外壳底色，`card` / `popover` 是浮在其上的面；两者刻意不同值，这是整个视觉语言的基础。
+- **低装饰**：默认无阴影、无渐变、无彩色光晕；分隔靠留白与极浅描边。
+- 界面文字统一简体中文。
 
-## Token 三层
+## 体系规则
 
-| 层 | 位置 | 规则 |
+四层，引用方向单向：
+
+| 层 | 位置 | 内容 | 谁能用 |
+| --- | --- | --- | --- |
+| 参数 | `tokens.css` 的 `:root` + 设置写入的行内变量 | 字号基准、密度、字体族、圆角 | 只被下一层引用 |
+| 主题层 | `--theme-*`，覆盖在 `styles/themes/<id>.css` | 配色主题唯一可改的一组变量 | 只被语义层引用 |
+| 语义层 | `--background` / `--state-hover` / `--foreground-subtle` 等 | 可被组件使用的名字 | 组件 |
+| 映射层 | `@theme` 把语义层变成 `bg-background` 这类工具类 | — | 组件 |
+
+硬约束：
+
+1. **语义层的值永远是 `var()` / `color-mix()` / `calc()`**，不写字面色值；调色板底料只允许出现在 `tokens.css`。
+2. **深色只改主题层**：语义层定义一次，靠 `.dark` 自动解析，不写两套语义。
+3. **改字号只动 `--font-size-base`，改密度只动 `--density`**，绝不改 `html` 的 font-size（那会让 `rem` 二次缩放）。
+4. **所有运行时可变 token 的值必须保持引用形式**，不能写成算好的字面量，否则设置改了不生效。
+5. **准入**：同一取值被 ≥3 处复用才立 token；新 token 必须同时进本文件、`tokens.css` 与校验白名单。
+6. 命名：颜色 `--<角色>`（映射成 `--color-<角色>`）、主题层 `--theme-*`、尺寸族 `--spacing-*`、高度层 `--elevation-*`、语法高亮 `--code-*`。
+
+## 运行时参数
+
+外观设置里四个旋钮，都存在设备本地（`localStorage`，键由 `@ucode/brand` 派生）：
+
+| 参数 | 取值 | 影响范围 |
 | --- | --- | --- |
-| primitive | `theme.css` 里的 `oklch()` 字面量 | 只描述颜色本身，不带业务含义，不出现在组件里 |
-| semantic | `--background` / `--primary` / `--success` 等 | 组件唯一可用的层 |
-| 组件 | `components/` 里的 class | 通过 Tailwind 语义类使用，如 `bg-card`、`text-muted-foreground` |
+| 界面字号 `--font-size-base` | 14–22px（默认 14） | **文字与图标**（图标是文字的图形化） |
+| 界面密度 `--density` | 紧凑 0.9 / 默认 1 / 宽松 1.1 | **间距、控件高度、栏宽、内容高度上限** |
+| 界面字体 `--font-ui-base` | 内置精选 + 系统栈 | 界面文字 |
+| 等宽字体 `--font-mono-stack` | **不可配**：系统等宽栈 + 中文回退 | 代码、路径、diff、终端、工具名 |
 
-**禁止**在任何组件里写裸色值（`#fff`、`text-black`、`bg-blue-500`），`scripts/verify` 的 `tokens` 检查会拦下。
-`components/ui/**` 也在检查范围内——它是 shadcn 的一次性产出，之后由我们维护。
+- 字号与密度**刻意不联动**：允许「字大 + 紧凑」这种组合，观感取舍交给用户；大字号配紧凑密度时界面会更挤，这是选择的结果而不是缺陷。
+- 派生链：字号 → 五档字号 + 图标四档 + 行高；密度 → `--base-unit = 0.25rem × density` → 间距基准、控件高度、栏宽、高度层的 offset/blur。
+- 应用只有一个出口：`lib/appearance.ts` 的 `applyAppearance` 把参数写到 `<html>` 的行内样式与 `data-theme`；
+  首屏由 `apps/web/index.html` 与 `apps/desktop/index.html` 的内联脚本按同一个键预先应用（否则会有一帧默认字号）。
+- 界面字体按需加载：`@fontsource-variable` 的 CSS 入口在选中时才动态引入，未加载完用回退字体渲染；字体族名与清单在 `lib/fonts.ts`。
+- 等宽只走系统字体，不打包 webfont：CJK 等宽字体（Sarasa Mono SC / Maple Mono CN）单字重就是几 MB，而收益只是「代码注释里的中文与 ASCII 严格 2:1 对齐」，不划算。栈里显式插入中文回退（见「排版」），中文能正常显示，代价是与 ASCII 不对齐。
 
 ## 颜色
 
-### 语义 token
+底料全部来自 Tailwind 内置调色板变量（`--color-neutral-*` 等），语义层用 `var()` 与 `color-mix(in oklab, …)` 组装；
+组件里禁止写调色板 utility 与调色板变量。深浅由主题层翻转，语义层不重复。
+
+### 表面与文本
+
+| token | 用途 | 浅色 | 深色 |
+| --- | --- | --- | --- |
+| `background` | 外壳、主区底色 | `neutral-50` | `neutral-900` |
+| `card` | 内容卡与面板 | `white` | `neutral-800` |
+| `popover` | 弹层、下拉、对话框、输入框 | `white` | `neutral-800` |
+| `muted` | 次级面板底、悬停与嵌入块 | `neutral-100` | `neutral-700` |
+| `secondary` | 次级实底（次按钮、次级徽标） | `neutral-200` | `neutral-700` |
+| `foreground` | 主文本 | `neutral-800` | `neutral-200` |
+| `foreground-subtle` | 次级文本、描述、时间、图标弱化 | 前景 60% | 前景 60% |
+| `foreground-subtlest` | 占位、最弱元数据、禁用邻接文案 | 前景 40% | 前景 30% |
+| `border` | 描边、分隔 | 叠加基准 10% | 同 |
+| `border-strong` | 浮层外框、分组卡外框 | 15% | 15% |
+| `ring` | focus-visible 光环 | `neutral-400` | `neutral-500` |
+| `overlay` | 遮罩（只为压暗背景） | 黑 40% | 黑 60% |
+
+- 「叠加基准」浅色是近黑、深色是近白，所以描边、状态层、遮罩在两种模式下都朝同一方向变化。
+- 三级文本是**唯一**的文本层级口径；不要用 `text-foreground/70` 这类自造透明度。
+- 透明度只用 `5 / 10 / 20 / 40 / 50 / 60 / 80` 七档（状态层在 CSS 里合成，组件不写）。
+
+### 交互态
+
+| token | 用途 | 浅色 | 深色 |
+| --- | --- | --- | --- |
+| `state-hover` | 悬停底（行、菜单项、按钮） | 叠加 5% | 叠加 8% |
+| `state-selected` | 选中底（列表行、侧栏项、展开中的触发钮） | 8% | 12% |
+| `state-active` | 按下底 | 12% | 16% |
+
+叠加式的好处：同一个 `hover:bg-state-hover` 落在 `card`、`popover`、`muted` 上都保持同一层关系，不会因为底色不同而深浅乱跳。
+
+### 功能色与数据色
 
 | token | 用途 |
 | --- | --- |
-| `background` / `foreground` | 外壳底色与主文本 |
-| `card` / `card-foreground` | 内容卡、面板 |
-| `popover` / `popover-foreground` | 弹层、下拉、对话框、输入框 |
-| `muted` / `muted-foreground` | 次级面板底、悬停与选中态；次级文本、描述、时间 |
-| `secondary` | 次级按钮底 |
-| `accent` | 悬停 / 聚焦底（与 `muted` 同值，语义上偏交互） |
-| `border` / `input` | 描边、输入框边 |
-| `ring` | focus-visible 光环 |
-| `primary` / `primary-foreground` | 品牌：主按钮、发送键、开关开启态；浅色近黑、深色近白 |
-| `sidebar*` | 左侧栏专用一组，与外壳同灰、选中态用 `sidebar-accent` |
+| `destructive(+foreground)` | 失败、删除、危险按钮、diff 删除行 |
+| `success(+foreground)` | 成功、新增、diff 新增行 |
+| `warning(+foreground)` | 警告、需注意（如放宽的权限档） |
+| `info(+foreground)` | 中性提示 |
+| `link` | 可点击的链接与文件引用 |
+| `chart-1..5` | 图表色，按蓝绿主导排序（蓝 / 青绿 / 琥珀 / 紫 / 青），同一图表按序取色 |
+| `git-modified` / `git-added` / `git-untracked` / `git-deleted` / `git-renamed` | 文件树的 git 状态色，独立一族，不借 diff 与警告色 |
 
-### 功能色
+- 功能色只表达状态，不用于装饰；不要为了「更醒目」而借用失败/成功色。
+- diff 的增删底色由 `success` / `destructive` 合成（`third-party.css` 里整组改写库变量），不新增独立 token。
 
-功能色独立于品牌色，只表达状态。每个都有对应的 `-foreground` 用于实底上的文字。
+### 高度层
 
-| token | 语义 | 典型用法 |
-| --- | --- | --- |
-| `destructive` | 失败 / 删除 | 错误提示、危险按钮、diff 删除行 |
-| `success` | 成功 / 新增 | diff 新增行、成功提示 |
-| `warning` | 警告 / 需注意 | 权限标记（如「完全访问」）、降级提示 |
-| `info` | 中性提示 / 链接 | 可点击的文件引用、信息条 |
-
-### 图表色
-
-`chart-1..5` 按**蓝绿主导**排序，前两色是最常出现的两条序列：
-
-| token | 色相 |
+| token | 用途 |
 | --- | --- |
-| `chart-1` | 蓝 |
-| `chart-2` | 绿 |
-| `chart-3` | 琥珀 |
-| `chart-4` | 紫 |
-| `chart-5` | 青 |
+| `shadow-raised` | 轻微浮起（分段控件选中段、独立小卡） |
+| `shadow-popover` | 下拉、菜单、浮层 |
+| `shadow-dialog` | 对话框、抽屉 |
+| `shadow-edge` | 侧栏底部信息区与列表之间的上边缘投影（唯一允许的非浮层投影） |
 
-同一图表内按序取色，不要跳着用；序列超过 5 条时优先合并，而不是引入第 6 个色相。
-
-## 表面与描边
-
-界面靠「底色差 + 极浅描边」分层，不靠阴影。四类表面各有固定取法，不要临时拼组合：
-
-| 表面 | 取法 | 说明 |
-| --- | --- | --- |
-| 外壳 / 主区底 | `bg-background` | 最底一层，侧栏与主区之间不画分隔线 |
-| 内容卡 | `bg-card` + `border border-border` | 主区内的大面板 |
-| 浮层 | `bg-popover` + `ring-1 ring-foreground/10` | 下拉、弹出层、对话框、输入容器 |
-| 分组容器 | `ring-1 ring-foreground/10` + `divide-y divide-border` | 设置分组这类「多行共用一张外框」 |
-| 遮罩 | `bg-overlay` | 只为压暗背景；不能改用 `bg-foreground/*`，深色下会变成提亮 |
-
-- 输入框聚焦时整卡提亮描边：`focus-within:ring-2 focus-within:ring-ring/40`
-- 内容卡内不要再用 `bg-card` 套一层同类卡片，改用 `bg-muted/50` 或只加 `ring`（否则白叠白分不出层）
-- 阴影只给真正浮起的层（弹层、对话框）用默认值，其余不写 `shadow-*`
-- 滚动条在 `styles/theme.css` 的 base 层统一：细窄、圆头、无轨道底色，颜色取 `--border`（悬停
-  `--muted-foreground`）；颜色全走语义 token，`.dark` 自动跟随。标准属性（Firefox）与
-  `::-webkit-scrollbar-*`（Chromium / Electron）两条路都写，组件里不再单独改滚动条
-
-### 分栏
-
-三栏布局（侧栏 | 对话区 | 工作台）用 shadcn 的 `Resizable`（`base/resizable.tsx`，底层
-`react-resizable-panels`）。尺寸一律用**像素**（库把数字当像素、字符串当百分比），栏宽不随窗口缩放：
-
-| 位置 | 取法 |
-| --- | --- |
-| 侧栏 | 200–400，默认 288；**收起时不参与分栏**（`useIsDesktop` + 状态决定是否渲染面板，不用 CSS 隐藏，隐藏后面板仍占份额） |
-| 对话区 | 400–不设上限，占剩余；`flex-1 min-w-0`，上下留 `my-2`，水平间隙交给分隔条 |
-| 工作台 | 400–不设上限，默认 640（展开时按窗口夹取，见 `fitPanelDefault`）；与对话区同形的内容卡（`bg-card` + `md:rounded-xl` + `md:border`），外侧留 `py-2 pr-2`；内部再分「侧栏 | 编辑器区」，见「面板内部」 |
-| 开关 | 侧栏按钮在最左、工作台按钮在最右（对话区右上角），图标随状态切换（展开 / 收起） |
-| 持久化 | 按栏记宽度（像素），键 `<slug>-panels-<组名>`（外层三栏是 `workspace`，工作台内部的侧栏是 `workbench`）；只在用户真正拖动时落盘，收起的栏位不会被清掉。收起状态另记：侧栏 `-sidebar-collapsed`、工作台 `-workbench-open` |
-
-- 分隔条**不画线**：栏与栏之间靠底色差分层，分隔本身不可见。命中区就是栏间距——侧栏侧 12px
-  （`-ml-3` 叠到侧栏右边缘的留白上，不额外占宽）、工作台侧 8px（与卡片自身的 `m-2` 对齐）、
-  工作台内部的侧栏侧 6px（同样用 `-ml-1.5` 叠到侧栏右边缘，否则两侧之间会多出一条面板底色的缝），
-  按 `className` 逐条给；悬停提示只有 `cursor-col-resize`，键盘聚焦时给
-  `focus-visible:bg-ring/30`，否则键盘用户看不到焦点在哪
-- 需要更明显的悬停 / 拖拽态时挂库给的 `data-separator` 状态属性，不要改回常驻的线
-- 需要一条可见分界时用**面板自己的边框**，而不是分隔条：文件树列自带 `border-r`
-- 拖拽、双击复位与键盘（方向键）由库提供；不自己实现命中区与光标
-- 恢复宽度用每个面板自己的 `defaultSize`，不用库的 `defaultLayout`：后者只在「键数等于当前面板数」时才生效，
-  收起某栏后面板数会变，记忆会被静默忽略
-
-### 交互嵌套
-
-- 一行本身可点时用 `button`（或 Radix 触发器），**里面不能再放可交互元素**：需要第二个动作（如
-  「点这个路径打开预览」）就把动作做成同级按钮，让触发器的命中区缩到「图标 + 名称」那一截；
-  把按钮或 `role="button"` 套进按钮里会产生无效 HTML，读屏与键盘焦点也会错乱
-
-### 面板内部
-
-工作台（右侧第三栏）是 VSCode 那种「活动栏 + 侧栏 + 编辑器区」的工具，条状区高度与列表行高统一：
-
-| 区域 | 取法 |
-| --- | --- |
-| 活动栏 | 宽 40px，`border-r border-border`，竖排图标按钮（`size-8`）：项目文件 / 源代码管理，最下是收起面板；点当前视图的图标即收起侧栏 |
-| 侧栏 | 宽 180–360（默认 275）；顶部固定 36px 的一行控件（项目文件：筛选框 + 刷新，项目名进筛选框的 placeholder；代码管理：改动 / 历史切换 + 增删合计 + 堆叠 / 刷新），列表行高 28px、`rounded-lg`、选中 `bg-muted` |
-| 标签条 | 高 36px（与对话区头部同档），`border-b border-border`；一份文档一格、溢出横滚；每格是「标题按钮 + 关闭按钮」两个同级元素，不嵌套 |
-| 编辑器区 | 占剩余宽度；内容自带 36px 工具条与滚动区；文档有四类：文件预览、单文件 diff、全部改动堆叠、提交详情（后者是元信息 + 该提交的 diff 堆叠）；标签支持右键菜单（关闭 / 关闭其他 / 关闭全部） |
-| 空态 | 垂直居中：图标 `size-7 text-muted-foreground/60` + 主文案 `text-sm font-medium` + 说明 `text-xs` |
-| 分界 | 活动栏与侧栏各自用 `border-r` 画一条可见分界（走「面板自己的边框」而不是分隔条）；侧栏与编辑器之间的分隔条本身不画线 |
-
-- 目录行只用折角符（`ChevronRight` 转 90°），不叠文件夹图标；文件按类型给图标（`lib/file-icons.ts` 的映射），不引图标资源
-- 图标一律 `size-3.5 text-muted-foreground`
-- 文件树的 git 装饰：改过的文件名用状态色并在右侧给字母徽标（`U` 未跟踪 / `!` 冲突 / `M` / `A` / `D` / `R`…），目录按「其下最重的那一个标记」着色、不加字母——与资源管理器一致，颜色只表达状态
-- 树行（文件树与 git 变更树，文件与目录都有）右键出菜单：复制相对路径 / 复制路径——相对路径按各自的根算（会话工作目录 / 仓库根），与 `@` 引用、diff 里的写法一致；唤出菜单时该行跟着呈选中态（`data-[state=open]:bg-muted`，由 Radix 写在触发器上），菜单要作用在哪一行看得见
-- diff 的渲染用 `@git-diff-view/react`：它的 `--diff-*` 配色在 `styles/theme.css` 里整组改写成语义 token（深浅色由 token 自己跟随，不引入第二套颜色）；代码高亮走自写的 shiki 适配器（`lib/shiki-diff.ts`），着色值仍是 `var(--code-*)`，与消息流的代码块、文件预览同一口径；展示方式默认双栏（键 `<slug>-diff-mode`）、自动换行默认关（键 `<slug>-diff-wrap`），两者都记住选择；未变更区域的渐进展开也走它的能力
-- 「全部改动」（代码管理视图的 `Layers` 入口）把所有变更文件的 diff 堆叠成一份文档：每块一个文件、可单独折起，文件头**吸顶**（`sticky top-0`）、分隔线画在内容上（折起时内容不渲染，线自然消失）；块内容**进入视口才取数**（`use-in-view`）——几十个文件不会一次发上百个请求；块内不给「全部展开」，避免一屏铺出上万行
-- 窄屏（< 768）抽屉铺满屏幕宽度，面板内退化成单列：侧栏与编辑器区互斥，打开文件即切到编辑器，标签条最左给返回箭头
-
-### 语法高亮
-
-代码高亮用 shiki（core + JS 引擎 + 按需语言），颜色不写十六进制，而是映射到 `theme.css` 里的
-`--code-*` 变量；变量取值全部来自已有语义 token，因此深浅色自动跟随。
-
-| 变量 | 取自 | 用于 |
-| --- | --- | --- |
-| `--code-comment` / `--code-punctuation` | `muted-foreground` | 注释、标点、运算符 |
-| `--code-keyword` / `--code-tag` | `chart-4` | 关键字、标签 |
-| `--code-string` | `chart-2` | 字符串 |
-| `--code-number` | `chart-3` | 数字与常量 |
-| `--code-function` / `--code-link` | `chart-1` | 函数、链接 |
-| `--code-type` | `chart-5` | 类型与类 |
-| `--code-property` / `--code-variable` | `foreground` | 变量与属性 |
-| `--code-invalid` | `destructive` | 语法错误 |
-
-- 这是项目里唯一把颜色用于「状态」之外的场景；新增语法类一律先复用上表，不新增色相
-- diff 行给两层着色：增删行用 `success` / `destructive` 底色，正文再用 `--code-*` 走语法高亮（shiki 适配器见 `lib/shiki-diff.ts`）。两层都取自语义 token，不会互相干扰；语言未就绪或超大文件时高亮自动退回纯文本
-- 行号区不用透明度：库在统一模式把行号整块设成 `0.5`，在 `styles/theme.css` 里盖成实底
-
-## 圆角
-
-基准 `--radius: 0.75rem`（12px），其余档位在 `@theme inline` 中由它派生。组件按下表取档，不要临时写 `rounded-[7px]`：
-
-| 档位 | 计算 | 约值 | 用于 |
-| --- | --- | --- | --- |
-| `rounded-xl` | `1.4 × radius` | 17px | 内容卡、弹层、对话框、输入框 |
-| `rounded-lg` | `1 × radius` | 12px | 按钮、控件、列表行 |
-| `rounded-md` | `0.8 × radius` | 10px | chip、徽章 |
-| `rounded-sm` | `0.6 × radius` | 7px | 小标记、代码片段 |
-| `rounded-full` | — | — | 头像、圆形图标按钮、状态点 |
+默认无阴影：结构靠底色差与描边。offset / blur 由 `--base-unit` 派生，所以密度变化时阴影一起走。
 
 ## 排版
 
-字体 `Geist Variable`（`--font-sans`），正文与标题同族；代码、路径、工具名用 `font-mono`。
-**沿用 Tailwind 默认字号档位，不自定义新档位**，只规定用法：
+- 字体：`--font-ui` = 设置给出的界面字体 + **固定的中文回退**；`--font-mono` = 系统等宽栈 + 同一份中文回退。
+  等宽栈必须带中文回退：Windows 的 Consolas 不含中文字形，不带会落到宋体（JetBrains Mono、Geist Mono 同样没有汉字）。
+- 五档字号，全部由基准派生（14px 基准下给出括号里的值）：
 
-| 场景 | 类 | 说明 |
+| 档 | 用途 | 基准 14px 时 |
 | --- | --- | --- |
-| 正文、消息内容 | `text-sm` | 默认档 |
-| 组件标题（会话标题、卡片标题） | `text-sm font-medium` | 不与正文拉开字号，靠字重区分 |
-| 说明、时间、分组标题、次级信息 | `text-xs` | 配 `text-muted-foreground` |
-| 空态问候语 | `text-xl font-semibold` | 界面上最大的正文层级，与输入卡、建议行同属居中 hero |
-| 空态水印 | `BrandLogo` 大尺寸 + `opacity-[0.07]` | 品牌图（深浅色各自切图），纯装饰，不算文字层级 |
-| 代码、路径、内联片段 | `font-mono text-xs` | 配 `rounded-sm bg-muted` |
+| `text-xs` | 次级说明、时间、徽标、行内代码、密集列表 | 12px |
+| `text-sm` | 正文、控件、列表行（默认档） | 14px |
+| `text-base` | 页面与对话框标题、用量等大数字 | 16px |
+| `text-lg` | Markdown 一级标题 | 18px |
+| `text-xl` | 空态问候语 | 20px |
 
-- 中文正文用 `leading-relaxed`；密集列表用默认行高
-- 字重只用 `normal` / `medium` / `semibold` 三档，不用 `bold`
-- 不用斜体、不用全大写做标题
+- 图表字号**另算**，不占上面五档，只用于轴、刻度、图例与热力图标签：`text-chart-axis`（基准的 5/7）、`text-chart-label`（6/7）、`text-chart-value`（基准）。
+- 行高：密集 UI 用 `leading-tight`，默认由各字号自带（约 1.5em），长文正文用 `leading-prose`（1.75）。行高用 `em` 表达，字号变化时比例不变。
+- 字重只用 `normal` / `medium` / `semibold`；不用 `bold`、不用斜体、不用全大写做标题。
+- 字距全局 `0.4px`（`--tracking-base`，绝对值、不随字号缩放）：中英混排下汉字之间不至于拥挤，改一处即全局生效。
+  局部要拉开时用 `tracking-*` 覆盖（全大写小字号微标签用 `tracking-widest`，快捷键标签是现例）。
+- 数字类信息（耗时、用量、行号）加 `tabular-nums`。
+- 中文换行由 `@streamdown/cjk` 在 Markdown 渲染层处理，组件不要覆盖 `word-break` / `line-break`。
 
-## 间距与密度
+## 间距与尺寸
 
-- 基准 4px；间距只用 Tailwind 的 `gap-*` / `p-*` 档位
-- 控件高度：小 `h-7`、默认 `h-8`、大 `h-9`；图标按钮同高同宽
-- 列表行高 36px（`h-9`），行内边距 `px-2`
-- 卡片内边距 12–16px（`p-3` / `p-4`）；区块间距 16–24px
+- 基准 `--base-unit = 0.25rem × 密度`，所有 `gap` / `p` / `h` / `w` 都是它的整数倍。
+- 允许档位：`0 / 0.5 / 1 / 1.5 / 2 / 2.5 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 12`（0–48px），由 `design` 校验按白名单守着——越档要先进这张表。禁任意值；相对约束（`max-w-[85%]`、`h-[60vh]`）用百分比与视口单位。
+- 间距节奏：`1` 图标与文字 · `2` 行内间隙与紧凑控件内边距 · `3` 密集列表行内边距 · `4` 卡片与面板内边距 · `6–8` 区块之间 · `9` / `12` 图标占位缩进与空态留白。
+- 控件高度：`h-6`(24) / `h-7`(28) / `h-8`(32，默认) / `h-9`(36)；方形图标按钮同宽同高。
+- 行高表（随密度缩放）：主区列表行 36 · 工作台列表行 28 · 工具行 32 · 标签条 36 · 活动栏 40。
+- 图标：`size-icon-xs`(12) / `-sm`(14) / `-base`(16，默认) / `-lg`(20)，由字号派生；更大的图形（空态插图、头像）用间距档。
+- 内容区高度上限用间距档表达（如 `max-h-105` = 420px），避免任意值。
 
-## 消息区
+## 圆角
 
-对话流不是卡片列表，而是页面底色上的一列内容：分层靠留白、字号与颜色，不靠外框。实现落位
-`packages/ui/src/lib/chat-rows.ts`（扁平行投影）、`business/message-row.tsx`（行渲染）
-与 `business/message-list.tsx`（虚拟滚动）；用户消息自成一体，在 `business/user-message.tsx`。
+基准 `--radius`（0.75rem），四档派生：`rounded-sm`(0.6×) / `rounded-md`(0.8×) / `rounded-lg`(1×) / `rounded-xl`(1.4×)，另有 `rounded-full`。
 
-| 元素 | 取法 |
+取档只看**容器嵌套层级**，不看组件重要性：
+
+- 第一个圆角容器一律 `rounded-xl`；嵌套时逐级降为 `lg → md → sm`（`sm` 为下限）。
+- 控件（按钮、输入框、选择器）默认 `rounded-lg`；落在 `rounded-lg` 父容器里降为 `md`，落在 `rounded-md` / `sm` 里降为 `sm`。
+- 布局容器、分隔条、包装层不算一层。
+- `rounded-full` 只用于刻意的胶囊与圆形；禁任意值与 `rounded-2xl` 及以上。
+
+## 层级
+
+| z | 用途 |
 | --- | --- |
-| 行间距 | 行首用 padding：新一轮 `pt-6`、轮内 `pt-3`。**不能用 `space-y-*` / `mt-*`**——虚拟列表按元素高度测量，margin 不计入会让滚动位置算错 |
-| 用户消息 | `bg-muted/60` + `border border-border` + `rounded-lg`，右对齐，`max-w-[85%]`；不用反色气泡 |
-| 用户消息的 chip | 句子外的技能 / 命令排在气泡上方，句子里的 `@` 引用就地渲染；两类同一套外观（`rounded-full` + `bg-muted` + `text-xs`），引用可点开右侧工作台预览 |
-| 用户消息的图片 / 附件 | 正文里一律是带描边的等宽文字 token（`rounded-md` + `border-border` + `bg-background` + `text-foreground` + `font-mono text-xs`，前带 `size-3` 类型图标），内容是 `图片<序号>`（序号与「图片」之间不留空格）与文件名；图片点开原图弹层、附件点开下载，输入区编辑器里是同一套 token（assistant 侧的图片与文件块不受此约束） |
-| 过长的用户消息 | 超过 `max-h-80` 折叠（`overflow-hidden`），下方给「展开 / 收起」入口；用户贴整段日志时不该把屏幕占满 |
-| assistant 正文 | 直接铺在 `bg-card` 上，不套容器；排版交给 `.md-content` |
-| 思考过程 | 只在展开聚合行后出现，仍是单行灰字（「思考过程」+ 时长），自己再展开才看正文 |
-| 工具行 | 单行 `h-8`：图标 + 标题 + 入参摘要；**不设底色**，悬停只让末尾的小三角现身；展开体缩进 `pl-6`，输出用 `bg-muted/50` |
-| 聚合摘要 | 连续的思考与工具调用折成一句灰字「思考了 3 次，使用了 2 个 Shell，1 个 编辑」：无图标、无底色，悬停出小三角 |
-| 提问段 | 一次提问与其答复**独立成段**，不并进聚合行：`bg-muted/40` + `ring-1 ring-foreground/10` + `rounded-lg`，内部按「主题 / 问题 / 选项」排，选中的打勾并带出选项说明、未选中的淡一档；标题分「提问中 / 已提问 / 未回答」三态 |
-| 审批记录段 | 一次权限确认的结论与对象**独立成段**，与提问段同一套排版：结论行（允许为中性色、拒绝用 `text-destructive`，带盾形图标）+ 工具名与对象（`font-mono`）；「本会话恒允」补一行授权范围，子会话发起的请求补一行来源 |
-| 生成中提示 | 列表最后一行：统一的 `Spinner` + 「工作中」+ 实时耗时（`tabular-nums`）；起点取本轮用户消息的时刻，纯前端按半秒刷新 |
-| 加载指示 | 只有 `base/spinner.tsx` 一处定义（`Loader2` + `animate-spin`），各处只覆盖尺寸；用图标就不再叠省略号 |
-| 轮页脚 | 模型 · 耗时，右侧是复制与分叉入口；悬停才现；**只在这一轮落定后才渲染**——生成中的实时进度由尾部的生成中提示承担 |
-| 操作行 | 时刻 / 分叉 / 编辑 / 复制等悬停才现，用 `min-h-6` 占位避免出现时顶动内容；复制成功后图标换成对勾并保持约 1.5s |
-| 浮起入口 | 「回到底部」这类浮在列表上的按钮走浮层取法：`bg-popover` + `ring-1 ring-foreground/10` |
+| `10` | 局部浮起（图表提示、吸顶的编辑器工具条） |
+| `20` | 粘性条 |
+| `50` | 弹层与遮罩（下拉、菜单、选择、提示、对话框、抽屉） |
 
-- 可展开的行一律不设 hover 底色——密集的工具行会把底色连成一片灰带；可点靠悬停时才现的小三角表达
-- 行的 key 取 `ChatItem.uid`（跨「乐观条目 → 权威条目」不变），**不能取 `id`**：`message_end` 会把 `live-assistant-N` 换成服务端 id，快照刷新也会整批换掉；key 一变整行就被卸载重建，生成中看得出来闪一下。新增可展开的行时同样要求 key 只建一次（聚合行的 key 固定取首段的 key）
-- 连续的思考与工具调用合成一行摘要，展开才按原文顺序回看每一段；正文 / 图片 / 附件按定义打断聚合
-- 摘要报具体工具名与次数，不用粗分类计数、也没有「其他」兜底；两项以上用逗号分隔（各项自带数字，用「和」会和后面的数字挤在一起）
-- shell 类调用就叫 `Shell`，不译成中文
-- 失败不在摘要里报数与图标，只在展开后各条自带状态图标；**任何层级都不自动展开**（包括失败与执行中的调用），要不要看细节由用户决定
-- 正在处理的那一组（思考还在流，或组内有工具在跑）行尾要出加载指示，不能只在工具运行时才出
-- 用户参与过的交互（提问及其答复、权限确认）要独立成段：聚合行只报「用了几个什么工具」，把它并进去就看不到问了什么、选了什么、确认了什么
-- 「回到底部」与自动跟随由「用户是否贴着底部」这一个状态决定，且它**只在用户主动滚动时改写**：自己发起的贴底滚动与实测高度的补偿也会触发 scroll 事件，那一刻距离可能仍大于阈值，拿去判断会把按钮误亮出来；跟随则在行数或总高度变化时重新落到最新一行
-- 生成中的那一轮不报模型与耗时：这个判断不能靠条目的 `live` 标记（流式投影里它只在 `liveMessageId` 对得上时才置位），要在投影层用「是否正在进行」+ 轮次判断
-- 思考与工具的行与摘要一律用 `text-muted-foreground`（入参再淡一档 `/70`），不与正文争注意力；完全隐藏思考走设置（外观 → 思考过程）
-- 嵌套的可点行必须用具名 group（`group/thought` / `group/tool`）：无名 group 会被外层聚合行的悬停点亮，让整列小三角一起现形
-- 一屏内的层级只有两档：正文 `text-sm` > 折叠行与摘要 `text-xs text-muted-foreground`
-
-## 输入区
-
-输入区是「在哪儿干活 + 说什么」两件事，分两层：
-
-| 元素 | 取法 |
-| --- | --- |
-| 外层容器 | `rounded-xl bg-muted/50`，承载首行项目 / 分支条与内层白卡，也是粘贴 / 拖拽的落点 |
-| 项目 / 分支条 | 首行 `px-2 py-2`（与列表行同高 36px）；项目 chip 草稿态可下拉（`rounded-md px-1.5 py-0.5 text-xs` + `hover:bg-muted`），已有会话同形但只读（无悬停反馈）；分支 chip 只在确实是 git 仓库且取得到分支名时出现 |
-| 输入卡 | 内层 `rounded-lg bg-popover` + `ring-1 ring-foreground/10`，聚焦只把 ring 换成 `ring-ring`（颜色变、粗细不变，省得光标进出时抖一下）；编辑区 `px-3 py-3`、`min-h-16`、`max-h-[220px]`（消息「编辑重发」复用同一个编辑器，高度口径自然一致）；不在 `bg-card` 上再套 `bg-card` |
-| 工具栏 | 左 `+`（附件 / 技能）· 模型 · 模式 · 权限；右 思考 · 发送 / 停止。均为无边框的 `text-xs` 轻量按钮，图标 `size-3.5` |
-| 建议行 | 只在空态出现，排在输入卡**下方**（`rounded-full` + `border` + `text-xs`，带 `size-3.5` 图标），点击填入输入框而不是发送 |
-| 空态 | 品牌图 + 按时段问候语，与输入卡同属居中一列 |
-
-- 空态与对话态**共用同一个输入卡挂载点**（父节点不变）：hero 只让外层容器 `justify-center` 并把问候渲染在输入卡上方；挪动父节点会让编辑器重挂载、草稿与附件占位一起丢
-- 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型口径见 `docs/components.md`），弹层开在触发钮上方（`side="top"`）；带副标题的模式 / 权限固定 `w-72`（副标题压到一行放得下），只有档位名的思考收到 `w-40`
-- 选择器的选项行：图标占一列（`items-start`），标题与副标题都从图标之后起排；图标与文字 `gap-1.5`，标题与副标题之间 `gap-1`；带副标题的行 `py-2`，只有标题的行 `py-1.5`；整行 `cursor-pointer`
-- 选中打勾一律跟着**标题行**走：单行条目靠行容器 `items-center`（勾垂直居中就是标题行），带副标题的条目靠 `items-start`（勾贴标题行）——勾的落点是 `base/dropdown-menu` 里绝对定位的静态位置，由行容器的对齐方式决定，别在行里再补偏移
-- 项目弹层取「搜索行 + 单行条目」：面板 `rounded-xl`；搜索行 `h-11`（图标 `left-3.5 size-4`、输入 `pl-9 text-sm`）；条目行 `px-2 py-3` + `gap-2.5`，左侧 `Folder size-4 text-muted-foreground`、名称 `text-sm truncate`、选中打勾靠右；名称重名的（两个目录末段同名）才在名字后补父目录名（`ucode · job`），全路径落在条目的 `title` 里；底下两条动作（选择目录 / 小助理）与条目同高同形，都带图标
-
-## Markdown 渲染
-
-对话区的正文由 `packages/ui/src/styles/theme.css` 的 `.md-content` 一层渲染，解析与流式交给 `streamdown`
-（唯一入口是 `packages/ui/src/business/message-response.tsx`，对话正文、md 预览、压缩摘要共用），
-取值口径就写在那里，新增元素先看这一节再动：
-
-- 层级只有两档：正文 `text-sm leading-7`，代码块与表格 `text-xs`；标题不与正文拉开字号，靠字重
-- 标题 `mt-5 mb-2`（首个元素不带上边距），与段落一同构成长文的阅读节奏
-- 表格**自己滚**：`block w-max max-w-full overflow-x-auto`。宽表不但撑破列宽，还会把整段对话变成
-  横向滚动区；它按内容宽度渲染、上限不超列宽，超出时只滚表格自身。表头 `bg-muted/50`，
-  单元格 `px-3 py-1.5` 且顶对齐（多行单元格不会被另一列拉歪）。**不要再套一层容器卡片**：streamdown
-  自带的表格容器（`border + bg-sidebar + p-2`）已由 `business/markdown-table.tsx` 整份替换，描边与滚动
-  只由 `.md-content table` 一层负责
-- 正文图片：本站附件先取字节转 blob 再渲染（`business/attachment-image.tsx`）；外层用 `span`，因为正文里的
-  图片常落在 `<p>` 里，块级元素会把段落拆开
-- 列表标记用 `text-muted-foreground`；GFM 任务列表去掉圆点（勾选框本身就是标记）
-- 行内 code 与代码块都只换底色（`bg-muted`）不换色相；字号仍只用 Tailwind 默认档位
-- 代码块右上角有悬浮复制按钮（`business/code-block.tsx`），与图块、表格、图片的悬浮按钮同一口径：
-  悬停或键盘聚焦时出现；复制的是源码原文，成功图标换成对勾并保持 1.5s（`business/copy-action.tsx`，
-  消息页脚的复制共用同一份）
-- Mermaid 图块（`.md-mermaid` + 内层 `.md-mermaid-viewport`）：底色用卡片色（与图自身的 `background` 一致）、
-  `p-3`、圆角描边同代码块；高度上限 `max-h-[420px]`，宽图在块内自己横向滚（`svg` 保持 `max-w-none`，
-  缩字会把标签挤成一团）。图源不完整或语法不在支持范围时回落成代码块，不弹错误面板
-- 全屏查看（图块 / 表格 / 图片共用 `business/fullscreen-dialog.tsx`，走 `openDialog`，挂载即打开）：
-  窄屏铺满、桌面 `90vw × 86vh`，工具条右侧依次是内容自己的动作（缩放控件）与关闭按钮。
-  图表与图片的入口统一为「点内容本身或点右上角悬浮按钮」（图块的悬浮按钮常驻显示逻辑同表格、图片）；
-  图表与图片共用可缩放视口（`business/zoomable-preview.tsx` 挂 `hooks/use-zoom-viewport.ts`）：
-  视口内拖拽平移、滚轮平移、`Ctrl` 加滚轮与加减号键缩放，比例下拉给 50% / 100% / 200% 与
-  「适配窗口」「重置缩放」；适配窗口按需放大也按需缩小（图片放大到糊可接受）
-
-## 阴影
-
-- 默认无阴影，靠 `border` 与底色差分层
-- 仅弹层、下拉、对话框可用极轻阴影（基础组件已带默认值，不要额外叠加）
-- **唯一例外**：侧栏底部信息区与上方滚动列表之间用 `shadow-edge`（`--edge-shadow`，只有上边缘的一层极轻投影）——
-  那里既没有内容卡可借边框、画线又太硬。除它之外不新增 `--shadow-*` 用法
-- 禁止彩色阴影、大范围模糊光晕
+- 同层多个浮层靠渲染顺序（Portal 顺序）决定，不再加数字。
+- toast 由 sonner 自管（其 toaster 的 z-index 远高于上面的档位），不参与本表。
 
 ## 动效
 
-| 场景 | 时长 | 缓动 |
+- 时长三档：`100ms`（遮罩淡入淡出）、`150ms`（颜色、悬停、聚焦，默认）、`200ms`（弹层出现与消失）。
+- 缓动只用 `ease-out`；线性只用于扫光这类持续动画。
+- 属性只做 `colors` / `opacity` / `transform`；禁 `transition-all`。
+- 位移类动效（按下 `translate-y-px`）必须在 `prefers-reduced-motion: reduce` 下关闭；呼吸类动画同理由基础层统一关闭。
+- 不为列表项加进入动画：长列表滚动时它只会变成噪音。
+
+## 渐变
+
+默认**不使用装饰渐变**。唯一允许的两处来自工具链：
+
+- `shimmer`（加载中的文字扫光，来自 `shadcn/tailwind.css`）；
+- `scroll-fade`（滚动边缘的蒙版渐变，用于提示还有内容）。
+
+禁止在组件里自造 `linear-gradient`；确需新渐变时先写进本文件并登记校验白名单。
+
+## 反馈
+
+四个层次，按「影响范围」选择，不要越级：
+
+| 层次 | 用在 | 形态 |
 | --- | --- | --- |
-| 颜色、悬停、聚焦 | 150ms | ease-out |
-| 弹层出现 / 消失 | 200ms | ease-out |
-| 流式光标 | 呼吸（`animate-pulse`） | — |
+| 就地 | 字段校验、复制成功、动作进行中 | 控件旁的文字 / 图标切换（成功后图标变对勾并保持约 1.5s） |
+| 轻提示 | 动作结果、非阻塞错误 | toast（一到两行，不给按钮，除非提供「撤销」） |
+| 阻塞确认 | 不可恢复的破坏性动作 | `confirm` 对话框（标题 + 一句后果 + 破坏性按钮） |
+| 决策面板 | 等用户作答（权限、提问、计划） | 盖住输入区的面板，见 [`docs/design-surfaces.md`](./docs/design-surfaces.md) |
 
-- 位移类动效（如按下 `translate-y-px`）必须在 `prefers-reduced-motion: reduce` 下关闭
-- 不要为列表项加进入动画
+- 加载三态：200ms 内不显示指示；超过就出局部 `Spinner`；首屏列表用 `Skeleton`（尺寸贴近最终内容，避免跳动）；
+  长任务用「工作中 + 实时耗时」一行。
+- 空态必须有五要素：图标、主文案、说明、一个明确的下一步动作、以及不留空白。
+- 错误就近显示并给重试入口；不丢上下文、不覆盖用户已输入的内容；服务端错误按 `ERROR_CODES` 渲染（见 [`docs/api.md`](./docs/api.md)）。
+- 乐观更新只用于「几乎必然成功且可回滚」的动作，失败必须回滚并提示。
 
-## 图标
+## 状态矩阵
 
-- 统一 lucide-react
-- 行内图标 `size-3.5`（14px）或 `size-4`（16px），按钮内与其他文字同色（`currentColor`）
-- 图标只作辅助，不单独承载语义；纯图标按钮必须带 `title` 或 `aria-label`
+每个可交互元素都要过一遍；视觉取值如下，行为要求见 [`docs/components.md`](./docs/components.md)。
 
-## 深色模式
+| 状态 | 视觉 |
+| --- | --- |
+| default | 底色按表面取法，文字 `foreground` |
+| hover | `bg-state-hover`，150ms 过渡 |
+| active / 按下 | `bg-state-active`；位移只用于按钮（`translate-y-px`） |
+| selected | `bg-state-selected`；**不能只靠字重**表达选中 |
+| focus-visible | `ring-2 ring-ring/50`，键盘可达；输入类控件额外 `border-ring` |
+| disabled | `opacity-50` + `cursor-not-allowed`，并阻止事件；不改变文字色阶 |
+| loading | `Spinner` + 文案（「加载中…」），不阻塞其它交互 |
+| empty | 见「反馈」的空态五要素 |
+| error | `bg-destructive/10` + `text-destructive`，描边 `border-destructive/40` |
+| running / streaming | 与普通态可区分（加载指示在行尾），不阻塞其它交互 |
 
-- 用 `next-themes`，`attribute="class"`，在 `<html>` 上加 `.dark`；`@custom-variant dark (&:is(.dark *))`
-- `defaultTheme="system"`，`storageKey="ucode-theme"`，`disableTransitionOnChange`
-- 主题三态：浅色 / 深色 / 跟随系统，入口在设置对话框
-- `index.html` 内联一段脚本，在首屏渲染前根据 `localStorage` 或系统偏好设置 `.dark`，避免闪白
-- 深色下品牌色翻转（近黑 → 近白），分层关系保持不变；功能色提亮、降饱和
+## 对齐与可读性
 
-## 多主题扩展
+- 单行内容用 `items-center`；带副标题的块用 `items-start`，图标与标题首行对齐。
+- 截断：单行 `truncate` + `title` 兜底；需要说明含义的用 Tooltip，不靠 `title` 讲操作。
+- 可点目标最小 24px（`size-6`）；紧凑列表行里的图标按钮用 `size-6`，不要更小。
+- 长内容优先 `max-h-*` 折叠并给展开入口，而不是把屏幕占满。
+- 列表与表格里的数字右对齐并加 `tabular-nums`。
 
-当前只有浅色与深色两套。未来加主题时：
+## 无障碍
 
-- 在 `theme.css` 新增 `[data-theme="<名>"]` 层，只覆盖 semantic token，**不动 primitve 结构之外的组件**
-- 主题名只影响 token，不影响任何 `className`
-- 新增主题必须同时给出浅色与深色两套值
+- 对比度：正文 ≥ 4.5:1，大字号与非文本（描边、焦点环、图表线）≥ 3:1。
+- 焦点始终可见：不写 `outline: none` 而不补 ring；分隔条等自定义命中区也要给键盘焦点样式。
+- 不只靠颜色表意：git 状态配字母徽标、错误配文案、选中配底色或勾选。
+- 表单控件与 `Label` 关联；纯图标按钮必须带 `title` 或 `aria-label`。
+- 尊重 `prefers-reduced-motion`。
+
+## 响应式
+
+- 布局断点只用 `md`(768)：三栏退化为抽屉与单列；`sm`(640) 只用于弹层宽度。不引入 `lg` / `xl`，需要更细的密度差异时改 `max-width` 或可见性，而不是改变组件语义。
+- 窄屏表单控件用 `text-base`（16px）防 iOS 聚焦缩放，这是字号体系之外唯一的固定例外。
+
+## 第三方依赖
+
+外部组件带自己的变量与数字字号时，按两条规则接：
+
+1. **样式映射**：在 `styles/third-party.css` 里把库的变量整组改写成语义 token（现例：`@git-diff-view/react` 的 `--diff-*`），
+   库样式必须先于映射引入（入口 `theme.css` 的顺序即为此）。映射里同样禁止字面色值。
+2. **数值字号**：库只接受数字字号时，用 `hooks/use-token-number` 读基准参数换算（现例：diff 行字号 = 基准的 6/7），
+   而不是写死常量——否则改字号时它会掉队。
+3. **颜色采样**：库自己解析颜色字符串时，不能直接读变量的 computed 值——语义层用 `color-mix()` 合成，
+   读出来是未求值的表达式（如 `color-mix(in oklab, oklch(…), transparent)`）。要经浏览器求值：
+   本仓库走 `lib/mermaid-color.ts` 的 1×1 canvas 采样（`CSS.supports` 先校验再采样，得 sRGB 四通道），
+    mermaid 的颜色引擎与语法高亮都吃这一层。
+
+## 配色主题
+
+- 主题只换配色，写在 [`packages/ui/src/styles/themes/`](./packages/ui/src/styles/themes/)：
+  覆盖 `--theme-shell` / `-panel` / `-raised` / `-solid` / `-text` / `-primary` / `-primary-fg` / `-ring` / `-line` 这九个变量（深浅各一块），
+  强度类变量（`-text-soft` / `-text-faint` / `-line-soft` / `-overlay` / `-shadow-*`）按需覆写。
+- 选择器必须写 `html[data-theme="…"]` 与 `html.dark[data-theme="…"]`：后者不可省，否则深色会被基础主题层盖回去。
+- 新增主题要同时在 `lib/themes.ts` 的 `COLOR_THEME_IDS` 登记；`scripts/verify` 的 `themes` 校验比对两份清单与覆盖完整性。
+- 主题不影响字体、字号与圆角——「换风格」需要新主题，而不是改这几个旋钮。
+
+## 新增 token 的流程
+
+1. 先确认现有语义表达不了（多数需求能由 `state-*` / 三级前景 / 高度层覆盖）。
+2. 定层：参数（设置可改）、主题层（配色可换）、语义层（组件用），再定名。
+3. 进 `tokens.css` 并映射成工具类；如果它是「可枚举的尺寸档位」，同时进 `scripts/verify/checks/design.ts` 的白名单。
+4. 更新本文件与 `CHANGELOG.md`。

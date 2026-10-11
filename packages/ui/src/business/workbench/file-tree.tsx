@@ -45,7 +45,7 @@ const emptyTree = (): TreeState => ({ children: new Map(), loading: new Set() })
 /** 行上的装饰：有变更时名字用状态色，并在右侧补一个字母徽标 */
 const nameToneOf = (mark: GitMark | undefined, active: boolean): string => {
   if (mark) return markTone(mark);
-  return active ? "font-medium text-foreground" : "text-muted-foreground";
+  return active ? "font-medium text-foreground" : "text-foreground-subtle";
 };
 
 export function FileTree({
@@ -174,7 +174,7 @@ export function FileTree({
           );
         })}
         {all.length > MAX_ENTRIES ? (
-          <p className="px-2 py-1 text-[11px] text-muted-foreground">
+          <p className="px-2 py-1 text-xs text-foreground-subtle">
             {t("仅列出前 {{value}} 项，共 {{total}} 项", { value: MAX_ENTRIES, total: all.length })}
           </p>
         ) : null}
@@ -187,7 +187,7 @@ export function FileTree({
       {/* 与代码管理的头部同高（36px）：切视图时列表不会跳 */}
       <div className="flex h-9 shrink-0 items-center gap-1.5 px-2">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute top-1/2 left-2 size-icon-sm -translate-y-1/2 text-foreground-subtle" />
           <Input
             value={query}
             placeholder={t("在「{{name}}」中筛选文件", { name: baseName(root) || root })}
@@ -204,7 +204,7 @@ export function FileTree({
               title={t("刷新目录")}
               onClick={() => setTree(emptyTree())}
             >
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-icon-sm" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("刷新目录")}</TooltipContent>
@@ -214,11 +214,11 @@ export function FileTree({
       <div className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={t("项目文件")}>
         {tree.loading.has(root) && !tree.children.has(root) ? (
           <div className="flex justify-center py-3">
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           </div>
         ) : matches ? (
           matches.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted-foreground">
+            <p className="px-3 py-2 text-xs text-foreground-subtle">
               {searching ? t("搜索中…") : t("没有匹配的文件")}
             </p>
           ) : (
@@ -234,7 +234,7 @@ export function FileTree({
                 />
               ))}
               {matchesTruncated ? (
-                <p className="px-2 py-1 text-[11px] text-muted-foreground">
+                <p className="px-2 py-1 text-xs text-foreground-subtle">
                   {t("仅显示前 {{value}} 条", { value: SEARCH_LIMIT })}
                 </p>
               ) : null}
@@ -287,21 +287,21 @@ function TreeRow({
           className={cn(
             "flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs",
             nameToneOf(mark, active),
-            !mark && active ? "bg-muted" : "hover:bg-muted/60",
+            !mark && active ? "bg-muted" : "hover:bg-state-hover",
             // 右键唤出菜单的那一刻也算选中：菜单要作用在哪一行得看得见
-            "data-[state=open]:bg-muted",
+            "data-[state=open]:bg-state-selected",
           )}
           title={entry.path}
           onClick={onSelect}
         >
           {isDir ? (
             <ChevronRight
-              className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")}
+              className={cn("size-icon-sm shrink-0 transition-transform", open && "rotate-90")}
             />
           ) : (
             <span className="w-3.5 shrink-0" aria-hidden />
           )}
-          {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+          {Icon ? <Icon className="size-icon-sm shrink-0" /> : null}
           <span className="min-w-0 flex-1 truncate">{entry.name}</span>
           {mark ? <MarkBadge mark={mark} /> : null}
         </button>
@@ -338,16 +338,16 @@ function FlatRow({
           className={cn(
             "flex h-7 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs",
             nameToneOf(mark, active),
-            !mark && active ? "bg-muted" : "hover:bg-muted/60",
+            !mark && active ? "bg-muted" : "hover:bg-state-hover",
             // 右键唤出菜单的那一刻也算选中
-            "data-[state=open]:bg-muted",
+            "data-[state=open]:bg-state-selected",
           )}
           title={entry.path}
           onClick={onSelect}
         >
-          <Icon className="size-3.5 shrink-0" />
+          <Icon className="size-icon-sm shrink-0" />
           <span className="shrink-0 truncate">{entry.name}</span>
-          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground/70">
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground-subtlest">
             {toRelativePath(root, entry.path)}
           </span>
           {mark ? <MarkBadge mark={mark} /> : null}
@@ -361,7 +361,7 @@ function FlatRow({
 /** 状态徽标：字母右对齐，颜色取标记自己的色调 */
 function MarkBadge({ mark }: { mark: GitMark }) {
   return (
-    <span className={cn("ml-auto shrink-0 font-mono text-[11px]", markTone(mark))} aria-hidden>
+    <span className={cn("ml-auto shrink-0 font-mono text-xs", markTone(mark))} aria-hidden>
       {markLetter(mark)}
     </span>
   );

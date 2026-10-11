@@ -23,7 +23,7 @@ import { openDirectoryPickerDialog } from "../directory-picker-dialog";
 
 /** 可点的项目 / 分支 chip：无边框、悬停才给底色 */
 export const PROJECT_CHIP_CLASS =
-  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-3.5";
+  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground [&_svg]:size-icon-sm";
 
 /**
  * 只显示名字时，「末段同名」的项目在列表里长得一模一样。这类名字收集起来，
@@ -88,12 +88,12 @@ export function ProjectPicker({ name, path, onSelect }: ProjectPickerProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-80 rounded-xl">
         <div className="relative p-1">
-          <Search className="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute top-1/2 left-3.5 size-icon-base -translate-y-1/2 text-foreground-subtle" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("搜索工作区")}
-            className="h-11 w-full bg-transparent pr-2 pl-9 text-sm outline-none placeholder:text-muted-foreground"
+            className="h-11 w-full bg-transparent pr-2 pl-9 text-sm outline-none placeholder:text-foreground-subtle"
             // 菜单会拦方向键与字符键做导航，输入框必须把它们留在自己这里
             onKeyDown={(event) => event.stopPropagation()}
           />
@@ -111,10 +111,10 @@ export function ProjectPicker({ name, path, onSelect }: ProjectPickerProps) {
                   title={abbreviateHome(item.path)}
                   className="cursor-pointer gap-2.5 px-2 py-3"
                 >
-                  <Folder className="size-4 shrink-0 text-muted-foreground" />
+                  <Folder className="size-icon-base shrink-0 text-foreground-subtle" />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {duplicated.has(label) ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="shrink-0 text-xs text-foreground-subtle">
                       · {baseName(dirName(item.path))}
                     </span>
                   ) : null}
@@ -123,15 +123,15 @@ export function ProjectPicker({ name, path, onSelect }: ProjectPickerProps) {
             })}
           </DropdownMenuRadioGroup>
         ) : (
-          <p className="px-2 py-3 text-xs text-muted-foreground">{t("还没有打开过项目")}</p>
+          <p className="px-2 py-3 text-xs text-foreground-subtle">{t("还没有打开过项目")}</p>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2.5 px-2 py-3" onSelect={() => void pickDirectory()}>
-          <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+          <FolderOpen className="size-icon-base shrink-0 text-foreground-subtle" />
           {t("选择目录")}
         </DropdownMenuItem>
         <DropdownMenuItem className="gap-2.5 px-2 py-3" onSelect={() => onSelect(null)}>
-          <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+          <Sparkles className="size-icon-base shrink-0 text-foreground-subtle" />
           {t("小助理")}
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -11,7 +11,7 @@ import { PROJECT_CHIP_CLASS, ProjectPicker } from "./project-picker";
 
 /** 只读 chip：与可点的那枚同形，但不给悬停反馈 */
 const READONLY_CHIP_CLASS =
-  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground [&_svg]:size-3.5";
+  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-foreground-subtle [&_svg]:size-icon-sm";
 
 type ProjectRowProps = {
   /** 草稿态（还没有会话）：项目可切换 */

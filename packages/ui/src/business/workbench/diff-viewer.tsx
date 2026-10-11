@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import { Spinner } from "../../base/spinner";
 import type { FileDiff } from "../../hooks/use-file-diff";
+import { useTokenNumber } from "../../hooks/use-token-number";
 import type { GitDiffTarget } from "../../hooks/use-workbench-data";
 import type { DiffMode } from "../../lib/diff-prefs";
 import { hunkPatchText } from "../../lib/git-patch";
@@ -19,8 +20,8 @@ import { hunkPatchText } from "../../lib/git-patch";
 /** 库的命令式入口：工具条上的「全部展开 / 收起」要直接调实例方法 */
 export type DiffFileRef = { getDiffFileInstance: () => DiffFile | null };
 
-/** 行高与项目其它 mono 文本一致（text-xs） */
-const DIFF_FONT_SIZE = 12;
+/** diff 行字号跟随 text-xs 档（基准的 6/7）：库只吃数字字号，取不到基准时用 14px 推回的默认值 */
+const CODE_SIZE_RATIO = 6 / 7;
 
 export function DiffViewer({
   target,
@@ -38,6 +39,7 @@ export function DiffViewer({
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
+  const fontSizeBase = useTokenNumber("--font-size-base", 14);
   const { diff, contents, highlighter } = fileDiff;
 
   /** 库的入参：hunk 要「一整段 patch 文本」，两侧原文供它算未变更区域 */
@@ -60,24 +62,24 @@ export function DiffViewer({
   if (diff.loading && !diff.data) {
     return (
       <div className="flex justify-center py-4">
-        <Spinner className="text-muted-foreground" />
+        <Spinner className="text-foreground-subtle" />
       </div>
     );
   }
   if (diff.error) {
-    return <p className="px-1 py-2 text-xs text-muted-foreground">{diff.error.message}</p>;
+    return <p className="px-1 py-2 text-xs text-foreground-subtle">{diff.error.message}</p>;
   }
   if (!diff.data) return null;
   if (diff.data.binary) {
     return (
-      <p className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
-        <FileWarning className="size-3.5" />
+      <p className="flex items-center gap-2 px-1 py-2 text-xs text-foreground-subtle">
+        <FileWarning className="size-icon-sm" />
         {t("二进制文件，git 不展开差异")}
       </p>
     );
   }
   if (!diffData) {
-    return <p className="px-1 py-2 text-xs text-muted-foreground">{t("没有差异")}</p>;
+    return <p className="px-1 py-2 text-xs text-foreground-subtle">{t("没有差异")}</p>;
   }
 
   return (
@@ -87,7 +89,7 @@ export function DiffViewer({
       diffViewMode={mode === "split" ? DiffModeEnum.Split : DiffModeEnum.Unified}
       diffViewTheme={resolvedTheme === "light" ? "light" : "dark"}
       diffViewWrap={wrap}
-      diffViewFontSize={DIFF_FONT_SIZE}
+      diffViewFontSize={Math.round(fontSizeBase * CODE_SIZE_RATIO)}
       registerHighlighter={highlighter ?? undefined}
       diffViewHighlight={highlighter !== null}
     />

@@ -29,10 +29,10 @@ export function SessionSection({
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <span className="truncate text-sm text-muted-foreground">{title}</span>
+            <span className="truncate text-sm text-foreground-subtle">{title}</span>
             <ChevronRight
               className={cn(
-                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                "size-icon-sm shrink-0 text-foreground-subtle transition-transform",
                 !collapsed && "rotate-90",
               )}
             />

@@ -33,15 +33,15 @@ export function PermissionRecordView({ record, footer, onFork }: PermissionRecor
 
   return (
     <>
-      <div className="rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-foreground/10">
+      <div className="rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-border-strong">
         <div
           className={
             allowed
-              ? "flex items-center gap-1.5 text-xs text-muted-foreground"
+              ? "flex items-center gap-1.5 text-xs text-foreground-subtle"
               : "flex items-center gap-1.5 text-xs text-destructive"
           }
         >
-          <Icon aria-hidden className="size-3.5 shrink-0" />
+          <Icon aria-hidden className="size-icon-sm shrink-0" />
           {label}
         </div>
         <div className="mt-1.5 flex min-w-0 items-baseline gap-2">
@@ -49,7 +49,7 @@ export function PermissionRecordView({ record, footer, onFork }: PermissionRecor
             {toolTitleOf(record.tool, t)}
           </span>
           <span
-            className="min-w-0 truncate font-mono text-xs text-muted-foreground"
+            className="min-w-0 truncate font-mono text-xs text-foreground-subtle"
             title={record.subject}
           >
             {record.subject}
@@ -57,13 +57,13 @@ export function PermissionRecordView({ record, footer, onFork }: PermissionRecor
         </div>
         {/* 「本会话恒允」的范围值得写出来：它决定了后续哪些同类调用不再询问 */}
         {record.decision === "allow_session" && record.scope ? (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-foreground-subtle">
             {t("{{scope}} 在本会话内不再询问", { scope: record.scope })}
           </p>
         ) : null}
         {/* 子会话在子会话自己那边执行，但审批归属根会话；回放时看不出来源会很困惑 */}
         {record.sourceSessionId ? (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-foreground-subtle">
             {t("来自子智能体「{{description}}」", {
               description: record.sourceDescription ?? record.sourceSessionId,
             })}

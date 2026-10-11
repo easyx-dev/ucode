@@ -24,17 +24,17 @@ export function SubagentProgress({
 
   return (
     <div className="border-t border-border pt-2">
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Bot className="size-3.5 shrink-0" />
+      <div className="mb-2 flex items-center gap-1.5 text-xs text-foreground-subtle">
+        <Bot className="size-icon-sm shrink-0" />
         <span className="shrink-0">{t("子智能体过程")}</span>
         {stream.description ? (
-          <span className="truncate text-foreground/70">{stream.description}</span>
+          <span className="truncate text-foreground-subtle">{stream.description}</span>
         ) : null}
         <span className="ml-auto shrink-0">{status}</span>
         {onOpenSession && stream.sessionId ? (
           <button
             type="button"
-            className="shrink-0 text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+            className="shrink-0 text-foreground-subtle underline-offset-2 hover:text-foreground hover:underline"
             onClick={() => onOpenSession(stream.sessionId)}
           >
             {t("打开子会话")}
@@ -67,7 +67,7 @@ export function SubagentSessionLink({
     <div className="border-t border-border pt-2">
       <button
         type="button"
-        className="rounded text-xs text-foreground/70 underline-offset-2 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="rounded text-xs text-foreground-subtle underline-offset-2 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
         onClick={() => onOpenSession(sessionId)}
       >
         {t("查看子会话")}

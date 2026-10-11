@@ -6,6 +6,8 @@
 import type { Client } from "@ucode/sdk";
 import { createContext, type ReactNode, useContext, useEffect } from "react";
 
+import { AppearanceProvider } from "./appearance-provider";
+
 const ClientContext = createContext<Client | null>(null);
 
 export type UiProviderProps = {
@@ -36,7 +38,11 @@ export function UiProvider({ client, children }: UiProviderProps) {
     };
   }, [client]);
 
-  return <ClientContext.Provider value={client}>{children}</ClientContext.Provider>;
+  return (
+    <AppearanceProvider>
+      <ClientContext.Provider value={client}>{children}</ClientContext.Provider>
+    </AppearanceProvider>
+  );
 }
 
 /** 取运行时 client；未注入即被使用说明装配顺序有问题 */

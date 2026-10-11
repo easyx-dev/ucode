@@ -28,7 +28,7 @@ export function CopyAction({ className, text }: { className?: string; text: stri
     <button
       type="button"
       className={cn(
-        "shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground",
+        "shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground",
         className,
       )}
       title={copied ? t("已复制") : t("复制")}
@@ -36,7 +36,7 @@ export function CopyAction({ className, text }: { className?: string; text: stri
         void copyText(text).then((ok) => setCopied(ok));
       }}
     >
-      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      {copied ? <Check className="size-icon-sm" /> : <Copy className="size-icon-sm" />}
     </button>
   );
 }

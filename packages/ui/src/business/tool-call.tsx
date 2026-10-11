@@ -84,7 +84,7 @@ function PathLabel({ path, range }: { path: string; range?: string }) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   const text = (
-    <span className="truncate font-mono text-xs text-muted-foreground/70" title={path}>
+    <span className="truncate font-mono text-xs text-foreground-subtlest" title={path}>
       {path}
     </span>
   );
@@ -93,7 +93,7 @@ function PathLabel({ path, range }: { path: string; range?: string }) {
       {workbench ? (
         <button
           type="button"
-          className="truncate rounded-sm text-left font-mono text-xs text-muted-foreground/70 hover:text-foreground hover:underline"
+          className="truncate rounded-sm text-left font-mono text-xs text-foreground-subtlest hover:text-foreground hover:underline"
           title={t("预览 {{path}}", { path })}
           onClick={(event) => {
             // 工具行本身可展开，路径点击不应该顺带把行打开 / 收起
@@ -117,18 +117,18 @@ export function InputLabel({ input }: { input: ToolInput }) {
       return <PathLabel path={input.path} range={input.range} />;
     case "command":
       return (
-        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.command}>
+        <span className="truncate font-mono text-xs text-foreground-subtlest" title={input.command}>
           {input.command}
         </span>
       );
     case "pattern":
       return (
         <>
-          <span className="shrink-0 font-mono text-xs text-muted-foreground/70">
+          <span className="shrink-0 font-mono text-xs text-foreground-subtlest">
             /{input.pattern}/
           </span>
           {input.scope ? (
-            <span className="truncate text-[11px] text-muted-foreground" title={input.scope}>
+            <span className="truncate text-xs text-foreground-subtle" title={input.scope}>
               {input.scope}
             </span>
           ) : null}
@@ -136,13 +136,13 @@ export function InputLabel({ input }: { input: ToolInput }) {
       );
     case "url":
       return (
-        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.url}>
+        <span className="truncate font-mono text-xs text-foreground-subtlest" title={input.url}>
           {input.url}
         </span>
       );
     case "query":
       return (
-        <span className="truncate font-mono text-xs text-muted-foreground/70" title={input.query}>
+        <span className="truncate font-mono text-xs text-foreground-subtlest" title={input.query}>
           {input.query}
         </span>
       );
@@ -197,8 +197,8 @@ export function ToolCall({ entry, children }: ToolCallProps) {
       {/* 工具名那一截是展开触发器；路径按钮是它的兄弟而非子元素——按钮里不能再套按钮 */}
       <div className="flex h-8 w-full items-center gap-2">
         <CollapsibleTrigger className="group flex shrink-0 items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none">
-          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="shrink-0 text-xs text-muted-foreground">
+          <Icon className="size-icon-sm shrink-0 text-foreground-subtle" />
+          <span className="shrink-0 text-xs text-foreground-subtle">
             {toolTitleOf(entry.name, t)}
           </span>
         </CollapsibleTrigger>
@@ -206,7 +206,7 @@ export function ToolCall({ entry, children }: ToolCallProps) {
           <InputLabel input={input} />
           {entry.skill ? (
             <span
-              className="shrink-0 rounded bg-muted px-1 text-[11px] text-muted-foreground"
+              className="shrink-0 rounded bg-muted px-1 text-xs text-foreground-subtle"
               title={t("技能 {{name}}", { name: entry.skill.name })}
             >
               {t("技能 {{name}}", { name: entry.skill.name })}
@@ -220,16 +220,16 @@ export function ToolCall({ entry, children }: ToolCallProps) {
           title={statusLabel}
         >
           {entry.running ? (
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           ) : entry.isError ? (
-            <TriangleAlert className="size-3.5 text-destructive" />
+            <TriangleAlert className="size-icon-sm text-destructive" />
           ) : (
-            <CheckCircle2 className="size-3.5 text-muted-foreground/60" />
+            <CheckCircle2 className="size-icon-sm text-foreground-subtlest" />
           )}
         </span>
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/tool:opacity-100 group-data-[state=open]:opacity-100",
+            "size-icon-sm shrink-0 text-foreground-subtle opacity-0 transition group-hover/tool:opacity-100 group-data-[state=open]:opacity-100",
             open && "rotate-90",
           )}
         />
@@ -249,10 +249,10 @@ export function ToolCall({ entry, children }: ToolCallProps) {
             <OutputView text={output} isError={entry.isError} />
           ) : null}
           {!hasBody && !entry.running ? (
-            <p className="text-xs text-muted-foreground">{t("（无输出）")}</p>
+            <p className="text-xs text-foreground-subtle">{t("（无输出）")}</p>
           ) : null}
           {!hasBody && entry.running ? (
-            <p className="text-xs text-muted-foreground">{t("执行中")}</p>
+            <p className="text-xs text-foreground-subtle">{t("执行中")}</p>
           ) : null}
           {children}
         </div>

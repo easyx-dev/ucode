@@ -27,7 +27,7 @@ import { ForkAction } from "./message-footer";
 
 /** chip 共用一套外观：句子外的技能 / 命令与句子里的引用都长这样 */
 const CHIP_CLASS =
-  "inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground";
+  "inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-foreground-subtle";
 
 /** 折叠阈值：超过这个高度的正文收起，留出恰好能看出「还有下文」的一段 */
 const BODY_MAX_HEIGHT = "max-h-80";
@@ -187,7 +187,7 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
         <div className="flex flex-wrap justify-end gap-1.5">
           {parsed.skill ? (
             <span className={CHIP_CLASS} title={t("技能")}>
-              <Sparkles className="size-3 shrink-0" />
+              <Sparkles className="size-icon-xs shrink-0" />
               {parsed.skill.name}
             </span>
           ) : null}
@@ -261,7 +261,7 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
       {overflowing ? (
         <button
           type="button"
-          className="rounded text-xs text-muted-foreground hover:text-foreground"
+          className="rounded text-xs text-foreground-subtle hover:text-foreground"
           onClick={() => setExpanded((prev) => !prev)}
         >
           {expanded ? t("收起") : t("展开")}
@@ -269,7 +269,7 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
       ) : null}
 
       <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-        <span className="text-xs text-muted-foreground">{clockLabel(item.createdAt)}</span>
+        <span className="text-xs text-foreground-subtle">{clockLabel(item.createdAt)}</span>
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
         {canEdit ? <EditAction onClick={() => setEditing(true)} /> : null}
         <CopyAction text={original} />
@@ -284,11 +284,11 @@ function EditAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      className="shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
       title={t("编辑并重新发送")}
       onClick={onClick}
     >
-      <Pencil className="size-3.5" />
+      <Pencil className="size-icon-sm" />
     </button>
   );
 }

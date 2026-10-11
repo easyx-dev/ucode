@@ -56,7 +56,7 @@ const TONE: Record<GitMark, string> = {
   deleted: "text-destructive",
   renamed: "text-info",
   copied: "text-info",
-  typeChanged: "text-muted-foreground",
+  typeChanged: "text-foreground-subtle",
 };
 
 export const markLetter = (mark: GitMark): string => LETTER[mark];

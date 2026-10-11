@@ -28,7 +28,7 @@ export function LoginPage({ notice }: { notice?: string | null }) {
     <div className="flex min-h-dvh items-center justify-center bg-background px-4">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm space-y-5 rounded-2xl border bg-popover p-6 shadow-sm"
+        className="w-full max-w-sm space-y-5 rounded-xl border bg-popover p-6 shadow-raised"
       >
         <div className="flex items-center gap-2">
           <BrandLogo className="size-6" />
@@ -53,11 +53,11 @@ export function LoginPage({ notice }: { notice?: string | null }) {
         {errorText ? <p className="text-sm text-destructive">{errorText}</p> : null}
 
         <Button type="submit" className="w-full" disabled={auth.busy || password.length === 0}>
-          {auth.busy ? <Spinner className="size-4" /> : null}
+          {auth.busy ? <Spinner className="size-icon-base" /> : null}
           {t("登录")}
         </Button>
 
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-foreground-subtle">
           {t("密码在服务首次启动时生成，可查看服务注册文件 service.json。")}
         </p>
       </form>

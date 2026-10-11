@@ -26,6 +26,12 @@ export const themeStorageKey = `${brand.slug}-theme`;
 /** 语言存储键：与主题同理，首屏内联脚本（设 `<html lang>`）与运行时切换共用 */
 export const localeStorageKey = `${brand.slug}-locale`;
 
+/**
+ * 外观偏好存储键：字号 / 密度 / 字体 / 配色主题。
+ * 同样要过首屏内联脚本（`index.html` 的 `%BRAND_APPEARANCE_KEY%`），否则会有一帧默认字号。
+ */
+export const appearanceStorageKey = `${brand.slug}-appearance`;
+
 /** 会话 token 存储键：浏览器端凭证落 localStorage，与主题 / 语言同属品牌命名空间 */
 export const sessionTokenStorageKey = `${brand.slug}-session-token`;
 

@@ -16,7 +16,7 @@ export function ServiceUnavailable({ reason, servicePath }: ServiceUnavailablePr
   return (
     <div className="flex h-dvh w-full flex-col items-center justify-center gap-3 bg-background px-6 text-center">
       <h1 className="text-base font-medium text-foreground">{t("未连接到本机服务")}</h1>
-      <p className="max-w-lg text-sm text-muted-foreground">
+      <p className="max-w-lg text-sm text-foreground-subtle">
         {reason === "missing" &&
           t("未找到服务注册文件 {{path}}，请先启动服务。", { path: servicePath })}
         {reason === "unreachable" && t("无法连接本机服务，请确认服务已启动。")}

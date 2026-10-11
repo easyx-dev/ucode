@@ -1,0 +1,61 @@
+/*
+ * 第三方样式映射：把库自带的颜色变量整组改写成我们自己的语义 token，不让第二套配色进来。
+ *
+ * 规则（见 DESIGN.md「第三方依赖」）：
+ * - 只允许引用语义层或 `color-mix()` 合成，禁止写字面色值；
+ * - 引入库样式必须排在映射之前（入口 `theme.css` 的顺序即为此）；
+ * - 选择器要够具体，靠排在库样式之后取胜，不改库的 DOM 结构。
+ */
+
+/*
+ * 行号列宽度不要动：库按行号位数估算，通过内联样式把 width / min-width / max-width 都写进每个 td
+ * （`--diff-aside-width--`），外面再写宽度也只是与它打架——想更窄/更宽应当先确认估算规则本身出了问题。
+ *
+ * diff 视图（@git-diff-view/react）：库把配色收敛成一组 `--diff-*` 变量，深浅色由 token 自己跟随，
+ * 不再分 light / dark 两套。语法高亮由我们注册的 shiki 适配器着色（`lib/shiki-diff.ts`），
+ * 取值是 `--code-*`，所以这里不需要再映射库自带的 `.hljs-*` 配色。
+ */
+.diff-tailwindcss-wrapper[data-theme] .diff-style-root {
+  --diff-border--: var(--border);
+  --diff-plain-content--: var(--card);
+  --diff-expand-content--: var(--muted);
+  --diff-empty-content--: var(--muted);
+  --diff-plain-lineNumber--: var(--muted);
+  --diff-expand-lineNumber--: var(--muted);
+  --diff-plain-lineNumber-color--: var(--foreground-subtle);
+  --diff-expand-lineNumber-color--: var(--foreground-subtle);
+  --diff-hunk-content--: var(--state-selected);
+  --diff-hunk-content-color--: var(--foreground-subtle);
+  --diff-hunk-lineNumber--: var(--state-selected);
+  --diff-hunk-lineNumber-hover--: var(--ring);
+  --diff-add-content--: color-mix(in oklab, var(--success) 15%, transparent);
+  --diff-add-content-highlight--: color-mix(in oklab, var(--success) 35%, transparent);
+  /* 行号格不混透明底：半透明叠在行底色上会串色，压成实色边界才看得准 */
+  --diff-add-lineNumber--: color-mix(in oklab, var(--success) 25%, var(--card));
+  --diff-del-content--: color-mix(in oklab, var(--destructive) 15%, transparent);
+  --diff-del-content-highlight--: color-mix(in oklab, var(--destructive) 35%, transparent);
+  --diff-del-lineNumber--: color-mix(in oklab, var(--destructive) 25%, var(--card));
+  --diff-add-widget--: var(--primary);
+  --diff-add-widget-color--: var(--primary-foreground);
+}
+
+/*
+ * 库把等宽字体名写死在行内样式上（`Menlo, Consolas, monospace`），会盖过设计系统的 `--font-mono`：
+ * Windows 上 Consolas 不含中文字形，中文注释会落到宋体、并与 ASCII 错位（这正是等宽栈要带中文回退的原因）。
+ * 内联样式只能用 `!important` 覆盖；选择器按库的包装层类名匹配，不依赖具体视图模式（统一 / 分栏）。
+ */
+.diff-tailwindcss-wrapper [class*="-diff-table-wrapper"] {
+  font-family: var(--font-mono) !important;
+}
+
+/* 库把行文字直接写成黑 / 白，这里按语义前景色盖回去 */
+.diff-tailwindcss-wrapper[data-theme] [data-state="diff"],
+.diff-tailwindcss-wrapper[data-theme] [data-state="plain"],
+.diff-tailwindcss-wrapper[data-theme] [data-state="hunk"] {
+  color: var(--foreground);
+}
+
+/* 库在统一模式把行号整块设成 0.5 透明，这里按语义色实底显示 */
+.diff-tailwindcss-wrapper .opacity-\[0\.5\] {
+  opacity: 1;
+}

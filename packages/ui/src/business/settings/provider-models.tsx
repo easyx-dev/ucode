@@ -44,7 +44,7 @@ export function ProviderModels({ provider, onPatch, onAdd, onRemove }: ProviderM
       ))}
 
       <Button variant="outline" size="sm" onClick={() => onAdd()}>
-        <Plus className="size-4" />
+        <Plus className="size-icon-base" />
         {t("添加模型")}
       </Button>
     </div>

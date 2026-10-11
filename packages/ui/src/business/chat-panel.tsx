@@ -331,8 +331,8 @@ export function ChatPanel({
       {/* 输入区照常留在原位，等用户作答时由决策面板盖住它（待答交互优先于计划决策）；子会话只读，连同输入区一起收起 */}
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">
-          <Bot className="size-4 shrink-0 text-muted-foreground" />
-          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+          <Bot className="size-icon-base shrink-0 text-foreground-subtle" />
+          <p className="min-w-0 flex-1 text-xs text-foreground-subtle">
             {t("子会话是委派产生的独立对话，只能查看；需要它继续请在父会话里说明。")}
           </p>
           <Button variant="outline" size="sm" onClick={onBackToParent}>

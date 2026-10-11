@@ -114,9 +114,9 @@ export function ChatHeader({
           onClick={onToggleSidebar}
         >
           {sidebarCollapsed ? (
-            <PanelLeftOpen className="size-4" />
+            <PanelLeftOpen className="size-icon-base" />
           ) : (
-            <PanelLeftClose className="size-4" />
+            <PanelLeftClose className="size-icon-base" />
           )}
         </Button>
       ) : null}
@@ -128,7 +128,7 @@ export function ChatHeader({
           title={t("返回父会话")}
           onClick={onBackToParent}
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-icon-base" />
         </Button>
       ) : null}
 
@@ -146,17 +146,17 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 shrink-0 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+          className="h-6 shrink-0 gap-1 px-1.5 text-xs text-foreground-subtle hover:text-foreground"
           title={t("打开源会话")}
           onClick={() => onOpenForkSource(session.forkedFromId as string)}
         >
-          <GitFork className="size-3.5" />
+          <GitFork className="size-icon-sm" />
           {t("分叉自「{{name}}」", { name: forkedFromName || session.forkedFromId })}
         </Button>
       ) : null}
       {session?.running ? (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-          <Spinner className="size-3" />
+        <span className="flex shrink-0 items-center gap-1 text-xs text-foreground-subtle">
+          <Spinner className="size-icon-xs" />
           {t("生成中")}
         </span>
       ) : null}
@@ -168,11 +168,11 @@ export function ChatHeader({
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-1 px-2 text-xs text-muted-foreground tabular-nums hover:text-foreground"
+                className="gap-1 px-2 text-xs text-foreground-subtle tabular-nums hover:text-foreground"
                 title={t("使用统计")}
                 onClick={onOpenUsage}
               >
-                <Gauge className="size-3.5" />
+                <Gauge className="size-icon-sm" />
                 {context ? contextPercentLabel(context) : "—"}
               </Button>
             </TooltipTrigger>
@@ -186,7 +186,7 @@ export function ChatHeader({
           <>
             <Badge variant="destructive">{t("未配置模型")}</Badge>
             <Button size="sm" variant="outline" onClick={onOpenSettings}>
-              <Settings2 className="size-4" />
+              <Settings2 className="size-icon-base" />
               {t("去设置")}
             </Button>
           </>
@@ -201,7 +201,7 @@ export function ChatHeader({
               onClick={onReloadModels}
               title={t("重建运行时")}
             >
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-icon-sm" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("按当前配置重建运行时，正在生成的会话本轮结束后切换")}</TooltipContent>
@@ -219,9 +219,9 @@ export function ChatHeader({
                 onClick={onToggleWorkbench}
               >
                 {workbenchOpen ? (
-                  <PanelRightClose className="size-4" />
+                  <PanelRightClose className="size-icon-base" />
                 ) : (
-                  <PanelRightOpen className="size-4" />
+                  <PanelRightOpen className="size-icon-base" />
                 )}
               </Button>
             </TooltipTrigger>

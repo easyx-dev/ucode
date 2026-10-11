@@ -32,8 +32,8 @@ export function DiffDisplayControls({
         label={t("展示方式")}
         value={mode}
         options={[
-          { value: "unified", label: t("统一"), icon: <AlignLeft className="size-3.5" /> },
-          { value: "split", label: t("双栏"), icon: <Columns2 className="size-3.5" /> },
+          { value: "unified", label: t("统一"), icon: <AlignLeft className="size-icon-sm" /> },
+          { value: "split", label: t("双栏"), icon: <Columns2 className="size-icon-sm" /> },
         ]}
         onChange={onSelectMode}
       />
@@ -47,7 +47,7 @@ export function DiffDisplayControls({
             title={t("自动换行")}
             onClick={onToggleWrap}
           >
-            <WrapText className="size-4" />
+            <WrapText className="size-icon-base" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{t("自动换行")}</TooltipContent>

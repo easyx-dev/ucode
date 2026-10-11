@@ -305,7 +305,7 @@ export function Composer({
 
           <div
             className={cn(
-              "rounded-lg bg-popover ring-1 ring-foreground/10 transition-shadow",
+              "rounded-lg bg-popover ring-1 ring-border-strong transition-shadow",
               // 聚焦只换 ring 颜色：变宽会让输入卡在光标进出时抖一下
               "focus-within:ring-ring",
             )}
@@ -337,39 +337,45 @@ export function Composer({
               onFiles={handleFiles}
             />
 
+            {/* 左侧一组在窄容器下横向滚动，右侧（思考 + 发送）始终可见；
+                整行不换行，否则大字号 + 紧凑密度下中文标签会拆成两行 */}
             <div className="flex items-center gap-1 px-2 pb-2">
-              <AddMenu
-                sessionId={sessionId}
-                cwdPath={cwdPath}
-                onFiles={handleFiles}
-                onInsertCommand={(command) => editorHandle.current?.insertCommand(command) ?? false}
-              />
-
-              {providers.length > 0 ? (
-                <ModelPicker
-                  providers={providers}
-                  value={model}
-                  open={openPicker === "model"}
-                  onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
-                  onSelect={onSelectModel}
+              <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
+                <AddMenu
+                  sessionId={sessionId}
+                  cwdPath={cwdPath}
+                  onFiles={handleFiles}
+                  onInsertCommand={(command) =>
+                    editorHandle.current?.insertCommand(command) ?? false
+                  }
                 />
-              ) : null}
 
-              <ModePicker
-                value={mode}
-                open={openPicker === "mode"}
-                onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
-                onSelect={onSelectMode}
-              />
+                {providers.length > 0 ? (
+                  <ModelPicker
+                    providers={providers}
+                    value={model}
+                    open={openPicker === "model"}
+                    onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
+                    onSelect={onSelectModel}
+                  />
+                ) : null}
 
-              <PermissionPicker
-                value={permissionMode}
-                open={openPicker === "permission"}
-                onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
-                onSelect={onSelectPermissionMode}
-              />
+                <ModePicker
+                  value={mode}
+                  open={openPicker === "mode"}
+                  onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
+                  onSelect={onSelectMode}
+                />
 
-              <div className="ml-auto flex items-center gap-1">
+                <PermissionPicker
+                  value={permissionMode}
+                  open={openPicker === "permission"}
+                  onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
+                  onSelect={onSelectPermissionMode}
+                />
+              </div>
+
+              <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
                 <ThinkingPicker
                   value={thinkingLevel}
                   resolved={resolvedThinkingLevel}
@@ -380,11 +386,11 @@ export function Composer({
 
                 {streaming ? (
                   <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
-                    <Square className="size-3.5" />
+                    <Square className="size-icon-sm" />
                   </Button>
                 ) : (
                   <Button size="icon" onClick={submit} disabled={uploading} title={t("发送")}>
-                    <ArrowUp className="size-4" />
+                    <ArrowUp className="size-icon-base" />
                   </Button>
                 )}
               </div>

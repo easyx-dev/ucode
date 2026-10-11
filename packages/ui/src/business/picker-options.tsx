@@ -10,7 +10,7 @@ import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "../base/dropdown-
 
 /** 工具栏里的轻量按钮：图标 + 文案，无边框、悬停才给底色 */
 export const PICKER_TRIGGER_CLASS =
-  "flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50 dark:bg-transparent dark:hover:bg-muted [&_svg]:size-3.5";
+  "flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 dark:bg-transparent dark:hover:bg-state-hover [&_svg]:size-icon-sm";
 
 export type PickerOption = {
   value: string;
@@ -46,7 +46,7 @@ export function PickerOptions({ options, value, onSelect }: PickerOptionsProps) 
             <span className="flex flex-col gap-1">
               <span>{option.label}</span>
               {option.description ? (
-                <span className="text-xs text-muted-foreground">{option.description}</span>
+                <span className="text-xs text-foreground-subtle">{option.description}</span>
               ) : null}
             </span>
           </DropdownMenuRadioItem>

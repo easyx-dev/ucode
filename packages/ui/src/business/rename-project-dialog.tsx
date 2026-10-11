@@ -50,7 +50,7 @@ export function RenameProjectDialog({ path, name, onSubmit, onCancel }: RenamePr
             if (event.key === "Enter") submit();
           }}
         />
-        <p className="text-xs text-muted-foreground">{t("留空即用目录名")}</p>
+        <p className="text-xs text-foreground-subtle">{t("留空即用目录名")}</p>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
             {t("取消")}

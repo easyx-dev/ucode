@@ -50,7 +50,7 @@ export function GitFileDiff({
         <span className="min-w-0 flex-1 truncate font-mono text-xs" title={target.file}>
           {target.file}
           {data?.oldPath ? (
-            <span className="text-muted-foreground">{` ← ${data.oldPath}`}</span>
+            <span className="text-foreground-subtle">{` ← ${data.oldPath}`}</span>
           ) : null}
         </span>
         {data ? <GitCounts additions={data.additions} deletions={data.deletions} /> : null}
@@ -73,9 +73,9 @@ export function GitFileDiff({
                   onClick={toggleAll}
                 >
                   {allExpanded ? (
-                    <FoldVertical className="size-4" />
+                    <FoldVertical className="size-icon-base" />
                   ) : (
-                    <UnfoldVertical className="size-4" />
+                    <UnfoldVertical className="size-icon-base" />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -90,7 +90,7 @@ export function GitFileDiff({
       </div>
 
       {data?.truncated ? (
-        <p className="shrink-0 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+        <p className="shrink-0 border-t border-border px-3 py-2 text-xs text-foreground-subtle">
           {t("差异过大，已按上限截断")}
         </p>
       ) : null}

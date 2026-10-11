@@ -26,14 +26,14 @@ function DraftPlaceholder({ loading }: { loading: boolean }) {
 
   if (loading) {
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner className="size-4" />
+      <p className="flex items-center gap-2 text-sm text-foreground-subtle">
+        <Spinner className="size-icon-base" />
         {t("加载中…")}
       </p>
     );
   }
   return (
-    <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
+    <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
       {t("还没有接入供应商，点右上角「添加供应商」。")}
     </p>
   );
@@ -71,7 +71,7 @@ function AddProviderButton({ onClick }: { onClick: () => void }) {
 
   return (
     <Button variant="outline" size="sm" onClick={onClick}>
-      <Plus className="size-4" />
+      <Plus className="size-icon-base" />
       {t("添加供应商")}
     </Button>
   );
@@ -102,7 +102,7 @@ export function SettingsModels({ title, draft, testingKey, onTest }: SettingsMod
         action={<AddProviderButton onClick={() => setAdding(true)} />}
       />
 
-      <p className="shrink-0 border-b border-border px-6 py-2 text-xs text-muted-foreground md:px-8">
+      <p className="shrink-0 border-b border-border px-6 py-2 text-xs text-foreground-subtle md:px-8">
         {t("保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。")}
       </p>
 

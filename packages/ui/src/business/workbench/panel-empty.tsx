@@ -13,9 +13,9 @@ export function PanelEmpty({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-6 py-8 text-center">
-      <span className="text-muted-foreground/60">{icon}</span>
+      <span className="text-foreground-subtlest">{icon}</span>
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="text-xs text-foreground-subtle">{hint}</p> : null}
       {action ? <div className="mt-1 flex items-center gap-2">{action}</div> : null}
     </div>
   );

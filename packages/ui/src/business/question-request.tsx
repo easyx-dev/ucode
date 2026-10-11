@@ -141,7 +141,7 @@ function QuestionPrompt({
                     ? "bg-info"
                     : index === step
                       ? "bg-foreground"
-                      : "bg-muted-foreground/25",
+                      : "bg-foreground-subtle/20",
                 )}
               />
             </button>
@@ -149,22 +149,24 @@ function QuestionPrompt({
         </span>
         <button
           type="button"
-          className="rounded-md p-0.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="rounded-md p-0.5 text-foreground-subtle outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           title={collapsed ? t("展开") : t("收起")}
           aria-expanded={!collapsed}
           onClick={() => setCollapsed((prev) => !prev)}
         >
-          <ChevronDown className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+          <ChevronDown
+            className={cn("size-icon-base transition-transform", collapsed && "rotate-180")}
+          />
         </button>
       </div>
 
       {!item ? null : (
         <>
           <div className="space-y-2 px-3 pt-3">
-            {source ? <p className="text-[11px] text-muted-foreground">{source}</p> : null}
+            {source ? <p className="text-xs text-foreground-subtle">{source}</p> : null}
             <p className="text-sm font-medium">{item.question}</p>
             {collapsed ? null : (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-foreground-subtle">
                 {item.multiple ? t("选择多个答案") : t("选择一个答案")}
               </p>
             )}
@@ -186,13 +188,15 @@ function QuestionPrompt({
                     onClick={() => toggle(option.label)}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                      selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+                      selected
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-state-hover",
                     )}
                   >
                     <Mark selected={selected} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium">{option.label}</span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                      <span className="mt-0.5 block text-xs text-foreground-subtle">
                         {option.description}
                       </span>
                     </span>
@@ -226,7 +230,7 @@ function QuestionPrompt({
                     value={draft.custom}
                     onChange={(event) => setCustom(event.target.value)}
                     placeholder={t("输入你的答案…")}
-                    className="mt-0.5 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                    className="mt-0.5 w-full bg-transparent text-xs outline-none placeholder:text-foreground-subtle"
                   />
                 </span>
               </div>
@@ -263,7 +267,7 @@ function QuestionPrompt({
           onClick={advance}
         >
           {isLast ? t("提交") : t("下一步")}
-          <span className="ml-1 text-[11px] opacity-70">⌘⏎</span>
+          <span className="ml-1 text-xs opacity-70">⌘⏎</span>
         </Button>
       </div>
     </>
@@ -275,8 +279,8 @@ function Mark({ selected }: { selected: boolean }) {
   return (
     <span
       className={cn(
-        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors",
-        selected ? "border-primary" : "border-muted-foreground/40",
+        "mt-0.5 flex size-icon-base shrink-0 items-center justify-center rounded-full border transition-colors",
+        selected ? "border-primary" : "border-foreground-subtle/40",
       )}
     >
       {selected ? <span className="size-2 rounded-full bg-primary" /> : null}

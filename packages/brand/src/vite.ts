@@ -7,7 +7,7 @@
  */
 import type { Plugin } from "vite";
 
-import { brand, localeStorageKey, themeStorageKey } from "./brand.ts";
+import { appearanceStorageKey, brand, localeStorageKey, themeStorageKey } from "./brand.ts";
 
 export const brandHtml = (): Plugin => ({
   name: "brand-html",
@@ -16,5 +16,6 @@ export const brandHtml = (): Plugin => ({
       // 用函数替换：品牌标题可能含 `$&` 这类替换模式，字符串替换会把它当占位符
       .replaceAll("%BRAND_TITLE%", () => brand.title)
       .replaceAll("%BRAND_THEME_KEY%", () => themeStorageKey)
-      .replaceAll("%BRAND_LOCALE_KEY%", () => localeStorageKey),
+      .replaceAll("%BRAND_LOCALE_KEY%", () => localeStorageKey)
+      .replaceAll("%BRAND_APPEARANCE_KEY%", () => appearanceStorageKey),
 });

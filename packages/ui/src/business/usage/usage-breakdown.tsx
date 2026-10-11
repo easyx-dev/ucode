@@ -26,7 +26,7 @@ export function UsageModelUsage({ items }: UsageModelUsageProps) {
               <div className="flex items-baseline justify-between gap-3 text-xs">
                 <span className="flex min-w-0 items-baseline gap-1.5">
                   <span className="truncate font-medium">{item.model}</span>
-                  <span className="shrink-0 text-muted-foreground">{item.provider}</span>
+                  <span className="shrink-0 text-foreground-subtle">{item.provider}</span>
                 </span>
                 <span className="shrink-0 tabular-nums">
                   {formatTokens(item.totals.totalTokens)}
@@ -67,15 +67,15 @@ export function UsageSessionList({ items, onOpen }: UsageSessionListProps) {
                 type="button"
                 disabled={item.deletedAt !== null}
                 onClick={() => onOpen(item.sessionId)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-state-hover disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="min-w-0 truncate">{item.name || item.sessionId}</span>
-                  <Badge variant="secondary" className="shrink-0 text-[10px]">
+                  <Badge variant="secondary" className="shrink-0 text-xs">
                     {usageKindLabel(item.kind, t)}
                   </Badge>
                   {item.deletedAt ? (
-                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                    <Badge variant="outline" className="shrink-0 text-xs">
                       {t("已归档")}
                     </Badge>
                   ) : null}

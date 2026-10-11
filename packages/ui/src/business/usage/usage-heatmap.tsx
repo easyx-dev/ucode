@@ -122,7 +122,7 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
       ) : (
         // biome-ignore lint/a11y/noStaticElementInteractions: 只作悬停命中区，真正的交互是格子本身
         <div className="relative w-fit" ref={gridRef} onMouseLeave={() => setTip(null)}>
-          <div className="flex gap-[3px] pl-7 text-[10px] leading-4 text-muted-foreground">
+          <div className="flex gap-0.5 pl-7 text-chart-axis leading-4 text-foreground-subtle">
             {calendar.columns.map((column) => (
               <span key={column.weekStart} className="w-4 shrink-0 whitespace-nowrap">
                 {column.month ? t("{{month}} 月", { month: column.month }) : ""}
@@ -131,7 +131,7 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
           </div>
 
           <div className="flex gap-2">
-            <div className="flex w-5 flex-col gap-[3px] text-[10px] text-muted-foreground">
+            <div className="flex w-5 flex-col gap-0.5 text-chart-axis text-foreground-subtle">
               {WEEKDAY_KEYS.map((key) => (
                 <span key={key} className="flex h-4 items-center whitespace-nowrap">
                   {weekdayLabelOf(key, t)}
@@ -139,12 +139,13 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
               ))}
             </div>
 
-            <div className="flex gap-[3px]">
+            <div className="flex gap-0.5">
               {calendar.columns.map((column) => (
-                <div key={column.weekStart} className="flex flex-col gap-[3px]">
+                <div key={column.weekStart} className="flex flex-col gap-0.5">
                   {WEEKDAY_KEYS.map((key, row) => {
                     const cell = column.cells[row];
-                    if (!cell) return <span key={key} aria-hidden className="size-4 rounded-sm" />;
+                    if (!cell)
+                      return <span key={key} aria-hidden className="size-icon-base rounded-sm" />;
                     return (
                       <button
                         key={key}
@@ -170,7 +171,7 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
                           event.preventDefault();
                           moveFocus(cell.date, step);
                         }}
-                        className={cn("size-4 rounded-sm", HEAT_CLASS[cell.level])}
+                        className={cn("size-icon-base rounded-sm", HEAT_CLASS[cell.level])}
                       />
                     );
                   })}
@@ -179,10 +180,10 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
             </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-1 pl-7 text-[10px] text-muted-foreground">
+          <div className="mt-2 flex items-center gap-1 pl-7 text-chart-axis text-foreground-subtle">
             <span>{t("少")}</span>
             {HEAT_CLASS.map((className) => (
-              <span key={className} className={cn("size-3 rounded-sm", className)} />
+              <span key={className} className={cn("size-icon-xs rounded-sm", className)} />
             ))}
             <span>{t("多")}</span>
           </div>

@@ -31,7 +31,7 @@ function ResizableHandle({ className, ...props }: ResizablePrimitive.SeparatorPr
       className={cn(
         // 光标是唯一的悬停提示（库在拖拽期间还会给 data-separator 状态，需要时再挂样式）
         "relative flex w-3 shrink-0 cursor-col-resize items-center justify-center bg-transparent",
-        "focus-visible:bg-ring/30 focus-visible:outline-hidden",
+        "focus-visible:bg-ring/40 focus-visible:outline-hidden",
         className,
       )}
       {...props}

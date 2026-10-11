@@ -270,10 +270,10 @@ export function MessageList({
       {following || rows.length === 0 ? null : (
         <button
           type="button"
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-popover px-3 py-1 text-xs text-foreground ring-1 ring-foreground/10 hover:bg-muted"
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-popover px-3 py-1 text-xs text-foreground ring-1 ring-border-strong hover:bg-state-hover"
           onClick={backToLatest}
         >
-          <ArrowDown className="size-3.5" />
+          <ArrowDown className="size-icon-sm" />
           {t("回到底部")}
         </button>
       )}

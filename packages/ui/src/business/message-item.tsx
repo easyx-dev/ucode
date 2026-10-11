@@ -54,7 +54,7 @@ export function MessageItem({
   // 忽略计划的界面标记：沿用 muted 便签，不带「（扩展消息）」前缀
   if (isPlanIgnored(item)) {
     return (
-      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
+      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-foreground-subtle ring-1 ring-border-strong">
         {t("已忽略计划")}
       </div>
     );
@@ -64,7 +64,7 @@ export function MessageItem({
   if (item.role === "custom") {
     const text = content.map((block) => (block.type === "text" ? block.text : "")).join("");
     return (
-      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground ring-1 ring-foreground/10">
+      <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-foreground-subtle ring-1 ring-border-strong">
         {t("（扩展消息）")} {text.slice(0, 400)}
       </div>
     );

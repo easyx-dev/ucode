@@ -33,11 +33,11 @@ const toneOf = (type: DiffRowType): string => {
     case "del":
       return "bg-destructive/10 text-destructive";
     default:
-      return "text-muted-foreground";
+      return "text-foreground-subtle";
   }
 };
 
-const gutter = "shrink-0 select-none text-right text-muted-foreground/60";
+const gutter = "shrink-0 select-none text-right text-foreground-subtlest";
 
 function DiffRowView({ row, showNumbers }: { row: DiffRow; showNumbers: boolean }) {
   return (
@@ -71,7 +71,7 @@ export function DiffView({
   const [showAll, setShowAll] = useState(false);
 
   if (rows.length === 0) {
-    return <p className="text-xs text-muted-foreground">{t("（无内容）")}</p>;
+    return <p className="text-xs text-foreground-subtle">{t("（无内容）")}</p>;
   }
 
   const showNumbers = rows.some((row) => row.oldLine != null || row.newLine != null);
@@ -94,7 +94,7 @@ export function DiffView({
       {hidden > 0 ? (
         <button
           type="button"
-          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+          className="text-xs text-foreground-subtle hover:text-foreground hover:underline"
           onClick={() => setShowAll(true)}
         >
           {t("显示全部 {{value}} 行", { value: rows.length })}

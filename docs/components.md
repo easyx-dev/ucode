@@ -1,7 +1,7 @@
 # 组件规范
 
-前端组件的组织方式与约束。视觉取值（颜色 / 圆角 / 字号 / 动效 / 表面与描边）见 `DESIGN.md`，
-本文只管组件的结构与行为。
+前端组件的组织方式与约束。视觉取值（颜色 / 状态层 / 排版 / 尺寸与圆角 / 阴影与层级 / 动效）见 [`DESIGN.md`](../DESIGN.md)，
+界面分块见 [`design-surfaces.md`](./design-surfaces.md)，本文只管组件的结构与行为。
 
 **本文声明规范并举例，不列举组件清单**——清单会随实现漂移，需要靠人维护；规范应当稳定到不需要维护。
 
@@ -67,11 +67,11 @@ packages/ui/src/
 | 状态 | 要求 |
 | --- | --- |
 | default | 默认外观 |
-| hover | 用语义类（`hover:bg-muted` / `hover:text-foreground`），不写死颜色 |
-| active / selected | 用语义类区分（`bg-accent`，侧栏用 `bg-sidebar-accent`），不能只靠字重 |
+| hover | 用语义类（`hover:bg-state-hover`），不写死颜色 |
+| active / selected | 用语义类区分（按下 `bg-state-active`、选中 `bg-state-selected`），不能只靠字重 |
 | focus-visible | 必须有 `focus-visible:ring-2 focus-visible:ring-ring/50`，键盘可达 |
 | disabled | `disabled:opacity-50 disabled:cursor-not-allowed`，并阻止事件 |
-| loading | 图标 + `animate-spin` 或 `Skeleton`，文案用「加载中…」 |
+| loading | 图标 + `animate-spin` 或 `Skeleton`，文案用「加载中…」；200ms 内不显示指示 |
 | empty | 给出下一步动作；列表/搜索结果为空也要有一句说明，不留空白 |
 | error | 就近显示原因，用 `text-destructive` / `bg-destructive/10` |
 | running / streaming | 与普通态可区分，且不阻塞其它交互 |

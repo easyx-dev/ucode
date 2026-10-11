@@ -72,14 +72,14 @@ export function ModelPicker({
         <button
           type="button"
           className={cn(
-            "flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground",
-            "outline-none transition-colors hover:bg-muted hover:text-foreground",
+            "flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-subtle",
+            "outline-none transition-colors hover:bg-state-hover hover:text-foreground",
             "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
           )}
           title={t("切换模型")}
         >
           <span className="max-w-48 truncate">{value || t("选择模型")}</span>
-          <ChevronDown className="size-3.5 shrink-0" />
+          <ChevronDown className="size-icon-sm shrink-0" />
         </button>
       </Popover.Trigger>
 
@@ -89,33 +89,33 @@ export function ModelPicker({
           align="start"
           sideOffset={6}
           className={cn(
-            "z-50 w-80 rounded-xl bg-popover shadow-md ring-1 ring-foreground/10 outline-none",
+            "z-50 w-80 rounded-xl bg-popover shadow-popover ring-1 ring-border-strong outline-none",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
             "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           )}
         >
           <div className="relative p-1 pb-0">
-            <Search className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute top-1/2 left-3 size-icon-sm -translate-y-1/2 text-foreground-subtle" />
             <input
               // biome-ignore lint/a11y/noAutofocus: 弹出层里的搜索框，打开即输入是预期行为
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("搜索模型")}
-              className="h-7 w-full rounded-md bg-transparent pr-2 pl-7 text-xs outline-none placeholder:text-muted-foreground"
+              className="h-7 w-full rounded-md bg-transparent pr-2 pl-7 text-xs outline-none placeholder:text-foreground-subtle"
             />
           </div>
 
           <div className="max-h-72 overflow-y-auto p-1">
             {groups.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+              <p className="px-2 py-6 text-center text-xs text-foreground-subtle">
                 {t("没有匹配的模型")}
               </p>
             ) : null}
 
             {groups.map(({ provider, models }) => (
               <div key={provider.id} className="py-0.5">
-                <div className="px-2 py-1 text-xs text-muted-foreground">{provider.name}</div>
+                <div className="px-2 py-1 text-xs text-foreground-subtle">{provider.name}</div>
                 {models.map((model) => {
                   const ref = `${provider.id}/${model.id}`;
                   const selected = ref === value;
@@ -129,7 +129,7 @@ export function ModelPicker({
                       }}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none",
-                        "transition-colors hover:bg-muted focus-visible:bg-muted",
+                        "transition-colors hover:bg-state-hover focus-visible:bg-muted",
                         selected && "bg-muted",
                       )}
                     >
@@ -137,16 +137,16 @@ export function ModelPicker({
                         <span className="flex items-center gap-1.5">
                           <span className="truncate text-sm">{model.name}</span>
                           {model.vision ? (
-                            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                            <Badge variant="secondary" className="px-1.5 text-xs">
                               {t("视觉")}
                             </Badge>
                           ) : null}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground">
+                        <span className="block truncate text-xs text-foreground-subtle">
                           {describeModel(model, t)}
                         </span>
                       </span>
-                      {selected ? <Check className="size-3.5 shrink-0" /> : null}
+                      {selected ? <Check className="size-icon-sm shrink-0" /> : null}
                     </button>
                   );
                 })}

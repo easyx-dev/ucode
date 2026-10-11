@@ -36,19 +36,19 @@ function Choice({
 }) {
   return (
     <li className="flex items-start gap-1.5">
-      <span className="mt-px flex size-3.5 shrink-0 items-center justify-center">
-        {chosen ? <Check className="size-3.5 text-success" /> : null}
+      <span className="mt-px flex size-icon-sm shrink-0 items-center justify-center">
+        {chosen ? <Check className="size-icon-sm text-success" /> : null}
       </span>
       <span className="min-w-0 space-y-0.5">
         <span
           className={
-            chosen ? "block text-xs text-foreground" : "block text-xs text-muted-foreground/70"
+            chosen ? "block text-xs text-foreground" : "block text-xs text-foreground-subtlest"
           }
         >
           {label}
         </span>
         {chosen && description ? (
-          <span className="block text-xs text-muted-foreground">{description}</span>
+          <span className="block text-xs text-foreground-subtle">{description}</span>
         ) : null}
       </span>
     </li>
@@ -67,9 +67,9 @@ export function QuestionForm({ questions, answers, settled, footer, onFork }: Qu
 
   return (
     <>
-      <div className="rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-foreground/10">
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <MessageCircleQuestion aria-hidden className="size-3.5 shrink-0" />
+      <div className="rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-border-strong">
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-foreground-subtle">
+          <MessageCircleQuestion aria-hidden className="size-icon-sm shrink-0" />
           {headerOf(settled, answered, t)}
         </div>
         <div className="space-y-3">
@@ -86,7 +86,9 @@ export function QuestionForm({ questions, answers, settled, footer, onFork }: Qu
                 className="space-y-1"
               >
                 <div className="text-xs font-medium text-foreground">{question.header}</div>
-                <p className="text-sm leading-relaxed text-foreground/90">{question.question}</p>
+                <p className="text-sm leading-relaxed text-foreground-subtle">
+                  {question.question}
+                </p>
                 <ul className="space-y-0.5">
                   {question.options.map((option) => (
                     <Choice
@@ -101,7 +103,7 @@ export function QuestionForm({ questions, answers, settled, footer, onFork }: Qu
                   ))}
                 </ul>
                 {settled && picked.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t("（未回答）")}</p>
+                  <p className="text-xs text-foreground-subtle">{t("（未回答）")}</p>
                 ) : null}
               </div>
             );

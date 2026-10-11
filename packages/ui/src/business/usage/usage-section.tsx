@@ -16,7 +16,7 @@ export function UsageSection({ title, hint, action, children }: UsageSectionProp
     <section className="rounded-xl border border-border bg-card p-4">
       <header className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <h3 className="text-sm font-medium">{title}</h3>
-        {hint ? <span className="text-xs text-muted-foreground tabular-nums">{hint}</span> : null}
+        {hint ? <span className="text-xs text-foreground-subtle tabular-nums">{hint}</span> : null}
         {action ? <div className="ml-auto">{action}</div> : null}
       </header>
       {children}
@@ -27,7 +27,7 @@ export function UsageSection({ title, hint, action, children }: UsageSectionProp
 /** 区块内的空状态：虚线框 + 一行说明 */
 export function UsageEmpty({ text }: { text: string }) {
   return (
-    <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+    <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-foreground-subtle">
       {text}
     </p>
   );

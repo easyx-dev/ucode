@@ -29,15 +29,15 @@ export function DividerLine({ label, detail, children, defaultOpen = false }: Di
   const text = (
     <span className="flex shrink-0 items-center gap-1">
       {label}
-      {detail ? <span className="text-muted-foreground/70">{detail}</span> : null}
+      {detail ? <span className="text-foreground-subtlest">{detail}</span> : null}
       {expandable ? (
-        <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+        <ChevronRight className={cn("size-icon-xs transition-transform", open && "rotate-90")} />
       ) : null}
     </span>
   );
 
   return (
-    <div className="text-xs text-muted-foreground">
+    <div className="text-xs text-foreground-subtle">
       {expandable ? (
         <button
           type="button"

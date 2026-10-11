@@ -31,7 +31,7 @@ import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 
 /** 多行输入：与 `Input` 同一套 token，只是高度可随内容增高 */
 const TEXTAREA_CLASS =
-  "w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+  "w-full min-w-0 rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-foreground-subtle focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 type FieldProps = {
   label: string;
@@ -42,9 +42,9 @@ type FieldProps = {
 function Field({ label, description, children }: FieldProps) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-foreground-subtle">{label}</Label>
       {children}
-      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      {description ? <p className="text-xs text-foreground-subtle">{description}</p> : null}
     </div>
   );
 }

@@ -46,8 +46,8 @@ export function SegmentedControl<T extends string>({
               "flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
               "has-focus-visible:ring-2 has-focus-visible:ring-ring/50",
               selected
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-card text-foreground shadow-raised"
+                : "text-foreground-subtle hover:text-foreground",
             )}
           >
             <input

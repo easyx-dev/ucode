@@ -21,9 +21,9 @@ export function ComposerSuggestions({ onSelect }: { onSelect: (text: string) => 
             key={item.text}
             type="button"
             onClick={() => onSelect(item.text)}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-foreground-subtle outline-none transition-colors hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <Icon className="size-3.5" />
+            <Icon className="size-icon-sm" />
             {item.text}
           </button>
         );

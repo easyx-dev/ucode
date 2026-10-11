@@ -43,7 +43,7 @@ export function GitChangeTree({
   const repoRoot = status.repoRoot ?? "";
 
   if (groups.length === 0) {
-    return <p className="px-3 py-4 text-xs text-muted-foreground">{t("工作区没有改动")}</p>;
+    return <p className="px-3 py-4 text-xs text-foreground-subtle">{t("工作区没有改动")}</p>;
   }
 
   const toggle = (key: string): void => {
@@ -69,7 +69,7 @@ export function GitChangeTree({
             <button
               type="button"
               style={{ paddingLeft: `${depth * 14 + 10}px` }}
-              className="group flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              className="group flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
               title={node.path}
               onClick={() => onSelect({ file: entry.path, staged: group.staged })}
             >
@@ -93,22 +93,22 @@ export function GitChangeTree({
             <button
               type="button"
               style={{ paddingLeft: `${depth * 14 + 10}px` }}
-              className="flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              className="flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
               onClick={() => toggle(collapseKey)}
             >
               <ChevronRight
-                className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")}
+                className={cn("size-icon-sm shrink-0 transition-transform", open && "rotate-90")}
               />
-              <Folder className="size-3.5 shrink-0" />
+              <Folder className="size-icon-sm shrink-0" />
               <span className="min-w-0 flex-1 truncate">{node.name}</span>
-              <span className="flex shrink-0 items-center gap-1 font-mono text-[11px]">
+              <span className="flex shrink-0 items-center gap-1 font-mono text-xs">
                 {marks.map((mark) => (
                   <span key={mark} className={markTone(mark)}>
                     {markLetter(mark)}
                   </span>
                 ))}
               </span>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
+              <span className="shrink-0 text-xs tabular-nums text-foreground-subtlest">
                 {countFiles(node)}
               </span>
             </button>
@@ -124,15 +124,15 @@ export function GitChangeTree({
     <div className="py-1">
       {groups.map((group) => (
         <section key={group.id} className="py-1">
-          <p className="flex items-center gap-1 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+          <p className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-foreground-subtle">
             <span>{translate(GROUP_TITLE[group.id])}</span>
-            <span className="tabular-nums text-muted-foreground/60">{group.entries.length}</span>
+            <span className="tabular-nums text-foreground-subtlest">{group.entries.length}</span>
           </p>
           {buildChangeTree(group.entries).children.map((node) => renderNode(node, 0, group))}
         </section>
       ))}
       {status.truncated ? (
-        <p className="px-3 py-2 text-xs text-muted-foreground">{t("变更过多，仅列出前一部分")}</p>
+        <p className="px-3 py-2 text-xs text-foreground-subtle">{t("变更过多，仅列出前一部分")}</p>
       ) : null}
     </div>
   );

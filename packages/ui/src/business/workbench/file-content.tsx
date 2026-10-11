@@ -45,8 +45,8 @@ function Toolbar({
 }) {
   const { t } = useTranslation();
   const options: Array<SegmentedOption<RenderMode>> = [
-    { value: "preview", label: t("预览"), icon: <Eye className="size-3.5" /> },
-    { value: "source", label: t("源码"), icon: <Braces className="size-3.5" /> },
+    { value: "preview", label: t("预览"), icon: <Eye className="size-icon-sm" /> },
+    { value: "source", label: t("源码"), icon: <Braces className="size-icon-sm" /> },
   ];
 
   return (
@@ -59,7 +59,7 @@ function Toolbar({
           onChange={onModeChange}
         />
       ) : null}
-      <div className="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="ml-auto flex items-center gap-3 text-xs text-foreground-subtle">
         <span className="tabular-nums">{formatBytes(size)}</span>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -71,7 +71,7 @@ function Toolbar({
               disabled={reloading}
               onClick={onReload}
             >
-              <RotateCw className="size-3.5" />
+              <RotateCw className="size-icon-sm" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("重新读取文件")}</TooltipContent>
@@ -108,7 +108,7 @@ function Content({
         <>
           <TextPreview path={path} text={content.text} />
           {content.truncated ? (
-            <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+            <p className="border-t border-border px-3 py-2 text-xs text-foreground-subtle">
               {t("内容过大，已按上限截断")}
             </p>
           ) : null}
@@ -169,7 +169,7 @@ function Content({
         <TextPreview path={path} text={content.text} />
       )}
       {content.truncated ? (
-        <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+        <p className="border-t border-border px-3 py-2 text-xs text-foreground-subtle">
           {t("内容过大，已按上限截断")}
         </p>
       ) : null}
@@ -198,7 +198,7 @@ export function FileContent({ path }: { path: string }) {
           <PanelEmpty icon={<FileWarning className="size-7" />} title={error.message} />
         ) : loading && !data ? (
           <div className="flex h-full items-center justify-center">
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           </div>
         ) : data ? (
           <Content path={data.path} content={data} mode={mode} />

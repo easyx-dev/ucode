@@ -47,11 +47,11 @@ function NavItem({
       className={cn(
         "flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors",
         selected
-          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-          : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+          ? "bg-state-selected font-medium text-foreground"
+          : "text-foreground hover:bg-state-hover",
       )}
     >
-      <Icon className="size-4 shrink-0" aria-hidden />
+      <Icon className="size-icon-base shrink-0" aria-hidden />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -73,7 +73,7 @@ function TabItem({
       onClick={onSelect}
       className={cn(
         "flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm whitespace-nowrap transition-colors",
-        selected ? "bg-sidebar-accent font-medium" : "text-muted-foreground",
+        selected ? "bg-state-selected font-medium" : "text-foreground-subtle",
       )}
     >
       {label}
@@ -92,7 +92,7 @@ function SaveActions({
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-3">
       <Button className="w-full" onClick={onSave} disabled={saving || loading}>
-        {saving ? <Spinner className="size-4" /> : null}
+        {saving ? <Spinner className="size-icon-base" /> : null}
         {t("保存并生效")}
       </Button>
       <Button className="w-full" variant="ghost" onClick={onClose} disabled={saving}>
@@ -119,10 +119,10 @@ function DesktopNav({
   };
 
   return (
-    <nav className="hidden w-60 min-w-0 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
+    <nav className="hidden w-60 min-w-0 shrink-0 flex-col border-r border-border bg-background md:flex">
       <div className="flex h-14 shrink-0 items-center px-3">
         <Button variant="ghost" size="sm" onClick={onClose}>
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-icon-base" />
           {t("返回工作区")}
         </Button>
       </div>
@@ -130,7 +130,9 @@ function DesktopNav({
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-2">
         {SETTINGS_GROUP_IDS.map((group) => (
           <div key={group} className="space-y-1">
-            <h3 className="px-2 text-xs font-medium text-muted-foreground">{groupLabels[group]}</h3>
+            <h3 className="px-2 text-xs font-medium text-foreground-subtle">
+              {groupLabels[group]}
+            </h3>
             {SETTINGS_GROUP_SECTIONS[group].map((id) => (
               <NavItem
                 key={id}
@@ -161,17 +163,17 @@ function MobileNav({
   const meta = useSettingsSectionMeta();
 
   return (
-    <div className="flex min-w-0 shrink-0 flex-col gap-2 border-b border-border bg-sidebar px-2 py-2 md:hidden">
+    <div className="flex min-w-0 shrink-0 flex-col gap-2 border-b border-border bg-background px-2 py-2 md:hidden">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon-sm" aria-label={t("返回工作区")} onClick={onClose}>
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-icon-base" />
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
             {t("取消")}
           </Button>
           <Button size="sm" onClick={onSave} disabled={saving || loading}>
-            {saving ? <Spinner className="size-3.5" /> : null}
+            {saving ? <Spinner className="size-icon-sm" /> : null}
             {t("保存")}
           </Button>
         </div>

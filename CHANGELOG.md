@@ -36,6 +36,50 @@
 
 ### 新增
 
+- **外观参数：界面字号、界面密度、界面字体**（设置 → 外观，即时生效并记住；等宽固定为系统字体栈，不可配）。
+  字号基准（14–22px）只缩放**文字与图标**，密度（紧凑 / 默认 / 宽松）只缩放**间距、控件高度与栏宽**，
+  两者刻意不联动；字体按需加载（`@fontsource-variable` 的 CSS 入口在选中时才引入，未加载完用回退字体）。
+  参数写入 `<html>` 的行内变量并由 `localStorage` 持久化（键由品牌派生），首屏由两份 `index.html`
+  的内联脚本预先应用以避免闪动；同一份脚本也负责配色主题。
+
+- **配色主题机制**：主题只换配色，定义在 `packages/ui/src/styles/themes/<id>.css`，覆盖
+  `--theme-shell` / `-panel` / `-raised` / `-solid` / `-text` / `-primary` / `-primary-fg` / `-ring` / `-line`
+  这九个主题层变量（深浅各一块），清单登记在 `lib/themes.ts`，内置「默认」与「冷灰」两套。
+
+- **设计系统守卫**：`scripts/verify` 新增 `design` 与 `themes` 两项，「tokens」扩展为同时拦截
+  语义层的字面色值与组件里直接引用调色板变量。校验覆盖：字号 / 图标 / 圆角 / 阴影 / 层级 / 时长 /
+  透明度档位白名单、绝对尺寸禁任意值、禁自造渐变、旧 token 名残留、主题覆盖完整性与清单一致性。
+
+- **设计 token 改为四层**：参数（字号基准 / 密度 / 字体族 / 圆角）→ 主题层（`--theme-*`）→ 语义层
+  （`--background` / `--state-hover` / `--foreground-subtle` 等）→ Tailwind 映射层。配色底料改为一律引用
+  Tailwind 内置调色板变量并用 `color-mix(in oklab, …)` 合成；`theme.css` 拆成
+  `tokens.css` / `base.css` / `markdown.css` / `third-party.css` / `themes/`，入口 `theme.css` 只负责按序 `@import`。
+
+- **新增依赖**：`@fontsource-variable/inter`（可选的界面字体，按需加载）。
+
+### 变更
+
+- **组件层的 token 收敛**（破坏性）：`text-muted-foreground` 及其自造透明档拆成三级前景
+  `foreground` / `foreground-subtle` / `foreground-subtlest`；`accent` 与 `sidebar-*` 的交互态改由
+  `state-hover` / `state-selected` / `state-active` 承担；`border-input` 并入 `border`；浮层描边
+  `ring-foreground/10` 改用新增的 `border-strong`；焦点环统一 `ring-2`；小字号（10/11px）统一到 `text-xs`；
+  图标改用 `size-icon-xs/sm/base/lg`（跟随字号而非密度）；阴影收敛为 `shadow-raised` / `shadow-popover` /
+  `shadow-dialog`；`transition-all` 改为 `transition-colors`；任意值尺寸改为档位（相对约束仍用百分比与视口单位）。
+
+- **theme.css 里的 diff 配色映射**：`@git-diff-view/react` 的 `--diff-*` 变量改写成语义 token，`color-mix`
+  统一为 `in oklab`；diff 行字号改由 `use-token-number` 从字号基准换算（原来是写死的 12px）。
+
+- **文档**：`DESIGN.md` 重写为设计系统（token 四层、运行时外观参数、颜色 / 排版 / 间距尺寸 / 圆角 /
+  阴影层级 / 动效 / 渐变 / 反馈 / 状态 / 无障碍 / 响应式 / 第三方接入 / 配色主题 / 新增 token 流程），
+  界面规格（三栏骨架、消息区、输入区、工作台、空态与设置）移到新增的 `docs/design-surfaces.md`。
+
+### 移除
+
+- 语义 token `muted-foreground`、`accent` / `accent-foreground`、`input`、整个 `sidebar-*` 族，
+  以及 `rounded-2xl` / `3xl` / `4xl` 的映射。
+
+### 新增
+
 - **SVG 预览支持切到源码**：工具条上的「预览 / 源码」切换现在对 SVG 也出现（原先只有 markdown）——
   预览仍是 `<img>` 渲染，源码走文本渲染器按 XML 高亮（`lib/preview.ts` 的 `isTextImage` 判定）。
 

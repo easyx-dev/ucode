@@ -96,8 +96,8 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
       <div className="mx-auto flex w-full max-w-4xl items-start gap-2 text-xs">
         <Target
           className={cn(
-            "mt-0.5 size-4 shrink-0",
-            active ? "text-primary" : "text-muted-foreground",
+            "mt-0.5 size-icon-base shrink-0",
+            active ? "text-primary" : "text-foreground-subtle",
           )}
         />
         <div className="min-w-0 flex-1">
@@ -105,17 +105,17 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
             <span className="truncate font-medium text-foreground" title={goal.objective}>
               {goal.objective}
             </span>
-            <span className="shrink-0 text-muted-foreground">{statusText(goal, t)}</span>
+            <span className="shrink-0 text-foreground-subtle">{statusText(goal, t)}</span>
             {turns.length > 0 ? (
               <button
                 type="button"
-                className="flex shrink-0 items-center gap-0.5 text-muted-foreground hover:text-foreground"
+                className="flex shrink-0 items-center gap-0.5 text-foreground-subtle hover:text-foreground"
                 title={t("目标轮次")}
                 aria-expanded={turnsOpen}
                 onClick={() => setTurnsOpen((prev) => !prev)}
               >
                 <ChevronRight
-                  className={cn("size-3 transition-transform", turnsOpen && "rotate-90")}
+                  className={cn("size-icon-xs transition-transform", turnsOpen && "rotate-90")}
                 />
                 {/* 轮数与消息区的「目标续跑 · 第 n 轮」同口径（不含启动那一轮），故为 0 时不报数 */}
                 {goal.turns > 0 ? t("第 {{n}} 轮", { n: goal.turns }) : t("目标轮次")}
@@ -136,28 +136,28 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
                 />
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-foreground-subtle hover:text-foreground"
                   title={t("保存")}
                   onClick={commit}
                 >
-                  <Check className="size-3" />
+                  <Check className="size-icon-xs" />
                 </button>
               </span>
             ) : (
               <button
                 type="button"
-                className="flex shrink-0 items-center gap-1 tabular-nums text-muted-foreground hover:text-foreground"
+                className="flex shrink-0 items-center gap-1 tabular-nums text-foreground-subtle hover:text-foreground"
                 title={t("设置预算")}
                 onClick={startEditing}
               >
                 {usageText(goal, t)}
-                <Pencil className="size-3" />
+                <Pencil className="size-icon-xs" />
               </button>
             )}
           </div>
           {goal.verification?.nextStep ? (
             <div
-              className="mt-0.5 truncate text-muted-foreground"
+              className="mt-0.5 truncate text-foreground-subtle"
               title={goal.verification.nextStep}
             >
               {goal.verification.nextStep}
@@ -167,9 +167,12 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
             <div className="mt-1.5 space-y-0.5 border-t border-border pt-1.5">
               {turns.map((turn) => (
                 <div key={turn.key} className="flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 text-muted-foreground">{goalTurnLabel(turn, t)}</span>
-                  <span className="shrink-0 text-muted-foreground/70">{turnSummary(turn, t)}</span>
-                  <span className="min-w-0 truncate text-muted-foreground" title={turnReason(turn)}>
+                  <span className="shrink-0 text-foreground-subtle">{goalTurnLabel(turn, t)}</span>
+                  <span className="shrink-0 text-foreground-subtlest">{turnSummary(turn, t)}</span>
+                  <span
+                    className="min-w-0 truncate text-foreground-subtle"
+                    title={turnReason(turn)}
+                  >
                     {turnReason(turn)}
                   </span>
                 </div>
@@ -185,7 +188,7 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
               className="h-6 gap-1 px-2 text-xs"
               onClick={() => onCommand({ kind: "pause" })}
             >
-              <Pause className="size-3" />
+              <Pause className="size-icon-xs" />
               {t("暂停")}
             </Button>
           ) : null}
@@ -196,17 +199,17 @@ export function GoalBar({ goal, turns, onCommand, onBudget }: GoalBarProps) {
               className="h-6 gap-1 px-2 text-xs"
               onClick={() => onCommand({ kind: "resume" })}
             >
-              <Play className="size-3" />
+              <Play className="size-icon-xs" />
               {t("恢复")}
             </Button>
           ) : null}
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+            className="h-6 gap-1 px-2 text-xs text-foreground-subtle hover:text-destructive"
             onClick={() => onCommand({ kind: "clear" })}
           >
-            <Trash2 className="size-3" />
+            <Trash2 className="size-icon-xs" />
             {t("清除")}
           </Button>
         </div>

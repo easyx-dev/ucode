@@ -39,7 +39,7 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderDetailProps, "provide
       />
       {customized ? (
         <div className="flex items-center gap-2">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-foreground-subtle">
             {t("模型清单已被自定义（{{n}} 个），不再随内置目录更新。", {
               n: provider.models.length,
             })}
@@ -47,14 +47,14 @@ function BuiltinFields({ provider, onPatch }: Pick<ProviderDetailProps, "provide
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 shrink-0 px-2 text-[11px]"
+            className="h-6 shrink-0 px-2 text-xs"
             onClick={() => onPatch({ models: [] })}
           >
             {t("恢复默认")}
           </Button>
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-foreground-subtle">
           {t("端点与 {{n}} 个模型来自内置目录，随应用升级自动更新。", {
             n: provider.inheritedModels.length,
           })}
@@ -82,23 +82,23 @@ export function ProviderDetail({
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{builtin ? t("内置") : t("自定义")}</Badge>
         <span className="truncate text-sm font-medium">{provider.name || provider.id}</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-foreground-subtle">
           {provider.apiKeyMasked
             ? t("已保存 key {{masked}}", { masked: provider.apiKeyMasked })
             : t("未保存 key")}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={onTest} disabled={testing}>
-            {testing ? <Spinner className="size-4" /> : <Zap className="size-4" />}
+            {testing ? <Spinner className="size-icon-base" /> : <Zap className="size-icon-base" />}
             {t("测试连接")}
           </Button>
           <Button variant="ghost" size="icon-sm" onClick={onRemove} title={t("删除 provider")}>
-            <Trash2 className="size-4 text-destructive" />
+            <Trash2 className="size-icon-base text-destructive" />
           </Button>
         </div>
       </div>
 
-      <div className="space-y-4 rounded-xl p-4 ring-1 ring-foreground/10">
+      <div className="space-y-4 rounded-xl p-4 ring-1 ring-border-strong">
         {builtin ? (
           <BuiltinFields provider={provider} onPatch={onPatch} />
         ) : (

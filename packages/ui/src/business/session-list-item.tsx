@@ -20,20 +20,20 @@ import { relativeTimeLabel } from "../lib/time";
 
 /**
  * 等待类与出错优先于「生成中」：交互请求挂起时 run 占位可能还在，但它在等的是用户
- * 图标尺寸与父级项目行的文件夹图标一致（`size-4`），否则两者既不同大也不对齐
+ * 图标尺寸与父级项目行的文件夹图标一致（`size-icon-base`），否则两者既不同大也不对齐
  */
 function StatusMark({ status }: { status: SessionStatus }) {
   switch (status) {
     case "waiting_permission":
-      return <ShieldAlert className="size-4 shrink-0 text-warning" />;
+      return <ShieldAlert className="size-icon-base shrink-0 text-warning" />;
     case "waiting_question":
-      return <MessageCircleQuestion className="size-4 shrink-0 text-warning" />;
+      return <MessageCircleQuestion className="size-icon-base shrink-0 text-warning" />;
     case "waiting_plan":
-      return <ClipboardCheck className="size-4 shrink-0 text-warning" />;
+      return <ClipboardCheck className="size-icon-base shrink-0 text-warning" />;
     case "error":
-      return <CircleAlert className="size-4 shrink-0 text-destructive" />;
+      return <CircleAlert className="size-icon-base shrink-0 text-destructive" />;
     case "running":
-      return <Spinner className="size-4 text-muted-foreground" />;
+      return <Spinner className="size-icon-base text-foreground-subtle" />;
     default:
       return null;
   }
@@ -80,7 +80,7 @@ export function SessionListItem({
     <div
       className={cn(
         "group relative flex h-10 items-center rounded-lg pr-1 transition-colors",
-        active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
+        active ? "bg-state-selected" : "hover:bg-state-hover",
       )}
     >
       <button
@@ -97,7 +97,7 @@ export function SessionListItem({
             <StatusMark status={statusLabel ? session.status : "running"} />
           ) : (
             <>
-              {pinned ? <Pin className="size-3 text-muted-foreground" /> : null}
+              {pinned ? <Pin className="size-icon-xs text-foreground-subtle" /> : null}
               {unread ? (
                 <span
                   className="size-1.5 rounded-full bg-info"
@@ -110,7 +110,7 @@ export function SessionListItem({
         </span>
         <span className="truncate text-sm">{title}</span>
         {/* 时间戳并入点击区：标题到时刻之间的空白原本点不动，整行都可点才与视觉一致 */}
-        <span className="ml-auto shrink-0 pl-1 text-xs text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 [@media(pointer:coarse)]:hidden">
+        <span className="ml-auto shrink-0 pl-1 text-xs text-foreground-subtle transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 [@media(pointer:coarse)]:hidden">
           {relativeTimeLabel(session.updatedAt)}
         </span>
       </button>
@@ -124,7 +124,7 @@ export function SessionListItem({
             title={pinned ? t("取消置顶") : t("置顶")}
             onClick={onTogglePin}
           >
-            <Pin className={cn("size-3.5", pinned && "fill-current")} />
+            <Pin className={cn("size-icon-sm", pinned && "fill-current")} />
           </Button>
           <Button
             variant="ghost"
@@ -133,7 +133,7 @@ export function SessionListItem({
             title={t("归档")}
             onClick={onArchive}
           >
-            <Archive className="size-3.5" />
+            <Archive className="size-icon-sm" />
           </Button>
         </div>
       ) : null}

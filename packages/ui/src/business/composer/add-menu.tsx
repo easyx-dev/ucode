@@ -68,7 +68,7 @@ export function AddMenu({ sessionId, cwdPath, onFiles, onInsertCommand }: AddMen
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate text-sm">{skill.name}</span>
                   {skill.description ? (
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate text-xs text-foreground-subtle">
                       {skill.description}
                     </span>
                   ) : null}
@@ -76,10 +76,10 @@ export function AddMenu({ sessionId, cwdPath, onFiles, onInsertCommand }: AddMen
               </DropdownMenuItem>
             ))
           ) : (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("当前目录没有技能")}</p>
+            <p className="px-2 py-1.5 text-xs text-foreground-subtle">{t("当前目录没有技能")}</p>
           )}
           <DropdownMenuSeparator />
-          <p className="px-2 py-1 text-xs text-muted-foreground">
+          <p className="px-2 py-1 text-xs text-foreground-subtle">
             {t("@ 添加上下文")} · {t("/ 选择命令或技能")}
           </p>
         </DropdownMenuContent>

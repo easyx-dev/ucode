@@ -69,7 +69,7 @@ export function ReviewTree({
               title={t("堆叠查看全部改动")}
               onClick={() => workbench?.openChanges()}
             >
-              <Layers className="size-3.5" />
+              <Layers className="size-icon-sm" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("堆叠查看全部改动")}</TooltipContent>
@@ -83,7 +83,7 @@ export function ReviewTree({
               title={t("刷新")}
               onClick={review.reload}
             >
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-icon-sm" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("刷新")}</TooltipContent>
@@ -99,10 +99,10 @@ export function ReviewTree({
           />
         ) : status.loading && !status.data ? (
           <div className="flex justify-center py-4">
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           </div>
         ) : status.error ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground">{status.error.message}</p>
+          <p className="px-3 py-3 text-xs text-foreground-subtle">{status.error.message}</p>
         ) : !status.data ? null : !status.data.isRepo ? (
           <PanelEmpty
             icon={<GitBranch className="size-7" />}

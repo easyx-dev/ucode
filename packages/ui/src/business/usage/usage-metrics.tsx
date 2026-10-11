@@ -25,9 +25,9 @@ const monthDayLabel = (dateKey: string, t: TFunction): string =>
 function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2">
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-xs text-foreground-subtle">{label}</div>
       <div className="mt-0.5 text-lg font-medium tabular-nums">{value}</div>
-      <div className="mt-0.5 h-4 truncate text-xs text-muted-foreground tabular-nums">
+      <div className="mt-0.5 h-4 truncate text-xs text-foreground-subtle tabular-nums">
         {hint ?? ""}
       </div>
     </div>

@@ -1,0 +1,103 @@
+/*
+ * markdown 渲染（assistant 输出、md 预览、压缩摘要共用）。
+ *
+ * 层级只有两档：正文按基准字号与长文行高，代码块与表格降一档；标题不与正文拉开字号，靠字重区分。
+ * 中文断行由 `@streamdown/cjk` 处理（`message-response.tsx` 接入），这里不要覆盖 word-break / line-break。
+ */
+.md-content {
+  @apply text-sm leading-prose break-words;
+}
+.md-content > * + * {
+  @apply mt-3;
+}
+.md-content h1,
+.md-content h2,
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  @apply mt-5 mb-2 font-semibold leading-tight;
+}
+/* 首元素不带上边距：@apply 里的 first: 变体会被展开成非法选择器，这里显式写 */
+.md-content > :first-child {
+  @apply mt-0;
+}
+.md-content h1 {
+  @apply text-lg;
+}
+.md-content h2 {
+  @apply text-base;
+}
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  @apply text-sm;
+}
+.md-content ul {
+  @apply list-disc space-y-1 pl-5;
+}
+.md-content ol {
+  @apply list-decimal space-y-1 pl-5;
+}
+.md-content li::marker {
+  @apply text-foreground-subtle;
+}
+/* GFM 任务列表：勾选框本身就是标记，不要再叠一个圆点 */
+.md-content li:has(> input[type="checkbox"]) {
+  @apply list-none;
+}
+.md-content li > input[type="checkbox"] {
+  @apply mr-1.5 align-middle;
+}
+.md-content a {
+  @apply text-link underline underline-offset-2;
+}
+.md-content blockquote {
+  @apply border-l-2 pl-3 text-foreground-subtle;
+}
+.md-content code {
+  @apply rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs;
+}
+.md-content pre {
+  @apply overflow-x-auto rounded-lg bg-muted p-3 text-xs;
+}
+.md-content pre code {
+  @apply bg-transparent p-0;
+}
+/*
+ * 表格自己滚：宽表不但撑破列宽，还会把整段对话变成横向滚动区。
+ * 因此表格按内容宽度渲染（w-max）、上限不超过列宽（max-w-full），超出时只滚表格自身。
+ */
+.md-content table {
+  @apply block w-max max-w-full overflow-x-auto border-collapse text-xs;
+}
+.md-content th,
+.md-content td {
+  /* streamdown 给单元格带了自己的字号与 nowrap，这里按本仓库口径盖回去 */
+  @apply border border-border px-3 py-1.5 text-left align-top text-xs whitespace-normal;
+}
+.md-content thead {
+  /* 表头底色只由 th 提供，避免与 streamdown 的 thead 底色叠成两层 */
+  @apply bg-transparent;
+}
+.md-content th {
+  @apply bg-muted/50 font-medium;
+}
+.md-content hr {
+  @apply my-4 border-border;
+}
+/*
+ * 图表块：宽图自己横向滚动而不是缩字（缩字后标签会挤成一团），并给高度上限，避免一张图吃掉整屏。
+ * 底色用卡片色，图看起来是正文里的一张卡片；容器自身不滚动，全屏按钮才不会被图解带着跑。
+ */
+.md-content .md-mermaid {
+  @apply relative rounded-lg border border-border bg-card;
+}
+.md-content .md-mermaid-viewport {
+  /* 高度上限用间距基准表达（105 × 4px = 420px），随密度一起缩放 */
+  @apply max-h-105 overflow-auto p-3;
+}
+.md-content .md-mermaid-viewport svg {
+  @apply h-auto max-w-none;
+}

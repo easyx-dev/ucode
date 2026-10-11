@@ -131,7 +131,7 @@ export function UsageTrendChart({ daily }: UsageTrendChartProps) {
             </svg>
             <UsageTip tip={hover?.tip ?? null} />
           </div>
-          <div className="mt-1 flex justify-between text-[10px] text-muted-foreground tabular-nums">
+          <div className="mt-1 flex justify-between text-chart-axis text-foreground-subtle tabular-nums">
             <span>{first.date.slice(5)}</span>
             {count > 2 && middle ? <span>{middle.date.slice(5)}</span> : null}
             <span>{last.date.slice(5)}</span>

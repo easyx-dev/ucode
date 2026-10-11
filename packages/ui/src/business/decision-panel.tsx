@@ -18,7 +18,7 @@ export function DecisionPanel({ children }: DecisionPanelProps) {
       {/* 底衬：输入区整段（含它的上边框）都被它盖住，面板之外的点击也落在这里，不进输入区 */}
       <div aria-hidden className="absolute inset-0 z-10 bg-card" />
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
-        <div className="pointer-events-auto flex max-h-[70vh] w-full max-w-4xl flex-col overflow-y-auto rounded-xl bg-popover shadow-lg ring-1 ring-foreground/10">
+        <div className="pointer-events-auto flex max-h-[70vh] w-full max-w-4xl flex-col overflow-y-auto rounded-xl bg-popover shadow-dialog ring-1 ring-border-strong">
           {children}
         </div>
       </div>
@@ -40,10 +40,10 @@ type DecisionHeaderProps = {
 export function DecisionHeader({ icon: Icon, title, source, extra }: DecisionHeaderProps) {
   return (
     <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-      <Icon aria-hidden className="size-3.5 shrink-0 text-warning" />
+      <Icon aria-hidden className="size-icon-sm shrink-0 text-warning" />
       <span className="shrink-0 text-xs font-medium">{title}</span>
       {source ? (
-        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{source}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-foreground-subtle">{source}</span>
       ) : (
         <span className="min-w-0 flex-1" />
       )}

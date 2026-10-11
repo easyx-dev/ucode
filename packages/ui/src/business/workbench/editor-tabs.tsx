@@ -50,11 +50,11 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
       {onBack ? (
         <button
           type="button"
-          className="flex w-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+          className="flex w-8 shrink-0 items-center justify-center text-foreground-subtle hover:text-foreground"
           title={t("返回文件列表")}
           onClick={onBack}
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-icon-base" />
         </button>
       ) : null}
 
@@ -76,7 +76,7 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
                     "flex shrink-0 items-center gap-1 border-r border-border pr-1 pl-2.5 text-xs",
                     active
                       ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      : "text-foreground-subtle hover:bg-state-hover hover:text-foreground",
                   )}
                 >
                   <button
@@ -87,16 +87,16 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
                     title={titleOf(doc, t)}
                     onClick={() => workbench.selectDoc(doc.id)}
                   >
-                    <Icon className="size-3.5 shrink-0" />
+                    <Icon className="size-icon-sm shrink-0" />
                     <span className="truncate">{titleOf(doc, t)}</span>
                   </button>
                   <button
                     type="button"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 hover:bg-background/60 hover:text-foreground"
+                    className="flex size-icon-lg shrink-0 items-center justify-center rounded-sm text-foreground-subtlest hover:bg-background/60 hover:text-foreground"
                     title={t("关闭标签")}
                     onClick={() => workbench.closeDoc(doc.id)}
                   >
-                    <X className="size-3" />
+                    <X className="size-icon-xs" />
                   </button>
                 </div>
               </ContextMenuTrigger>

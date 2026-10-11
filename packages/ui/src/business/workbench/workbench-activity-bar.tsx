@@ -51,12 +51,12 @@ export function WorkbenchActivityBar() {
                   "size-8",
                   active
                     ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-foreground-subtle hover:text-foreground",
                 )}
                 title={label}
                 onClick={() => workbench.selectView(view)}
               >
-                <Icon className="size-4" />
+                <Icon className="size-icon-base" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">{label}</TooltipContent>
@@ -69,11 +69,11 @@ export function WorkbenchActivityBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="mt-auto size-8 text-muted-foreground hover:text-foreground"
+            className="mt-auto size-8 text-foreground-subtle hover:text-foreground"
             title={t("收起面板")}
             onClick={workbench.collapse}
           >
-            <PanelRightClose className="size-4" />
+            <PanelRightClose className="size-icon-base" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="right">{t("收起面板")}</TooltipContent>

@@ -14,12 +14,12 @@ const COLOR_TOKENS = {
   surface: "--card",
   /** 节点填充 */
   node: "--muted",
-  /** 提示块与次级元素 */
-  accent: "--accent",
+  /** 提示块与次级元素。取实色而非 `--state-hover`：后者是带透明度的叠加层，采色后交给 mermaid 会变成半透明底 */
+  accent: "--secondary",
   /** 正文与标签 */
   text: "--foreground",
   /** 连线、信号线 */
-  line: "--muted-foreground",
+  line: "--foreground-subtle",
   /** 描边与分隔 */
   border: "--border",
 } as const;

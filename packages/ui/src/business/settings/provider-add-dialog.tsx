@@ -45,7 +45,7 @@ function CatalogSearch({ value, onChange }: { value: string; onChange: (value: s
   return (
     <div className="relative shrink-0">
       <Search
-        className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 size-3.5 text-muted-foreground"
+        className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 size-icon-sm text-foreground-subtle"
         aria-hidden
       />
       <Input
@@ -72,7 +72,7 @@ function CatalogList({
 
   if (providers.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
+      <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
         {t("没有匹配的供应商。")}
       </p>
     );
@@ -88,15 +88,15 @@ function CatalogList({
             type="button"
             disabled={configured}
             onClick={() => onSelect(item.id)}
-            className="flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left ring-1 ring-foreground/10 transition-colors hover:bg-accent disabled:cursor-default disabled:opacity-60"
+            className="flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left ring-1 ring-border-strong transition-colors hover:bg-state-hover disabled:cursor-default disabled:opacity-60"
           >
             <span className="flex w-full items-center gap-1.5 text-sm">
               {item.name}
               {configured ? (
-                <span className="ml-auto text-[11px] text-muted-foreground">{t("已加入")}</span>
+                <span className="ml-auto text-xs text-foreground-subtle">{t("已加入")}</span>
               ) : null}
             </span>
-            <span className="text-[11px] text-muted-foreground">{item.authName || item.id}</span>
+            <span className="text-xs text-foreground-subtle">{item.authName || item.id}</span>
           </button>
         );
       })}
@@ -140,7 +140,7 @@ export function ProviderAddDialog({
 
         <Separator className="shrink-0" />
         <Button variant="outline" className="shrink-0 justify-start" onClick={onAddCustom}>
-          <Plus className="size-4" />
+          <Plus className="size-icon-base" />
           {t("添加自定义供应商")}
         </Button>
       </DialogContent>

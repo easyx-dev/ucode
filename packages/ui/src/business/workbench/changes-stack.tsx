@@ -52,7 +52,7 @@ export function ChangesStack({ path, reloadToken }: { path: string; reloadToken:
         <span className="shrink-0 text-xs font-medium">{t("全部改动")}</span>
         {status.data?.isRepo ? (
           <>
-            <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            <span className="min-w-0 truncate text-xs text-foreground-subtle">
               {t("{{value}} 个文件", { value: entries.length })}
             </span>
             <GitCounts additions={totals.additions} deletions={totals.deletions} />
@@ -70,22 +70,22 @@ export function ChangesStack({ path, reloadToken }: { path: string; reloadToken:
       <div className="min-h-0 flex-1 space-y-3 overflow-auto px-2 pb-2 [&>section:first-child]:pt-2">
         {status.loading && !status.data ? (
           <div className="flex justify-center py-4">
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           </div>
         ) : status.error ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">{status.error.message}</p>
+          <p className="px-1 py-2 text-xs text-foreground-subtle">{status.error.message}</p>
         ) : !status.data ? null : !status.data.isRepo ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">
+          <p className="px-1 py-2 text-xs text-foreground-subtle">
             {t("当前目录不在 git 仓库内，没有可查看的改动")}
           </p>
         ) : entries.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">{t("工作区没有改动")}</p>
+          <p className="px-1 py-2 text-xs text-foreground-subtle">{t("工作区没有改动")}</p>
         ) : (
           groups.map((group) => (
             <section key={group.id} className="space-y-2">
-              <p className="flex items-center gap-1 px-1 text-[11px] font-medium text-muted-foreground">
+              <p className="flex items-center gap-1 px-1 text-xs font-medium text-foreground-subtle">
                 <span>{translate(GROUP_TITLE[group.id])}</span>
-                <span className="tabular-nums text-muted-foreground/60">
+                <span className="tabular-nums text-foreground-subtlest">
                   {group.entries.length}
                 </span>
               </p>

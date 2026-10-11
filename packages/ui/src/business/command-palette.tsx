@@ -299,14 +299,14 @@ export function CommandPalette({
         <DialogTitle className="sr-only">{t("搜索")}</DialogTitle>
 
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <Search className="size-icon-base shrink-0 text-foreground-subtle" />
           <input
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t("搜索操作、任务或文件")}
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-subtle"
           />
         </div>
 
@@ -319,11 +319,11 @@ export function CommandPalette({
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs outline-none transition-colors",
                 tab === item.id
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:bg-accent/60",
+                  ? "bg-state-hover text-foreground"
+                  : "text-foreground-subtle hover:bg-state-hover",
               )}
             >
-              <item.icon className="size-3.5" />
+              <item.icon className="size-icon-sm" />
               {item.label}
             </button>
           ))}
@@ -331,7 +331,7 @@ export function CommandPalette({
 
         <div ref={listRef} className="max-h-80 overflow-y-auto px-1 pb-1">
           {empty ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+            <p className="px-2 py-6 text-center text-xs text-foreground-subtle">
               {filesLoading ? t("搜索中…") : t("无匹配结果")}
             </p>
           ) : null}
@@ -339,7 +339,9 @@ export function CommandPalette({
           {groups.map((group) =>
             group.items.length === 0 ? null : (
               <div key={group.id} className="py-0.5">
-                <p className="px-2 py-1 text-xs font-medium text-muted-foreground">{group.title}</p>
+                <p className="px-2 py-1 text-xs font-medium text-foreground-subtle">
+                  {group.title}
+                </p>
                 {group.items.map((item) => {
                   const index = cursor++;
                   const active = index === activeIndex;
@@ -352,18 +354,18 @@ export function CommandPalette({
                       onClick={() => select(item)}
                       className={cn(
                         "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm outline-none",
-                        active ? "bg-accent" : "hover:bg-accent/60",
+                        active ? "bg-state-hover" : "hover:bg-state-hover",
                       )}
                     >
-                      <item.icon className="size-4 shrink-0 text-muted-foreground" />
+                      <item.icon className="size-icon-base shrink-0 text-foreground-subtle" />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       {item.hint ? (
-                        <span className="max-w-[45%] min-w-0 shrink-0 truncate text-xs text-muted-foreground">
+                        <span className="max-w-[45%] min-w-0 shrink-0 truncate text-xs text-foreground-subtle">
                           {item.hint}
                         </span>
                       ) : null}
                       {item.shortcut ? (
-                        <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="shrink-0 text-xs text-foreground-subtle">
                           {item.shortcut}
                         </span>
                       ) : null}

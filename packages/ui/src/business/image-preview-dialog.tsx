@@ -35,7 +35,7 @@ export function ImagePreviewDialog({
       <FullscreenDialog description={t("图片全屏预览")} onClose={onClose} title={label}>
         <div className="flex min-h-0 items-center justify-center bg-background p-4">
           {failed ? (
-            <p className="text-sm text-muted-foreground">{t("图片不可用")}</p>
+            <p className="text-sm text-foreground-subtle">{t("图片不可用")}</p>
           ) : (
             <div className="h-[60vh] w-full max-w-xl animate-pulse rounded-md bg-muted/40" />
           )}

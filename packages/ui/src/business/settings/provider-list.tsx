@@ -35,7 +35,7 @@ function ProviderListItem({
       onClick={onSelect}
       className={cn(
         "flex h-9 shrink-0 items-center gap-2 rounded-lg px-2 text-left text-sm whitespace-nowrap transition-colors md:w-full md:whitespace-normal",
-        selected ? "bg-accent font-medium" : "hover:bg-accent/60",
+        selected ? "bg-state-hover font-medium" : "hover:bg-state-hover",
       )}
     >
       <span
@@ -65,7 +65,7 @@ export function ProviderList({ providers, selectedKey, onSelect }: ProviderListP
         if (items.length === 0) return null;
         return (
           <div key={source} className="flex shrink-0 gap-1 md:block md:w-full md:space-y-1">
-            <h3 className="hidden px-2 text-xs font-medium text-muted-foreground md:block">
+            <h3 className="hidden px-2 text-xs font-medium text-foreground-subtle md:block">
               {sourceLabels[source]}
             </h3>
             {items.map((provider) => (

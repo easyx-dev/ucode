@@ -55,8 +55,8 @@ export function MermaidBlock({ code, deferred }: { code: string; deferred?: bool
   if (state.status === "rendering") {
     return (
       <div className="md-mermaid">
-        <div className="md-mermaid-viewport flex min-h-24 items-center justify-center gap-2 text-muted-foreground text-xs">
-          <Loader2 className="size-3.5 animate-spin" />
+        <div className="md-mermaid-viewport flex min-h-24 items-center justify-center gap-2 text-foreground-subtle text-xs">
+          <Loader2 className="size-icon-sm animate-spin" />
           <span>{t("图表渲染中…")}</span>
         </div>
       </div>

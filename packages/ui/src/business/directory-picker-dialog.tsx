@@ -190,7 +190,7 @@ export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDia
             disabled={!listing?.parent || loading}
             onClick={() => listing?.parent && void navigateTo(listing.parent)}
           >
-            <ArrowUp className="size-3.5" />
+            <ArrowUp className="size-icon-sm" />
           </Button>
           <Input
             value={pathInput}
@@ -209,7 +209,7 @@ export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDia
             disabled={!listing || loading}
             onClick={() => setCreating((prev) => !prev)}
           >
-            <FolderPlus className="size-3.5" />
+            <FolderPlus className="size-icon-sm" />
             {t("新建文件夹")}
           </Button>
         </div>
@@ -236,24 +236,24 @@ export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDia
         <ScrollArea className="h-72 rounded-md border">
           <div className="p-1">
             {loading && !listing ? (
-              <p className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-                <Spinner className="size-3.5" />
+              <p className="flex items-center gap-2 px-2 py-2 text-xs text-foreground-subtle">
+                <Spinner className="size-icon-sm" />
                 {t("加载中…")}
               </p>
             ) : null}
 
             {listing && listing.entries.length === 0 ? (
-              <p className="px-2 py-2 text-xs text-muted-foreground">{emptyText}</p>
+              <p className="px-2 py-2 text-xs text-foreground-subtle">{emptyText}</p>
             ) : null}
 
             {listing?.entries.map((entry) => (
               <button
                 key={entry.path}
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50"
                 onClick={() => void navigateTo(entry.path)}
               >
-                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+                <Folder className="size-icon-sm shrink-0 text-foreground-subtle" />
                 <span className="truncate">{entry.name}</span>
               </button>
             ))}

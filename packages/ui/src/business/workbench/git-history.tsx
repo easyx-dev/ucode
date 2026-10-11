@@ -28,12 +28,12 @@ export function CommitHistory({
   const { data, error, loading } = useGitLog(path, limit, 0, reloadToken);
 
   if (error) {
-    return <p className="px-3 py-3 text-xs text-muted-foreground">{error.message}</p>;
+    return <p className="px-3 py-3 text-xs text-foreground-subtle">{error.message}</p>;
   }
   if (loading && !data) {
     return (
       <div className="flex justify-center py-4">
-        <Spinner className="text-muted-foreground" />
+        <Spinner className="text-foreground-subtle" />
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function CommitDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-xs text-foreground-subtle">
           {commit.shortHash}
         </span>
         <span className="min-w-0 flex-1 truncate text-xs" title={detail?.subject ?? commit.subject}>
@@ -105,13 +105,13 @@ export function CommitDetail({
         />
       </div>
 
-      <p className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+      <p className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-foreground-subtle">
         <span className="truncate">{commit.authorName}</span>
         <span className="shrink-0">{relativeTimeLabel(commit.authoredAt)}</span>
       </p>
 
       {detail?.body ? (
-        <pre className="max-h-32 shrink-0 overflow-auto border-b border-border px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+        <pre className="max-h-32 shrink-0 overflow-auto border-b border-border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground-subtle">
           {detail.body}
         </pre>
       ) : null}
@@ -119,17 +119,19 @@ export function CommitDetail({
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 [&>div:first-child]:pt-2">
         {loading && !data ? (
           <div className="flex justify-center py-4">
-            <Spinner className="text-muted-foreground" />
+            <Spinner className="text-foreground-subtle" />
           </div>
         ) : error ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">{error.message}</p>
+          <p className="px-1 py-2 text-xs text-foreground-subtle">{error.message}</p>
         ) : items.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">{t("这个提交没有改动文件")}</p>
+          <p className="px-1 py-2 text-xs text-foreground-subtle">{t("这个提交没有改动文件")}</p>
         ) : (
           <DiffStack items={items} mode={mode} wrap={wrap} reloadToken={reloadToken} />
         )}
         {data?.truncated ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">{t("变更过多，仅列出前一部分")}</p>
+          <p className="px-1 py-2 text-xs text-foreground-subtle">
+            {t("变更过多，仅列出前一部分")}
+          </p>
         ) : null}
       </div>
     </div>

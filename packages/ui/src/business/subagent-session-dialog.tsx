@@ -56,7 +56,7 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
             loading={stream.loadingHistory}
             working={stream.running}
             resetKey={sessionId}
-            empty={<p className="text-sm text-muted-foreground">{t("还没有内容")}</p>}
+            empty={<p className="text-sm text-foreground-subtle">{t("还没有内容")}</p>}
           />
         </div>
       </DialogContent>

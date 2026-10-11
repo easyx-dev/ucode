@@ -3,6 +3,7 @@
 export { brandAssets } from "./assets.ts";
 export type { Brand } from "./brand.ts";
 export {
+  appearanceStorageKey,
   appHomeDirname,
   brand,
   localeStorageKey,

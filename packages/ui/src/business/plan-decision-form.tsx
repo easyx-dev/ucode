@@ -37,7 +37,7 @@ export function PlanDecisionForm({
     <>
       <DecisionHeader icon={ClipboardList} title={t("计划已就绪")} />
 
-      <div className="px-3 pt-2.5 text-xs text-muted-foreground">
+      <div className="px-3 pt-2.5 text-xs text-foreground-subtle">
         {t("批准后切换到编码模式开始执行；也可以在下方补充意见，继续讨论计划。")}
       </div>
 
@@ -53,7 +53,7 @@ export function PlanDecisionForm({
         }}
         rows={2}
         placeholder={t("对计划有补充或异议？写在这里继续讨论")}
-        className="min-h-11 w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        className="min-h-11 w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-foreground-subtle disabled:cursor-not-allowed"
       />
 
       <div className="flex items-center gap-2 px-3 pb-3">
@@ -72,11 +72,11 @@ export function PlanDecisionForm({
           disabled={disabled || value.trim().length === 0}
           onClick={submitFeedback}
         >
-          <Send className="size-3.5" />
+          <Send className="size-icon-sm" />
           {t("提交反馈")}
         </Button>
         <Button size="sm" className="ml-auto" disabled={disabled} onClick={onApprove}>
-          <Check className="size-4" />
+          <Check className="size-icon-base" />
           {t("批准并执行")}
         </Button>
       </div>

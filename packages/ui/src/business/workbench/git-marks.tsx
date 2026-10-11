@@ -28,7 +28,7 @@ export function GitCounts({
 }) {
   if (additions === null && deletions === null) return null;
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums">
+    <span className="inline-flex shrink-0 items-center gap-1 font-mono text-xs tabular-nums">
       {additions !== null && additions > 0 ? (
         <span className="text-success">+{additions}</span>
       ) : null}

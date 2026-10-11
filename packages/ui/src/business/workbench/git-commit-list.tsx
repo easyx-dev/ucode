@@ -23,7 +23,7 @@ export function GitCommitList({
   const { t } = useTranslation();
 
   if (commits.length === 0) {
-    return <p className="px-3 py-4 text-xs text-muted-foreground">{t("还没有提交")}</p>;
+    return <p className="px-3 py-4 text-xs text-foreground-subtle">{t("还没有提交")}</p>;
   }
 
   return (
@@ -32,15 +32,15 @@ export function GitCommitList({
         <button
           key={commit.hash}
           type="button"
-          className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-muted/60"
+          className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-state-hover"
           onClick={() => onSelect(commit)}
         >
-          <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <GitCommitHorizontal className="mt-0.5 size-icon-sm shrink-0 text-foreground-subtle" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs text-foreground" title={commit.subject}>
               {commit.subject || t("（无标题）")}
             </span>
-            <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="mt-0.5 flex items-center gap-1.5 text-xs text-foreground-subtle">
               <span className="font-mono">{commit.shortHash}</span>
               <span className="truncate">{commit.authorName}</span>
               <span className="shrink-0">{relativeTimeLabel(commit.authoredAt)}</span>
@@ -50,7 +50,7 @@ export function GitCommitList({
                 {commit.refs.map((ref) => (
                   <span
                     key={ref}
-                    className="rounded-sm bg-muted px-1 font-mono text-[10px] text-muted-foreground"
+                    className="rounded-sm bg-muted px-1 font-mono text-xs text-foreground-subtle"
                   >
                     {ref}
                   </span>

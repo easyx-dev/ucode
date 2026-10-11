@@ -57,7 +57,7 @@ function PairingQrCode({ url }: { url: string }) {
     <img
       src={dataUrl}
       alt=""
-      className="mx-auto size-[180px] rounded-lg p-1 ring-1 ring-foreground/10"
+      className="mx-auto size-45 rounded-lg p-1 ring-1 ring-border-strong"
     />
   );
 }
@@ -85,9 +85,9 @@ function PairingPanel({
 
   return (
     <section className="space-y-2">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("配对链接")}</h3>
-      <div className="space-y-2 rounded-xl bg-popover p-4 ring-1 ring-foreground/10">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+      <h3 className="px-1 text-xs font-medium text-foreground-subtle">{t("配对链接")}</h3>
+      <div className="space-y-2 rounded-xl bg-popover p-4 ring-1 ring-border-strong">
+        <p className="text-xs leading-relaxed text-foreground-subtle">
           {t("生成一条链接发给同一网络下的设备，打开即可接入；5 分钟内有效，且只能使用一次。")}
         </p>
 
@@ -97,21 +97,25 @@ function PairingPanel({
             <div className="flex items-center gap-2">
               <Input readOnly value={pairing.url} className="font-mono text-xs" />
               <Button variant="outline" size="icon-sm" aria-label={t("复制链接")} onClick={copy}>
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? (
+                  <Check className="size-icon-base" />
+                ) : (
+                  <Copy className="size-icon-base" />
+                )}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground-subtle">
               {t("剩余有效时间 {{time}}", { time: formatRemaining(remaining) })}
             </p>
           </>
         ) : (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={busy} onClick={onCreate}>
-              {busy ? <Spinner className="size-4" /> : null}
+              {busy ? <Spinner className="size-icon-base" /> : null}
               {t("生成配对链接")}
             </Button>
             {pairing && remaining === 0 ? (
-              <span className="text-xs text-muted-foreground">{t("链接已过期")}</span>
+              <span className="text-xs text-foreground-subtle">{t("链接已过期")}</span>
             ) : null}
           </div>
         )}
@@ -135,28 +139,28 @@ function SessionList({
 
   return (
     <section className="space-y-2">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("活动会话")}</h3>
+      <h3 className="px-1 text-xs font-medium text-foreground-subtle">{t("活动会话")}</h3>
       <div className="space-y-2">
         {sessions.length === 0 ? (
-          <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
             {t("暂无活动会话")}
           </p>
         ) : null}
         {sessions.map((session) => (
           <div
             key={session.id}
-            className="flex items-center justify-between gap-4 rounded-xl bg-popover px-4 py-3 ring-1 ring-foreground/10"
+            className="flex items-center justify-between gap-4 rounded-xl bg-popover px-4 py-3 ring-1 ring-border-strong"
           >
             <div className="min-w-0 space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-medium">{session.label}</span>
                 {session.id === currentId ? (
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-foreground-subtle">
                     {t("本端")}
                   </span>
                 ) : null}
               </div>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="truncate text-xs text-foreground-subtle">
                 {t("最近使用 {{time}}", { time: new Date(session.lastSeenAt).toLocaleString() })}
               </p>
             </div>
@@ -181,9 +185,9 @@ function PasswordForm() {
 
   return (
     <section className="space-y-2">
-      <h3 className="px-1 text-xs font-medium text-muted-foreground">{t("修改密码")}</h3>
+      <h3 className="px-1 text-xs font-medium text-foreground-subtle">{t("修改密码")}</h3>
       <form
-        className="space-y-3 rounded-xl bg-popover p-4 ring-1 ring-foreground/10"
+        className="space-y-3 rounded-xl bg-popover p-4 ring-1 ring-border-strong"
         onSubmit={(event) => {
           event.preventDefault();
           if (canSubmit)
@@ -210,12 +214,12 @@ function PasswordForm() {
             onChange={(event) => setNext(event.target.value)}
           />
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-foreground-subtle">
           {t("新密码至少 8 位；修改后所有设备都需要重新登录。")}
         </p>
         {errorText ? <p className="text-xs text-destructive">{errorText}</p> : null}
         <Button type="submit" variant="outline" size="sm" disabled={!canSubmit}>
-          {auth.busy ? <Spinner className="size-4" /> : null}
+          {auth.busy ? <Spinner className="size-icon-base" /> : null}
           {t("修改密码")}
         </Button>
       </form>
@@ -269,7 +273,7 @@ export function SettingsRemoteAccess() {
 
   return (
     <div className="max-w-3xl space-y-5">
-      <p className="text-xs leading-relaxed text-muted-foreground">
+      <p className="text-xs leading-relaxed text-foreground-subtle">
         {t(
           "让同一网络下的设备接入本服务。通过鉴权的设备等于本机 owner，可驱动 agent 读写文件、执行命令。",
         )}

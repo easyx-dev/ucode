@@ -88,7 +88,7 @@ function StackedDiff({
       <button
         type="button"
         className={cn(
-          "sticky top-0 z-10 flex h-9 w-full items-center gap-2 bg-card px-2 text-left hover:bg-muted/40",
+          "sticky top-0 z-10 flex h-9 w-full items-center gap-2 bg-card px-2 text-left hover:bg-state-hover",
           // 折起时下面没有内容，底边线多余；反过来头部要自己圆上上下两个角
           collapsed ? "rounded-lg" : "rounded-t-lg",
         )}
@@ -97,7 +97,7 @@ function StackedDiff({
       >
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+            "size-icon-sm shrink-0 text-foreground-subtle transition-transform",
             !collapsed && "rotate-90",
           )}
         />

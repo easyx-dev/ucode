@@ -1,17 +1,50 @@
-/** 外观设置：主题三态、界面语言、消息区显示偏好与提醒方式 */
+/** 外观设置：配色与深浅模式、界面字号与密度、字体、语言、消息区显示偏好与提醒方式 */
 import type { Locale } from "@ucode/contracts";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
 import { useLocale } from "../../hooks/use-locale";
 import { useNoticeEnabled } from "../../hooks/use-notice-enabled";
 import { useShowThinking } from "../../hooks/use-show-thinking";
 import { useSoundEnabled } from "../../hooks/use-sound-enabled";
+import { type DensityId, FONT_SIZE_MAX, FONT_SIZE_MIN } from "../../lib/appearance";
+import { UI_FONTS } from "../../lib/fonts";
+import type { ColorThemeId } from "../../lib/themes";
+import { useAppearance } from "../../provider/appearance-provider";
 import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
 type ThemeValue = "light" | "dark" | "system";
 type ThinkingValue = "visible" | "hidden";
+
+/** 界面字体选择器；等宽不走设置（系统栈固定），所以只有这一个旋钮 */
+function UiFontSelect({
+  value,
+  label,
+  onChange,
+}: {
+  value: string;
+  label: string;
+  onChange: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label={label} className="w-40">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {UI_FONTS.map((option) => (
+          // 系统字体没有专属名字，文案与其他选项的专名一起放在这里
+          <SelectItem key={option.id} value={option.id}>
+            {option.id === "system" ? t("系统默认") : option.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function SettingsAppearance() {
   const { t } = useTranslation();
@@ -39,6 +72,17 @@ export function SettingsAppearance() {
   const value: ThemeValue = theme === "light" || theme === "dark" ? theme : "system";
 
   const { soundEnabled, setSoundEnabled, preview } = useSoundEnabled();
+
+  const { prefs, setPrefs } = useAppearance();
+  const colorThemeOptions = [
+    { value: "default", label: t("默认") },
+    { value: "zinc", label: t("冷灰") },
+  ] as const satisfies ReadonlyArray<SegmentedOption<ColorThemeId>>;
+  const densityOptions = [
+    { value: "compact", label: t("紧凑") },
+    { value: "default", label: t("默认") },
+    { value: "cozy", label: t("宽松") },
+  ] as const satisfies ReadonlyArray<SegmentedOption<DensityId>>;
 
   const { noticeEnabled, noticePermission, requestPermission, setNoticeEnabled } =
     useNoticeEnabled();
@@ -72,6 +116,62 @@ export function SettingsAppearance() {
             value={value}
             options={themeOptions}
             onChange={setTheme}
+          />
+        }
+      />
+      <SettingsRow
+        title={t("配色主题")}
+        description={t("换一组颜色，字体、字号与圆角不受影响。")}
+        control={
+          <SegmentedControl
+            label={t("配色主题")}
+            value={prefs.theme}
+            options={colorThemeOptions}
+            onChange={(next) => setPrefs({ theme: next })}
+          />
+        }
+      />
+      <SettingsRow
+        title={t("界面字号")}
+        description={t("控制文字与图标的大小；间距与控件高度由界面密度决定。")}
+        control={
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={1}
+              value={prefs.fontSizeBase}
+              onChange={(event) => setPrefs({ fontSizeBase: Number(event.target.value) })}
+              aria-label={t("界面字号")}
+              className="h-1.5 w-40 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+            />
+            <span className="w-10 text-right text-xs tabular-nums text-foreground-subtle">
+              {prefs.fontSizeBase}px
+            </span>
+          </div>
+        }
+      />
+      <SettingsRow
+        title={t("界面密度")}
+        description={t("控制间距、控件高度与栏宽；不影响文字大小。")}
+        control={
+          <SegmentedControl
+            label={t("界面密度")}
+            value={prefs.density}
+            options={densityOptions}
+            onChange={(next) => setPrefs({ density: next })}
+          />
+        }
+      />
+      <SettingsRow
+        title={t("界面字体")}
+        description={t("界面文字使用的字体，选中后按需加载并立即生效。")}
+        control={
+          <UiFontSelect
+            value={prefs.uiFont}
+            label={t("界面字体")}
+            onChange={(id) => setPrefs({ uiFont: id })}
           />
         }
       />
