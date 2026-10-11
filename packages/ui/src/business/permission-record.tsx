@@ -57,13 +57,13 @@ export function PermissionRecordView({ record, footer, onFork }: PermissionRecor
         </div>
         {/* 「本会话恒允」的范围值得写出来：它决定了后续哪些同类调用不再询问 */}
         {record.decision === "allow_session" && record.scope ? (
-          <p className="mt-1 text-xs text-foreground-subtle">
+          <p className="mt-1 text-xs break-words text-foreground-subtle">
             {t("{{scope}} 在本会话内不再询问", { scope: record.scope })}
           </p>
         ) : null}
         {/* 子会话在子会话自己那边执行，但审批归属根会话；回放时看不出来源会很困惑 */}
         {record.sourceSessionId ? (
-          <p className="mt-1 text-xs text-foreground-subtle">
+          <p className="mt-1 text-xs break-words text-foreground-subtle">
             {t("来自子智能体「{{description}}」", {
               description: record.sourceDescription ?? record.sourceSessionId,
             })}

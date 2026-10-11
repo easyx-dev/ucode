@@ -222,7 +222,7 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
           <div
             ref={bodyRef}
             className={cn(
-              "px-3 py-2 text-sm whitespace-pre-wrap text-foreground",
+              "px-3 py-2 text-sm break-words whitespace-pre-wrap text-foreground",
               // 限高常驻（展开才去）：底部渐隐靠自身掩码，不会碰到气泡的底色与描边
               expanded ? undefined : `${BODY_MAX_HEIGHT} overflow-hidden`,
               expanded || !overflowing ? undefined : BODY_FADE,

@@ -124,7 +124,10 @@ export function InputLabel({ input }: { input: ToolInput }) {
     case "pattern":
       return (
         <>
-          <span className="shrink-0 font-mono text-xs text-foreground-subtlest">
+          <span
+            className="truncate font-mono text-xs text-foreground-subtlest"
+            title={input.pattern}
+          >
             /{input.pattern}/
           </span>
           {input.scope ? (
@@ -206,7 +209,7 @@ export function ToolCall({ entry, children }: ToolCallProps) {
           <InputLabel input={input} />
           {entry.skill ? (
             <span
-              className="shrink-0 rounded bg-muted px-1 text-xs text-foreground-subtle"
+              className="truncate rounded bg-muted px-1 text-xs text-foreground-subtle"
               title={t("技能 {{name}}", { name: entry.skill.name })}
             >
               {t("技能 {{name}}", { name: entry.skill.name })}

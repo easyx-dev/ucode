@@ -42,13 +42,15 @@ function Choice({
       <span className="min-w-0 space-y-0.5">
         <span
           className={
-            chosen ? "block text-xs text-foreground" : "block text-xs text-foreground-subtlest"
+            chosen
+              ? "block text-xs break-words text-foreground"
+              : "block text-xs break-words text-foreground-subtlest"
           }
         >
           {label}
         </span>
         {chosen && description ? (
-          <span className="block text-xs text-foreground-subtle">{description}</span>
+          <span className="block text-xs break-words text-foreground-subtle">{description}</span>
         ) : null}
       </span>
     </li>
@@ -85,8 +87,10 @@ export function QuestionForm({ questions, answers, settled, footer, onFork }: Qu
                 key={`${index}:${question.header}`}
                 className="space-y-1"
               >
-                <div className="text-xs font-medium text-foreground">{question.header}</div>
-                <p className="text-sm leading-relaxed text-foreground-subtle">
+                <div className="text-xs font-medium break-words text-foreground">
+                  {question.header}
+                </div>
+                <p className="text-sm leading-relaxed break-words text-foreground-subtle">
                   {question.question}
                 </p>
                 <ul className="space-y-0.5">

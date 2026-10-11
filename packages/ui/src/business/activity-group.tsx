@@ -47,7 +47,9 @@ function ThinkingRow({ text, thinkingMs }: { text: string; thinkingMs?: number }
         />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="py-1 pr-1.5 pl-6 text-xs leading-relaxed whitespace-pre-wrap">{text}</div>
+        <div className="py-1 pr-1.5 pl-6 text-xs leading-relaxed break-words whitespace-pre-wrap">
+          {text}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );

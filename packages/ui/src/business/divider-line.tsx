@@ -27,9 +27,13 @@ export function DividerLine({ label, detail, children, defaultOpen = false }: Di
   const expandable = children !== undefined;
 
   const text = (
-    <span className="flex shrink-0 items-center gap-1">
-      {label}
-      {detail ? <span className="text-foreground-subtlest">{detail}</span> : null}
+    <span className="flex min-w-0 items-center gap-1">
+      <span className="truncate">{label}</span>
+      {detail ? (
+        <span className="truncate text-foreground-subtlest" title={detail}>
+          {detail}
+        </span>
+      ) : null}
       {expandable ? (
         <ChevronRight className={cn("size-icon-xs transition-transform", open && "rotate-90")} />
       ) : null}
