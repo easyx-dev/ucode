@@ -26,6 +26,7 @@ import {
 import { MCP_CONFIG_FILENAME } from "../../constants";
 import { env } from "../../env";
 import { logger } from "../../lib/logger";
+import { isRecord } from "../../utils/object";
 
 /** 运行时数据目录下的 MCP 配置文件路径；装配层按会话的 harnessDir 取，避免读到别的目录 */
 export const mcpConfigPathOf = (harnessDir: string): string =>
@@ -82,9 +83,6 @@ const mcpServersOf = (raw: RawMcpFile): Record<string, unknown> => {
     ? (value as Record<string, unknown>)
     : {};
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * 校验一条文件条目。文件里没有 `name`（name 是键），补上并给 `type` 补 pi 的默认值 stdio 后再校验。
