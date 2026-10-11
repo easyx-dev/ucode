@@ -16,12 +16,10 @@ import {
   type PermissionRecord,
   PRUNE_RECORD_CUSTOM_TYPE,
   RETRY_RECORD_CUSTOM_TYPE,
-  type RetryRecord,
   type ServerEventPayload,
   type SessionStatus,
   type SessionSummary,
   SKILL_RECORD_CUSTOM_TYPE,
-  type SkillRecord,
   SUBAGENT_RECORD_CUSTOM_TYPE,
   type SubagentSnapshot,
   type WebsearchConfig,
@@ -32,7 +30,7 @@ import {
   SUBAGENT_QUEUE_MAX,
   SUBAGENT_QUEUE_WAIT_MS,
 } from "../constants";
-import type { SessionOverride, SessionRecord, SessionRepository } from "../db/session-repository";
+import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { overrideOf } from "../db/session-repository";
 
 import { env } from "../env";
@@ -86,6 +84,8 @@ type PooledSession = {
   unsubscribe: () => void;
   /** 配置已变更：这一轮跑完（或下次访问）就按新配置重建 */
   stale: boolean;
+  /** 装配时解析好的工作目录（未绑定目录的会话即其工作区）：技能命中判定复用，免去每次工具调用查库 */
+  cwd: string;
   /** 本次装配的技能索引：命中判定与显式调用都查它，与广告给模型的同一份 */
   skills: SkillIndex;
   /** 本轮已记过的技能名：同一轮里分片读同一个文件只留第一条，轮次边界清空 */
@@ -832,6 +832,7 @@ export class SessionPool {
         unsubscribe,
         // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
         stale: generation !== this.generation,
+        cwd,
         skills: assembled.skills,
         skillHits: new Set(),
       };
@@ -921,8 +922,7 @@ export class SessionPool {
   ): void {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
-    const cwd = this.repository.find(sessionId)?.cwd ?? process.cwd();
-    const skill = matchSkillHit(toolName, args, cwd, entry.skills);
+    const skill = matchSkillHit(toolName, args, entry.cwd, entry.skills);
     if (!skill || entry.skillHits.has(skill.name)) return;
     entry.skillHits.add(skill.name);
     this.appendMarker(sessionId, entry.session.sessionManager, {
