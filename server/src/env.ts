@@ -1,7 +1,11 @@
-/** 环境变量解析：配置一律来自环境变量（.env / .env.prod），由 APP_HOME 派生全部路径；缺失即报错退出 */
-import { mkdirSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
-
+/**
+ * 环境变量解析：配置一律来自环境变量（.env / .env.prod），由 APP_HOME 派生全部路径；缺失即报错退出。
+ *
+ * 环境文件的定位与加载也在这里（它只服务本模块）：先按 `NODE_ENV` 选文件名、从 cwd 向上找到它并加载，
+ * 再读值、校验、派生路径。
+ */
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 import {
   APP_DIRNAME,
   ATTACHMENTS_DIRNAME,
@@ -9,16 +13,59 @@ import {
   CONFIG_FILENAME,
   DB_FILENAME,
   HARNESS_DIRNAME,
-  LOG_LEVELS,
   MCP_CONFIG_FILENAME,
-  PROMPT_SOURCES,
-  type PromptSource,
   SERVICE_FILENAME,
   SESSIONS_DIRNAME,
   WORKSPACE_DIRNAME,
-} from "./constants";
-import { envFileName, expandHome, loadEnvFile, resourceRoot, wasPreset } from "./lib/app-paths";
-import { readServiceRegistration } from "./lib/service-file";
+} from "./constants/dirs";
+import { LOG_LEVELS, PROMPT_SOURCES, type PromptSource } from "./constants/env";
+import { expandHome } from "./platform/paths";
+import { resourceRoot } from "./platform/resources";
+import { readServiceRegistration } from "./platform/service-registration";
+
+/** 当前应加载的环境文件名：生产 `.env.prod`，其余 `.env`（按 NODE_ENV 选择） */
+const envFileName = (): string => (process.env.NODE_ENV === "production" ? ".env.prod" : ".env");
+
+/** 从 start 向上查找指定环境文件，返回其绝对路径；找不到返回 undefined */
+const findEnvFile = (start: string, fileName: string): string | undefined => {
+  let current = start;
+  for (;;) {
+    const candidate = resolve(current, fileName);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+};
+
+/** 加载环境文件前 process.env 里已有的键（CLI 参数 / shell 变量），用于区分「显式设置」与「.env 默认」 */
+let presetKeys: ReadonlySet<string> = new Set();
+
+/** 该变量是否在加载环境文件前就已显式设置（区别 `.env` 注入的默认值） */
+const wasPreset = (name: string): boolean => presetKeys.has(name);
+
+/**
+ * 加载从 cwd 向上的环境文件，返回相对路径的解析基准（文件所在目录，无则 cwd）。
+ *
+ * 基准取环境文件所在目录而非仓库根：`APP_HOME` 常写成相对路径（如开发模板里的 `.tmp/<品牌>`），
+ * 只有相对它解析，在仓库内运行才能落到预期目录。
+ */
+const loadEnvFile = (): string => {
+  // 先快照：CLI 参数（--host/--port）与 shell 变量在加载环境文件前就已就位，
+  // 后续取值要靠它把「显式设置」与「.env 声明的默认值」区分开
+  presetKeys = new Set(Object.keys(process.env));
+
+  const envFile = findEnvFile(process.cwd(), envFileName());
+  if (envFile) {
+    try {
+      process.loadEnvFile(envFile);
+    } catch {
+      // 环境文件存在但不可读时按未设置处理，缺失项由下面的校验兜底
+    }
+    return dirname(envFile);
+  }
+  return process.cwd();
+};
 
 /** 相对路径的解析基准：环境文件所在目录（无则 cwd） */
 const baseDir = loadEnvFile();

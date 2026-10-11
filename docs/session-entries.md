@@ -16,7 +16,7 @@
   只用于回溯与展示。写点通常滞后于用户操作（切了还没跑，文件里还是上一轮的参数），拿条目回写会造出第二个
   真值源，顺序反过来一次就会把刚做的操作吞掉——模式 / 权限档位被回退就是这么来的。
 
-界面是否可见由 `server/src/core/serialize.ts` 的 `entryToDTO` 白名单决定：**默认不下发**，
+界面是否可见由 `server/src/harness/pi/serialize.ts` 的 `entryToDTO` 白名单决定：**默认不下发**，
 只有明确要展示的条目才带 `customType` 出去。
 
 ## pi 自带的条目
@@ -36,20 +36,20 @@
 
 | customType | 类型 | payload | 写入点 | 界面 |
 | --- | --- | --- | --- | --- |
-| `ucode.step` | custom | `{ turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/telemetry` | 不展示 |
+| `ucode.step` | custom | `{ turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/features/telemetry` | 不展示 |
 | `ucode.permission-decision` | custom | `{ tool, subject, scope, decision, sourceSessionId?, sourceDescription? }` | `server/src/core/pool.ts` | 展示成审批记录 |
 | `ucode.compaction` | custom | `{ reason, outcome, tokensBefore?, tokensAfter?, keptFrom?, skip?, error?, at }`（`reason` 取 `manual` / `threshold` / `overflow`，`outcome` 取 `done` / `skipped` / `failed`） | `server/src/core/pool.ts` | 展示成压缩分隔行 |
-| `ucode.goal` | custom | `{ event, status?, cause?, turns?, turnTokens?, turnToolCalls?, turnMs?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `budget` / `verdict` / `completed`）；`turnTokens` 是本轮用量增量（含本轮校验开销），`turnToolCalls` / `turnMs` 是本轮的调用数与耗时 | `server/src/harness/goal` | `completed` 并进它那一轮的分隔行，找不到开轮条目时才单独成线；其余不展示 |
-| `ucode.goal-prompt` | custom_message | 正文是注入的目标指令；`details` 为 `{ kind: kickoff \| continuation \| resume, turn? }` | `server/src/core/pool.ts`、`server/src/core/run.ts` | 展示成细线（目标启动 / 续跑 / 恢复） |
-| `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/core/run.ts` | 展示成细线（计划已批准） |
+| `ucode.goal` | custom | `{ event, status?, cause?, turns?, turnTokens?, turnToolCalls?, turnMs?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `budget` / `verdict` / `completed`）；`turnTokens` 是本轮用量增量（含本轮校验开销），`turnToolCalls` / `turnMs` 是本轮的调用数与耗时 | `server/src/harness/features/goal` | `completed` 并进它那一轮的分隔行，找不到开轮条目时才单独成线；其余不展示 |
+| `ucode.goal-prompt` | custom_message | 正文是注入的目标指令；`details` 为 `{ kind: kickoff \| continuation \| resume, turn? }` | `server/src/core/pool.ts`、`server/src/services/sessions/run.ts` | 展示成细线（目标启动 / 续跑 / 恢复） |
+| `ucode.plan-approved` | custom_message | 正文是「计划已批准，请开始执行。」 | `server/src/services/sessions/run.ts` | 展示成细线（计划已批准） |
 | `ucode.plan-ignored` | custom | `{ at }` | `server/src/routes/messages` | 展示成「已忽略计划」 |
 | `ucode.mode` | custom | `{ mode?, permissionMode?, at }`（至少一个变更项） | `server/src/core/pool.ts`（轮起点 `recordRunSettings`） | 不展示：审计「这一轮跑在什么参数下」（写侧靠它去重）；**不回读** |
-| `ucode.skill` | custom | `{ event, name, file, source, toolCallId?, at }`（`event` 取 `invoke` / `hit`，`source` 取 `COMMAND_ASSET_SOURCES`） | `server/src/core/pool.ts`、`server/src/core/run.ts` | 不单独成行：`hit` 挂在对应的 `read` 调用卡片上，`invoke` 只落文件 |
+| `ucode.skill` | custom | `{ event, name, file, source, toolCallId?, at }`（`event` 取 `invoke` / `hit`，`source` 取 `COMMAND_ASSET_SOURCES`） | `server/src/core/pool.ts`、`server/src/services/sessions/run.ts` | 不单独成行：`hit` 挂在对应的 `read` 调用卡片上，`invoke` 只落文件 |
 | `ucode.retry` | custom | `{ event, attempt, maxAttempts, delayMs?, errorMessage?, success?, at }`（`event` 取 `start` / `end`） | `server/src/core/pool.ts` | 展示成细线：`start` 与 `end(success: false)`；重试成功那条不下发 |
 | `ucode.prune` | custom | `{ cleared, freedTokens, targets: Array<{ id, tool }>, at }` | `server/src/core/pool.ts` | 不展示 |
 | `ucode.subagent` | custom | `{ event, childId, toolCallId, agent?, name?, isError?, aborted?, at }`（`event` 取 `start` / `end`） | `server/src/core/pool.ts` | 不展示 |
 | `ucode.interaction` | custom | `{ kind, requestId, outcome, sourceSessionId?, at }`（`kind` 取 `permission` / `question`，`outcome` 取 `resolved` / `dismissed` / `aborted`） | `server/src/app.ts` | 不展示 |
-| `ucode.memory-review` | custom | `{ file, title, at }` | `server/src/harness/memory` | 不展示 |
+| `ucode.memory-review` | custom | `{ file, title, at }` | `server/src/harness/features/memory` | 不展示 |
 
 `decision` 取值见契约的 `PERMISSION_DECISIONS`（`allow_once` / `allow_session` / `deny`）；
 `ucode.goal` 的 `cause` 取值见 `GOAL_PAUSE_CAUSES`（`blocked` 由模型调 `goal_blocked` 报的受阻）。
@@ -59,7 +59,7 @@
 ### 用户消息的正文形状
 
 一条用户消息的正文（`message` 条目里 user 角色的 `content` 文本）不是用户原话本身，而是
-「注入内容的边界块 + 用户原话」拼成的，顺序固定（见 `server/src/core/run.ts` 的 `composeText`）：
+「注入内容的边界块 + 用户原话」拼成的，顺序固定（见 `server/src/services/sessions/run.ts` 的 `composeText`）：
 
 ```
 <skill name="…" location="…">…</skill>   ← `/skill:name` 展开的技能正文（可选）
@@ -68,7 +68,7 @@
 用户原话                                  ← 正文，各类位置标记在里面
 ```
 
-- 边界块的正文归服务端中和同名标签、属性转义（`harness/tools/untrusted`），所以「匹配首个闭合标签」是安全的。
+- 边界块的正文归服务端中和同名标签、属性转义（`harness/utils/boundary`），所以「匹配首个闭合标签」是安全的。
 - 命令与技能由**服务端**展开（pi 的展开要求整条输入以 `/` 开头，而 `@` 引用拼在前面，交给 pi 会整条不展开），
   边界块同时是客户端认出「这是一条命令 / 技能」的唯一依据。
 - `@` 引用的 `path` 是工作目录相对写法（编辑重发回传的也是它），服务端读内容时按会话工作目录解析。

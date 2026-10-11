@@ -30,7 +30,7 @@
 - 错误详情（校验 issues、上游响应片段等）放 `data`
 - **服务端不做本地化**：`message` 是固定中文，供日志、`curl` 与未登记错误码兜底；
   客户端用 `code` 查 `@ucode/i18n` 的 `errorMessageKeys` 渲染当前语言，`params` 是渲染所需的插值值
-- 由 `lib/response` 的 `ok()` / `fail()` 生产，禁止各处手写封套
+- 由 `platform/response` 的 `ok()` / `fail()` 生产，禁止各处手写封套
 
 ## 错误码与 HTTP 状态
 
@@ -187,7 +187,7 @@
     - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals, contextUsage?: ContextUsage | null }`，改名 / 换模型 /
       置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
       模式），`contextUsage` 与它同帧。`ContextUsage` 除 `tokens / contextWindow / estimated` 外，还带
-      `budget`（本会话的压缩触发点，按 `harness/budget` 的有效预算算，不等于窗口）与 `lastCompaction`
+      `budget`（本会话的压缩触发点，按 `harness/setup/budget` 的有效预算算，不等于窗口）与 `lastCompaction`
       （最近一次自动压缩的 `{ reason, at }`）——界面据此说明「上下文为什么突然小了」
     - `session_archived`：载荷 `{ sessionId }`，归档（级联子会话逐个下发）
   - 压缩：`compaction_start` 载荷 `{ reason }`（`manual` / `threshold` / `overflow`），`compaction_end` 载荷

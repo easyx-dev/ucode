@@ -1,10 +1,9 @@
 /** /api/v1/models：模型目录与运行时重建 */
 import { emptyInputSchema, type ModelsResponse } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import type { Services } from "../../app";
-import { ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 const catalogOf = (services: Services): ModelsResponse => {
   const status = services.runtime.getStatus();

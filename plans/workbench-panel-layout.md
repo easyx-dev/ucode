@@ -48,7 +48,7 @@
 必须在我们的样式里整组改写成语义 token（见 `styles/theme.css` 的 diff 视图一节），否则就多出一套颜色体系；
 高亮改用项目现成的 shiki——官方适配层（`@git-diff-view/shiki`）把主题写死成 github light / dark，
 所以自写一个适配器（`lib/shiki-diff.ts`）复用同一个引擎与 `--code-*` 主题。另一个坑：它的 `hunks` 参数不是行数组
-——每个元素都会被当成一整段 diff 交给解析器，所以要整段拼好（`lib/git-patch.ts`）。
+——每个元素都会被当成一整段 diff 交给解析器，所以要整段拼好（`services/git-patch.ts`）。
 
 **对比结构仍由服务端解析。** 客户端不重跑比对（大文件会退化成「全删 + 全增」），hunk 结构照旧来自
 `git/diff`，只是还原成 patch 文本交给库；两侧原文来自 `git/contents`，供它算未变更区域——拿不到
@@ -61,7 +61,7 @@
 两者靠字母区分（未跟踪 `U`、冲突 `!`），服务端 `/git/status` 的四个桶保持原样——分组是展示层的事。
 
 **文件树接 git 装饰，也是「少切视图」的思路。** 改动过的文件在树里就变色并带字母徽标，目录按「其下最重
-的那个标记」着色（`lib/git-marks.ts` 的严重度表），不必为了确认某个文件有没有改过而切到代码管理视图。
+的那个标记」着色（`services/git-marks.ts` 的严重度表），不必为了确认某个文件有没有改过而切到代码管理视图。
 
 ## 文件级改动
 
@@ -69,9 +69,9 @@
 | --- | --- |
 | `provider/workbench.tsx` | `view` / `selectView` / `sidebarVisible` / `toggleSidebar` / `docs` / `activeDocId` / `selectDoc` / `closeDoc` / `openFile` / `openChange` / `openCommit` / `openCommitFile` / `collapse` / `cwd` |
 | `lib/workbench-docs.ts`（新） | 文档类型、id 规则与打开 / 切换 / 关闭的纯逻辑（上限 8）；`hooks/use-workbench-docs.ts`（新）持状态 |
-| `lib/git-marks.ts`（新） | 来源桶 → 标记（未跟踪单列）、字母与色调表、目录严重度、文件树装饰映射 |
-| `lib/git-groups.ts`（新） | 四个桶 → 「已暂存 / 未暂存」两组 |
-| `lib/git-patch.ts`（新） | 结构化 hunk → 一整段 patch 文本（库的 `hunks` 入参形态） |
+| `services/git-marks.ts`（新） | 来源桶 → 标记（未跟踪单列）、字母与色调表、目录严重度、文件树装饰映射 |
+| `services/git-groups.ts`（新） | 四个桶 → 「已暂存 / 未暂存」两组 |
+| `services/git-patch.ts`（新） | 结构化 hunk → 一整段 patch 文本（库的 `hunks` 入参形态） |
 | `business/workbench/workbench-activity-bar.tsx`（新） | 活动栏两个视图 + 收起面板 |
 | `business/workbench/workbench-sidebar.tsx`（新） | 按视图渲染文件树 / 代码管理，并把仓库状态算成装饰数据 |
 | `business/workbench/editor-tabs.tsx`（新） | 标签条（标题 + 关闭两个同级按钮，窄屏带返回箭头） |

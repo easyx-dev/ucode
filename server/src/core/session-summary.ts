@@ -10,9 +10,14 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { overrideOf, type SessionRecord, type SessionRepository } from "../db/session-repository";
-import { workspaceDirOf } from "../harness/workspace";
-import { draftSessionSummary, type SessionRuntimeState, sessionInfoToDTO } from "./serialize";
-import { recordToInfo } from "./session-index";
+import {
+  draftSessionSummary,
+  type SessionRuntimeState,
+  sessionInfoToDTO,
+} from "../harness/pi/serialize";
+import { recordToInfo } from "../harness/pi/session-index";
+import { resolveSessionCwd } from "./session-paths";
+import { workspaceDirOf } from "./workspace";
 
 /** 构造摘要所需的读取面：仓储 + 运行态 + 运行时默认值 */
 export type SessionSummarySources = {
@@ -77,7 +82,7 @@ export const describeSessionSummary = (
   }
 
   return sessionInfoToDTO(
-    recordToInfo(record),
+    recordToInfo(record, resolveSessionCwd(record)),
     override,
     model,
     resolvedThinkingLevel,

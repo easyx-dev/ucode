@@ -20,34 +20,34 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import {
-  draftSessionSummary,
-  type SessionRuntimeState,
-  sessionInfoToDTO,
-} from "../../core/serialize";
-import { assertModel, createSession } from "../../core/session";
-import { managerToIndex, recordToInfo } from "../../core/session-index";
+import { resolveSessionCwd } from "../../core/session-paths";
 import {
   describeSessionSummary,
   resolvedThinkingLevelOf,
   type SessionSummarySources,
 } from "../../core/session-summary";
+import { workspaceDirOf } from "../../core/workspace";
 import { overrideOf } from "../../db/session-repository";
 import { env } from "../../env";
+import { createForkedSessionFile, resolveForkSource } from "../../harness/features/fork";
+import {
+  draftSessionSummary,
+  type SessionRuntimeState,
+  sessionInfoToDTO,
+} from "../../harness/pi/serialize";
+import { managerToIndex, recordToInfo } from "../../harness/pi/session-index";
 import {
   type AgentRegistry,
   hasPrimaryMode,
   loadAgentRegistry,
   recommendedThinkingLevelOf,
   resolveThinkingLevel,
-} from "../../harness/agents";
-import { createForkedSessionFile, resolveForkSource } from "../../harness/fork";
-import { resolveSessionCwd } from "../../harness/session-config";
-import { workspaceDirOf } from "../../harness/workspace";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
-import { resolveTargetPath } from "../../utils/path";
+} from "../../harness/setup/agents";
+import { resolveTargetPath } from "../../platform/paths";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
+import { assertModel, createSession } from "../../services/sessions/create";
 
 /** primary 模式必须存在（内置或已注册的自定义角色）；否则新建 / 切换会落到未知 slug 上 */
 const assertPrimaryMode = (cwd: string, mode: string): void => {
@@ -129,7 +129,7 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
     const resolvedThinkingLevel = resolvedThinkingLevelOf(sources, record);
     return record.sourcePath
       ? sessionInfoToDTO(
-          recordToInfo(record),
+          recordToInfo(record, resolveSessionCwd(record)),
           overrideOf(record),
           model,
           resolvedThinkingLevel,
@@ -153,7 +153,7 @@ const listSessions = (services: Services, query: SessionListInput): SessionListR
 
 /**
  * 新建只返回 id 与草稿视图：会话文件在首次产生 assistant 回复时才落盘。
- * 请求里缺的会话参数按项目记住的值补（见 `harness/project`）。
+ * 请求里缺的会话参数按项目记住的值补（见 `services/projects`）。
  */
 const createSessionRoute = (services: Services, input: SessionCreateInput): SessionSummary => {
   if (!services.runtime.getStatus().configured) {

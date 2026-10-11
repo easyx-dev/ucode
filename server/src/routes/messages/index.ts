@@ -16,14 +16,19 @@ import {
   sessionIdInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import { projectMessages } from "../../core/projection";
-import { admitCompact, admitEdit, admitPlanApproval, admitPrompt } from "../../core/run";
-import { transcriptStates } from "../../core/serialize";
+import { resolveSessionCwd } from "../../core/session-paths";
 import { env } from "../../env";
-import { resolveSessionCwd } from "../../harness/session-config";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { projectMessages } from "../../harness/pi/projection";
+import { transcriptStates } from "../../harness/pi/serialize";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
+import {
+  admitCompact,
+  admitEdit,
+  admitPlanApproval,
+  admitPrompt,
+} from "../../services/sessions/run";
 
 export const createMessagesRoute = (services: Services) => {
   const router = new Hono();

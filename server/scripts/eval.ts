@@ -24,10 +24,10 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { SessionMode } from "@ucode/contracts";
-import { PROMPT_SOURCES, type PromptSource } from "../src/constants";
-import type { PiRuntime } from "../src/core/runtime";
+import { PROMPT_SOURCES, type PromptSource } from "../src/constants/env";
 import { env } from "../src/env";
-import { buildSessionOptions } from "../src/harness/session-config";
+import type { PiRuntime } from "../src/harness/pi/runtime";
+import { buildSessionOptions } from "../src/harness/setup/session-config";
 import { createLocalGateway } from "./lib/local-gateway";
 
 const args = process.argv.slice(2);
@@ -80,7 +80,7 @@ const CASES: EvalCase[] = [
   {
     name: "list-files",
     mode: "build",
-    prompt: "列出 server/src/harness/prompt/locales 下的所有文件路径。",
+    prompt: "列出 server/src/harness/setup/prompt/locales 下的所有文件路径。",
     toolsAny: ["find", "ls", "grep"],
     textAny: ["zh-CN"],
   },

@@ -31,7 +31,7 @@ export type ContextUsage = {
    */
   estimated: boolean;
   /**
-   * 本次会话的压缩触发阈值（token）：到达它就自动压缩（见 `harness/budget`）。
+   * 本次会话的压缩触发阈值（token）：到达它就自动压缩（见 `harness/setup/budget`）。
    * 与窗口分开给出，因为触发点按「有效预算」算，不等于模型声明的窗口。
    */
   budget?: number | null;

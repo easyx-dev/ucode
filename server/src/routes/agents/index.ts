@@ -8,7 +8,7 @@ import {
   SESSION_MODES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
+import { resolveSessionCwd } from "../../core/session-paths";
 import { env } from "../../env";
 import {
   type AgentProfile,
@@ -17,10 +17,10 @@ import {
   PRIMARY_PROFILES,
   SUBAGENT_PROFILES,
   SUBAGENT_SLUGS,
-} from "../../harness/agents";
-import { resolveSessionCwd } from "../../harness/session-config";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+} from "../../harness/setup/agents";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 const toView = (slug: string, profile: AgentProfile, fallbackSource: "builtin"): AgentView => ({
   slug,

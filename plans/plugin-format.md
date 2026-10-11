@@ -104,7 +104,7 @@ my-plugin/
 - 相对插件根，必须以 `./` 开头（`skills` 另接受 `"."` 指插件根）。
 - 必须落在插件根内；含 `..` 或越界一律拒绝该组件并出诊断。
 - 路径不存在同样拒绝并诊断。
-- 校验复用（不另写第四份）：`server/src/utils/path.ts` 与 `harness/context` 的 realpath + 前缀判定
+- 校验复用（不另写第四份）：`server/src/platform/paths/index.ts` 与 `harness/features/context` 的 realpath + 前缀判定
   上提后的公共实现。
 
 ## 五、变量
@@ -126,9 +126,9 @@ my-plugin/
 ### 6.1 skills / commands
 
 - 底层名 `<pluginToken>-<componentToken>`，显示名 `<plugin>:<componentName>`。
-- 加载走**装配期**注入：`additionalSkillPaths` / `additionalPromptTemplatePaths`（`server/src/harness/session-config.ts:185-188`），
+- 加载走**装配期**注入：`additionalSkillPaths` / `additionalPromptTemplatePaths`（`server/src/harness/setup/session-config.ts:186-189`），
   改名走 loader 的 `skillsOverride` / `promptsOverride`——后者与既有的内置命令 override 组合，
-  不得覆盖 `withBuiltinPrompts`（`harness/assets/index.ts:65`）。
+  不得覆盖 `withBuiltinPrompts`（`harness/setup/assets/index.ts:65`）。
 - commands 的 object 内联定义与子目录扁平化（`commands/db/migrate.md` → 显示名
   `<plugin>:db:migrate`，底层 token 扁平化）。
 - 只透传 pi 认的 `description` / `argument-hint` / 正文，其余 frontmatter 出诊断。
@@ -187,7 +187,7 @@ WebFetch→webfetch  WebSearch→websearch  Task→subagent
 ### 6.4 MCP
 
 - 读 `.mcp.json` 与清单 `mcpServers`，变量替换后**合并进现有 MCP 扩展的 `loadConfig`**
-  （`harness/mcp/index.ts:29`），不走 `pi.registerMcpServer`（现状未用该 API）。
+  （`harness/setup/mcp/index.ts:29`），不走 `pi.registerMcpServer`（现状未用该 API）。
 - 服务器名 `plugin_<pluginToken>_<server>`，工具名对齐 `mcp__plugin_<pluginToken>_<server>__<tool>`。
 - 与用户自己的 `$APP_HOME/harness/mcp.json` 分组展示；同名以用户配置优先（出诊断）。
 - 插件 MCP 仍只给「默认工具集」的会话（沿用现状边界：MCP 会激活 codemode，绕过只读白名单）。
@@ -197,7 +197,7 @@ WebFetch→webfetch  WebSearch→websearch  Task→subagent
 - 收集启用插件的 `bin/` 目录（存在且含可执行文件）。
 - 注入会话 bash 的 **spawn env**：`PATH` 追加在末尾，用 `path.delimiter`，不遮蔽系统命令，
   不改 server 进程 PATH（自研 shell 扩展已覆盖内置 bash，`shellCommandPrefix` 不生效，
-  见 `harness/shell/index.ts:1-8`）。
+  见 `harness/features/shell/index.ts:1-8`）。
 - 平台语义（Windows 的可执行后缀与 PATH 分隔符）在实施时明确并写进测试。
 
 ### 6.6 pi TS 扩展

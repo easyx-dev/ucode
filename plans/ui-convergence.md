@@ -15,12 +15,12 @@
 
 1. **图片在模型侧无法落在句子中间**。pi 的 `prompt(text, images)`（`pi-coding-agent/dist/core/agent-session.d.ts`）
    只接受「一整段文本 + 图片数组」，内部拼成 `[{type:"text"}, ...images]` 写进会话 JSONL，
-   `server/src/core/serialize.ts` 的 `blocksOf` 也是按这个顺序投影文本块与图片块。
+   `server/src/harness/pi/serialize.ts` 的 `blocksOf` 也是按这个顺序投影文本块与图片块。
    所以内联在**编辑器里是真的内联**，发出去只能表达成「正文里的标记 + 按同一顺序附在末尾的图片」，
    模型靠标记里的序号对上第 N 张图。要真正交错内容块得等 pi 暴露 content parts。
 2. **编辑重发现在没有复用输入区编辑器**：`business/message-item.tsx` 里是一个 `rows={3}` 的 `<textarea>`，
    且 `messageEditInputSchema`（`packages/contracts/src/messages/input.ts`）只有 `sessionId` / `entryId` / `text`，
-   `admitEdit`（`server/src/core/run.ts`）也不走 `buildPrompt`——所以带附件 / 图片的消息一经编辑，附件必丢。
+   `admitEdit`（`server/src/services/sessions/run.ts`）也不走 `buildPrompt`——所以带附件 / 图片的消息一经编辑，附件必丢。
 
 ## 二、已锁定决策
 
@@ -90,9 +90,9 @@
    - `lib/message-chips.ts`：`parseUserMessage` 改成**段落化解析**并一次写足（批次二直接复用）——
      收集 `<context path>` 的相对路径用于在正文里精确定位 `@路径`（不误伤用户自己打的 `@张三`），
      剥离新的 `<command name="…" args="…">` 块并还原 `{ name, args }`。
-   - `server/src/core/run.ts`：`buildPrompt` 拆成「上下文 / 附件准备（不依赖会话）」+「命令展开后拼装」；
+   - `server/src/services/sessions/run.ts`：`buildPrompt` 拆成「上下文 / 附件准备（不依赖会话）」+「命令展开后拼装」；
      `/name args` 在 `ensure` 之后用 `session.promptTemplates` 自己展开成 `<command>` 不可信边界块
-     （复用 `harness/tools/untrusted` 的 `wrapUntrusted`），展开逻辑落 `server/src/harness/assets/expand.ts`，
+     （复用 `harness/utils/boundary` 的 `wrapUntrusted`），展开逻辑落 `server/src/harness/setup/assets/expand.ts`，
      `$ARGUMENTS` / `$@` / `$N` / `${N:-默认}` / `${@:N:L}` 的语义对齐 pi 的 `substituteArgs`
      （该函数未从包入口导出，需自己实现并配 `__tests__/expand.test.ts`）。pi 侧不会再重复展开（body 不再以 `/` 开头）。
    - `business/message-item.tsx` 的用户消息分支抽成 `business/user-message.tsx`：四类 chip 同一套样式；
@@ -122,9 +122,9 @@
 
 13. `packages/contracts/src/constants.ts` 的 `COMMAND_ASSET_SOURCES` 末尾加 `"builtin"`（最低优先级）并改注释口径
     「项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 内置」；重跑 `pnpm api:docs`。
-14. 新增 `server/src/harness/assets/builtin.ts`（正文即 `.agents/commands/review.md` 的内容，源码内常量，打包后可读）；
-    `harness/assets/index.ts` 放宽「无目录即空集」早退、合并内置（磁盘同名跳过）、内置来源标 `builtin`；
-    `harness/session-config.ts` 的 loader 用 `promptsOverride` 追加未被占用的内置命令（`createSyntheticSourceInfo`
+14. 新增 `server/src/harness/setup/assets/builtin.ts`（正文即 `.agents/commands/review.md` 的内容，源码内常量，打包后可读）；
+    `harness/setup/assets/index.ts` 放宽「无目录即空集」早退、合并内置（磁盘同名跳过）、内置来源标 `builtin`；
+    `harness/setup/session-config.ts` 的 loader 用 `promptsOverride` 追加未被占用的内置命令（`createSyntheticSourceInfo`
     造合成路径）；`assets/__tests__/assets.test.ts` 补「无磁盘目录仍有内置 `/review`」与「磁盘同名覆盖内置」。
 15. 仓库自带的 `.agents/commands/review.md` **保留**（同名优先级更高，本地仍可随手改）；`CHANGELOG.md` 记
     「新增内置提示词命令」与「`commands` 响应的 `source` 增加 `builtin`」。
@@ -145,7 +145,7 @@
 
 - 常量与扫描器收进 `packages/contracts/src/messages/markers.ts`，两端共用一份：图片 `图片 N`、
   非图片 `附件 N.<ext>`（N 按各自类型在本条消息内的出现顺序）；展开后的引用行构造函数也在那里。
-- 服务端（`harness/attachment/inline.ts`）按标记顺序就地展开：非图片换成引用行、图片标记留着（本体按标记顺序
+- 服务端（`harness/features/attachment/inline.ts`）按标记顺序就地展开：非图片换成引用行、图片标记留着（本体按标记顺序
   进 vision 数组）。对得上的条件是「数量一致 + 各自 1..N 连续升序 + 非图片写出的扩展名与该附件相同」；
   对不上（用户手打了同名标记、附件被删了一个）整段退回「引用行前置 + 图片按原顺序」的老路径。
 
@@ -175,17 +175,17 @@
 - A 组：`lib/session-groups.ts` + `lib/__tests__/session-groups.test.ts`（新）、`business/session-list-item.tsx`、
   `business/chat-header.tsx`、`business/chat-panel.tsx`、`workspace-layout.tsx`（分隔条 `-ml-3`、`onRenameSession`）。
 - B 组：`business/composer/editor.tsx`（历史扩展）、`business/composer.tsx`（去掉 `border-t`）。
-- C 组：`lib/message-chips.ts`（段落化解析 + 命令 chip + 引用分段）、`server/src/harness/assets/expand.ts`（新）、
-  `server/src/harness/tools/untrusted.ts`（`command` 边界）、`server/src/core/run.ts`（`preparePrompt` / `assemblePrompt`）、
+- C 组：`lib/message-chips.ts`（段落化解析 + 命令 chip + 引用分段）、`server/src/harness/setup/assets/expand.ts`（新）、
+  `server/src/harness/utils/boundary.ts`（`command` 边界）、`server/src/services/sessions/run.ts`（`preparePrompt` / `assemblePrompt`）、
   `business/message-blocks.tsx`（新，内容块抽取）、`business/user-message.tsx`（新）、`business/message-item.tsx`、
   `business/message-footer.tsx`（`CopyAction`）。
 - D 组：`lib/panel-layout.ts`、`workspace-layout.tsx`、`styles/theme.css`（全局滚动条）。
-- E 组：`server/src/harness/assets/builtin.ts`（新）、`assets/index.ts`、`harness/session-config.ts`、
+- E 组：`server/src/harness/setup/assets/builtin.ts`（新）、`assets/index.ts`、`harness/setup/session-config.ts`、
   `packages/contracts/src/constants.ts`、`assets/__tests__/assets.test.ts`、`docs/api-reference.md`（重跑 `pnpm api:docs`）。
 - 文档与文案：`DESIGN.md`（分栏 / 消息区 / 滚动条）、`packages/i18n`（`复制` / `已复制`）、`CHANGELOG.md`、`TODO.md`。
 
-- 批次二（全部落地）：`packages/contracts/src/messages/markers.ts`（新）、`server/src/harness/attachment/inline.ts`（新）
-  + `__tests__/inline.test.ts`（新）、`server/src/core/run.ts`（按标记内联）、`packages/ui/src/lib/composer-document.ts`、
+- 批次二（全部落地）：`packages/contracts/src/messages/markers.ts`（新）、`server/src/harness/features/attachment/inline.ts`（新）
+  + `__tests__/inline.test.ts`（新）、`server/src/services/sessions/run.ts`（按标记内联）、`packages/ui/src/lib/composer-document.ts`、
   `lib/message-chips.ts`、`lib/message-document.ts`（新）+ `__tests__/message-document.test.ts`（新）、
   `business/attachment-preview.tsx`（新）、`business/composer/attachment-chip.tsx`（新）、`composer/editor.tsx`
   （可复用 + 附件节点）、`composer/use-composer-attachments.ts`、`composer.tsx`、`business/message-edit-form.tsx`（新）、

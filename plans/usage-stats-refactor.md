@@ -2,7 +2,7 @@
 
 > 依赖：[`stage-10-usage-stats.md`](./stage-10-usage-stats.md)（已落地的旧方案，本文的出发点）、
 > [`docs/session-entries.md`](../docs/session-entries.md)（`ucode.step`、`ucode.compaction` 的登记）、
-> `server/src/harness/telemetry`（步级数据的写入方）。
+> `server/src/harness/features/telemetry`（步级数据的写入方）。
 >
 > 状态：**未开始**（方案定稿，待实施）。
 
@@ -10,13 +10,13 @@
 
 ### 1.1 现状的四个问题
 
-1. **一个类管三件事**：`harness/usage/index.ts:209-412` 的 `UsageService` 同时是「跨会话统计聚合」、
+1. **一个类管三件事**：`harness/features/usage/index.ts:209-412` 的 `UsageService` 同时是「跨会话统计聚合」、
    「上下文占用的进程内瞬时状态」（`estimated` / `compactions` / `budgets` 三张内存表，`:216-228`）、
    「会话文件解析的 mtime 缓存」（`CachedSessionUsage`，`:197-206`）。三者的生命周期与失效条件都不同，
    却共用 `forget` / 一次构造。
 2. **契约混装**：`packages/contracts/src/stats/output.ts` 里 `ContextUsage`（会话级瞬时值）与
    `StatsSummaryResponse`（区间历史聚合）挤在一起，前者其实跟着 `sessions/output.ts` 走。
-3. **`ucode.step` 完全进不了统计**：`collectPoints`（`harness/usage/index.ts:106`）只认四类条目
+3. **`ucode.step` 完全进不了统计**：`collectPoints`（`harness/features/usage/index.ts:106`）只认四类条目
    （assistant 消息 `:109`、`usage` `:125`、`compaction|branch_summary` `:137`），`custom` 一律跳过；
    `CachedSessionUsage`（`:197`）也只缓存 `points` + `contextTokens`。步级数据每步都在落盘，却没有任何
    读取方。
@@ -65,7 +65,7 @@
 ## 四、目标结构
 
 ```
-server/src/harness/usage/
+server/src/harness/features/usage/
 ├── parse.ts        （新）条目 → 用量点 / 步级点；readUsage、entryTimeMs、countToolCalls、contextTokensOfBranch
 ├── aggregate.ts    （改）纯派生：现有的分桶 / 连续天数 / 时长 + 新增步级聚合
 ├── context.ts      （新）上下文占用的运行期状态：estimated / compactions / budgets 与 contextUsageOf
@@ -73,12 +73,12 @@ server/src/harness/usage/
                         summary / forget），不再自己解析条目
 ```
 
-`harness/telemetry` 留在原处（它是写入方），但它导出的 `StepRecord` 类型被 `parse.ts` 复用——
+`harness/features/telemetry` 留在原处（它是写入方），但它导出的 `StepRecord` 类型被 `parse.ts` 复用——
 两者共用一份形状定义，避免解析侧再抄一遍字段。
 
 ## 五、步级聚合的前提：`ucode.step` 补三个字段 + 修正一个口径
 
-`StepRecord`（`harness/telemetry/index.ts:29-65`）现在的字段够算耗时与占比，但要出「每轮步数」与
+`StepRecord`（`harness/features/telemetry/index.ts:29-65`）现在的字段够算耗时与占比，但要出「每轮步数」与
 「按模型分桶」还缺三样，另有一处口径自相矛盾：
 
 ### 5.1 补 `userTurn`（用户轮序号）
@@ -121,16 +121,16 @@ server/src/harness/usage/
 | 1 | `packages/contracts/src/stats/context.ts`（新） | `ContextUsage` 迁入 |
 | 2 | `packages/contracts/src/stats/output.ts` | 删 `ContextUsage`；加步级聚合类型（`StepUsageTotals` / `StepUsageBucket` / `StatsStepSummary`）；`StatsSummaryResponse` 加 `steps` |
 | 3 | `packages/contracts/src/sessions/output.ts` | `ContextUsage` 的引用改到新位置 |
-| 4 | `server/src/harness/telemetry/index.ts` | `StepRecord` 加 `userTurn` / `provider` / `model` / `stopReason`；`ttftMs` 口径；新增 `beginUserTurn()` |
+| 4 | `server/src/harness/features/telemetry/index.ts` | `StepRecord` 加 `userTurn` / `provider` / `model` / `stopReason`；`ttftMs` 口径；新增 `beginUserTurn()` |
 | 5 | `server/src/core/pool.ts` | `startRun`（:295-313）/ `startInjectedRun`（:315-341）调 `telemetry.beginUserTurn()` |
-| 6 | `server/src/harness/usage/parse.ts`（新） | 从 `index.ts` 抽出条目解析；新增 `ucode.step` 的解析（非法形状跳过，不让一条坏记录打断整份统计） |
-| 7 | `server/src/harness/usage/context.ts`（新） | 抽出现有的瞬时状态与 `contextUsageOf` / `forget` 的那部分 |
-| 8 | `server/src/harness/usage/aggregate.ts` | 新增步级派生（见第 5 节的字段）与分位计算 |
-| 9 | `server/src/harness/usage/index.ts` | `UsageService` 收窄；`CachedSessionUsage` 扩 `steps` |
+| 6 | `server/src/harness/features/usage/parse.ts`（新） | 从 `index.ts` 抽出条目解析；新增 `ucode.step` 的解析（非法形状跳过，不让一条坏记录打断整份统计） |
+| 7 | `server/src/harness/features/usage/context.ts`（新） | 抽出现有的瞬时状态与 `contextUsageOf` / `forget` 的那部分 |
+| 8 | `server/src/harness/features/usage/aggregate.ts` | 新增步级派生（见第 5 节的字段）与分位计算 |
+| 9 | `server/src/harness/features/usage/index.ts` | `UsageService` 收窄；`CachedSessionUsage` 扩 `steps` |
 | 10 | `packages/ui/src/lib/usage-series.ts` | `cacheHitRate` 等纯函数（第七节） |
 | 11 | `packages/ui/src/business/usage/*` | 新增步级卡片；命中率进总览卡片、按模型、按日趋势 |
 | 12 | `packages/i18n/src/locales/ui/en.ts` | 新文案（步级卡片标题与指标名、命中率） |
-| 13 | `server/src/harness/usage/__tests__/` | 见第八节 |
+| 13 | `server/src/harness/features/usage/__tests__/` | 见第八节 |
 | 14 | `docs/session-entries.md` | `ucode.step` 行的 payload 说明更新（三个新字段 + `ttftMs` 口径） |
 | 15 | `docs/api-reference.md` | `pnpm api:docs` 重新生成（`StatsSummaryResponse` 多了字段） |
 | 16 | `CHANGELOG.md` | 「新增」（步级统计与缓存命中率）+「变更」（`ucode.step` 的 `ttftMs` 字段语义） |
@@ -138,11 +138,11 @@ server/src/harness/usage/
 ## 七、缓存命中率
 
 数据层早就具备：`UsageTotals`（`packages/contracts/src/stats/output.ts:9-15`）带 `cacheReadTokens` /
-`cacheWriteTokens`，解析在 `harness/usage/index.ts:52-59`，累加在 `aggregate.ts:28-34`，
+`cacheWriteTokens`，解析在 `harness/features/usage/index.ts:52-59`，累加在 `aggregate.ts:28-34`，
 所以 `total` / `byModel` / `bySession` / `daily` / `weekly` 全都已经带着它们——缺的只是派生与展示。
 
 - **口径**：`cacheHitRate = cacheReadTokens / (inputTokens + cacheReadTokens)`。
-  依据是项目里的既定口径——`calculateContextTokens(usage)`（`harness/usage/index.ts:100`，来自 pi）
+  依据是项目里的既定口径——`calculateContextTokens(usage)`（`harness/features/usage/index.ts:100`，来自 pi）
   把 `input + cacheRead` 当输入侧规模；telemetry 的 `contextTokens` 同口径
   （`telemetry/index.ts:58` 注释与 `:272` 的计算）。即 `input` 是**未命中缓存**那部分。
 - **`cacheWriteTokens` 不进分母**：那是写入成本侧，单独作为「缓存写入」呈现。
@@ -159,7 +159,7 @@ server/src/harness/usage/
 
 ## 八、测试
 
-`server/src/harness/usage/__tests__/`（沿用现有的合成条目夹具与临时目录会话文件两种写法）：
+`server/src/harness/features/usage/__tests__/`（沿用现有的合成条目夹具与临时目录会话文件两种写法）：
 
 - `parse`：`ucode.step` 正常解析；字段缺失 / 类型不对的记录被跳过且不影响其余记录；
   `stopReason` 为错误时四个时间字段允许为 `null`。

@@ -25,15 +25,33 @@ import {
   type WebsearchConfig,
 } from "@ucode/contracts";
 import {
-  RETRY_MAX_ATTEMPTS,
   SUBAGENT_MAX_CONCURRENCY,
   SUBAGENT_QUEUE_MAX,
   SUBAGENT_QUEUE_WAIT_MS,
-} from "../constants";
+} from "../constants/agents";
+import { RETRY_MAX_ATTEMPTS } from "../constants/session";
 import type { SessionRecord, SessionRepository } from "../db/session-repository";
 import { overrideOf } from "../db/session-repository";
 
 import { env } from "../env";
+import type { GoalService } from "../harness/features/goal";
+import { parseGoalState } from "../harness/features/goal/state";
+import type { PromptImage } from "../harness/features/image";
+import type { MemoryService } from "../harness/features/memory";
+import { pruneToolOutputs } from "../harness/features/prune";
+import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/features/subagents";
+import { StepTelemetry } from "../harness/features/telemetry";
+import type { UsageService } from "../harness/features/usage";
+import { compactionSkipReasonOf } from "../harness/pi/compaction-skip";
+import { isPlanAwaitingDecision } from "../harness/pi/plan-state";
+import { appendSessionRecord } from "../harness/pi/records";
+import {
+  hasRunSettingsChanged,
+  lastRunSettingsOf,
+  type RunSettings,
+} from "../harness/pi/run-settings";
+import type { PiRuntime } from "../harness/pi/runtime";
+import { managerToIndex } from "../harness/pi/session-index";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -46,36 +64,23 @@ import {
   resolveSubagentCapability,
   subagentProfile,
   usesDefaultToolSet,
-} from "../harness/agents";
-import type { SkillIndex } from "../harness/assets";
-import { matchSkillHit, matchSkillInvoke } from "../harness/assets/skill-hit";
-import type { GoalService } from "../harness/goal";
-import { parseGoalState } from "../harness/goal/state";
-import type { PromptImage } from "../harness/image";
-import type { MemoryService } from "../harness/memory";
-import type { PermissionRule, SessionAllowStore } from "../harness/permissions";
-import { pruneToolOutputs } from "../harness/prune";
-import { assembleSession, contextBudgetFor, resolveSessionCwd } from "../harness/session-config";
-import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/subagents";
-import { StepTelemetry } from "../harness/telemetry";
-import type { GoalToolHooks } from "../harness/tools/goal";
-import type { UsageService } from "../harness/usage";
-import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "../harness/workspace";
-import { logger } from "../lib/logger";
-import { AppError } from "../lib/response";
+} from "../harness/setup/agents";
+import type { SkillIndex } from "../harness/setup/assets";
+import { matchSkillHit, matchSkillInvoke } from "../harness/setup/assets/skill-hit";
+import type { PermissionRule, SessionAllowStore } from "../harness/setup/permissions";
+import { assembleSession, contextBudgetFor } from "../harness/setup/session-config";
+import type { GoalToolHooks } from "../harness/setup/tools/goal";
+import { logger } from "../platform/logger";
+import { AppError } from "../platform/response";
 import { isRecord } from "../utils/object";
-import { compactionSkipReasonOf } from "./compaction-skip";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
-import { isPlanAwaitingDecision } from "./plan-state";
-import { appendSessionRecord } from "./records";
 import { planRecycle } from "./recycle";
-import { hasRunSettingsChanged, lastRunSettingsOf, type RunSettings } from "./run-settings";
 import { RunTracker } from "./run-tracker";
-import type { PiRuntime } from "./runtime";
-import { managerToIndex } from "./session-index";
+import { resolveSessionCwd } from "./session-paths";
 import { sessionStatusOf } from "./session-status";
 import { describeSessionSummary } from "./session-summary";
+import { cleanOrphanWorkspaces, ensureWorkspaceDir, workspaceDirOf } from "./workspace";
 
 type PooledSession = {
   session: AgentSession;
@@ -505,7 +510,7 @@ export class SessionPool {
   }
 
   /**
-   * 清掉过期的工具输出（`context_edit` 只改模型看到的视图，见 `harness/prune`），并落一条
+   * 清掉过期的工具输出（`context_edit` 只改模型看到的视图，见 `harness/features/prune`），并落一条
    * `PRUNE_RECORD_CUSTOM_TYPE` 记录：上下文里那批工具输出是哪一轮、被谁清掉的、省了多少，
    * 只有文件里查得到。
    */
@@ -564,13 +569,15 @@ export class SessionPool {
               refresh: (id) => this.refreshIndex(id),
               settleInteractions: (id) => this.permissions.interactions.forgetSource(record.id, id),
               // 父会话正在跑（委派发生在它的工具调用里），记录走池里那个 manager
-              record: (data) =>
+              record: (data) => {
+                const live = this.get(record.id)?.sessionManager;
                 appendSessionRecord(
                   record,
                   SUBAGENT_RECORD_CUSTOM_TYPE,
                   { ...data, at: new Date().toISOString() },
-                  this.get(record.id)?.sessionManager,
-                ),
+                  live ? { live } : { cwd: resolveSessionCwd(record) },
+                );
+              },
               dispose: (id) => {
                 this.dispose(id);
               },

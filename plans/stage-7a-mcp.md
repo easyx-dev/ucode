@@ -47,7 +47,7 @@
 ### 2. server · MCP 配置读写`server/src/agent/mcp/`
 
 - `config.ts`
-  - `env.mcpConfigPath` = `resolve(env.agentDir, "mcp.json")`（文件名常量 `MCP_CONFIG_FILENAME` 放 `server/src/constants.ts`）；
+  - `env.mcpConfigPath` = `resolve(env.agentDir, "mcp.json")`（文件名常量 `MCP_CONFIG_FILENAME` 放 `server/src/constants/`）；
     `mcpConfigPathOf(agentDir)` 供装配层按会话实际 agentDir 取路径（评测 / 测试会覆盖它以隔离）。
   - `readMcpConfig()`：读文件 → JSON 解析 → zod 校验 `{ mcpServers: Record<name, mcpServerSchema> }`；
     文件缺失返回空；解析 / 校验失败返回 `{ servers: [], errors: [...] }`，不抛错（与 pi 的 `errors` 语义一致）。
@@ -92,7 +92,7 @@
 - `POST /api/v1/mcp/list` → `McpListResponse`
 - `POST /api/v1/mcp/upsert` → `McpWriteResponse`
 - `POST /api/v1/mcp/delete` → `McpDeleteResponse`
-- 入参走 `jsonBody(...)`，出参 `ok(...)`，响应生产点显式标注契约类型；在 `server/src/index.ts` 注册。
+- 入参走 `jsonBody(...)`，出参 `ok(...)`，响应生产点显式标注契约类型；在 `server/src/app.ts` 注册。
 - 改动 `mcp.json` 不影响已建会话实例：下一次 `pool.ensure`（模式切换 / 空闲回收 / 服务重启）才重新加载。
   路由响应用于前端刷新列表，不主动重建会话。
 

@@ -93,7 +93,7 @@ peer 抑制与 pnpm / bun 适配、git 的 ref 固定——自研等价物等于
 三条硬约束：
 
 1. **声明不落盘**：`installAndPersist` 依赖文件型 settings，而会话装配用的是
-   `SettingsManager.inMemory()`（`harness/session-config.ts:253`）。插件来源身份存在**我们自己的**
+   `SettingsManager.inMemory()`（`harness/setup/session-config.ts:261`）。插件来源身份存在**我们自己的**
    `plugins.json` 里，装配时以路径注入，不碰 pi 的 settings。
 2. **子进程输出**：pi 的安装子进程用 `stdio: "inherit"`（`dist/core/package-manager.js:2141-2147`），
    在 server 里会绕过 pino 直接打到 stdout。**实施前先做一次 spike**：装一个真实 npm 包，看输出是否
@@ -102,14 +102,14 @@ peer 抑制与 pnpm / bun 适配、git 的 ref 固定——自研等价物等于
 3. **环境要求**：机器上需要 `npm` 与 `git` 可执行文件；缺失时出诊断（`gitUnavailable` 一类已有先例），
    不让服务崩。
 
-git 侧现状约束：`lib/git` 的 `runGit` 只读取向（固定参数、10s 超时、16 MiB 缓冲，
-`server/src/constants.ts:158,161`），clone 需要单独的参数组合与超时；私有仓需系统 git 凭据预置
+git 侧现状约束：`services/git` 的 `runGit` 只读取向（固定参数、10s 超时、16 MiB 缓冲，
+`server/src/constants/tools.ts`），clone 需要单独的参数组合与超时；私有仓需系统 git 凭据预置
 （`GIT_TERMINAL_PROMPT=0` 决定它直接失败），**我们不落任何明文凭证**。
 
 ## 五、url 源与解包
 
-- **网络底座**：把 `harness/tools/ssrf.ts` 的 `assertPublicUrl` 与 `webfetch.ts` 的手动重定向取流
-  上提到 `server/src/lib/net/`（webfetch 反向引用），供路由层与市场复用，避免再写一套。
+- **网络底座**：把 `harness/setup/tools/ssrf.ts` 的 `assertPublicUrl` 与 `webfetch.ts` 的手动重定向取流
+  上提到 `server/src/platform/net/`（webfetch 反向引用），供路由层与市场复用，避免再写一套。
 - **解包**：支持 `.zip` 与 `.tgz`。依赖选型 `fflate`（zip）+ `tar`（tgz），两者都是纯 JS、无原生编译，
   不用动 `pnpm-workspace.yaml` 的 `allowBuilds`。Node 内置 `node:zlib` 有 gzip / inflateRaw 但**没有
   tar 解析器**，tar 的 pax / longlink / symlink 处理属高风险解析器，不自己写。

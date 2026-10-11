@@ -2,7 +2,7 @@
  * 命令行入口：解析启动参数、处理重启与状态查询，再交给服务主体。
  *
  * 生产入口：`pnpm start` 跑的就是本文件经 esbuild 打成的 `dist/` 产物；
- * 开发走 `server/src/index.ts`（tsx watch），不经这里。
+ * 开发走 `server/src/main.ts`（tsx watch），不经这里。
  * 参数也面向「用自己开发自己」：`--restart` 按注册文件的 pid 结束旧实例再启动，
  * 让服务生命周期由手动控制，避免开发环境 watch 重启打断正在进行的会话。
  */
@@ -13,8 +13,8 @@ import { parseArgs } from "node:util";
 
 import { brand } from "@ucode/brand/values";
 
-import { resourceRoot } from "./lib/app-paths";
-import { readServiceRegistration } from "./lib/service-file";
+import { resourceRoot } from "./platform/resources";
+import { readServiceRegistration } from "./platform/service-registration";
 
 const HELP = `用法：${brand.name} [选项]
 
@@ -172,7 +172,7 @@ if (parsed.status) {
 
 if (parsed.restart) await stopRunning(env.servicePath);
 
-const { listening } = await import("./index");
+const { listening } = await import("./main");
 const port = await listening;
 const url = `http://${toDisplayHost(env.host)}:${port}`;
 console.log(`${brand.name} 已启动：${url}`);

@@ -2,10 +2,9 @@
 import { emptyInputSchema, type ServerEvent } from "@ucode/contracts";
 import { Hono } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
-
-import type { Services } from "../../app";
-import { EVENTS_HEARTBEAT_MS, SUBSCRIBER_QUEUE_MAX } from "../../constants";
-import { jsonBody } from "../../lib/validate";
+import { EVENTS_HEARTBEAT_MS, SUBSCRIBER_QUEUE_MAX } from "../../constants/session";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 /** 统一的帧格式：SSE 事件名固定 message，真正的类型在 JSON 里 */
 const writeFrame = async (stream: SSEStreamingApi, frame: ServerEvent): Promise<void> => {

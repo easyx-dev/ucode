@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
-import { openDatabase } from "../index";
+import { openDatabase } from "..";
 import { overrideOf, SessionRepository } from "../session-repository";
 
 /** 造一份最小可解析的会话 JSONL：header + 若干 user 消息（对账只看 header 与消息时间） */

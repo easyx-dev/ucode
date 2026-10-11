@@ -2,8 +2,8 @@
 import type { HealthMinimalResponse } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { ok } from "../../lib/response";
-import { serviceVersion } from "../../lib/version";
+import { ok } from "../../platform/response";
+import { serviceVersion } from "../../platform/version";
 
 export const createHealthRoute = () => {
   const router = new Hono();

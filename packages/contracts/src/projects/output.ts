@@ -6,7 +6,7 @@ import type { PermissionMode, ThinkingPreference } from "../constants";
  * 项目：按会话工作目录（cwd）归口的一组偏好，供侧栏展示与新建会话时预填。
  *
  * 它是「这台机器上的某个目录」的概念，不属于任何一份会话记录，故不存在会话文件里；
- * 行随会话创建自动登记（见 `server/src/harness/project`），不提供删除。
+ * 行随会话创建自动登记（见 `server/src/services/projects`），不提供删除。
  */
 export type ProjectSummary = {
   id: string;

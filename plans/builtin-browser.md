@@ -56,7 +56,7 @@
    支持 abort 结算与 `forget(sessionId)`，与审批 / 提问一致。
 2. 桌面端渲染层订阅该帧 → 经 `BrowserBridge` 执行 → `POST /api/v1/browser/respond` 回传结果。
    收到请求时自动展开面板并切到浏览器标签（ZCode 行为）。
-3. 工具集（`harness/tools/browser/`）：`browser_open` / `browser_snapshot`（可交互元素摘要，
+3. 工具集（`harness/setup/tools/browser/`）：`browser_open` / `browser_snapshot`（可交互元素摘要，
    让模型少猜选择器）/ `browser_click` / `browser_type` / `browser_press` / `browser_scroll` /
    `browser_screenshot` / `browser_history` / `browser_tabs` / `browser_close`。
    截图由主进程 `capturePage()` → base64 → 渲染层上传 attachments → 应答带 `attachmentId`

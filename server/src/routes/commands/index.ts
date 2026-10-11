@@ -6,12 +6,12 @@ import {
   ERROR_CODES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
+import { resolveSessionCwd } from "../../core/session-paths";
 import { env } from "../../env";
-import { loadCommandAssets } from "../../harness/assets";
-import { resolveSessionCwd } from "../../harness/session-config";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { loadCommandAssets } from "../../harness/setup/assets";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 /** 列举所用的工作目录：优先会话，其次显式 cwd，最后助理工作区 */
 const resolveCwd = (services: Services, input: CommandsListInput): string => {

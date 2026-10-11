@@ -28,6 +28,15 @@ describe("parseUserMessage", () => {
     assert.equal(parsed.skill, undefined);
   });
 
+  it("技能名里的转义字符能还原（服务端会转义属性值）", () => {
+    const raw = '<skill name="a&amp;b" location="/skills/a&amp;b.md">\n正文\n</skill>\n\n看看这个';
+
+    const parsed = parseUserMessage(raw);
+
+    assert.deepEqual(parsed.skill, { name: "a&b" });
+    assert.equal(parsed.text, "看看这个");
+  });
+
   it("技能自成 chip，附件引用行留在句子里", () => {
     const raw =
       '<skill name="review" location="/skills/review.md">\n技能正文\n</skill>\n\n' +

@@ -2,7 +2,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { EventName } from "@ucode/contracts";
 
-import { messageToDTO, type TranscriptState } from "./serialize";
+import { messageToDTO, type TranscriptState } from "../harness/pi/serialize";
 
 /** 事件名与数据的组合；总线负责补 sessionId 与 seq */
 export type SseEvent = { event: EventName; data: Record<string, unknown> };

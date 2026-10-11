@@ -1,7 +1,7 @@
 /**
  * 用户消息的还原：前置展开块的剥离、正文里标记的切分、技能 / 命令 / 附件 chip 的取出。
  *
- * 服务端把注入内容拼成前置块与正文一起落进会话条目（顺序见 `server/src/core/run.ts`）：
+ * 服务端把注入内容拼成前置块与正文一起落进会话条目（顺序见 `server/src/services/sessions/run.ts`）：
  *   <skill …>…</skill> / <command …>…</command> / <context …>…</context> / 用户正文
  * 块内容只喂给模型，界面整体剥掉它们（不展开、不成段）：技能与命令各自出 chip 排在气泡上方，
  * 正文里的 `@` 引用、图片标记与附件引用行是句子成分，就地还原成可点 chip（位置即用户当初放的位置）。
@@ -12,8 +12,11 @@
 import {
   ATTACHMENT_REF_PATTERN,
   ATTACHMENT_REF_PREFIX,
+  COMMAND_TAG,
+  CONTEXT_TAG,
   type ContextRef,
   IMAGE_MARKER_PREFIX,
+  SKILL_TAG,
 } from "@ucode/contracts";
 
 import type { ComposerPayload } from "./composer-payload";
@@ -48,10 +51,16 @@ export type ParsedUserMessage = {
   text: string;
 };
 
-const SKILL_PATTERN = /^<skill name="([^"]*)" location="[^"]*">\n[\s\S]*?\n<\/skill>\n{0,2}/;
-const COMMAND_PATTERN = /^<command name="([^"]*)" args="([^"]*)">\n[\s\S]*?\n<\/command>\n{0,2}/;
-const CONTEXT_PATTERN =
-  /^<context path="([^"]*)"(?: lines="([^"]*)")?>\n[\s\S]*?\n<\/context>\n{0,2}/;
+// 标签名取自契约（服务端的包裹器用同一份名单）：名字一改两边同步，不会单边失效
+const SKILL_PATTERN = new RegExp(
+  `^<${SKILL_TAG} name="([^"]*)" location="[^"]*">\\n[\\s\\S]*?\\n</${SKILL_TAG}>\\n{0,2}`,
+);
+const COMMAND_PATTERN = new RegExp(
+  `^<${COMMAND_TAG} name="([^"]*)" args="([^"]*)">\\n[\\s\\S]*?\\n</${COMMAND_TAG}>\\n{0,2}`,
+);
+const CONTEXT_PATTERN = new RegExp(
+  `^<${CONTEXT_TAG} path="([^"]*)"(?: lines="([^"]*)")?>\\n[\\s\\S]*?\\n</${CONTEXT_TAG}>\\n{0,2}`,
+);
 /** 图片标记里的序号：前缀之后紧跟着的数字 */
 const IMAGE_ORDINAL = /^\d+/;
 /** 早期消息把附件引用行前置在正文头部：连同其后的换行一起剥，免得气泡里多出空行 */
@@ -162,7 +171,7 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
   for (;;) {
     const skillMatch = text.match(SKILL_PATTERN);
     if (skillMatch) {
-      skill = { name: skillMatch[1] ?? "" };
+      skill = { name: unescapeAttribute(skillMatch[1] ?? "") };
       text = text.slice(skillMatch[0].length);
       continue;
     }

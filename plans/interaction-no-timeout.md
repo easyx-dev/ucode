@@ -69,12 +69,12 @@
 `question` 之所以没这个问题，是因为它的 `ask(ask, signal)` 早就把 signal 接到了交互中转上；
 审批目前**没有**这条通道，只有 timer 兜底——所以「删 timer」必须与「接 signal」同一次做完。
 
-附带收益：子智能体超时 / 被中止时 `child.abort()`（`harness/subagents/spawn.ts:108`）也会立刻结算它挂起的审批，
+附带收益：子智能体超时 / 被中止时 `child.abort()`（`harness/features/subagents/spawn.ts:108`）也会立刻结算它挂起的审批，
 不再是「等 `settleInteractions` 收尾」。
 
 ## 五、改动清单
 
-### 1. `server/src/constants.ts`
+### 1. `server/src/constants/`
 
 删 `PERMISSION_APPROVAL_TIMEOUT_MS`（:61-62）与 `QUESTION_TIMEOUT_MS`（:64-65）及注释。
 
@@ -106,7 +106,7 @@ private settleOnAbort(requestId: string, signal?: AbortSignal): () => void {
   `signal?.aborted` 早返回保留。
 - `settle()`（:184-190）去掉 `clearTimeout(entry.timer)`。
 
-### 3. `server/src/harness/permissions/extension.ts`
+### 3. `server/src/harness/setup/permissions/extension.ts`
 
 - `PermissionGate.request`（:35-36）与 `PermissionHooks.request`（:45-46）加 `signal?: AbortSignal`，
   注释「超时 / 断连按 `deny`」→「本轮中断 / 会话清理按 `deny`」。
@@ -118,12 +118,12 @@ private settleOnAbort(requestId: string, signal?: AbortSignal): () => void {
 :364-369 的审批钩子改为 `request: (ask, signal) =>
 this.permissions.interactions.requestPermission(interactionSessionId, ask, signal, source)`。
 
-### 5. `server/src/harness/tools/question.ts`
+### 5. `server/src/harness/setup/tools/question.ts`
 
 - 文件头注释（:5）改「答复与取消都以可读结果回给模型」。
 - 删 `execute` 里的 `result.kind === "timeout"` 分支（:69-73）；`cancelled` 的可读错误保留。
 
-### 6. `server/src/harness/subagents/spawn.ts`
+### 6. `server/src/harness/features/subagents/spawn.ts`
 
 :230 注释「避免它超时前一直挂在前端」→「避免子会话已结束而请求仍挂在前端」。
 
@@ -133,11 +133,11 @@ this.permissions.interactions.requestPermission(interactionSessionId, ask, signa
   收敛为 `new InteractionBroker(bus)`；删「超时按拒绝结算」「超时结算为 timeout」两条；
   新增「本轮中断时挂起的审批按拒绝结算」（`AbortController` → `"deny"`）与「信号已中断时不挂起请求」
   （`list` 为空）；`forgetSource` 用例的调用改为 `requestPermission("p1", ask, undefined, { source })`。
-- `server/src/harness/permissions/__tests__/extension.test.ts`：`Handler` 增加 `ctx: ExtensionContext` 形参，
+- `server/src/harness/setup/permissions/__tests__/extension.test.ts`：`Handler` 增加 `ctx: ExtensionContext` 形参，
   加 `call(handler, event, signal?)` 小助手替换现有 `handler(callEvent(...))`；新增一条断言
   `gate.request` 收到的 signal 与 `ctx.signal` 是同一实例（防止信号在中间层被丢掉）。
-- `server/src/harness/tools/__tests__/question.test.ts`：头注释同步；删「超时抛可读错误」，「取消」保留。
-- `harness/__tests__/session-config.test.ts` 与 `harness/subagents/__tests__/spawn.test.ts` 的桩函数少参仍兼容，
+- `server/src/harness/setup/tools/__tests__/question.test.ts`：头注释同步；删「超时抛可读错误」，「取消」保留。
+- `harness/__tests__/session-config.test.ts` 与 `harness/features/subagents/__tests__/spawn.test.ts` 的桩函数少参仍兼容，
   不用改。
 
 ## 七、文档与变更日志

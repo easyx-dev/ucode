@@ -21,7 +21,8 @@ import {
   gitStatusInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
 import {
   assertGitRef,
   isTracked,
@@ -29,13 +30,11 @@ import {
   requireRepositoryRoot,
   resolveRepoPath,
   runDiff,
-} from "../../lib/git";
-import { readDiffContents } from "../../lib/git/contents";
-import { parseFileDiff } from "../../lib/git/diff";
-import { readCommit, readLog } from "../../lib/git/log";
-import { readRepositoryStatus } from "../../lib/git/status";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+} from "../../services/git";
+import { readDiffContents } from "../../services/git/contents";
+import { parseFileDiff } from "../../services/git/diff";
+import { readCommit, readLog } from "../../services/git/log";
+import { readRepositoryStatus } from "../../services/git/status";
 
 /** 未跟踪文件的 diff 需要 `--no-index` 与一个「空文件」参照；git 在 Windows 上也认 /dev/null */
 const NULL_PATH = "/dev/null";

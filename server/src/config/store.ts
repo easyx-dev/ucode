@@ -14,7 +14,7 @@ import {
 } from "@ucode/contracts";
 
 import { env } from "../env";
-import { AppError } from "../lib/response";
+import { AppError } from "../platform/response";
 
 export const emptyConfig = (): AppConfig => ({
   providers: [],

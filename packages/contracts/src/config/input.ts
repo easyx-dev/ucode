@@ -82,7 +82,7 @@ export const providerModelSchema = z.object({
   inputLimits: modelInputLimitsSchema.optional(),
   contextWindow: z.number().int().positive().default(128000),
   /**
-   * 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/budget`）。
+   * 有效上下文预算（token）：到达它就压缩，留空按窗口推算（见 `harness/setup/budget`）。
    * 单步延迟随上下文线性上升，而各模型的实际退化点相差很大（声明窗口常常远大于可用窗口），
    * 这里给一个人工覆盖的口子。
    */

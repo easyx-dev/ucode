@@ -22,7 +22,7 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
 /**
- * 思考档位的偏好：`auto` 表示按本会话模式的推荐档位（见 `harness/agents/profiles`），
+ * 思考档位的偏好：`auto` 表示按本会话模式的推荐档位（见 `harness/setup/agents/profiles`），
  * 其余取值是显式档位。会话行存的是偏好，实际注入 pi 的档位由装配层解析。
  */
 export const THINKING_PREFERENCES = ["auto", ...THINKING_LEVELS] as const;

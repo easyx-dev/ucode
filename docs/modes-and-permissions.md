@@ -19,7 +19,7 @@
 ## 会话模式
 
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
-内置三个，声明在 `server/src/harness/agents/profiles.ts`，工具名清单在 `server/src/harness/tools/names.ts`。
+内置三个，声明在 `server/src/harness/setup/agents/profiles.ts`，工具名清单在 `server/src/harness/setup/tools/names.ts`。
 工具集里有两个条件注册项：记忆工具与目标结算工具（`goal_complete` / `goal_blocked`）只在**会话有 active 目标**
 时挂上，且仅限**未断写盘**的默认集会话（即 `build`；判定见 `isReadOnlyCapability`）——只读模式不该有
 「结算目标」这回事，子会话不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复
@@ -72,7 +72,7 @@
 
 ## 权限引擎
 
-实现：`server/src/harness/permissions/`。规则是声明式的，挂在 pi 的 `tool_call` 拦截上
+实现：`server/src/harness/setup/permissions/`。规则是声明式的，挂在 pi 的 `tool_call` 拦截上
 （`extension.ts` + `DefaultResourceLoader({ extensionFactories })`，装配在 `session-config.ts`）。
 
 ### 规则与判定

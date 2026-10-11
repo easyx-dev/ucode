@@ -103,7 +103,7 @@
 | [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、分层依赖方向（layers）、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令
@@ -119,6 +119,7 @@
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层 `:5174`）；服务需另行启动，跨域来源见 `.env.example` |
+| `pnpm start:desktop` | 构建桌面端后由 Electron 直接加载产物（`file://`，不起渲染层服务；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
 
 **起 dev 前显式覆盖 `APP_HOME`**：服务的取值顺序是「显式环境变量 > `service.json` > `.env`」，
 所以从已导出 `APP_HOME` 的 shell 里起 dev（生产实例自己起的会话、桌面端进程都会导出）会绕过 `.env`，
@@ -195,21 +196,65 @@ agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里�
 
 完整规则见 [`docs/api.md`](./docs/api.md)。server 侧只强调三点：
 
-- 出参统一走 `lib/response` 的 `ok()` / `fail()`，不手写封套；错误码从 `ERROR_CODES` 取，不写字面量。
+- 出参统一走 `platform/response` 的 `ok()` / `fail()`，不手写封套；错误码从 `ERROR_CODES` 取，不写字面量。
 - 响应生产点必须显式标注契约类型（或 `satisfies`），契约改字段要让 server 编译失败。
 - 请求校验 schema 与响应类型放 `packages/contracts/src/<domain>/{input,output}.ts`，先落契约再写路由。
 
 ### server 目录约定
 
-- `routes/` 与 `lib/` 下一级一律是文件夹（`routes/health/index.ts`、`lib/response/index.ts`），
-  不直接放 `.ts` 文件；`core/`、`utils/`、`constants.ts` 保持单文件。
-- `core/` 是 pi SDK 封装；`harness/` 是会话装配层（把覆盖值与运行时收敛成 `createAgentSession` 参数，
-  后续模式 / 工具集 / 自研提示词都在这里汇入）；`lib/` 是服务端基建（封套 / 校验中间件 / 日志）；
-  `utils/` 只放无业务语义的纯函数；默认值与固定目录名放 `constants.ts`。
-  `harness/` 里几个自带子系统：`budget.ts`（窗口 → 压缩触发点，唯一口径）、`prune/`（清过期工具输出）、
-  `telemetry/`（每步耗时归因，写成 `ucode.step` 条目）。
+server 侧分五层，依赖方向单一：`routes → services → core → harness → pi`；`platform` 是基建，不许反向
+依赖上层。这条由 `scripts/verify` 的 layers 校验兜底（`harness` 依赖 `core` 只能 `import type`、
+`harness/pi` 不得反向依赖 `harness/setup|features`、`core` 不得引用 `services`、`platform` 与 `utils`
+不得依赖 `routes` / `services` / `core` / `harness` / `db` / `config`。
+根部文件（`env.ts` 等）不在校验范围内，是刻意的：`platform/logger` 要取日志级别，这一条边允许存在）。
+
+| 层 | 职责 | 判据 |
+| --- | --- | --- |
+| `routes/` | 协议适配：Hono 路由、zod 校验、封套、SSE | 只做 HTTP 适配，不写业务判断 |
+| `services/` | 业务与胶水：用例编排、进程生命周期、跨组件连线 | 被 routes 调用；`lifecycle.ts` / `config.ts` 是两个进程级入口 |
+| `core/` | 内核·会话运行态 | 持有 `AgentSession` 或进程内运行态（池、占位、挂起请求、事件流） |
+| `harness/` | 基于 pi 的能力 | 直接构造 / 转换 / 驱动 pi 的对象与数据结构 |
+| `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
+| `utils/` | 纯函数：`object` / `time` | 无 IO、不引用任何 server 层 |
+
+- `platform/` 里的 `paths` 与 `resources` 是两回事：前者是**用户 / 会话给出的路径**的归一与校验
+  （纯变换，入参决定结果），后者是**本进程自己的随包资源根**（由模块位置推出的常量）。
+
+- 路径形态：根目录只放入口与装配（`main.ts` / `cli.ts` / `app.ts` / `env.ts`）；`routes/`、`services/`、
+  `platform/` 下一级一律是文件夹（域目录里只放 `index.ts` 与 `__tests__`，不直接放 `.ts`）；
+  `core/`、`utils/` 保持单文件，`constants/` 按域拆文件。
+- `constants/` 按域拆文件：`dirs`（目录名与文件名）、`session`（事件、重试、上下文预算、旧输出清理）、
+  `tools`（联网 / shell / `@` 引用 / fs / git）、`agents`（角色与子智能体）、`attachments`、
+  `memory` / `title` / `goal`（三个功能域）、`auth`、`env`（环境白名单）。
+  消费方**按域引入**（`from "../constants/session"`），不设汇总再导出的桶文件；
+  默认值与固定目录名都放这里。
+- **`utils` 的定义是「模块内聚的公共方法」，判据是作用域而不是纯度**：
+  - 顶层 `utils/` 强调跨模块的通用性，所以要求纯函数——无 IO、无业务语义、不引用任何 server 层
+    （由 `layers` 校验兜底）；
+  - 模块内的 `utils/`（如 `harness/utils/`）只在模块内使用、作用域不出模块，因此**允许有 IO 与业务语义**；
+    它本来就不该被模块外引用。
+  新增一个方法时的选择：多个模块都要用 → 顶层 `utils/`（得是纯函数）；只在本模块内共用 → 本模块的 `utils/`。
+- `harness/` 分三组 + 一个公共方法目录：
+  - `pi/`：与 pi 的数据 / 对象互转（`runtime` / `provider-config` / `session-index` / `records` / `serialize` /
+    `projection` / `plan-state` / `compaction-skip` / `run-settings`）；只依赖 contracts、`harness/utils` 与顶层 `utils`；
+  - `setup/`：一次装配所需的全部（`session-config` / `agents` / `permissions` / `tools` / `prompt` / `mcp` /
+    `assets` / `budget`）；
+  - `features/`：会话跑起来之后的能力（`goal` / `memory` / `prune` / `telemetry` / `title` / `usage` /
+    `subagents` / `shell` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
+    这批是「内置功能」，后续按 [`plans/plugins.md`](./plans/plugins.md) 逐块迁成插件，迁完后应消失；
+  - `utils/`：harness 内的公共方法（`text.ts` 取消息文本、`boundary.ts` 不可信内容的边界包裹与中和，
+    后者的标签名单在 `packages/contracts`）。按下一段关于 `utils` 的定义，它只服务于 harness，
+    **不要求纯函数**；`layers` 会拦下它反向依赖 `pi` / `setup` / `features`。
+- 会话工作目录与工作区的口径在 `core/`（`session-paths.ts` / `workspace.ts`）：它们是本服务的会话概念，
+  被 core、services、routes 与 pi 适配共用；`harness/pi` 需要时由调用方把解析结果当参数传进去
+  （这样 `harness` 依赖 `core` 才能保持「只取类型」）。
+- `core/` 不读应用配置（配置以注入形式进来）、不装配工具 / 提示词 / 权限、不与 pi 做格式转换；
+  `harness/` 依赖 `core/` 只能 `import type`，需要内核编排能力时由 core 以回调的形式注入。
+- **内核与宿主**（供插件平台引用）：「内核」不是某个目录，而是 `core/` + `harness/{pi,setup}` +
+  `platform/` + `db/` + `config/` 的并集，是插件永远碰不到的东西；「宿主」是 `harness/plugins/` +
+  `services/plugins/`。
 - 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
-- 日志统一走 `lib/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
+- 日志统一走 `platform/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
 
 ### 目录与临时文件
 

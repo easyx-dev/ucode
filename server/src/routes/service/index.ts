@@ -6,12 +6,11 @@ import {
   serviceHostInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import type { Services } from "../../app";
 import { env } from "../../env";
-import { ok } from "../../lib/response";
-import { writeServiceRegistration } from "../../lib/service-file";
-import { jsonBody } from "../../lib/validate";
+import { ok } from "../../platform/response";
+import { writeServiceRegistration } from "../../platform/service-registration";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 export const createServiceRoute = (services: Services) => {
   const router = new Hono();

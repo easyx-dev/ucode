@@ -1,5 +1,5 @@
 /**
- * 约定校验入口：migrations / contracts / api-docs / tokens / design / themes / brand / i18n / session-entries / manifest / tests。
+ * 约定校验入口：migrations / contracts / api-docs / layers / tokens / design / themes / brand / i18n / session-entries / manifest / tests。
  *
  * 由根 `pnpm check` 调用（`biome check . && pnpm -r typecheck && pnpm -r test && node scripts/verify/index.ts`）。
  * 任一检查不通过即非零退出，输出处会用「文件:行」定位。
@@ -12,6 +12,7 @@ import { run as runAppearance } from "./checks/appearance.ts";
 import { run as runContracts } from "./checks/contracts.ts";
 import { run as runDesign } from "./checks/design.ts";
 import { run as runI18n } from "./checks/i18n.ts";
+import { run as runLayers } from "./checks/layers.ts";
 import { run as runManifest } from "./checks/manifest.ts";
 import { run as runMigrations } from "./checks/migrations.ts";
 import { run as runSessionEntries } from "./checks/session-entries.ts";
@@ -25,6 +26,7 @@ const CHECKS: Array<{ name: string; run: (root: string) => string[] }> = [
   { name: "migrations", run: runMigrations },
   { name: "contracts", run: runContracts },
   { name: "api-docs", run: runApiDocs },
+  { name: "layers", run: runLayers },
   { name: "tokens", run: runTokens },
   { name: "design", run: runDesign },
   { name: "themes", run: runThemes },

@@ -258,7 +258,7 @@ const toModelPayload = (model: DraftModel) => ({
   name: model.name.trim() || undefined,
   reasoning: model.reasoning,
   contextWindow: Number(model.contextWindow) || 128000,
-  // 留空即不写进配置：预算由服务端按窗口推算（见 harness/budget）
+  // 留空即不写进配置：预算由服务端按窗口推算（见 harness/setup/budget）
   ...(Number(model.contextBudget) > 0 ? { contextBudget: Number(model.contextBudget) } : {}),
   maxTokens: Number(model.maxTokens) || 8192,
   input: model.input,

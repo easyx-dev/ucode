@@ -15,10 +15,14 @@ import {
   IMAGE_MIME_TYPES,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import { isAttachmentId, putAttachment, resolveAttachment } from "../../harness/attachment";
-import { storeImage } from "../../harness/image";
-import { AppError, ok } from "../../lib/response";
+import {
+  isAttachmentId,
+  putAttachment,
+  resolveAttachment,
+} from "../../harness/features/attachment";
+import { storeImage } from "../../harness/features/image";
+import { AppError, ok } from "../../platform/response";
+import type { Services } from "../../services";
 
 const isImageMime = (value: string): boolean =>
   (IMAGE_MIME_TYPES as readonly string[]).includes(value);

@@ -18,7 +18,7 @@
    而那张卡默认收起（`tool-call.tsx` 的 `open` 初值 `false`）——不点开就完全看不见。
 2. **目标进度**：`GoalBar` 已在输入区上方展示状态与用量，但「第几轮、这一轮花了多少、下一步是什么」
    要展开「目标轮次」才看得到。
-3. **bash 工具调起的后台服务**：**服务端没有任何记录**。`harness/shell/` 三层封装只透传
+3. **bash 工具调起的后台服务**：**服务端没有任何记录**。`harness/features/shell/` 三层封装只透传
    `BashOperations.exec(command, cwd, options)`，拿不到 pid / 进程组 / 端口；条目、投影与事件流里都没有这类信息。
 
 **目标**：对话区右下角一枚悬浮入口（有活动才出现），把这三块收敛到一张只读面板里——一眼看全，
@@ -99,7 +99,7 @@ exec 后：fire-and-forget 结算
 
 ### 4.3 包裹位置与异常路径
 
-插在 `createLocalBashOperations()` 之外、`withShellGuard` 之内（`harness/shell/index.ts:19-37` 的流水线）：
+插在 `createLocalBashOperations()` 之外、`withShellGuard` 之内（`harness/features/shell/index.ts:19-37` 的流水线）：
 
 - `withBlockedCommands` 是最外层且命中即 `return`（`blocked.ts:43-53`），**被拦下的命令根本进不来**，
   不会为一条没跑的命令探测；
@@ -145,10 +145,10 @@ client: engine.applyFrame 直接替换 state.services
 
 | 文件 | 改动 |
 | --- | --- |
-| `server/src/constants.ts` | `SERVICE_PROBE_TIMEOUT_MS`（300）、`SERVICE_OUTPUT_CAPTURE_MAX_BYTES`（64 KiB）、`SERVICE_MAX_TRACKED_PER_SESSION`（20，防清单膨胀） |
-| `server/src/harness/shell/services.ts`（新） | 纯函数 `portsFromCommand` / `portsFromOutput` / `isLoopbackHost` + `probePort`（`net.createConnection` → `127.0.0.1`）+ `withServiceWatch(base, deps)` |
-| `server/src/harness/shell/index.ts` | `createShellExtension(deps?)` 接探测钩子，插进 `:24-29` 的流水线 |
-| `server/src/harness/session-config.ts` | `SessionAssemblyInput` 加 `services?: ServiceWatchHooks`（`:94-126`）；`:197` 改 `createShellExtension(input.services)` |
+| `server/src/constants/` | `SERVICE_PROBE_TIMEOUT_MS`（300）、`SERVICE_OUTPUT_CAPTURE_MAX_BYTES`（64 KiB）、`SERVICE_MAX_TRACKED_PER_SESSION`（20，防清单膨胀） |
+| `server/src/harness/features/shell/services.ts`（新） | 纯函数 `portsFromCommand` / `portsFromOutput` / `isLoopbackHost` + `probePort`（`net.createConnection` → `127.0.0.1`）+ `withServiceWatch(base, deps)` |
+| `server/src/harness/features/shell/index.ts` | `createShellExtension(deps?)` 接探测钩子，插进 `:24-29` 的流水线 |
+| `server/src/harness/setup/session-config.ts` | `SessionAssemblyInput` 加 `services?: ServiceWatchHooks`（`:94-126`）；`:197` 改 `createShellExtension(input.services)` |
 | `server/src/core/background-services.ts`（新） | `BackgroundServices` 类，按 `RunTracker` 先例：持 `SessionEventBus`，`observe(sessionId, { command, cwd, port })` / `refresh(sessionId)` / `listOf(sessionId)` / `forget(sessionId)`，**状态真的变了才 emit** |
 | `server/src/core/pool.ts` | 构造时 `new BackgroundServices(this.events)`；`:669-671` 旁注入 hook（子会话不注入）；`:801-803` 的主会话分支调 `refresh`；`dispose`（`:1061` 附近）调 `forget`；加 `listServicesOf(sessionId)` 转发 |
 | `server/src/routes/messages/index.ts` | `:59` 旁加 `services: services.pool.listServicesOf(sessionId)` |
@@ -196,7 +196,7 @@ pool 只留「创建 / 注入 / 转发 / 清理」四处接线。
 
 `node:test` + `node:assert/strict`，与被测模块同级 `__tests__/`：
 
-- `server/src/harness/shell/__tests__/services.test.ts`：
+- `server/src/harness/features/shell/__tests__/services.test.ts`：
   - `portsFromCommand` / `portsFromOutput`：URL 形态、`--port` / `PORT=` / `port N`、重复端口去重、
     非回环 host 丢弃、正文里的数字不被误认成端口；
   - 命中判定：pre 可连 → 不算（挡住「探到别人已有的服务」）；pre 不可连 ∧ post 可连 → 算；

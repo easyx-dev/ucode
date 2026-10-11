@@ -20,7 +20,7 @@ import type {
   QuestionInteraction,
   QuestionItem,
 } from "@ucode/contracts";
-import type { PermissionAsk } from "../harness/permissions";
+import type { PermissionAsk } from "../harness/setup/permissions";
 import type { SessionEventBus } from "./event-bus";
 
 /** question 的结算结果：用户答复 / 本轮中断或会话关闭 */

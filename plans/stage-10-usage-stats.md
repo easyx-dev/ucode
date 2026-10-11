@@ -67,7 +67,7 @@
 - **`server/src/app.ts`**：装配 `UsageService`（复用同一仓储），加入 `Services`。
 - **`server/src/routes/stats/index.ts`（新）**：`POST /stats/summary`。
 - **`server/src/routes/sessions/index.ts`**：`describeSession` 带上 `usage`。
-- **`server/src/index.ts`**：挂载 `/stats`。
+- **`server/src/app.ts`**：挂载 `/stats`。
 - **无 DB / schema 变更**，`docs/database.md` 不动。
 
 ## 六、前端改动

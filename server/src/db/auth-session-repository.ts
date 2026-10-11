@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 
-import { openDatabase } from "./index";
+import { openDatabase } from "./";
 
 export type AuthSessionRecord = {
   /** 会话 id（uuid），用于展示与撤销 */

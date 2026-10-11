@@ -102,7 +102,7 @@ server/src/agent/
 
 - 契约先行：请求 schema 与响应类型落 `packages/contracts/src/<domain>/{input,output}.ts`。
 - 环境变量统一 `APP_` 前缀；错误码从 `ERROR_CODES` 取，不写字面量。
-- 出参走 `lib/response` 的 `ok()` / `fail()`；响应生产点标注契约类型。
+- 出参走 `platform/response` 的 `ok()` / `fail()`；响应生产点标注契约类型。
 - 中文注释 / 文案；界面文案走 i18n（key 用中文原文，中英目录齐平）。
 - 涉及流程状态（脚本、环境变量、启动方式、依赖、目录结构、对外接口）时同步 `CHANGELOG.md`。
 - 每阶段结束执行 `pnpm check`。

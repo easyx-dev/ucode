@@ -2,7 +2,7 @@
  * /api/v1/auth：登录、登出、whoami、改密码、活动会话列表与撤销、签发并兑换一次性配对码。
  *
  * 凭证不放 Cookie：登录与兑换都把会话 token 直接回给客户端，由客户端放进 `Authorization: Bearer`
- * （见 `lib/auth/middleware.ts`）。服务端不做本地化：失败走 AppError + ERROR_CODES，正文按契约返回。
+ * （见 `services/auth/middleware.ts`）。服务端不做本地化：失败走 AppError + ERROR_CODES，正文按契约返回。
  */
 import { getConnInfo } from "@hono/node-server/conninfo";
 import {
@@ -25,14 +25,13 @@ import {
 } from "@ucode/contracts";
 import type { Context } from "hono";
 import { Hono } from "hono";
-
-import type { Services } from "../../app";
 import type { AuthSessionRecord } from "../../db/auth-session-repository";
-import type { AuthVariables, Principal } from "../../lib/auth/middleware";
-import { pickLanAddress } from "../../lib/auth/net";
-import { isSecureRequest } from "../../lib/auth/request";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
+import type { AuthVariables, Principal } from "../../services/auth/middleware";
+import { pickLanAddress } from "../../services/auth/net";
+import { isSecureRequest } from "../../services/auth/request";
 
 /** 会话记录 → 对外视图；token 哈希不外泄 */
 const toSessionView = (record: AuthSessionRecord): AuthSessionView => ({

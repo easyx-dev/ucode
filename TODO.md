@@ -36,11 +36,11 @@
 
 ## 需求 · 步级耗时统计的聚合与展示
 
-**现象**：每步的耗时已经把三段拆开记进会话（`ucode.step` 条目，见 `server/src/harness/telemetry`），
+**现象**：每步的耗时已经把三段拆开记进会话（`ucode.step` 条目，见 `server/src/harness/features/telemetry`），
 但还没有聚合出口与展示——用量面板看不到「每轮步数 / 平均每步耗时 / 首 token 占比 / 工具耗时占比」，
 于是「压缩阈值定多少、要不要降 thinking 档、并发子智能体要不要错峰」这些判断仍要手工扫会话文件。
 
-**待办**：在 `harness/usage` 的派生里加上步级聚合，落到 `packages/contracts/src/stats/output.ts`
+**待办**：在 `harness/features/usage` 的派生里加上步级聚合，落到 `packages/contracts/src/stats/output.ts`
 并在用量面板展示。**使用统计整体会另行重构**，这条可以并入那次重构，或等重构后按新结构补——
 数据已经在按步落盘，缺的只是聚合与呈现。
 
@@ -94,7 +94,7 @@
 
 **现象**：三块「跑着但不在视野里」的状态散在界面上——进行中的子智能体只内联在默认收起的工具卡里
 （不点开完全看不见）、目标进度要展开「目标轮次」才看得到、`bash` 工具起的后台服务则**完全没有记录**
-（`server/src/harness/shell/` 只透传 `BashOperations.exec`，拿不到 pid、端口与进程关系）。
+（`server/src/harness/features/shell/` 只透传 `BashOperations.exec`，拿不到 pid、端口与进程关系）。
 
 **方案**：[`plans/activity-panel.md`](./plans/activity-panel.md)（方案定稿，待实施）。
 

@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { openDatabase } from "..";
 import { type AuthSessionRecord, AuthSessionRepository } from "../auth-session-repository";
-import { openDatabase } from "../index";
 
 const created: string[] = [];
 

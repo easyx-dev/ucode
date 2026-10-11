@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { SessionRepository } from "../../db/session-repository";
-import type { GoalService } from "../../harness/goal";
-import type { MemoryService } from "../../harness/memory";
-import type { SessionAllowStore } from "../../harness/permissions";
-import type { UsageService } from "../../harness/usage";
+import type { GoalService } from "../../harness/features/goal";
+import type { MemoryService } from "../../harness/features/memory";
+import type { UsageService } from "../../harness/features/usage";
+import type { PiRuntime } from "../../harness/pi/runtime";
+import type { SessionAllowStore } from "../../harness/setup/permissions";
 import { SessionEventBus } from "../event-bus";
 import { InteractionBroker } from "../interactions";
 import { SessionPool } from "../pool";
-import type { PiRuntime } from "../runtime";
 
 /** 构造只存引用的池：除仓储的 find 外，其余依赖在以下用例里都不被触达 */
 const createPool = (): { pool: SessionPool; events: SessionEventBus } => {

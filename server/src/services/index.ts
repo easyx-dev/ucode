@@ -1,0 +1,192 @@
+/** 服务装配：把仓储、运行时、会话池与各领域服务装成 routes 依赖的 Services 容器 */
+import type { AppConfigPatchInput } from "@ucode/contracts";
+import { INTERACTION_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
+
+import { ConfigStore } from "../config/store";
+import { SessionEventBus } from "../core/event-bus";
+import { InteractionBroker } from "../core/interactions";
+import { SessionPool } from "../core/pool";
+import { resolveSessionCwd } from "../core/session-paths";
+import { openDatabase } from "../db";
+import { AttachmentRepository } from "../db/attachment-repository";
+import { AuthSessionRepository } from "../db/auth-session-repository";
+import { ProjectRepository } from "../db/project-repository";
+import { SessionRepository } from "../db/session-repository";
+import { env } from "../env";
+import { GoalService } from "../harness/features/goal";
+import { MemoryService } from "../harness/features/memory";
+import { TitleService } from "../harness/features/title";
+import { UsageService } from "../harness/features/usage";
+import { appendSessionRecord } from "../harness/pi/records";
+import { PiRuntime } from "../harness/pi/runtime";
+import { hasPrimaryMode, loadAgentRegistry } from "../harness/setup/agents";
+import { contextBudgetOf } from "../harness/setup/budget";
+import { SessionAllowStore } from "../harness/setup/permissions";
+import type { ServiceRegistration } from "../platform/service-registration";
+import { CredentialStore } from "./auth/credentials";
+import { PairingStore } from "./auth/pairing";
+import { RateLimiter } from "./auth/rate-limit";
+import { SessionService } from "./auth/sessions";
+import { createConfigService } from "./config";
+import { createLifecycle } from "./lifecycle";
+import { ProjectService } from "./projects";
+
+export type Services = {
+  config: ConfigStore;
+  /** 会话元数据与索引（SQLite） */
+  sessions: SessionRepository;
+  /** 附件元数据（SQLite）；字节在 `$APP_HOME/app/attachments` */
+  attachments: AttachmentRepository;
+  /** 项目偏好：按 cwd 归口的展示名与最近的会话参数 */
+  projects: ProjectService;
+  runtime: PiRuntime;
+  pool: SessionPool;
+  /** 会话事件总线：/events 的唯一数据源 */
+  events: SessionEventBus;
+  /** 交互中转：权限审批等「服务端提问、前端回答」的挂起请求 */
+  interactions: InteractionBroker;
+  /** 会话级权限状态：审批弹窗里的「本会话恒允」 */
+  permissions: SessionAllowStore;
+  /** 使用统计：从会话记录聚合 token 用量，不落库 */
+  usage: UsageService;
+  /** 目标模式：会话目标状态与落定后的校验续跑 */
+  goals: GoalService;
+  /** 会话标题：首条消息得到回复后自动起名 */
+  titles: TitleService;
+  /** 鉴权：凭证、登录会话、一次性配对码与登录限流 */
+  auth: {
+    credentials: CredentialStore;
+    sessions: SessionService;
+    pairing: PairingStore;
+    loginLimiter: RateLimiter;
+    /** 服务注册信息（host / port 等）；端口自选时 index 会在监听后回写同一个对象 */
+    registration: ServiceRegistration;
+  };
+  /** 更新配置：落盘 + 按需重建 ModelRuntime，并把内存会话回收成「下次访问按新配置重装」 */
+  applyConfig(patch: AppConfigPatchInput): Promise<void>;
+  /** 用当前配置重建运行时（手动刷新模型目录） */
+  reload(): Promise<void>;
+  /** 关闭共享的 SQLite 连接 */
+  close(): void;
+};
+
+export const createServices = async (registration: ServiceRegistration): Promise<Services> => {
+  // 单进程单连接：几个仓储共用同一个句柄，关闭也由这里统一负责
+  const db = openDatabase();
+  const config = new ConfigStore();
+  const sessions = new SessionRepository(db);
+  const attachments = new AttachmentRepository(db);
+  const authSessions = new SessionService(new AuthSessionRepository(db));
+  const credentials = new CredentialStore(registration, env.servicePath);
+  const pairing = new PairingStore();
+  const loginLimiter = new RateLimiter();
+  const runtime = new PiRuntime();
+  const events = new SessionEventBus();
+  const projects = new ProjectService({
+    repository: new ProjectRepository(db),
+    isModelUsable: (ref) => Boolean(runtime.resolveModelRef(ref)),
+    // 自定义 primary 角色随项目目录走，故可用性判定要按该项目的 cwd 读一次角色注册表
+    hasMode: (cwd, mode) => hasPrimaryMode(mode, loadAgentRegistry({ cwd, appHome: env.homeDir })),
+    // 改名与写回默认值都广播：写回是「在会话里改了参数」的副作用，各端手上的项目行要跟上
+    onChange: (list) =>
+      events.emitControl({
+        type: "projects_changed",
+        projects: { projects: list, total: list.length },
+      }),
+  });
+  // 池在这里之后才建，回调用到时现取（挂起的交互只存在于正在跑的会话上）
+  const interactions = new InteractionBroker(events, ({ sessionId, request, outcome }) => {
+    const record = sessions.find(sessionId);
+    const live = pool.get(sessionId)?.sessionManager;
+    const payload = {
+      kind: request.kind,
+      requestId: request.requestId,
+      outcome,
+      ...("sourceSessionId" in request ? { sourceSessionId: request.sourceSessionId } : {}),
+      at: new Date().toISOString(),
+    };
+    // 两种去向都没有（会话行不存在且池里没有活会话）时什么都不写：挂起的交互只存在于正在跑的会话上
+    if (live) {
+      appendSessionRecord(record, INTERACTION_RECORD_CUSTOM_TYPE, payload, { live });
+    } else if (record) {
+      appendSessionRecord(record, INTERACTION_RECORD_CUSTOM_TYPE, payload, {
+        cwd: resolveSessionCwd(record),
+      });
+    }
+  });
+  const permissions = new SessionAllowStore();
+  const usage = new UsageService(
+    sessions,
+    (ref) => runtime.contextWindowOf(ref),
+    // 触发点与装配层注入 pi 的阈值同源：界面显示的「预算」就是实际会压缩的那个数
+    (ref) => {
+      const contextWindow = runtime.contextWindowOf(ref);
+      if (!contextWindow) return null;
+      return contextBudgetOf({
+        contextWindow,
+        override: runtime.contextBudgetOf(ref),
+      }).triggerTokens;
+    },
+  );
+  const memory = new MemoryService(() => config.get().memory);
+  const goals = new GoalService(sessions, usage, events);
+  const pool = new SessionPool(
+    runtime,
+    sessions,
+    events,
+    () => config.get().websearch,
+    {
+      allow: permissions,
+      interactions,
+    },
+    memory,
+    goals,
+    usage,
+  );
+  // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话
+  const titles = new TitleService({
+    sessions,
+    events,
+    liveOf: (sessionId) => pool.get(sessionId),
+    emitSummary: (sessionId) => pool.refreshSummary(sessionId),
+  });
+
+  const lifecycle = createLifecycle({
+    db,
+    config,
+    runtime,
+    pool,
+    sessions,
+    attachments,
+    projects,
+    auth: { sessions: authSessions, pairing, loginLimiter },
+  });
+  const configService = createConfigService({ config, runtime, pool, events });
+
+  await lifecycle.start();
+
+  return {
+    config,
+    sessions,
+    attachments,
+    projects,
+    runtime,
+    pool,
+    events,
+    interactions,
+    permissions,
+    usage,
+    goals,
+    titles,
+    auth: {
+      credentials,
+      sessions: authSessions,
+      pairing,
+      loginLimiter,
+      registration,
+    },
+    applyConfig: configService.applyConfig,
+    reload: configService.reload,
+    close: lifecycle.stop,
+  };
+};

@@ -25,7 +25,8 @@ const JSON_BODY = /jsonBody\(\s*(\w+)\s*\)/;
 
 /** server 里真实注册的端点集合 */
 const scanServerRoutes = (root: string): ScannedEndpoint[] => {
-  const entry = readFileSync(join(root, "server/src/index.ts"), "utf8");
+  // 路由挂载点：`createApp` 里逐个 `v1.route(...)`；入口 index.ts 只负责监听与退出
+  const entry = readFileSync(join(root, "server/src/app.ts"), "utf8");
   const domains = [...entry.matchAll(MOUNT)]
     .map((match) => match[1])
     .filter((domain): domain is string => Boolean(domain))

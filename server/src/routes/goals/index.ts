@@ -10,11 +10,11 @@ import {
   sessionIdInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import { admitGoalRun } from "../../core/run";
-import { buildGoalKickoff, buildGoalResume } from "../../harness/goal/prompt";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { buildGoalKickoff, buildGoalResume } from "../../harness/features/goal/prompt";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
+import { admitGoalRun } from "../../services/sessions/run";
 
 const requireSession = (services: Services, sessionId: string) => {
   const record = services.sessions.find(sessionId);

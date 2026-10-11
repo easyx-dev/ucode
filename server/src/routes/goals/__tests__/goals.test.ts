@@ -9,21 +9,20 @@ import { describe, it } from "node:test";
 import { API_BASE_PATH, ERROR_CODES, type GoalView } from "@ucode/contracts";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-
-import type { Services } from "../../../app";
 import { SessionEventBus } from "../../../core/event-bus";
 import type { SessionRecord, SessionRepository } from "../../../db/session-repository";
-import { GoalService } from "../../../harness/goal";
+import { GoalService } from "../../../harness/features/goal";
 import {
   type GoalState,
   parseGoalState,
   pauseGoal,
   serializeGoalState,
   startGoal,
-} from "../../../harness/goal/state";
-import type { UsageService } from "../../../harness/usage";
-import { AppError, fail } from "../../../lib/response";
-import { createGoalsRoute } from "../index";
+} from "../../../harness/features/goal/state";
+import type { UsageService } from "../../../harness/features/usage";
+import { AppError, fail } from "../../../platform/response";
+import type { Services } from "../../../services";
+import { createGoalsRoute } from "..";
 
 const VERIFICATION = { achieved: true, reason: "已完成", nextStep: "", at: "t" };
 

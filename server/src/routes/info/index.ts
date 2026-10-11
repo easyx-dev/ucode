@@ -2,8 +2,8 @@
 import { API_VERSION, type ServerInfoResponse } from "@ucode/contracts";
 import { Hono } from "hono";
 
-import { ok } from "../../lib/response";
-import { compatRange, serviceVersion } from "../../lib/version";
+import { ok } from "../../platform/response";
+import { compatRange, serviceVersion } from "../../platform/version";
 
 export const createInfoRoute = () => {
   const router = new Hono();

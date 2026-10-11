@@ -59,6 +59,41 @@
 
 ### 变更
 
+- **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用
+  `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 缩放，
+  `windowControl` IPC），固定在左端，中线由布局用 `ResizeObserver` 实测并经 `--window-controls-center` 报给壳层
+  （对话区头部那行控件的中线再减去内容卡距顶的间距、随密度字号自动跟上），展开时落在侧栏顶部、收起时落在对话区头部（头部右移 80px），
+  其余空处为拖拽区；卡片自己的 `md:my-2` 不变。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-focus`）。
+  控件与拖拽条在最上层（新增 `z-chrome` 层级 + `window-control-*` 色），弹层遮罩不遮它们。
+  常量在 `apps/desktop/src/shared/chrome.ts`。其他平台保留系统边框与系统控件。
+
+- **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 缩放符号）。
+
+- **新增 `pnpm start:desktop`**：桌面端分 dev 与生产两种运行方式——dev 仍走 `pnpm dev:desktop`（渲染层 `:5174`
+  的 Vite dev server，`DESKTOP_RENDERER_URL` 改由脚本声明，主进程不再自带默认端口）；生产由
+  `pnpm start:desktop` 先构建、再由 Electron 以 `file://` 直接加载 `dist/index.html`，不起渲染层服务
+  （与打包后的加载方式一致）。
+
+- **桌面端按 `NODE_ENV` 选环境文件**：`apps/desktop` 主进程原固定读 `.env`，跑构建产物时会连上开发实例；
+  现与 server 同口径（生产读 `.env.prod`），`pnpm start:desktop` 带 `NODE_ENV=production`
+  即连生产实例（`~/.ucode`），`pnpm dev:desktop` 仍读 `.env`。该口径由 `connection.ts` 的 `envFileName` 单测兜底。
+
+- **桌面端渲染层是独立 Web 来源，服务端要放行**：生产形态下加载方式为 `file://`，页面来源是 `null`，
+  故连生产实例需 `.env.prod` 声明 `APP_CORS_ORIGIN=null`（dev 桌面端仍是 `.env` 里的 `http://localhost:5174`）。
+  已实测：`null` 来源的预检与普通请求均正常，渲染层能完成启动并渲染工作区。
+
+- **server 目录重构（破坏性）**：`lib/` 拆掉，新增 `services/`（业务与胶水）与 `platform/`（进程基建：
+  封套 / 校验 / 日志 / 路径 / 版本 / 注册文件）；`core/` 收敛为会话运行态，其中 9 个 pi 数据适配文件
+  （`serialize` / `records` / `session-index` / `projection` / `plan-state` / `compaction-skip` /
+  `run-settings` / `runtime` / `provider-config`）下沉 `harness/pi/`；`harness/` 分 `pi/`、`setup/`、
+  `features/` 三组与公共方法目录 `utils/`（取消息文本、不可信内容的边界包裹与中和，标签名单在
+  `packages/contracts`）；会话工作目录与工作区的口径从 `harness/` 移到 `core/`（`session-paths` / `workspace`），
+  `pi` 适配改为由调用方传入；
+  会话创建与投递用例（原 `core/{session,run}.ts`）移到 `services/sessions/`。`app.ts` 从此只承载
+  `createApp`（HTTP 装配），服务容器与进程生命周期移到 `services/`（域目录一律文件夹，仅 `index.ts` 除外）。
+  分层与依赖方向由 `scripts/verify` 新增的 layers 校验兜底；服务端常量从单文件 `constants.ts` 拆成 `constants/`
+  （按域分文件，消费方按域引入）。完整落位表见 `AGENTS.md`「server 目录约定」。
+
 - **组件层的 token 收敛**（破坏性）：`text-muted-foreground` 及其自造透明档拆成三级前景
   `foreground` / `foreground-subtle` / `foreground-subtlest`；`accent` 与 `sidebar-*` 的交互态改由
   `state-hover` / `state-selected` / `state-active` 承担；`border-input` 并入 `border`；浮层描边
@@ -72,6 +107,14 @@
 - **文档**：`DESIGN.md` 重写为设计系统（token 四层、运行时外观参数、颜色 / 排版 / 间距尺寸 / 圆角 /
   阴影层级 / 动效 / 渐变 / 反馈 / 状态 / 无障碍 / 响应式 / 第三方接入 / 配色主题 / 新增 token 流程），
   界面规格（三栏骨架、消息区、输入区、工作台、空态与设置）移到新增的 `docs/design-surfaces.md`。
+
+### 修复
+
+- **技能命令的边界可被正文伪造**：`/skill:name` 展开的 `<skill …>` 块原先是手工拼字符串，没走
+  `wrapUntrusted`，技能正文里写一行 `</skill>` 就能提前闭合边界——既能把后续文字伪装成对话本身，
+  也会让客户端的 chip 解析（按首个闭合标签切块）把剩余正文当成用户原话。改为一律走边界包裹；
+  同时补全边界标签名单（原缺 `skill`），并把名单上提到 `packages/contracts`，
+  服务端的包裹 / 中和与客户端的解析共用一份（原先两边各写一遍字面量）。
 
 ### 移除
 
@@ -102,7 +145,7 @@
 
 - **git diff 的渲染改用 `@git-diff-view/react`**（`packages/ui` 新增依赖）：Split / Unified、行号、
   hunk 折叠与未变更区域的逐步展开都由它提供，自己那套铺行与折叠（`lib/diff-blocks.ts`、`lib/diff-rows.ts`）
-  随之删除；服务端的结构化 hunk 还原成 patch 文本喂给它（`lib/git-patch.ts`），两侧原文（`git/contents`）
+  随之删除；服务端的结构化 hunk 还原成 patch 文本喂给它（`services/git-patch.ts`），两侧原文（`git/contents`）
   供它算未变更区域。它是 CSS 变量驱动的主题，配色在 `styles/theme.css` 里整组改写成语义 token，
   没有引入第二套颜色；代码高亮用项目现成的 shiki（自写适配器 `lib/shiki-diff.ts`，因为官方的 shiki
   适配层把主题写死成 github 两套），着色值仍是 `var(--code-*)`；行号区不再半透明（库在统一模式给的
@@ -177,7 +220,7 @@
   新增条目忘了登记会被拦下。约定：要给模型看的用 `custom_message`（带 `customType`），只为回溯的用
   `custom`——后者不进上下文也不下发界面。
 - **内置提示词命令**：`/review` 不再依赖工作目录下的 `.agents/commands/review.md`——正文随源码打包
-  （`server/src/harness/assets/builtin.ts`），来源为 `builtin` 且优先级最低，项目与全局提示词目录的
+  （`server/src/harness/setup/assets/builtin.ts`），来源为 `builtin` 且优先级最低，项目与全局提示词目录的
   同名文件仍可覆盖；`commands/list` 响应的 `source` 因此多一个取值 `builtin`。
 - **消息区的复制与折叠**：用户消息与 assistant 轮页脚各加复制入口（成功后图标换成对勾并保持约 1.5s），
   过长的用户消息按最大高度折叠并给「展开 / 收起」。
@@ -195,12 +238,12 @@
   响铃不看页面可见性；设置的外观页新增「提示音」行（开关 + 试听）。
 
 - **上下文预算与旧输出清理**：压缩触发点不再等于「模型声明的窗口 − 16k」——百万窗口的模型下那等于
-  永不触发（实测会话涨到 731k 仍在全量重发）。改为按 `harness/budget` 的有效预算规则注入 pi 的
+  永不触发（实测会话涨到 731k 仍在全量重发）。改为按 `harness/setup/budget` 的有效预算规则注入 pi 的
   `compaction` 设置（触发点 = min(窗口 − max(16k, 10%), 400k)，保留量 = clamp(窗口 × 15%, 4k, 40k)），
-  并在模型配置里新增可选的 `contextBudget` 覆盖（设置页模型行可填）。同时新增 `harness/prune`：
+  并在模型配置里新增可选的 `contextBudget` 覆盖（设置页模型行可填）。同时新增 `harness/features/prune`：
   每轮落定后把最近两轮与最近 40k token 之外的工具输出换成占位（`context_edit`，**只换正文不清消息**，
   保住 tool-call 配对），单次腾出不足 20k token 就不动，避免碎片式清理反复打断前缀缓存。
-- **每步耗时归因**：新增 `harness/telemetry`，把每次模型往返拆成「首 token 延迟 / 流式解码 / 工具执行」
+- **每步耗时归因**：新增 `harness/features/telemetry`，把每次模型往返拆成「首 token 延迟 / 流式解码 / 工具执行」
   三段，外加「等用户」的时间，写成会话里的 `custom` 条目 `ucode.step`（不进模型上下文）。
   上下文占用（`ContextUsage`）随之带上压缩触发点 `budget` 与最近一次自动压缩的原因 / 时间。
 - **工作台（右侧第三栏）**：默认收起，由对话区右上角的图标按钮（与侧栏按钮对称）或命令面板里的
@@ -258,7 +301,7 @@
   面板默认宽度 420 → 640、下限 320 → 400，且展开时按窗口夹取，窄窗口不再把对话区压破；
   移动端两个抽屉铺满屏幕宽度，面板内退化为侧栏 / 编辑器互斥。
   `provider/workbench.tsx` 的 API 换成「视图 + 文档标签 + 打开动作」；删 `panel-tabs` / `review-content`，
-  新增 `lib/diff-rows.ts`、`lib/diff-blocks.ts`、`lib/git-groups.ts`、`lib/git-marks.ts`、`lib/workbench-docs.ts`
+  新增 `lib/diff-rows.ts`、`lib/diff-blocks.ts`、`services/git-groups.ts`、`services/git-marks.ts`、`lib/workbench-docs.ts`
   与 `hooks/use-workbench-docs.ts`。
 
 - **git 变更树收敛成「已暂存 / 未暂存」两组**：未跟踪与冲突都并入未暂存（都还没进 index），
@@ -317,7 +360,7 @@
 - **思考档位改为「偏好 + 模式推荐值」**：会话行存的是**偏好**——`auto`（缺省）或具体档位，
   接口上是 `SessionSummary.thinkingLevel`；摘要多给一个 `resolvedThinkingLevel` 表示实际生效的那个，
   右下角选择器选「自动」时显示成「自动 · 极高」。`auto` 按**本会话模式的推荐档位**解析
-  （`build` = `xhigh`、`plan` = `max`、`ask` = `medium`，声明在 `harness/agents/profiles.ts`），
+  （`build` = `xhigh`、`plan` = `max`、`ask` = `medium`，声明在 `harness/setup/agents/profiles.ts`），
   自定义 primary 角色可用 frontmatter `thinking` 覆盖；子会话行的 mode 就是父的 mode，
   所以委派出去的子智能体按父模式的推荐值跑（纯 `subagent` 角色再声明 `thinking` 会直接报错）。
   **移除设置页的「默认思考档位」**：`appConfig.thinkingLevel` 与 `RuntimeStatus.thinkingLevel`
@@ -425,7 +468,7 @@
   于是新会话首轮必定写两条相同记录，服务重启 / 换模型 / 换权限档位导致实例重装后也会再写一条，
   消息区里于是每轮都冒出一行「本轮参数」。改为对着会话文件里最后一条设置点去重。
 
-- **每步耗时记录的首 token / 解码两段永远是空值**：`harness/telemetry` 等的 `message_update` +
+- **每步耗时记录的首 token / 解码两段永远是空值**：`harness/features/telemetry` 等的 `message_update` +
   `assistantMessageEvent.type === "start"` 永远不会出现——pi 的 `start` 帧走的是 `message_start` 事件，
   `message_update` 只承载内容帧。锤点改为 `message_start`（响应头到达）与首个 `message_update`
   （首个内容帧），`ucode.step` 因此新增 `firstEventAt` / `firstEventMs` / `toolNames` / `hasText` /
@@ -579,7 +622,7 @@
   只有联网搜索变化时连运行时都不重建。回收会一并把该实例上挂起的审批 / 提问按取消结算。
   `config_changed` 因此不再意味着「内存会话全部重置」，
   `session_busy` 只出现在必须空闲的写操作上（文案改为「会话正在生成，请先中断或等本轮结束」）。
-- 配置改为**环境变量声明、代码不带默认值**（缺失 / 非法即启动报错）：`server/src/constants.ts` 移除
+- 配置改为**环境变量声明、代码不带默认值**（缺失 / 非法即启动报错）：`server/src/constants/` 移除
   `DEFAULT_PORT` / `DEFAULT_HOST` / `DEFAULT_POOL_IDLE_MS` / `DEFAULT_PROMPT_SOURCE`，
   `env.ts` 改为从环境变量读取并校验。按 `NODE_ENV` 选择环境文件：生产 **`.env.prod`**
   （`APP_HOME=~/.ucode`、`APP_LOG_LEVEL=info`）、其余 `.env`（开发，`APP_HOME=.tmp/.ucode`），
@@ -589,7 +632,7 @@
   其中 `APP_HOST` / `APP_PORT` 作为**默认值**（取值顺序 显式 > `service.json` > `.env`，见「修复」）；
   web 开发代理改为读取 `.env` 的 `APP_PORT`，不再写死。
 - 默认端口 `2048` → `19688`（声明在 `.env` / `.env.prod`）。
-- 路径解析：新增 `server/src/lib/app-paths`（定位仓库根资源根 + 按 `NODE_ENV` 选择环境文件），
+- 路径解析：新增 `server/src/env.ts` 里的环境文件定位（定位仓库根资源根 + 按 `NODE_ENV` 选择环境文件），
   `env.repoRoot` 更名 `env.resourceRoot`。
 - 命名调整：运行时数据目录 `$APP_HOME/agent` 更名为 `$APP_HOME/harness`（`AGENT_DIRNAME` → `HARNESS_DIRNAME`、
   `env.agentDir` → `env.harnessDir`），server 源码模块 `server/src/agent/` 更名为 `server/src/harness/`。
@@ -1047,7 +1090,7 @@
 
 - 新增 `packages/contracts`（`@ucode/contracts`）：接口请求校验（zod）、响应类型、统一封套与跨端常量的单一事实源，
   server 与 web 共用同一入口（前端允许引到 zod，不再为隔离它拆子路径）。
-- server 新增日志模块 `lib/logger`（pino，开发期 `pino-pretty`）与请求日志中间件 `requestLogger`。
+- server 新增日志模块 `platform/logger`（pino，开发期 `pino-pretty`）与请求日志中间件 `requestLogger`。
 - server 新增 `utils/`（纯函数）与 `constants.ts`（默认值与固定目录名）；新增 `APP_LOG_LEVEL` 环境变量。
 - 引入 Biome 作为格式化与 lint 入口（`biome.json`），根脚本新增 `pnpm check`
   （`biome check .` + `pnpm -r typecheck`，作为强制校验入口）与 `pnpm format`。

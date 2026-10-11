@@ -2,7 +2,7 @@
  * 按 provider 配置拉取可用模型列表：请求构造、多种返回形态的解析、能力补齐与可读错误。
  *
  * pi 没有「列出某个 provider 的模型」的能力：`getProviders` / `getModels` 读的是内存快照，
- * `refresh` 只对内置 provider 的远程目录生效（见 `core/runtime.ts`），所以这里自己打
+ * `refresh` 只对内置 provider 的远程目录生效（见 `harness/pi/runtime.ts`），所以这里自己打
  * `GET {baseUrl}/models`，只做「看得到有哪些模型」，不写任何配置。
  */
 import {
@@ -14,7 +14,7 @@ import {
   type ProviderModelsResponse,
 } from "@ucode/contracts";
 
-import { AppError } from "../lib/response";
+import { AppError } from "../platform/response";
 import { type CapabilityValues, inferModelCapabilities } from "./model-capabilities";
 
 /** 拉取模型列表的超时；与 config/test 的连通性测试同档，避免设置页长时间转圈 */

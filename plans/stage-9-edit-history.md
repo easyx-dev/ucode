@@ -64,7 +64,7 @@
 
 - **新文件 `server/src/agent/edit/index.ts`**：纯函数
   `resolveEditableUserEntry(branch, entryId)`：不在活动分支 → 400；非 user 消息 → 400；否则返回条目。
-- **`server/src/core/run.ts`**：新增 `admitEdit`，依次校验会话存在 / 非子会话 / 未归档 / 不在跑 →
+- **`server/src/services/sessions/run.ts`**：新增 `admitEdit`，依次校验会话存在 / 非子会话 / 未归档 / 不在跑 →
   `pool.ensure` → `session.isIdle` → 校验编辑点 → `navigateTree` → 发 `transcript_reset` → 复用 `startRun` 重发。
 - **`server/src/routes/messages/index.ts`**：新增 `POST /edit`，返回 `PromptAdmittedResponse`。
 - **无 DB / schema 变更**。

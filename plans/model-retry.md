@@ -20,7 +20,7 @@
 - 事件齐备：`auto_retry_start`（`attempt` / `maxAttempts` / `delayMs` / `errorMessage`）与
   `auto_retry_end`（`success` / `attempt` / `finalError`）；
 - ucode 把这两个事件**丢弃**了（`server/src/core/events.ts:184-185` 的 default 分支），
-  且 `applyOverrides`（`harness/session-config.ts:263-274`）只覆盖 `defaultTools` 与 `compaction`，
+  且 `applyOverrides`（`harness/setup/session-config.ts:263-274`）只覆盖 `defaultTools` 与 `compaction`，
   没碰 `retry`；
 - 失败耗尽也是静默的：模型失败不会让 `prompt()` reject（pi 把它变成 `stopReason: "error"` 的 assistant
   消息），所以 `reportRunError` 不发错误帧；`messageToDTO`（`serialize.ts:188-206`）也只映射
@@ -86,9 +86,9 @@
 | --- | --- | --- |
 | 1 | `packages/contracts/src/constants.ts` | 加 `RETRY_RECORD_CUSTOM_TYPE = "ucode.retry"`、`RETRY_RECORD_EVENTS = ["start", "end"]` 与 `RetryRecord`（`event` / `attempt` / `maxAttempts` / `delayMs?` / `errorMessage?` / `success?` / `at`） |
 | 2 | `packages/contracts/src/messages/output.ts` | `MessageDTO` 加 `retryRecord?: RetryRecord`（紧挨 `skillRecord` / `modeChange`） |
-| 3 | `server/src/harness/session-config.ts` | `applyOverrides` 加 `retry`（上限 5） |
+| 3 | `server/src/harness/setup/session-config.ts` | `applyOverrides` 加 `retry`（上限 5） |
 | 4 | `server/src/core/pool.ts` | `session.subscribe` 加 `auto_retry_start` / `auto_retry_end` 分支 → 新增私有 `recordRetry`（`appendCustomEntry` → `transcript_reset`，照 :807 的 `recordPermissionDecision`） |
-| 5 | `server/src/core/serialize.ts` | 加 `retryRecordOf(data)` 逐字段校验；`custom` 分支按决策 3 放行 |
+| 5 | `server/src/harness/pi/serialize.ts` | 加 `retryRecordOf(data)` 逐字段校验；`custom` 分支按决策 3 放行 |
 | 6 | `packages/ui/src/lib/chat-nodes.ts` | 新增节点 `kind: "retry"`；条目放行但**不能落进 `content` 兜底行** |
 | 7 | `packages/ui/src/lib/chat-rows.ts` | 新增行类型 `ChatRetryRow` |
 | 8 | `packages/ui/src/business/message-row.tsx` | 分发到新组件 |

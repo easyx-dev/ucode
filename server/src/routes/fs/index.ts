@@ -1,4 +1,4 @@
-/** /api/v1/fs：文件系统浏览、新建目录、按名检索与读取文件（读逻辑在 `lib/file-content`） */
+/** /api/v1/fs：文件系统浏览、新建目录、按名检索与读取文件（读逻辑在 `services/files`） */
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -24,11 +24,11 @@ import {
 import fuzzysort from "fuzzysort";
 import { Hono } from "hono";
 
-import { FS_SEARCH_MAX_SCAN } from "../../constants";
-import { readFileContent } from "../../lib/file-content";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
-import { parentPathOf, resolveExistingPath, resolveTargetPath } from "../../utils/path";
+import { FS_SEARCH_MAX_SCAN } from "../../constants/tools";
+import { parentPathOf, resolveExistingPath, resolveTargetPath } from "../../platform/paths";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import { readFileContent } from "../../services/files";
 
 /** 读单个目录项；断链的符号链接与特殊文件返回 null，由调用方过滤 */
 const readEntry = (dir: string, name: string): FsEntry | null => {

@@ -7,9 +7,9 @@ import {
   projectUpdateInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import { ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 /** 列表；与写入后广播的帧同形，客户端只在一处归并 */
 const projectList = (services: Services): ProjectListResponse => {

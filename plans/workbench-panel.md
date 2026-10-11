@@ -49,7 +49,7 @@ packages/ui/base        resizable（shadcn 生成的分栏容器 / 面板 / 分�
 全局参数（`--no-pager`、`core.quotepath=false`）落在子命令之前，diff 参数
 （`--no-ext-diff` / `--no-textconv` / `--no-color`）在子命令之后——git 的全局选项与子命令选项
 不能混放。用户可控入参只有「仓库内相对路径」与「提交引用」，两者都在服务端校验。
-diff 由服务端解析成结构化 hunk（`lib/git/diff.ts`），客户端不做文本解析。
+diff 由服务端解析成结构化 hunk（`services/git/diff.ts`），客户端不做文本解析。
 
 **行数统计用 `--no-renames`。** 这样 `--numstat -z` 的每条记录都是「增 删 路径」三个字段，
 不必处理重命名那种「空路径 + 双路径」的特例；代价是重命名条目拿不到行数，按契约给 `null`。
@@ -85,8 +85,8 @@ diff 由服务端解析成结构化 hunk（`lib/git/diff.ts`），客户端不�
 
 ## 验证
 
-- 单测：`server/src/lib/git/__tests__/git.test.ts`（真实临时仓库上跑 status / diff / log / show / contents、
-  路径与 hash 校验）、`server/src/lib/file-content/__tests__/file-content.test.ts`、
+- 单测：`server/src/services/git/__tests__/git.test.ts`（真实临时仓库上跑 status / diff / log / show / contents、
+  路径与 hash 校验）、`server/src/services/files/__tests__/file-content.test.ts`、
   `packages/ui/src/lib/__tests__/{preview,shiki,path,panel-layout,git-marks,git-groups,git-tree,git-patch,diff-prefs,workbench-docs}.test.ts`。
 - `pnpm check`（biome + typecheck + test + verify）。
 - 手工：`pnpm dev` 开 `:5173`，验活动栏切视图、侧栏拖宽 / 收起、多标签、双栏 diff、折叠与全部展开收起、

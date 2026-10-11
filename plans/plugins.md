@@ -8,6 +8,9 @@
 >
 > 本文取代本文件此前的「插件机制 v1」稿（原文已由本次重写替换）：那一版的落位与接缝多处与
 > 当前代码不符，逐条修正见第九节。
+>
+> 全文的路径与行号已对齐 `AGENTS.md`「server 目录约定」的分层（`routes → services → core → harness → pi`，
+> `harness/` 分 `pi` / `assemble` / `features` 三组 + 跨组原语）。
 
 ## 一、定位
 
@@ -33,7 +36,7 @@
 
 这条边界不是审美选择。`goal` 的现状正好说明问题：它的状态机、提示词、阈值、UI 组件本来就能留在
 插件内，真正卡住的是内核没给编排钩子与存储槽位——`startInjectedRun` 是 `SessionPool` 私有方法
-（`server/src/core/pool.ts:339`）、落定后的编排写死在 `agent_settled` 监听里（`pool.ts:790-828`）、
+（`server/src/core/pool.ts:352`）、落定后的编排写死在 `agent_settled` 监听里（`pool.ts:816`）、
 目标状态是专用列且占用了第 4 号迁移（`server/src/db/index.ts:46-48`）。
 
 ## 三、插件模型
@@ -76,16 +79,16 @@
 
 | 现状缺口 | 目标形态 |
 | --- | --- |
-| 插件目录不在角色发现链里（`harness/agents/custom.ts:208-231` 只认 `.ucode/agents` 与 `$APP_HOME/agents`） | 发现链纳入插件根，`AgentSource` 增 `plugin` |
-| 自定义角色的权限规则被写死清空（`custom.ts:173`） | 由 `modes.permissions` 提供，走既有 `AgentProfile.capability.permissions` 与 `parentModeRules`（`harness/agents/capability.ts:103-107`） |
+| 插件目录不在角色发现链里（`harness/setup/agents/custom.ts:215` 只认 `.ucode/agents` 与 `$APP_HOME/agents`） | 发现链纳入插件根，`AgentSource` 增 `plugin` |
+| 自定义角色的权限规则被写死清空（`custom.ts:173`） | 由 `modes.permissions` 提供，走既有 `AgentProfile.capability.permissions` 与 `parentModeRules`（`harness/setup/agents/capability.ts:103-107`） |
 | 无 `excludeTools`（`capability.ts:69` 的 primary 路径恒为 `[]`） | 角色能力补该字段，插件声明经工具名白名单收敛 |
-| 无权限档位字段（`AgentProfile` 无此项，`session-config.ts:171` 只读会话行） | 加模式级默认档位，取值顺序：会话行 > 模式默认 > 全局默认，且默认落在不放宽侧 |
-| 能力上限无约束（`primaryCapability` 拿全量声明） | 插件模式的能力必须 ⊆ 内核默认集，`KNOWN_TOOL_NAMES`（`harness/tools/names.ts:57`）之外的声明一律拒绝 |
-| 提示词只有三个内置 slug（`harness/prompt/locales/zh-CN.ts:102-113`，未知 slug 得空串） | 插件自带正文 + 分节，装配时并入 |
+| 无权限档位字段（`AgentProfile` 无此项，`session-config.ts:167` 只读会话行） | 加模式级默认档位，取值顺序：会话行 > 模式默认 > 全局默认，且默认落在不放宽侧 |
+| 能力上限无约束（`primaryCapability` 拿全量声明） | 插件模式的能力必须 ⊆ 内核默认集，`KNOWN_TOOL_NAMES`（`harness/setup/tools/names.ts:57`）之外的声明一律拒绝 |
+| 提示词只有三个内置 slug（`harness/setup/prompt/locales/zh-CN.ts:102-113`，未知 slug 得空串） | 插件自带正文 + 分节，装配时并入 |
 
 会话参数本身不必改：`sessions.mode` 已是字符串 slug，契约只校验形态（`packages/contracts/src/sessions/input.ts:16-20`），
-存在性查注册表（`capability.ts:40-43`）；`$APP_HOME/agents/*.md` 今天就能覆盖内置模式
-（`custom.ts:244-270`）。
+存在性查注册表（`capability.ts` 查注册表）；`$APP_HOME/agents/*.md` 今天就能覆盖内置模式
+（`custom.ts:279`）。
 
 ### 5.2 界面
 
@@ -119,14 +122,14 @@
 
 | 钩子 | 用途 | 现状对应物 |
 | --- | --- | --- |
-| `assemble` | 注入工具、工具钩子、提示词片段 | `harness/session-config.ts` 的装配链（`:218` `assembleSession`） |
-| `onTurnSettled` | 一轮落定后运行编排（判定、续跑、清理） | `pool.ts:790-828` 的 `agent_settled` 监听 |
-| `injectTurn` | 服务端注入一轮（不占用户队列） | `pool.ts:339` `startInjectedRun`（私有） |
-| `onDispose` | 实例回收时释放插件资源 | `pool.ts:1066` `goals.forget` |
-| `onModeChange` | 模式切换时的暂停 / 恢复语义 | `routes/sessions/index.ts:229-235` |
+| `assemble` | 注入工具、工具钩子、提示词片段 | `harness/setup/session-config.ts` 的装配链（`:219` `assembleSession`） |
+| `onTurnSettled` | 一轮落定后运行编排（判定、续跑、清理） | `pool.ts:816` 的 `agent_settled` 监听 |
+| `injectTurn` | 服务端注入一轮（不占用户队列） | `pool.ts:352` `startInjectedRun`（私有） |
+| `onDispose` | 实例回收时释放插件资源 | `pool.ts:1079` `goals.forget` |
+| `onModeChange` | 模式切换时的暂停 / 恢复语义 | `routes/sessions/index.ts:234` |
 
 硬约束：钩子不得打断进行中的一轮，回收沿用「活跃者标脏、空闲者立即丢弃」的既有语义
-（`core/pool.ts:1094` `recycleForConfigChange` 与 `core/recycle.ts` 的 `planRecycle`）。
+（`core/pool.ts:1112` `recycleForConfigChange` 与 `core/recycle.ts` 的 `planRecycle`）。
 
 ## 六、内核锁死清单
 
@@ -143,7 +146,7 @@ schema、鉴权与凭证、事件总线的投递顺序与 seq 语义、日志与
 - **真身与来源分离**：真身 `{ id, kind, version, files }` 与来源无关；来源 `packaged`（随包）或
   `cloud`（中继下发）。
 - **单一注册表**：`kind` ∈ `prompt` / `skill` / `tool` / `plugin`。现有 `BUILTIN_PROMPT_COMMANDS`
-  （`server/src/harness/assets/builtin.ts:19` 的 `/review`）迁入为 `kind: "prompt"`。
+  （`server/src/harness/setup/assets/builtin.ts:19` 的 `/review`）迁入为 `kind: "prompt"`。
 - **统一来源与优先级**：来源恒标 `builtin`、优先级**恒为最低**（磁盘 / 用户同名者胜出）；插件侧
   `PLUGIN_SOURCES` 从一开始就含 `builtin`。
 - **物化只给需要磁盘真身的类型**：
@@ -153,7 +156,7 @@ schema、鉴权与凭证、事件总线的投递顺序与 seq 语义、日志与
   | `prompt` | 内存合成 `PromptTemplate`（现状） | pi 的模板是内存对象，`builtin:<name>` 合成路径即可 |
   | `skill` | 物化到 `$APP_HOME/app/builtin/skills/<id>/SKILL.md` | pi 的 `Skill` 只有 `filePath`（`dist/core/skills.d.ts:9-16`），模型靠 `read` 取正文，命中记录也认这个路径 |
   | `plugin` | 物化到 `$APP_HOME/app/builtin/plugins/<id>/`，由插件 registry 以隐式启用项加载 | 插件包天然是目录形态 |
-  | `tool` | 代码注册（`harness/tools` + 能力清单 + 权限规则），注册表只登记元数据 | 工具是代码不是文件 |
+  | `tool` | 代码注册（`harness/setup/tools` + 能力清单 + 权限规则），注册表只登记元数据 | 工具是代码不是文件 |
 
 - **物化语义**：幂等（内容相同跳过）、升级按内容覆盖、不做哈希目录名（否则命中记录里的路径每次
   升级都变）；物化相位早于第一次装配与 `/` 菜单列举。
@@ -172,7 +175,7 @@ schema、鉴权与凭证、事件总线的投递顺序与 seq 语义、日志与
 
 | 技能 | 用途 | 真身 | 物化 |
 | --- | --- | --- | --- |
-| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/assets/builtin/skills/plugin-create/{SKILL.md,references/…}` | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
+| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/plugins/builtin/skills/plugin-create/{SKILL.md,references/…}` | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
 | `plugin-review` | 审计第三方插件：清单与路径越界、hook 命令（shell 注入、`${user_config}` 落在 shell 里、curl 管道执行）、`bin/` 内容、MCP 配置（command / url / headers 里的 token）、TS 扩展的代码执行面、试图放宽权限、网络与写盘范围；输出按「阻断 / 警告 / 提示」分级 | 同上的 `plugin-review/` | 同上的物化 |
 
 调用方式 `/skill:plugin-create`、`/skill:plugin-review`，来源标 `builtin`；`plugin-review` 的描述要
@@ -204,12 +207,12 @@ esbuild `loader: { ".md": "text" }` 内联（正文长且含代码块，写成 J
 
 | 旧稿写法 | 实际 |
 | --- | --- |
-| `server/src/agent/plugins/` | `server/src/agent/` 不存在；装配层是 `harness/session-config.ts`（`:146` `createSessionLoader`、`:218` `assembleSession`、`:314` `buildSessionOptions`）。落位见第十四节 |
-| 在 `resources_discover` 里申报 skills / prompts | 该事件在 `session_start` 后由 `bindExtensions` 触发，而绑定只在 `mode === "build" && usesDefaultToolSet`（`core/pool.ts:737`）；plan / ask 会话拿不到。改为**装配期**注入 loader 的 `additionalSkillPaths` / `additionalPromptTemplatePaths` / `skillsOverride` / `promptsOverride`（`session-config.ts:185-188`） |
-| bin 走 `settingsManager.applyOverrides({ shellCommandPrefix })` | 自研 shell 扩展已整体覆盖内置 bash，该设置不生效（`harness/shell/index.ts:1-8`）。改为往会话 bash 的 spawn env 注入 PATH（`harness/shell/env.ts` 的范式，`path.delimiter`，追加在末尾不遮蔽系统命令） |
-| 插件 MCP 用 `pi.registerMcpServer` | 现状不用它，只有 `createMcpExtension({ loadConfig })`（`harness/mcp/index.ts:29`）。插件 MCP 合并进那个 `loadConfig`，命名 `plugin_<plugin>_<server>`，`mcp.json` 同名优先；配置路径是 `$APP_HOME/harness/mcp.json`（`env.ts:128`），不是旧稿写的 `$APP_HOME/agent/mcp.json` |
-| 「启用集指纹 + 回收」 | 现状只有「配置代次 + stale」（`pool.ts:1094`，唯一调用点是配置保存 `app.ts:232`）。装配时把指纹记进 `SessionEntry`，`ensure()` 比对不一致即重建；活跃轮次沿用 `planRecycle` 的标脏语义 |
-| hooks 只在 build 模式 | `pool.ts:737` 的条件要按「本次装配是否挂了需要绑定的扩展」判定：`assembleSession` 返回 `needsBind`（plugins 扩展不带 MCP，不会激活 codemode、不会绕过只读白名单） |
+| `server/src/agent/plugins/` | `server/src/agent/` 不存在；装配层是 `harness/setup/session-config.ts`（`:146` `createSessionLoader`、`:219` `assembleSession`、`:323` `buildSessionOptions`）。落位见第十四节 |
+| 在 `resources_discover` 里申报 skills / prompts | 该事件在 `session_start` 后由 `bindExtensions` 触发，而绑定只在 `mode === "build" && usesDefaultToolSet`（`core/pool.ts:732`）；plan / ask 会话拿不到。改为**装配期**注入 loader 的 `additionalSkillPaths` / `additionalPromptTemplatePaths` / `skillsOverride` / `promptsOverride`（`session-config.ts:186-189`） |
+| bin 走 `settingsManager.applyOverrides({ shellCommandPrefix })` | 自研 shell 扩展已整体覆盖内置 bash，该设置不生效（`harness/features/shell/index.ts:1-8`）。改为往会话 bash 的 spawn env 注入 PATH（`harness/features/shell/env.ts` 的范式，`path.delimiter`，追加在末尾不遮蔽系统命令） |
+| 插件 MCP 用 `pi.registerMcpServer` | 现状不用它，只有 `createMcpExtension({ loadConfig })`（`harness/setup/mcp/index.ts:29`）。插件 MCP 合并进那个 `loadConfig`，命名 `plugin_<plugin>_<server>`，`mcp.json` 同名优先；配置路径是 `$APP_HOME/harness/mcp.json`（`env.ts:128`），不是旧稿写的 `$APP_HOME/agent/mcp.json` |
+| 「启用集指纹 + 回收」 | 现状只有「配置代次 + stale」（`pool.ts:1112`，唯一调用点是配置保存 `services/config.ts:60`）。装配时把指纹记进 `SessionEntry`，`ensure()` 比对不一致即重建；活跃轮次沿用 `planRecycle` 的标脏语义 |
+| hooks 只在 build 模式 | `pool.ts:732` 的条件要按「本次装配是否挂了需要绑定的扩展」判定：`assembleSession` 返回 `needsBind`（plugins 扩展不带 MCP，不会激活 codemode、不会绕过只读白名单） |
 | `${UCODE_PLUGIN_ROOT}` 等字面量 | brand 校验扫 `server/src` 命中品牌名即报错（`packages/brand/scripts/verify.ts:100-113`）。清单目录、项目级目录、变量名全部从 `brand.slug` 派生（`CLAUDE_*` / `ZCODE_*` 别名保持字面量） |
 | `$APP_HOME/harness/extensions` 自动加载 | 会话 loader 未设 `noExtensions`，pi 会扫 `<agentDir>/extensions` 自动加载——这是绕过信任模型的既存通道，定策关掉，TS 扩展统一走插件信任清单（变更记 `CHANGELOG`） |
 | 动作名 `marketplace/add`、`enable`、`disable`、`configure` | `docs/api.md` 的动作是封闭词表，这些都不在表内。复用既有动作：`plugins/list` / `create` / `update` / `delete` / `refresh`；市场用 `marketplace/list` / `create` / `delete` / `refresh`；插件动作调用登记新动作 `invoke` |
@@ -230,11 +233,11 @@ esbuild `loader: { ".md": "text" }` 内联（正文长且含代码块，写成 J
 
 | 位置 | 现在 | 迁完后 |
 | --- | --- | --- |
-| `harness/session-config.ts:297` | 记忆工具按 `mode === "build"` | 由插件声明的作用域决定 |
-| `core/pool.ts:719` | `bindExtensions` 按 `mode === "build"` | 按装配返回的 `needsBind` |
-| `routes/sessions/index.ts:233` | 切走 `build` 即暂停目标 | 由目标插件自己订阅 `onModeChange` |
-| `harness/agents/profiles.ts:72` | `Record<SessionMode, …>` 锁死三个模式 | 注册表查询 |
-| `harness/agents/capability.ts:92` | `isReadOnlyCapability` 只认「整批 deny 写工具」 | 能力标记（`reads` / `writes` / `plans`）由声明给出 |
+| `harness/setup/session-config.ts:293` | 记忆工具按 `mode === "build"` | 由插件声明的作用域决定 |
+| `core/pool.ts:732` | `bindExtensions` 按 `mode === "build"` | 按装配返回的 `needsBind` |
+| `routes/sessions/index.ts:234` | 切走 `build` 即暂停目标 | 由目标插件自己订阅 `onModeChange` |
+| `harness/setup/agents/profiles.ts:72` | `Record<SessionMode, …>` 锁死三个模式 | 注册表查询 |
+| `harness/setup/agents/capability.ts:92` | `isReadOnlyCapability` 只认「整批 deny 写工具」 | 能力标记（`reads` / `writes` / `plans`）由声明给出 |
 | `packages/ui/.../mode-picker.tsx:14,27,53` | 常量列表 + 三个硬编码图标 | 注册表数据 + 图标回落 |
 | `packages/ui/src/lib/mode.ts:5-31` | 三个内置 slug 的文案 | 注册表提供的 `displayName` / `description` |
 
@@ -288,21 +291,33 @@ L4 / L5：`pnpm smoke` 加一条「启用含 skill 的插件后模型可调用�
 
 ## 十四、落位与接口
 
+宿主不是一层，是跨三处的组件；落位对齐 `AGENTS.md`「server 目录约定」的 `harness/` 三组与 `services/`：
+
 ```
-server/src/harness/plugins/     manifest.ts  registry.ts  sanitize.ts  adapters/{skills,commands,agents,hooks,mcp,bin}.ts  host.ts  extension.ts  index.ts
-server/src/plugins/             状态读写（plugins.json）、来源登记、市场解析与版本比对
-server/src/harness/assets/builtin/  registry.ts  materialize.ts  skills/plugin-create/…  skills/plugin-review/…  prompts（/review 迁入）
+server/src/harness/plugins/         宿主·接缝：manifest.ts  registry.ts  sanitize.ts
+                                    adapters/{skills,commands,agents,hooks,mcp,bin,extensions}.ts
+                                    host.ts  index.ts
+server/src/harness/plugins/builtin/ 内置插件与内置资产：registry.ts  materialize.ts
+                                    plan/  goal/  skills/plugin-create/…  skills/plugin-review/…  prompts（/review 迁入）
+server/src/services/plugins/        状态读写（plugins.json）、来源登记、市场解析与版本比对
+server/src/db/plugin-state-repository.ts  plugin_state 表读写
+server/src/routes/plugins/          plugins / marketplace 两个域的路由
 packages/contracts/src/plugins/     input.ts  output.ts
 packages/contracts/src/marketplace/ input.ts  output.ts
 ```
 
+- 插件贡献并入装配走 `harness/setup/`（装配管道）；`injectTurn` / `onTurnSettled` / `onDispose`
+  由 `core/pool` 以**回调配柄**的形式交给宿主，宿主不得 `import` core 的运行时值
+  （`scripts/verify` 的 layers 校验会拦下）。
+- 内置资产（`prompt` / `skill` / `tool` / `plugin` 四类）的注册与物化落 `harness/plugins/builtin/`：
+  它服务于插件平台，不是命令技能索引的一部分。运行期物化路径仍为 `$APP_HOME/app/builtin/`。
 - 契约域只有 `input.ts` / `output.ts`，导出要在 `packages/contracts/src/index.ts` 手写两行。
 - 错误码只加实际会返回的：`plugin_not_found` / `plugin_manifest_invalid` /
   `plugin_component_invalid` / `plugin_source_invalid` / `plugin_requires_trust` / `marketplace_invalid`；
   每个都必须同步 `packages/i18n` 的 `error-messages.ts` 与 `domain` 文案（否则 typecheck 失败）。
 - 既有枚举扩展：`COMMAND_ASSET_SOURCES`、`AGENT_SOURCES` 增 `plugin`；`PromptCommandView` /
   `SkillCommandView` / `AgentView` 增 `displayName` / `plugin` / `invoke`（按需）。
-- 路由注册在 `server/src/index.ts:81-101`，并在 `scripts/api-docs/endpoints.ts` 登记、`generate.ts`
+- 路由注册在 `server/src/app.ts:61-82`，并在 `scripts/api-docs/endpoints.ts` 登记、`generate.ts`
   的 `DOMAIN_LABELS` 补中文标题、`pnpm api:docs` 重生成 `docs/api-reference.md`。
 - SDK：`apis.ts` 加域、`stores/plugins.ts`、`client.ts` 三处、`index.ts` 导出、`hooks/use-plugins.ts`。
 - 设置页：`packages/ui/src/lib/settings-section.ts`、`business/settings/settings-sections.tsx`、
@@ -330,7 +345,7 @@ packages/contracts/src/marketplace/ input.ts  output.ts
 | `docs/api-reference.md` | `pnpm api:docs` 重生成 |
 | `docs/session-entries.md` | 插件条目规则（前缀注册） |
 | `docs/modes-and-permissions.md` | 插件定义模式后，「模式从哪来」的口径更新 |
-| `AGENTS.md` | 目录约定加 `server/src/plugins/`、`harness/plugins/`、`harness/assets/builtin/`；`$APP_HOME` 布局加 `plugins/` 与 `app/plugins.json`、`app/builtin/` |
+| `AGENTS.md` | 目录约定加 `harness/plugins/`、`harness/plugins/builtin/`、`services/plugins/`；`$APP_HOME` 布局加 `plugins/` 与 `app/plugins.json`、`app/builtin/` |
 | `CHANGELOG.md` | 未发布段（接口、目录、`noExtensions` 行为变更） |
 | `plans/{agent-tools-and-modes,stage-11-goal,input-commands-skills}.md` | 标注「后续以插件形态实现」，迁移后再改正文 |
 

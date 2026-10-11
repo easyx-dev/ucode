@@ -27,6 +27,7 @@ export * from "./interactions/output";
 export * from "./locale";
 export * from "./mcp/input";
 export * from "./mcp/output";
+export * from "./messages/boundary";
 export * from "./messages/input";
 export * from "./messages/markers";
 export * from "./messages/output";

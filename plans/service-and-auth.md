@@ -195,11 +195,11 @@
 
 | 路径 | 职责 |
 | --- | --- |
-| `server/src/lib/service-file/index.ts` | 定位 / 加锁 / 读写 `$APP_HOME/app/service.json`（0600）；随机生成 `serviceToken` / `password`；`ensure` 所需的 pid 仲裁 |
-| `server/src/lib/auth/credentials.ts` | `serviceToken` / `password` 的读取与常量时间比较 |
-| `server/src/lib/auth/sessions.ts` | 会话签发 / 校验 / 撤销 / 列举（哈希落库） |
-| `server/src/lib/auth/pairing.ts` | 配对码内存表：签发 / 兑换 / 过期 |
-| `server/src/lib/auth/middleware.ts` | Hono 鉴权中间件：放行清单 + 解析 principal |
+| `server/src/platform/service-registration/index.ts` | 定位 / 加锁 / 读写 `$APP_HOME/app/service.json`（0600）；随机生成 `serviceToken` / `password`；`ensure` 所需的 pid 仲裁 |
+| `server/src/services/auth/credentials.ts` | `serviceToken` / `password` 的读取与常量时间比较 |
+| `server/src/services/auth/sessions.ts` | 会话签发 / 校验 / 撤销 / 列举（哈希落库） |
+| `server/src/services/auth/pairing.ts` | 配对码内存表：签发 / 兑换 / 过期 |
+| `server/src/services/auth/middleware.ts` | Hono 鉴权中间件：放行清单 + 解析 principal |
 | `server/src/db/auth-session-repository.ts` | `auth_session` 表的增删查 |
 | `server/src/routes/auth/index.ts` | 登录 / 登出 / whoami / 改密码 / 签发配对码 |
 
@@ -207,7 +207,7 @@
 
 | 路径 | 改动 |
 | --- | --- |
-| `server/src/index.ts` | `serve` 指定 `hostname`；端口 0 时回写；挂载鉴权中间件；Web UI 同源托管保持默认；`GET /auth/connect/:code` 挂在 API 之外 |
+| `server/src/main.ts` | `serve` 指定 `hostname`；端口 0 时回写；挂载鉴权中间件；Web UI 同源托管保持默认；`GET /auth/connect/:code` 挂在 API 之外 |
 | `server/src/env.ts` | host / port 来源优先级：env > `service.json` > 默认 |
 | `server/src/db/index.ts` | schema v7：`auth_session` 表 |
 | `server/src/routes/health/index.ts` | 拆为 health(min) / info(discovery) / status(authed) |
@@ -249,11 +249,11 @@
 - 验证：`APP_PORT=0` 启动 → `service.json` 写入真实端口且 `0600`；二次启动复用同一文件；`pnpm check`。
 
 **阶段 2 · 鉴权**
-- 改动：`db/index.ts`(v7)、`db/auth-session-repository.ts`、`lib/auth/*`、`routes/auth/*`、`index.ts` 挂载与 health / info / status 拆分、contracts `auth` 域 + 错误码、`sdk`（bearer / cookie / 401）、`ui` / `web` 登录页、i18n。
+- 改动：`db/index.ts`(v7)、`db/auth-session-repository.ts`、`services/auth/*`、`routes/auth/*`、`index.ts` 挂载与 health / info / status 拆分、contracts `auth` 域 + 错误码、`sdk`（bearer / cookie / 401）、`ui` / `web` 登录页、i18n。
 - 验证：未认证 → `401`（导航 302 `/login`）；`GET /api/v1/health` 仅 `{ up, version }`；带 `serviceToken` 的 Bearer 通过；密码登录种 Cookie 后可调业务接口；改密码后旧会话失效；`pnpm check` + agent-browser 走查。
 
 **阶段 3 · 配对与远程访问**
-- 改动：`lib/auth/pairing.ts`、`routes/auth`（签发）、`index.ts`（`/auth/connect/:code`）、contracts `PairingCreateOutput`、UI「远程访问」弹窗（LAN 开关 / 链接 + 二维码 + 倒计时 / 会话列表与撤销 / 改密码）。
+- 改动：`services/auth/pairing.ts`、`routes/auth`（签发）、`index.ts`（`/auth/connect/:code`）、contracts `PairingCreateOutput`、UI「远程访问」弹窗（LAN 开关 / 链接 + 二维码 + 倒计时 / 会话列表与撤销 / 改密码）。
 - 验证：链接 5 分钟内可用、**仅一次**、过期即失效、兑换后 302 且带 Cookie；开 `0.0.0.0` 后局域网可达、默认 `127.0.0.1` 不可达。
 
 **阶段 4 · 版本协商与多客户端**

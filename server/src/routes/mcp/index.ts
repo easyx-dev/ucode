@@ -9,10 +9,10 @@ import {
   mcpUpsertInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import type { Services } from "../../app";
-import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../harness/mcp";
-import { ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { deleteMcpServer, readMcpConfig, writeMcpServer } from "../../harness/setup/mcp";
+import { ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 export const createMcpRoute = (services: Services) => {
   const router = new Hono();

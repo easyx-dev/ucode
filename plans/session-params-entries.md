@@ -16,8 +16,8 @@
   （`appendTranscriptPatch`，定义在 `:193`）。同路径上模型 / 档位走 pi 原生
   `model_change` / `thinking_level_change`（`:206-209`）。
 - 运行时真值：`app.db` 的 `session.mode` / `permission_mode` 列；`pool.ensure` 读它决定工具集、
-  提示词、记忆工具（`server/src/core/pool.ts:597,627` → `harness/session-config.ts:222-223,279`）。
-- 下发与展示：`server/src/core/serialize.ts:382-391` 白名单放行成 `modeChange`，
+  提示词、记忆工具（`server/src/core/pool.ts:597,627` → `harness/setup/session-config.ts:222-223,279`）。
+- 下发与展示：`server/src/harness/pi/serialize.ts:382-391` 白名单放行成 `modeChange`，
   前端 `packages/ui/src/lib/chat-nodes.ts:430-433` 渲染细线。
 - **这个条目目前是只读展示品**：权限引擎（`approvalMode` 来自 `overrideOf(record).permissionMode`）
   与装配（工具集、提示词、plan 待决策判定）读的都是 `app.db`，没有一条运行路径读 `ucode.mode`。
@@ -68,14 +68,14 @@
 
 - **差分写**：池内**实例**上记「已写入值」，与 `record.mode` / `record.permissionMode` 相同即跳过。
   状态不能挂在条目对象上——模式变更必然 `dispose`，条目会跟着消失；照
-  `harness/telemetry/index.ts:30-31` 的 `turn` 计数（按实例生命周期计数、重装即重置）落。
+  `harness/features/telemetry/index.ts:30-31` 的 `turn` 计数（按实例生命周期计数、重装即重置）落。
   注意它的作用面只有「同一实例内连续多轮」：**「切了但没跑就零写入」是 2.4 删掉 PATCH 写点实现的**，
   与差分写是两件事，原稿把两个收益都挂在差分写上。
 - **重装即重置**：dispose / 空闲回收后标记丢失，下一轮再写一条。这不是冗余，而是「本实例的生效值」
   ——重建会话实例才让模式生效（`sessions/index.ts:294-297`）。
 - **排队不算新一轮**：steer / followUp 走 `run.ts:178-181`，不经 `startRun`，同一轮内不会重复写。
 - **存量文件自愈**：任何被继续使用的老会话，下一轮就补上起点；按「不做历史兼容」的约定不回填脚本。
-- **子会话**：`harness/subagents/spawn.ts:175` 的 `child.prompt(task)` 不经 `pool.startRun`，子会话文件会
+- **子会话**：`harness/features/subagents/spawn.ts:175` 的 `child.prompt(task)` 不经 `pool.startRun`，子会话文件会
   缺起点。但子会话实例本身就是 `pool.ensure` 建的（`spawn.ts:255` → `pool.ts:527`），所以补写点落在
   `ensure` 的**新建分支**即可，不必给 spawn 加钩子（原稿「子会话不经过 pool」的前提写错了）。
 - **fork**：`createBranchedSession` 保留 root→leaf 路径，设置点在路径上就带过去；不在也无妨，新文件第一轮自动补。
@@ -108,7 +108,7 @@
 边界：
 
 - 文件里的 slug 可能是已被删除的自定义角色 → 校准时先用 `hasPrimaryMode` 校验
-  （`server/src/harness/agents/capability.ts:45`），未知 slug 不回写；装配侧本就有兜底（`:39-42`）。
+  （`server/src/harness/setup/agents/capability.ts:45`），未知 slug 不回写；装配侧本就有兜底（`:39-42`）。
 - **子会话行不参与校准**：子会话的 `mode` 继承父（`spawn.ts:244`），拿它的文件回写会把父的模式
   洗成子会话的起点。
 - **与 `docs/database.md` 冲突**（已同步）：该文件 :51-52 把 `mode` / `permission_mode` 归入「应用自己写、
@@ -163,7 +163,7 @@
 | 顺序 | 文件 | 改动 |
 | --- | --- | --- |
 | 1 | `packages/contracts/src/messages/output.ts` | `MessageDTO` 加 `mode?` / `permissionMode?`（契约先行，紧挨 `modeChange`） |
-| 2 | `server/src/core/serialize.ts` | `TranscriptState` 加两字段；`transcriptStates`（:165-180）认 `ucode.mode`；`messageToDTO`（:188-206）带出 |
+| 2 | `server/src/harness/pi/serialize.ts` | `TranscriptState` 加两字段；`transcriptStates`（:165-180）认 `ucode.mode`；`messageToDTO`（:188-206）带出 |
 | 3 | `server/src/core/pool.ts` | 新增 `recordRunSettings`（差分状态挂实例）；`startRun` / `startInjectedRun` 调用；`ensure` 新建分支补子会话起点；打开已有文件时校准（含「重新取 record」的时序） |
 | 4 | `server/src/routes/sessions/index.ts` | 删 `ucode.mode` 写点（:210-217）与随之而来的 `transcript_reset` 分支；`dispose`（:294-297）保留 |
 | 5 | `packages/ui/src/lib/mode.ts` + `packages/i18n/src/locales/ui/en.ts` | 细线文案按「本轮参数」重写，删三套旧 key（第三节） |

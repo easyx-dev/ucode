@@ -70,7 +70,7 @@ pi 的技能是「提示词清单 + 模型自己读文件」的机制，不是�
    `StepTelemetry.flush` 同一姿态）。
 8. **技能索引复用会话自己那个 resourceLoader**：`session-config` 已经为每个会话 `loader.reload()` 过，
    广告给模型、`/skill:name` 展开、我们的记录必须取自同一份 `loader.getSkills()`——另起一次装载会让
-   「界面列出的」「pi 认的」「记录里的」出现三份口径（`harness/assets/index.ts` 的文件头注释正是这条约束）。
+   「界面列出的」「pi 认的」「记录里的」出现三份口径（`harness/setup/assets/index.ts` 的文件头注释正是这条约束）。
 9. **不新增事件名**：条目写完后发既有的 `transcript_reset` 帧（`fromEntryId`）让在线客户端重取快照，
    与审批记录、压缩完成同一做法。
 
@@ -99,9 +99,9 @@ pi 的技能是「提示词清单 + 模型自己读文件」的机制，不是�
 - **读技能的渠道取决于工具集**：pi 在 `read` 与 `bash` 之间挑第一个**在工具集里**的作为广告渠道
   （`dist/core/system-prompt.js:99-101` 取 `["read","bash"]` 的 `find`）。自定义角色的 `tools` 白名单若只有
   `bash` 没有 `read`，模型会改用 bash 读技能文件——按决策 6 我们不认这条路径，那类角色的命中恒为零。
-  本仓库的只读档含 `read`（`server/src/harness/tools/names.ts:19` 的 `READ_ONLY_TOOLS`），现实里成立。
+  本仓库的只读档含 `read`（`server/src/harness/setup/tools/names.ts:19` 的 `READ_ONLY_TOOLS`），现实里成立。
 - **索引口径只此一份**：`loader.getSkills()` 与 `commands/list` 的来源判定必须同源。本仓库的约束写在
-  `server/src/harness/assets/index.ts` 的文件头注释里——另起一次装载会让「界面列出的」「pi 认的」
+  `server/src/harness/setup/assets/index.ts` 的文件头注释里——另起一次装载会让「界面列出的」「pi 认的」
   「记录里的」出现三份口径。
 
 ## 五、改动清单
@@ -142,14 +142,14 @@ export type SkillRecord = {
 skillRecord?: SkillRecord;
 ```
 
-### 3. `server/src/harness/assets/index.ts`
+### 3. `server/src/harness/setup/assets/index.ts`
 
 - `sourceOf`（:72）改为导出——与 `commands/list` 的来源判定共用一份实现，避免两处规则漂移；
 - 新增 `skillIndexOf(skills: Skill[], paths: CommandAssetPath[]): SkillIndex`：
   `{ list: Array<{ name; file; source }>, byFile: Map<string, …>, byName: Map<string, …> }`。
   路径归一（`~` / 相对 / `realpath`）在这里做一次，命中比对与显式调用判定都查这份索引。
 
-### 4. `server/src/harness/assets/skill-hit.ts`（新文件）
+### 4. `server/src/harness/setup/assets/skill-hit.ts`（新文件）
 
 纯函数，只依赖 `node:path` 与索引，与 `expand.ts` 并列（同属「命令与技能」这一域）：
 
@@ -170,11 +170,11 @@ export const matchSkillInvoke = (
 ```
 
 `matchSkillHit`：`toolName !== "read"` 直接返回 `null`；取 `args.path`（非字符串 / 空串返回 `null`），
-归一化后查 `byFile`。`matchSkillInvoke`：判据复用既有的 `SKILL_PATTERN`（`server/src/harness/assets/expand.ts:26`，改为导出）
+归一化后查 `byFile`。`matchSkillInvoke`：判据复用既有的 `SKILL_PATTERN`（`server/src/harness/setup/assets/expand.ts:26`，改为导出）
 而不是另写一条 `^/skill:(\S+)`——`expandSkillCommand`（同名文件 :116）用的就是它，两处正则漂移会让
 「展开的」与「记录的」对不上。取到名字查 `byName`，查不到返回 `null`（pi 也是原样透传）。
 
-### 5. `server/src/harness/session-config.ts`
+### 5. `server/src/harness/setup/session-config.ts`
 
 - `createSessionLoader`（:145）在 `await loader.reload()`（:208）之后返回 `{ loader, skills }`，
   `skills` 由 `loader.getSkills().skills` 经 `skillIndexOf` 得到（路径用本地 `assetPaths.skills`，:155/:184）；
@@ -197,7 +197,7 @@ export const matchSkillInvoke = (
 - 新增公开方法 `noteSkillInvoke(sessionId, text)`：内部用池条目的 `skills` 判 `matchSkillInvoke` 并写
   `event: "invoke"` 记录；技能索引与写入都关在池里，调用方不接触资源装载。
 
-### 7. `server/src/core/run.ts`
+### 7. `server/src/services/sessions/run.ts`
 
 `assemblePrompt`（定义 :109）有**两个调用点**，各自在投递之前调一次
 `services.pool.noteSkillInvoke(sessionId, prepared.text)`：
@@ -209,7 +209,7 @@ export const matchSkillInvoke = (
 
 `admitGoalRun`（:270）与 `admitPlanApproval`（:291）是合成注入，正文由我们自己写，不记。
 
-### 8. `server/src/core/serialize.ts`
+### 8. `server/src/harness/pi/serialize.ts`
 
 - `modeRecordOf`（:256）旁加 `skillRecordOf(data: unknown): SkillRecord | null`：逐字段校验
   （`event` 在 `SKILL_RECORD_EVENTS` 里、`name` / `file` / `at` 是字符串、`source` 在
@@ -240,14 +240,14 @@ export const matchSkillInvoke = (
 
 ## 六、测试
 
-- `server/src/harness/assets/__tests__/skill-hit.test.ts`（新）：命中；非 `read` 工具不命中；索引外的
+- `server/src/harness/setup/assets/__tests__/skill-hit.test.ts`（新）：命中；非 `read` 工具不命中；索引外的
   同名文件不命中；绝对 / 相对 / `~` 三种写法命中同一技能；`args` 非法形状返回 `null`；`matchSkillInvoke`
   的名字不在索引里返回 `null`。
 - `server/src/core/__tests__/serialize.test.ts`：`hit` 条目投影出 `skillRecord`；`invoke` 返回 `null`；
   `data` 缺字段 / `event` 非法 / `source` 越界时返回 `null`。
 - `packages/ui/src/lib/__tests__/chat-nodes.test.ts`：命中条目不再单独成行；对应的 tool leg 带
   `skill.name`；命中条目没有配对的调用记录（孤儿）时不产生任何行；`invoke` 条目无副作用。
-- `server/src/harness/__tests__/session-config.test.ts`：新装配函数返回的技能索引与
+- `server/src/harness/setup/__tests__/session-config.test.ts`：新装配函数返回的技能索引与
   `loadCommandAssets` 的集合一致（守住「不出现第三份口径」）。
 
 ## 七、文档与变更日志

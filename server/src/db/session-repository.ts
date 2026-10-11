@@ -17,8 +17,8 @@ import {
 import { z } from "zod";
 
 import { env } from "../env";
-import { logger } from "../lib/logger";
-import { openDatabase } from "./index";
+import { logger } from "../platform/logger";
+import { openDatabase } from "./";
 
 /** 单会话的可覆盖项；未设置时回落到全局默认 */
 export type SessionOverride = {
@@ -46,7 +46,7 @@ export type SessionOverride = {
   deletedAt?: string;
 };
 
-/** 列表展示用的缓存字段，由 `core/session-index` 从 pi 会话对象提取 */
+/** 列表展示用的缓存字段，由 `harness/pi/session-index` 从 pi 会话对象提取 */
 export type SessionIndex = {
   sourcePath: string;
   preview: string;

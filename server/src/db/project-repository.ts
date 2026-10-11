@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import type { PermissionMode, ThinkingPreference } from "@ucode/contracts";
 import { z } from "zod";
 
-import { openDatabase } from "./index";
+import { openDatabase } from "./";
 
 /** 可写回项目的会话参数；未给的字段不动（写回只覆盖用户这次显式选择的那几项） */
 export type ProjectDefaultsPatch = {
@@ -92,7 +92,7 @@ export class ProjectRepository {
   }
 
   /**
-   * 删掉不在 `keepPaths` 里的行（启动对账清理无主项目，见 `harness/project` 的 `reconcile`），
+   * 删掉不在 `keepPaths` 里的行（启动对账清理无主项目，见 `services/projects` 的 `reconcile`），
    * 返回被删的路径。逐行按 `path` 删：始终带 `WHERE`，也不受参数个数上限影响。
    */
   deleteOrphans(keepPaths: readonly string[]): string[] {

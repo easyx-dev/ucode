@@ -26,8 +26,9 @@ pnpm dev
 # 生产：构建后用 19688 一个端口
 pnpm build && pnpm start
 
-# 桌面端：先起 server，再单独起 Electron（渲染层 5174）
-pnpm dev:desktop
+# 桌面端：先起 server，再单独起 Electron
+pnpm dev:desktop        # 开发：渲染层走 vite dev server（:5174），连开发实例
+pnpm start:desktop      # 生产：构建后由 Electron 直接加载产物（不起渲染层服务），连生产实例
 ```
 
 打开 `http://localhost:19688`（生产）或 `http://localhost:5173`（开发）。首次启动会生成登录密码并打印在启动日志里（也可查看 `$APP_HOME/app/service.json`），用密码登录后即可使用。
@@ -66,14 +67,25 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 
 ### 桌面端（Electron）
 
-`apps/desktop` 是独立客户端，本轮只做**开发运行**、只连**已运行**的本机服务：
+`apps/desktop` 是独立客户端，当前有 dev 与生产（跑构建产物）两种运行方式（不做安装包、不拉起服务），
+只连**已运行**的本机服务（按启动时的 `NODE_ENV` 选择连开发还是生产实例）：
 
+- 渲染层来源：开发时由 `:5174` 的 Vite dev server 提供（启动脚本声明 `DESKTOP_RENDERER_URL`，改代码即时生效）；
+  生产时由 Electron 以 `file://` 直接加载构建好的 `dist/index.html`，不起渲染层服务——与打包后的加载方式一致。
+- 窗口：macOS 去掉系统标题栏，系统红绿灯也一并隐藏，改由界面自绘三颗窗口控件（关 / 最小化 / 缩放，`windowControl` IPC）；
+  点固定在左端，中线由布局实测（`--window-controls-center`：头部那行控件的中线减去内容卡距顶的间距），展开时落在侧栏顶部、
+  收起时落在对话区头部（头部右移 80px）；悬停露出操作符号，窗口失焦置灰。详见
+  [`docs/design-surfaces.md`](./docs/design-surfaces.md)「应用骨架」。其他平台保留系统边框与系统控件。
 - 界面：自带 Vite + React 渲染层，复用 `@ucode/ui` 的组件与 `@ucode/sdk`；会话 / 设置状态只在本窗口内（不走 URL）。
 - 免登录：主进程读 `$APP_HOME/app/service.json` 拿 `serviceToken`，对发往服务 `/api/v1` 的请求注入
   `Authorization: Bearer`（fetch / SSE / 附件图片都带上），**凭证不进渲染层**；渲染层只拿 `baseUrl`。
-- 跨域：渲染层跑在 `http://localhost:5174`，需在 `.env` 放行 `APP_CORS_ORIGIN=http://localhost:5174`
-  （带凭证的跨域不能用 `*`）。未找到服务或凭证失效时，界面给出可读提示。
-- 启动：先 `pnpm dev`（或 `pnpm start`）起服务，再 `pnpm dev:desktop`。
+- 跨域：渲染层是独立 Web 来源，服务端得放行它——dev 的来源是 `http://localhost:5174`（连开发实例，写 `.env`），
+  `file://` 的来源是 `null`（连生产实例，写 `.env.prod`：`APP_CORS_ORIGIN=null`）。白名单只决定请求发不发得出去，
+  凭证是 `serviceToken`（只由主进程注入，渲染层拿不到）。未找到服务或凭证失效时，界面给出可读提示，
+  并显示出找不到的注册文件路径。
+- 启动：先起服务，再按场合二选一——开发用 `pnpm dev` + `pnpm dev:desktop`，生产用 `pnpm start` + `pnpm start:desktop`
+  （后者先构建桌面端，再由 Electron 直接加载产物）。`start:desktop` 带 `NODE_ENV=production`，即读 `.env.prod`
+  的 `APP_HOME`（`~/.ucode`），故连的是生产实例；`dev:desktop` 读 `.env`，连开发实例。
 
 > 尚未做：安装包（内置服务运行时）、服务发现与自动拉起、按 `compatRange` 的版本兼容决策；留待打包阶段。
 
@@ -251,7 +263,7 @@ curl -X POST http://localhost:19688/api/v1/config/test \
 
 `thinkingLevel` 取值与 pi 一致：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
 会话的档位是**偏好**：输入区右下角选「自动」（默认）即按本会话模式的推荐档位跑
-（`plan` = `max`、`build` = `xhigh`、`ask` = `medium`，见 `server/src/harness/agents/profiles.ts`），
+（`plan` = `max`、`build` = `xhigh`、`ask` = `medium`，见 `server/src/harness/setup/agents/profiles.ts`），
 选了具体档位就以会话的为准。
 
 ---
@@ -450,46 +462,37 @@ packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
   components.json          # shadcn CLI 配置
 server/src/
   cli.ts                   # 命令行入口：参数解析 / --restart / --status / --open，再交给 index
-  env.ts                   # APP_HOME 派生 harness/ 与 app/ 下的全部路径
-  app.ts                   # Services 装配、配置热重载
-  constants.ts             # 默认值与固定目录名
-  utils/                   # 纯函数工具（time / object）
-  lib/                     # 服务端基建
-    app-paths/             # 源码 / 打包的形态判定：资源根、按 NODE_ENV 加载 .env / .env.prod
-    response/              # 统一封套 + AppError（message 为中文兜底，params 给客户端插值）
-    validate/              # jsonBody 中间件
-    logger/                # pino 实例 + 请求日志
-  config/store.ts          # config.json 读写、apiKey 脱敏
-  db/                      # SQLite（node:sqlite）
-    index.ts               # 连接、PRAGMA、user_version 迁移
-    session-repository.ts  # 会话元数据与索引的读写
-  core/                    # pi SDK 封装
-    runtime.ts             # ModelRuntime 单例、模型解析、模型目录
-    provider-config.ts     # provider 配置 → pi registerProvider 入参
+  env.ts                   # 环境变量解析：定位并加载 .env(.prod)、取值校验、派生全部路径
+  app.ts                   # createApp：中间件、鉴权、路由挂载、静态托管
+  main.ts                  # 入口：服务注册、监听端口、优雅退出
+  constants/               # 常量按域拆文件：dirs / session / tools / agents / attachments / memory / title / goal / auth / env
+  config/                  # config.json：读写、变更分级、模型能力与目录
+  db/                      # SQLite（node:sqlite）：连接、user_version 迁移、各表仓储
+  core/                    # 内核·会话运行态：持有实例，管一轮怎么跑
     pool.ts                # sessionId -> AgentSession 池、按会话串行、空闲回收
+    run-tracker.ts         # 一轮的占位与收尾顺序
+    recycle.ts             # 配置变更时的回收计划（空闲立即回收 / 活跃标脏）
     event-bus.ts           # 会话事件总线（/events 的唯一数据源）
-    run.ts                 # 后台推进一轮生成
-    projection.ts          # 在途消息投影（刷新后不丢流式内容）
-    session-index.ts       # pi 会话对象 -> 入库索引 / SessionInfo
-    serialize.ts           # pi 会话条目 -> MessageDTO
-    events.ts              # AgentSessionEvent -> SSE 事件
-  harness/                 # 会话装配层：覆盖值 + 运行时 -> createAgentSession 参数
-    session-config.ts      # 工作目录 / 模型 / 档位解析与创建参数组装（模式/工具/提示词的汇入点）
-    assets/                # 命令与技能目录解析 + 装载（pi ResourceLoader 只认我们的目录）
-    prompt/                # 系统提示词：组装 + 多语言目录 + 模型族变体（pi / custom 两套源可切换）
-      index.ts             # 按目录拼装整段提示词（custom 源）或 pi 源叠加片段
-      locales/             # 语言目录：新增语言＝按 PromptCatalog 加文件并注册（当前仅 zh-CN）
-      variant.ts           # 模型适配：按模型解析提示词变体（当前统一 default）
-    tools/                 # 自研工具与工具集装配
-      index.ts             # 内置工具白名单 + 自研工具的成对装配（交给 createAgentSession）
-      webfetch.ts          # 抓公网链接转 markdown（响应体上限、返回内容边界包裹）
-      ssrf.ts              # 目标准入：协议白名单 + 回环 / 私网 / 链路本地拦截
-      websearch/           # 搜索 provider 抽象（brave / tavily）与 index.ts 工具定义
-    __tests__/             # 同模块的单元测试（约定见 AGENTS.md）
-  routes/                  # health / models / config / sessions / messages / events
-  index.ts                 # Hono 装配、静态托管 web、优雅退出
-  scripts/
-    smoke.ts               # 不经 HTTP 的 SDK 冒烟测试
+    events.ts              # AgentSessionEvent -> 对外帧
+    interactions.ts        # 权限审批 / 提问的挂起与结算
+    session-paths.ts       # 会话工作目录口径
+    workspace.ts           # 会话工作区目录（$APP_HOME/workspace/<id>）
+    session-status.ts      # 状态口径；session-summary.ts 是摘要 DTO 口径
+  harness/                 # 基于 pi 的能力
+    pi/                    # 与 pi 的数据 / 对象互转：runtime / serialize / records / session-index 等
+    setup/                 # 一次装配所需的全部：角色、权限、工具、提示词、MCP、命令技能、预算
+    features/              # 会话跑起来后的能力：goal / memory / title / usage / subagents / shell 等
+    utils/                 # harness 内的公共方法：取消息文本、不可信内容的边界包裹
+  services/                # 业务与胶水：用例编排、进程生命周期（域目录一律文件夹，仅 index.ts 除外）
+    index.ts               # Services 装配（routes 只依赖它）
+    lifecycle/             # 启动对账、定时清理、退出收尾
+    config/                # 配置用例：applyConfig / reload
+    auth/ projects/ sessions/ files/ git/  # 鉴权、项目偏好、会话用例、文件读取、只读 git
+  platform/                # 进程基建：response / validate / logger / version / paths / resources / service-registration
+  utils/                   # 跨模块通用的纯函数（object / time）
+  routes/                  # HTTP 域：health / models / config / sessions / messages / events / …
+  scripts/                 # 不经 HTTP 的冒烟与评测
+    smoke.ts               # pi SDK 直连模型端点
     eval.ts                # 提示词评测：真实模型跑固定用例，按提示词源对比
     lib/local-gateway.ts   # smoke / eval 共用的本地端点装配
 apps/web/src/

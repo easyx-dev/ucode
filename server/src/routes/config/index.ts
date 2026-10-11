@@ -12,12 +12,11 @@ import {
   providerModelsInputSchema,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-
-import type { Services } from "../../app";
 import { fetchProviderModels } from "../../config/provider-models";
 import { publicConfig } from "../../config/store";
-import { AppError, ok } from "../../lib/response";
-import { jsonBody } from "../../lib/validate";
+import { AppError, ok } from "../../platform/response";
+import { jsonBody } from "../../platform/validate";
+import type { Services } from "../../services";
 
 const testConnection = async (
   input: ConfigTestInput,

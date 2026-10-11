@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { openDatabase } from "../index";
+import { openDatabase } from "..";
 import { ProjectRepository } from "../project-repository";
 
 const created: string[] = [];
