@@ -30,8 +30,17 @@
 | url | 清单直链；用 `ETag` / `Last-Modified` 做条件请求，内容没变就不重复下载 |
 | git / github | 浅克隆清单仓；清单可在 `.<slug>-plugin` / `.zcode-plugin` / `.claude-plugin` 下或仓根 |
 
-内置 `claude-plugins-official`（Claude Code 官方市场）。它**不是强依赖**：
-GitHub 不可达时刷新失败只记在状态里，不弹错误。
+随包内置两个市场，都**不是强依赖**（GitHub 不可达时刷新失败只记在状态里，不弹错误）：
+
+| 市场 | 来源 | 代码类组件（hooks / 扩展 / bin） |
+| --- | --- | --- |
+| `<slug>-plugins-official` | 我们自己的官方市场（git 仓，仓里放 `marketplace.json` 与插件目录） | 注入 |
+| `claude-plugins-official` | Claude Code 官方市场（git 仓） | **不注入**——它是别人的官方市场，按第三方档处理（技能 / 命令 / MCP 照常可用） |
+
+「内置」只表示开箱就有、刷新失败不弹错；**是否注入执行类组件看市场是谁的**，不看是否内置。
+
+两个都可以删（删除只移除登记，不动已有缓存），删过的内置市场不会被重新加回来；
+升级后新增的内置市场会在下次启动时自动并入现有状态。
 
 ## 安全边界
 

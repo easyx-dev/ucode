@@ -368,12 +368,21 @@ MCP servers 与**可信官方** hooks 投进现有能力域；来自非官方第
 **开箱内置的市场**（与 ZCode 的 `DEFAULT_PLUGIN_MARKETPLACES` 同形同源，见
 [`zai-org/ZCode`](https://github.com/zai-org/ZCode) 的 `packages/shared/src/plugin-marketplaces.ts`）：
 
-| id | 来源 | 状态 |
-| --- | --- | --- |
-| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | **已内置**；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
-| `<slug>-plugins-official` | CDN 上的 `marketplace.json` 直链 | **待接入**：CDN 地址未定，不在这里编造地址；定下来再补一行，并带上随包 seed 分片与 CDN 分片的合并 |
+| id | 来源 | 档位 | 状态 |
+| --- | --- | --- | --- |
+| `<slug>-plugins-official` | `lvyueyang/<slug>-plugins-official`（git 简写） | `official` | **已内置**：仓里放 `marketplace.json`（仓根或 `.<slug>-plugin/` 下）与插件目录 |
+| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | `market` | **已内置**；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
 
-两条约定：首次启动把内置市场写入状态（用户可删，卸载只移除登记、不碰已有缓存）；
+档位与「是否随包内置」是两件事：内置只管「开箱就有 + 刷新失败静默」，档位看**市场是谁的**——
+`claude-plugins-official` 是别人的官方市场，它的 hooks / extensions / bin 按第三方档处理（只出诊断）。
+实现在 `marketplaceRecordSchema.trust`；用户自己登记的市场一律 `market`。
+
+我们自己的官方市场用 git 仓而不是 CDN 直链：改插件 push 即发版，也不需要额外的 CDN 拓扑与
+「随包 seed 分片 + CDN 分片合并」那套（原计划的 CDN 形态到此作废）。两个市场的仓库地址都由
+`brand.slug` 派生，B 端定制时跟着品牌走。
+
+两条约定：**每次启动把缺失的内置市场并入状态**（版本升级带来新内置市场时要能自动出现；删过的
+记在 `removedMarketplaces` 里、不再加回来——用户可删，卸载只移除登记、不碰已有缓存）；
 市场身份用 id、插件身份用 `<name>@<marketplace>`（例：`hello@my-market`）——状态文件的 key、日志、
 会话里的引用都用这个形状（磁盘目录另按来源分，见 6.3）。id 进目录名时只保留字母、数字、`_`、`-`，
 其余字符一律替换为 `-`。

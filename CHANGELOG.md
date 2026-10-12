@@ -85,6 +85,19 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **内置我们自己的官方市场，并把信任档位与「是否内置」解耦**：随包预置 `<slug>-plugins-official`
+  （git 仓 `lvyueyang/<slug>-plugins-official`，清单放仓根或 `.<slug>-plugin/` 下），与
+  `claude-plugins-official` 并列；原先计划里的 CDN 直链形态作废，市场名与仓库地址都由 `brand.slug` 派生。
+  市场记录新增 `trust`：判定改用它而不是 `builtin`——按方案第五章，`official` 只含随包资产与
+  **我们自己的**官方市场，`claude-plugins-official` 是别人的官方市场，它的 hooks / extensions / bin
+  自此按第三方档处理（只出诊断、不注入），技能 / 命令 / MCP 照旧。这是与方案对齐的修正：
+  此前 `builtin ⇒ official`，等于把 Claude 官方市场的执行类组件也注入了。
+
+- **内置市场改为「启动时并入」，老状态文件也能看到新市场**：原先 `DEFAULT_PLUGIN_MARKETPLACES`
+  只在首次创建空状态时写入，已经存在 `plugins.json` 的实例升级后看不到新增的内置市场
+  （表现为「代码里加了、界面里没有」）。现在加载时把缺失的内置市场并进状态并落盘，`revision` 不动；
+  用户删掉过的内置市场记进 `removedMarketplaces`，不会被加回来。
+
 - **并发刷新同一个插件市场不再互相破坏**：git / github 市场的 staging 目录改成每次独立
   （`<市场>.staging-<随机>`），并按市场对刷新做并发去重——原先固定路径下，连点两下「刷新」
   会让两个克隆互相删掉对方的 `.git`，git 报 `could not lock config file .../.git/config` 而双双失败。

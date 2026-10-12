@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-
+import { brand } from "@ucode/brand/values";
 import {
   PLUGIN_COMPONENT_GROUPS,
   type PluginSource,
@@ -39,22 +39,47 @@ export const isLocalMarketplace = (name: string | undefined): boolean =>
  *
  * 自有官方市场（`<slug>-plugins-official`）等它的 CDN 直链定下来再加——不在这里编造地址。
  */
+/** 我们自己的官方市场 id：`<slug>-plugins-official`，B 端定制时随品牌走 */
+export const OFFICIAL_PLUGIN_MARKETPLACE_ID = `${brand.slug}-plugins-official`;
+
+/**
+ * 开箱内置的市场。两个都不是强依赖：刷新失败只落 `lastError`，不弹用户可见错误。
+ *
+ * 我们自己的官方市场用 git 仓（`lvyueyang/<slug>-plugins-official`）而不是 CDN 直链：
+ * 仓里放 `marketplace.json` 与插件目录即可，改完 push 就能发版，也不需要额外的 CDN 与 seed 分片。
+ */
 export const DEFAULT_PLUGIN_MARKETPLACES: readonly PluginMarketplaceRecord[] = [
+  {
+    name: OFFICIAL_PLUGIN_MARKETPLACE_ID,
+    source: { source: "github", repo: `lvyueyang/${OFFICIAL_PLUGIN_MARKETPLACE_ID}` },
+    builtin: true,
+    trust: "official",
+    refreshedOk: false,
+    pluginCount: 0,
+  },
   {
     name: "claude-plugins-official",
     source: { source: "github", repo: "anthropics/claude-plugins-official" },
     builtin: true,
+    // 别人的官方市场：随包内置，但执行类组件按第三方档处理
+    trust: "market",
     refreshedOk: false,
     pluginCount: 0,
   },
 ];
-
 const marketplaceRecordSchema = z.object({
   /** 市场身份，插件 id 的后半段 */
   name: z.string().min(1),
   source: pluginSourceSchema,
   /** 随包内置：刷新失败只落 `lastError`，不出用户可见错误 */
   builtin: z.boolean().default(false),
+  /**
+   * 执行类组件的信任档位。与 `builtin` **无关**：随包内置只表示「开箱就有 + 失败静默」，
+   * 档位看的是**市场是谁的**——只有随包资产与我们自己的官方市场算 `official`，
+   * 其余（含 `claude-plugins-official` 这种别人的官方市场）都是 `market`，hooks / extensions / bin 只出诊断。
+   * 依据见 `plans/plugins.md` 第五章的来源门控表。
+   */
+  trust: z.enum(["official", "market"]).default("market"),
   lastRefreshAt: z.string().optional(),
   /** 上一次刷新是否成功；从没刷新过为 false */
   refreshedOk: z.boolean().default(false),
@@ -123,6 +148,11 @@ const installedPluginRecordSchema = z.object({
 export const pluginStateSchema = z.object({
   revision: z.number().int().nonnegative().default(0),
   marketplaces: z.array(marketplaceRecordSchema).default([]),
+  /**
+   * 用户删掉过的内置市场。只作记录：内置市场默认**每次加载都并入**（版本升级带来新市场时要能自动出现），
+   * 但被删过的不再加回来——否则「可删」就是句空话。
+   */
+  removedMarketplaces: z.array(z.string()).default([]),
   installed: z.array(installedPluginRecordSchema).default([]),
 });
 
@@ -139,12 +169,30 @@ export type PluginMarketplaceRecord = z.infer<typeof marketplaceRecordSchema>;
 export type InstalledPluginRecord = z.infer<typeof installedPluginRecordSchema>;
 export type PluginState = z.infer<typeof pluginStateSchema>;
 
-/** 初始状态：两个内置市场随包写入，插件列表为空 */
+/** 初始状态：内置市场随包写入，插件列表为空 */
 export const emptyPluginState = (): PluginState => ({
   revision: 0,
   marketplaces: DEFAULT_PLUGIN_MARKETPLACES.map((record) => structuredClone(record)),
+  removedMarketplaces: [],
   installed: [],
 });
+
+/**
+ * 并入这次版本新增的内置市场：状态文件里缺的、且用户没删过的，补回来。
+ * `revision` 不动——只是多了一条市场记录，没有任何已装插件的归属或装配结果发生变化。
+ */
+export const withBuiltinMarketplaces = (state: PluginState): PluginState => {
+  const present = new Set(state.marketplaces.map((item) => item.name));
+  const removed = new Set(state.removedMarketplaces);
+  const missing = DEFAULT_PLUGIN_MARKETPLACES.filter(
+    (record) => !present.has(record.name) && !removed.has(record.name),
+  );
+  if (missing.length === 0) return state;
+  return {
+    ...state,
+    marketplaces: [...state.marketplaces, ...missing.map((record) => structuredClone(record))],
+  };
+};
 
 /** 组装插件 id：没有归属市场就是本地登记 */
 export const toPluginId = (name: string, marketplace?: string): string =>
@@ -158,8 +206,9 @@ export const parsePluginId = (id: string): { name: string; marketplace: string }
 };
 
 /**
- * 信任档位：随包 / 我们官方市场来的算 `official`，用户显式登记的本地目录算 `local`，
- * 其余市场一律 `market`（执行类组件只出诊断）。
+ * 信任档位：市场声明 `trust: "official"`（随包资产与我们自己的官方市场）算 `official`，
+ * 用户显式登记的本地目录算 `local`（路径可见、开发态自测用），其余市场一律 `market`。
+ * 执行类组件只在前两档注入。
  */
 export const pluginSourceOf = (
   record: InstalledPluginRecord,
@@ -167,7 +216,7 @@ export const pluginSourceOf = (
 ): PluginSource => {
   if (isLocalMarketplace(record.marketplace)) return "local";
   const marketplace = marketplaces.find((item) => item.name === record.marketplace);
-  return marketplace?.builtin ? "official" : "market";
+  return marketplace?.trust === "official" ? "official" : "market";
 };
 
 /** 一个插件在某个工作目录里的生效开关 */

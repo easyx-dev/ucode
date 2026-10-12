@@ -429,6 +429,8 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
             name: input.name,
             source: input.source,
             builtin: false,
+            // 用户自己登记的市场一律 market 档：执行类组件只出诊断（见 plans/plugins.md 第五章）
+            trust: "market",
             refreshedOk: false,
             pluginCount: 0,
           },
@@ -449,6 +451,10 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       commit((current) => ({
         ...current,
         marketplaces: current.marketplaces.filter((item) => item.name !== record.name),
+        // 删内置市场要记账：加载时会并入缺失的内置市场，不记账就等于删完又长回来
+        removedMarketplaces: record.builtin
+          ? [...new Set([...current.removedMarketplaces, record.name])]
+          : current.removedMarketplaces,
       }));
       return { removed: true, orphanedPlugins, revision: state.get().revision };
     },

@@ -44,10 +44,15 @@ const makePluginDir = (name: string): string => {
   return root;
 };
 
-const marketplace = (name: string, builtin: boolean): PluginMarketplaceRecord => ({
+const marketplace = (
+  name: string,
+  builtin: boolean,
+  trust: PluginMarketplaceRecord["trust"] = "market",
+): PluginMarketplaceRecord => ({
   name,
   source: { source: "github", repo: "owner/repo" },
   builtin,
+  trust,
   refreshedOk: false,
   pluginCount: 0,
 });
@@ -83,11 +88,11 @@ describe("buildPluginRegistry", () => {
     assert.equal(registry.revision, 3);
   });
 
-  it("按来源分档：内置市场 official、直接登记 local、其余市场 market", () => {
+  it("按来源分档：声明 official 的市场 official、直接登记 local、其余（含随包内置的第三方市场）market", () => {
     const official = installed({
       name: "a",
       path: makePluginDir("a"),
-      marketplace: "builtin-market",
+      marketplace: "our-official",
     });
     const localByField = installed({
       name: "b",
@@ -98,7 +103,12 @@ describe("buildPluginRegistry", () => {
     const market = installed({ name: "c", path: makePluginDir("c"), marketplace: "third-party" });
     const registry = buildPluginRegistry({
       revision: 1,
-      marketplaces: [marketplace("builtin-market", true), marketplace("third-party", false)],
+      marketplaces: [
+        marketplace("our-official", true, "official"),
+        // 别人的官方市场：随包内置也是 market 档
+        marketplace("bundled-market", true, "market"),
+        marketplace("third-party", false),
+      ],
       installed: [official, localByField, localByAbsence, market],
     });
 
@@ -110,22 +120,32 @@ describe("buildPluginRegistry", () => {
     assert.deepEqual(registry.diagnostics, []);
   });
 
-  it("第三方市场的执行类组件标为不注入，权威来源与资源型组件不受影响", () => {
+  it("market 档的执行类组件标为不注入（含随包内置的第三方市场），权威来源与资源型组件不受影响", () => {
     const plugins = [
-      installed({ name: "a", path: makePluginDir("a"), marketplace: "builtin-market" }),
+      installed({ name: "a", path: makePluginDir("a"), marketplace: "our-official" }),
       installed({ name: "b", path: makePluginDir("b"), marketplace: LOCAL_MARKETPLACE_NAME }),
       installed({ name: "c", path: makePluginDir("c"), marketplace: "third-party" }),
+      installed({ name: "d", path: makePluginDir("d"), marketplace: "bundled-market" }),
     ];
     const registry = buildPluginRegistry({
       revision: 1,
-      marketplaces: [marketplace("builtin-market", true), marketplace("third-party", false)],
+      marketplaces: [
+        marketplace("our-official", true, "official"),
+        marketplace("bundled-market", true, "market"),
+        marketplace("third-party", false),
+      ],
       installed: plugins,
     });
 
-    const [official, local, market] = registry.plugins;
+    const [official, local, market, bundled] = registry.plugins;
     assert.deepEqual(official?.blocked, []);
     assert.deepEqual(local?.blocked, []);
     assert.deepEqual(market?.blocked, ["hooks", "extensions", "bin"]);
+    assert.deepEqual(
+      bundled?.blocked,
+      ["hooks", "extensions", "bin"],
+      "随包内置但非我们自己的市场",
+    );
     // 资源型组件照常解析：第三方插件的技能仍然可用
     assert.deepEqual(
       market?.components.filter((entry) => entry.group === "skills").map((entry) => entry.name),

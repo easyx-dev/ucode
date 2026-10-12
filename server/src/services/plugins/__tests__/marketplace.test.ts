@@ -8,6 +8,7 @@ import { afterEach, describe, it } from "node:test";
 import type { PluginsListResponse, ServerControlEvent } from "@ucode/contracts";
 
 import type { SessionEventBus } from "../../../core/event-bus";
+import { DEFAULT_PLUGIN_MARKETPLACES } from "../../../harness/plugins/state";
 import { createMarketplaceService } from "../marketplace";
 import type { SourceRunner } from "../sources";
 import { PluginStateStore } from "../state";
@@ -86,10 +87,10 @@ describe("市场登记", () => {
     assert.equal(created.marketplace.refreshedOk, false);
     assert.equal(created.revision, 1);
 
-    // 内置的 Claude 官方市场随初始状态就在，本地登记追加在它之后
+    // 两个随包内置的市场先在场，本地登记追加在它们之后
     assert.deepEqual(
       service.list().marketplaces.map((item) => item.name),
-      ["claude-plugins-official", "my-market"],
+      [...DEFAULT_PLUGIN_MARKETPLACES.map((item) => item.name), "my-market"],
     );
   });
 

@@ -1,6 +1,6 @@
 /** services/plugins/state：plugins.json 的建立、限权、代次推进与纯逻辑 */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -14,6 +14,7 @@ import {
   emptyPluginState,
   LOCAL_MARKETPLACE_NAME,
   loadProjectPluginOverrides,
+  OFFICIAL_PLUGIN_MARKETPLACE_ID,
   parsePluginId,
   pluginSourceOf,
   pluginSwitchOf,
@@ -118,12 +119,13 @@ describe("纯逻辑", () => {
     assert.equal(parsePluginId("x@"), null);
   });
 
-  it("来源分档：内置市场 official、无市场 local、其余 market", () => {
+  it("来源分档：声明 official 的市场 official、无市场 local、其余 market", () => {
     const marketplaces = [
       {
         name: "builtin-market",
         source: { source: "github", repo: "owner/repo" } as const,
         builtin: true,
+        trust: "official" as const,
         refreshedOk: false,
         pluginCount: 0,
       },
@@ -145,6 +147,62 @@ describe("纯逻辑", () => {
       "official",
     );
     assert.equal(pluginSourceOf({ ...base, marketplace: "third-party" }, marketplaces), "market");
+  });
+
+  it("老状态文件缺了后来新增的内置市场：加载时补回并落盘", () => {
+    const path = makeStatePath();
+    // 模拟上一个版本写下的状态：只有 Claude 那一个内置市场
+    writeFileSync(
+      path,
+      JSON.stringify({
+        revision: 3,
+        marketplaces: [
+          {
+            name: "claude-plugins-official",
+            source: { source: "github", repo: "anthropics/claude-plugins-official" },
+            builtin: true,
+            refreshedOk: false,
+            pluginCount: 0,
+          },
+        ],
+        installed: [],
+      }),
+      "utf8",
+    );
+
+    const state = new PluginStateStore(path).load();
+    assert.deepEqual(
+      state.marketplaces.map((item) => item.name),
+      ["claude-plugins-official", OFFICIAL_PLUGIN_MARKETPLACE_ID],
+      "缺的内置市场补回来",
+    );
+    assert.equal(state.revision, 3, "只是多一条市场记录，不动代次");
+    assert.deepEqual(
+      JSON.parse(readFileSync(path, "utf8")).marketplaces.map(
+        (item: { name: string }) => item.name,
+      ),
+      ["claude-plugins-official", OFFICIAL_PLUGIN_MARKETPLACE_ID],
+      "补进来的结果立刻落盘，别每次启动都重算",
+    );
+  });
+
+  it("删掉过的内置市场不会被加载时的并入加回来", () => {
+    const path = makeStatePath();
+    const store = new PluginStateStore(path);
+    const initial = store.load();
+    store.set({
+      ...initial,
+      marketplaces: initial.marketplaces.filter(
+        (item) => item.name !== OFFICIAL_PLUGIN_MARKETPLACE_ID,
+      ),
+      removedMarketplaces: [OFFICIAL_PLUGIN_MARKETPLACE_ID],
+    });
+
+    const reloaded = new PluginStateStore(path).load();
+    assert.deepEqual(
+      reloaded.marketplaces.map((item) => item.name),
+      ["claude-plugins-official"],
+    );
   });
 
   it("覆盖按 local > project > user 生效，只翻已登记插件的开关", () => {

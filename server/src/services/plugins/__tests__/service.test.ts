@@ -181,7 +181,7 @@ describe("安装与登记", () => {
     );
   });
 
-  it("归属内置市场时来源档位是 official", async () => {
+  it("归属我们自己的官方市场时来源档位是 official", async () => {
     const { service, state } = setup();
     state.set({
       ...state.get(),
@@ -190,6 +190,7 @@ describe("安装与登记", () => {
         {
           name: "my-official",
           source: { source: "directory", path: makeDir() },
+          trust: "official",
           builtin: true,
           refreshedOk: false,
           pluginCount: 0,
@@ -518,6 +519,7 @@ describe("执行类组件的来源门控", () => {
         {
           name: marketplace,
           source: { source: "github", repo: "owner/repo" },
+          trust: builtin ? "official" : "market",
           builtin,
           refreshedOk: false,
           pluginCount: 0,
@@ -689,6 +691,7 @@ describe("hooks 的来源门控与解析", () => {
         {
           name: "third-party",
           source: { source: "github", repo: "owner/repo" },
+          trust: "market",
           builtin: false,
           refreshedOk: false,
           pluginCount: 0,

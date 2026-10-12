@@ -15,6 +15,7 @@ import {
   type InstalledPluginRecord,
   type PluginState,
   pluginStateSchema,
+  withBuiltinMarketplaces,
 } from "../../harness/plugins/state";
 import { AppError } from "../../platform/response";
 
@@ -26,7 +27,10 @@ export class PluginStateStore {
   load(): PluginState {
     if (!existsSync(this.path)) return this.set(emptyPluginState());
     try {
-      this.state = pluginStateSchema.parse(JSON.parse(readFileSync(this.path, "utf8")));
+      const parsed = pluginStateSchema.parse(JSON.parse(readFileSync(this.path, "utf8")));
+      // 版本升级可能带来新的内置市场：并进状态并立刻落盘，否则老用户永远看不到它
+      const merged = withBuiltinMarketplaces(parsed);
+      this.state = merged === parsed ? parsed : this.set(merged);
     } catch (error) {
       throw new AppError(
         ERROR_CODES.invalidConfig,
