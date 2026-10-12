@@ -65,10 +65,11 @@
 ### 变更
 
 - **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用
-  `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 缩放，
+  `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 全屏，
+  绿点 ⌥ 点击为最大化 / 还原，
   `windowControl` IPC，`lucide-react` 画符号），固定在左端，中线由布局实测并经 `--window-controls-center` 报给壳层：
   展开时落在侧栏顶部（取头部那行控件的中线再减去内容卡距顶的间距）、收起时落在对话区头部（直接取那行的控件中线，与行对齐）；
-  点直径 14px、横向占 86px。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-focus`）。
+  点直径 14px、横向占 86px。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-state`，同时下发全屏态）。
   控件与拖拽条在最上层（新增 `z-chrome` 层级 + `window-control-*` 色），弹层遮罩不遮它们。
   常量在 `apps/desktop/src/shared/chrome.ts`。其他平台保留系统边框与系统控件。
 
@@ -96,7 +97,7 @@
   对话区头部在无标题栏窗口下整行可拖；另开 `acceptFirstMouse`——macOS 默认会把未聚焦窗口的第一次点击
   只当作激活，导致自绘的点与按钮「点一下没反应」。
 
-- **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 缩放符号）。
+- **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 全屏符号）。
 
 - **新增 `pnpm start:desktop`**：桌面端分 dev 与生产两种运行方式——dev 仍走 `pnpm dev:desktop`（渲染层 `:5174`
   的 Vite dev server，`DESKTOP_RENDERER_URL` 改由脚本声明，主进程不再自带默认端口）；生产由

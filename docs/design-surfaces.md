@@ -24,7 +24,7 @@
 - 恢复宽度用每个面板自己的 `defaultSize`，不用库的 `defaultLayout`（收起某栏后面板数会变，记忆会被忽略）。
 
 **无标题栏窗口**（macOS 桌面端，`titleBarStyle: hiddenInset`，系统红绿灯已隐藏）：窗口控件由界面自绘——
-三颗点（关 / 最小化 / 缩放）固定在左端，位置是我们定的，不跟任何系统灯位走，展开 / 收起侧栏都不移动：
+三颗点（关 / 最小化 / 全屏）固定在左端，位置是我们定的，不跟任何系统灯位走，展开 / 收起侧栏都不移动：
 
 | 状态 | 三颗点落在哪 | 让位方式 | 拖拽宿主（控件挂在它里面） |
 | --- | --- | --- | --- |
@@ -56,7 +56,10 @@
 - 点尺寸固定（`size-window-control`，14px，不随字号密度缩放）、左起 20px、间距 8px、尾部 8px、
   横向共 86px（`WINDOW_CONTROLS_WIDTH`）。
 - 交互按 macOS 交通灯的惯例：悬停整组时点内露出操作符号，窗口失焦时整组 `opacity-40`；
-  窗口焦点由主进程经 `desktop:window-focus` 下发，标题条在失焦时也一次点得动（`acceptFirstMouse`）。
+  窗口焦点与全屏态由主进程经 `desktop:window-state` 下发，标题条在失焦时也一次点得动（`acceptFirstMouse`）。
+- 绿点是**全屏**：点它进 / 出全屏，符号与文案随状态换（全屏时是朝里的那对箭头）；**⌥ 点击是最大化 / 还原**
+  （同一颗钮的 macOS 变体，AppKit 里它就叫 zoom button，动作 `zoom`；全屏期间不接 ⌥——全屏窗口不可缩放）。
+  拖拽区双击也能最大化（系统标题栏双击），但那条路受系统「双击窗口标题栏」设置影响，只能算第二条路。
 - 控件在最上层（`z-chrome`，见 DESIGN.md「层级」），弹层打开的遮罩盖不住它。
 - 常量与判定在 `apps/desktop/src/shared/chrome.ts`，布局侧只收 `titleBarInset` / `windowControlsWidth`
   / `windowControls`（web 不传，即 0 / 不渲染，界面不留空）。拖拽区用共享样式里的 `.window-drag`

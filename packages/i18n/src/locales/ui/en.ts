@@ -708,7 +708,8 @@ export default {
   // Desktop shell（无标题栏窗口里自绘的窗口控件）
   关闭窗口: "Close window",
   最小化窗口: "Minimize window",
-  缩放窗口: "Zoom window",
+  进入全屏: "Enter full screen",
+  退出全屏: "Exit full screen",
 
   // Workbench（右侧第三栏：活动栏 + 侧栏 + 编辑器区）
   工作台: "Workbench",

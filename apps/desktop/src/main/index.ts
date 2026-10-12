@@ -13,7 +13,7 @@ import { isFrameless } from "../shared/chrome.ts";
 import { readServiceConnection, serviceFilePath } from "./connection.ts";
 import { registerNotificationIpc } from "./notification.ts";
 import { installRendererProtocol, RENDERER_ORIGIN, registerRendererScheme } from "./proxy.ts";
-import { registerWindowControlsIpc, watchWindowFocus } from "./window-controls.ts";
+import { registerWindowControlsIpc, watchWindowState } from "./window-controls.ts";
 
 /**
  * 未声明时加载 `app://` 下的构建产物（生产形态）；开发时声明为 Vite 服务地址。
@@ -97,10 +97,10 @@ const createWindow = (): void => {
     },
   });
   window.once("ready-to-show", () => window.show());
-  // 系统红绿灯收起后，关窗 / 最小化 / 缩放由界面上的三颗点经 IPC 触发
+  // 系统红绿灯收起后，关窗 / 最小化 / 全屏由界面上的三颗点经 IPC 触发
   if (isFrameless(process.platform)) {
     window.setWindowButtonVisibility(false);
-    watchWindowFocus(window);
+    watchWindowState(window);
   }
 
   // 打包后不受 `DESKTOP_RENDERER_URL` 影响：分发的应用只跑自己带的那份渲染层

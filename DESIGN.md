@@ -104,7 +104,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `link` | 可点击的链接与文件引用 |
 | `chart-1..5` | 图表色，按蓝绿主导排序（蓝 / 青绿 / 琥珀 / 紫 / 青），同一图表按序取色 |
 | `git-modified` / `git-added` / `git-untracked` / `git-deleted` / `git-renamed` | 文件树的 git 状态色，独立一族，不借 diff 与警告色 |
-| `window-control-close` / `-minimize` / `-zoom` / `-foreground` | 无标题栏窗口里自绘窗口控件的三颗点及其上的符号；固定色，不进主题层也不随深浅翻转（它们是系统语义，跟着配色主题变会被认错） |
+| `window-control-close` / `-minimize` / `-zoom` / `-foreground` | 无标题栏窗口里自绘窗口控件的三颗点及其上的符号（`-zoom` 是绿点，AppKit 里这颗钮就叫 zoom button：默认进出全屏，⌥ 点击最大化）；固定色，不进主题层也不随深浅翻转（它们是系统语义，跟着配色主题变会被认错） |
 
 - 功能色只表达状态，不用于装饰；不要为了「更醒目」而借用失败/成功色。
 - 窗口控件色不复用 `destructive` / `warning` / `success`：它们表达的是「系统窗口怎么操作」，与状态语义无关。
