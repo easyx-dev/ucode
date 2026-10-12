@@ -270,8 +270,11 @@ export function Composer({
   );
 
   return (
-    <div className="bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto w-full max-w-4xl space-y-2">
+    <div className="px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* 新会话（还没落会话，即「未选择会话」草稿态）收窄一档：此时输入卡与问候语自成一块，与消息列无关 */}
+      <div
+        className={cn("mx-auto w-full space-y-2", sessionId === null ? "max-w-2xl" : "max-w-4xl")}
+      >
         {/* biome-ignore lint/a11y/noStaticElementInteractions: 整条容器都作粘贴 / 拖拽落点，真正的交互在内部编辑器 */}
         <div
           className="rounded-xl bg-muted/50"
