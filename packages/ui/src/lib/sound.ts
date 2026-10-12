@@ -6,26 +6,16 @@
  */
 import { brand } from "@ucode/brand";
 import notifySoundUrl from "../assets/notify.wav";
+import { readStorage, writeStorage } from "./storage";
 
 /** 提示音开关的持久化键：纯本机界面偏好，不进服务端配置 */
 const ENABLED_KEY = `${brand.slug}-notice-sound-enabled`;
 
 /** 提示音开关：读不到（首次、隐私模式）按开启处理 */
-export const readSoundEnabled = (): boolean => {
-  try {
-    return window.localStorage.getItem(ENABLED_KEY) !== "0";
-  } catch {
-    return true;
-  }
-};
+export const readSoundEnabled = (): boolean => readStorage(ENABLED_KEY) !== "0";
 
-export const writeSoundEnabled = (enabled: boolean): void => {
-  try {
-    window.localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
-  } catch {
-    // 写不进去（隐私模式）不影响本次会话
-  }
-};
+export const writeSoundEnabled = (enabled: boolean): void =>
+  writeStorage(ENABLED_KEY, enabled ? "1" : "0");
 
 /**
  * 复用一个音频元素：连续来消息时不该叠着响好几个，

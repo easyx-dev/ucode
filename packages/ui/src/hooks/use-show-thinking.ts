@@ -7,16 +7,12 @@
 import { brand } from "@ucode/brand";
 import { useSyncExternalStore } from "react";
 
+import { readStorage, writeStorage } from "../lib/storage";
+
 const STORAGE_KEY = `${brand.slug}-show-thinking`;
 
 /** 读不到（隐私模式）时按展示处理：思考过程默认可见 */
-const read = (): boolean => {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) !== "0";
-  } catch {
-    return true;
-  }
-};
+const read = (): boolean => readStorage(STORAGE_KEY) !== "0";
 
 let showThinking = read();
 const listeners = new Set<() => void>();
@@ -32,11 +28,7 @@ const getSnapshot = (): boolean => showThinking;
 
 const write = (next: boolean): void => {
   showThinking = next;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-  } catch {
-    // 写不进去（隐私模式）不影响本次会话
-  }
+  writeStorage(STORAGE_KEY, next ? "1" : "0");
   for (const listener of listeners) listener();
 };
 

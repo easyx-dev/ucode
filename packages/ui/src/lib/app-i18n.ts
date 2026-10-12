@@ -10,18 +10,13 @@ import { DEFAULT_LOCALE, isLocale, type Locale } from "@ucode/contracts";
 import { createI18n } from "@ucode/i18n";
 import type { i18n as I18nInstance } from "i18next";
 import { initReactI18next } from "react-i18next";
-
+import { readStorage, writeStorage } from "./storage";
 import { setDayjsLocale } from "./time";
 
 /** 读取持久化的语言偏好；缺失或非法时回落 DEFAULT_LOCALE */
 export const readStoredLocale = (): Locale => {
-  try {
-    const stored = localStorage.getItem(localeStorageKey);
-    return isLocale(stored) ? stored : DEFAULT_LOCALE;
-  } catch {
-    // 隐私模式下 localStorage 不可用，按默认语言渲染
-    return DEFAULT_LOCALE;
-  }
+  const stored = readStorage(localeStorageKey);
+  return isLocale(stored) ? stored : DEFAULT_LOCALE;
 };
 
 export const createAppI18n = (): I18nInstance => {
@@ -31,11 +26,7 @@ export const createAppI18n = (): I18nInstance => {
 
   i18n.on("languageChanged", (lng) => {
     if (!isLocale(lng)) return;
-    try {
-      localStorage.setItem(localeStorageKey, lng);
-    } catch {
-      // 存不下也不影响本次会话
-    }
+    writeStorage(localeStorageKey, lng);
     document.documentElement.lang = lng;
     setDayjsLocale(lng);
   });
