@@ -19,6 +19,7 @@ import {
 import { findManifestFile } from "../../../harness/plugins/manifest";
 import { hashDirectory } from "../../../harness/plugins/source-hash";
 import type { PluginSourceSpec } from "../../../harness/plugins/state";
+import { logger } from "../../../platform/logger";
 import { type PublicFetchResult, publicFetch } from "../../../platform/net";
 import { resolveExistingPath } from "../../../platform/paths";
 import { detectArchiveFormat, unpackArchive } from "./unpack";
@@ -51,8 +52,26 @@ export type SourceRunner = (
 ) => Promise<{ stdout: string }>;
 
 export const defaultSourceRunner: SourceRunner = async (file, args, options) => {
-  const result = await execa(file, args, { timeout: options.timeout, reject: true });
-  return { stdout: typeof result.stdout === "string" ? result.stdout : "" };
+  const startedAt = Date.now();
+  try {
+    const result = await execa(file, args, { timeout: options.timeout, reject: true });
+    // 拉包可能几十秒：留一条可排查的记录（命令、耗时、输出尾巴），不进用户界面
+    logger.debug(
+      {
+        command: `${file} ${args[0] ?? ""}`,
+        ms: Date.now() - startedAt,
+        tail: typeof result.stderr === "string" ? result.stderr.trim().slice(-400) : "",
+      },
+      "插件来源命令完成",
+    );
+    return { stdout: typeof result.stdout === "string" ? result.stdout : "" };
+  } catch (error) {
+    logger.warn(
+      { command: `${file} ${args[0] ?? ""}`, ms: Date.now() - startedAt, args },
+      "插件来源命令失败",
+    );
+    throw error;
+  }
 };
 
 export type StagePluginSourceInput = {

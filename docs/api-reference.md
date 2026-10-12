@@ -70,6 +70,7 @@
 | POST | `/api/v1/plugins/delete` | 移除插件登记（purge 时一并清理缓存与插件数据） |
 | POST | `/api/v1/plugins/refresh` | 按来源重读插件清单并推进代次 |
 | POST | `/api/v1/marketplace/list` | 列出已登记的市场与刷新状态 |
+| POST | `/api/v1/marketplace/info` | 市场内插件列表（读上一次刷新的缓存，不触发网络） |
 | POST | `/api/v1/marketplace/create` | 登记市场来源 |
 | POST | `/api/v1/marketplace/delete` | 移除市场登记（下挂插件只失去来源，内容不删） |
 | POST | `/api/v1/marketplace/refresh` | 刷新市场清单（本轮只支持本地目录市场） |
@@ -1344,6 +1345,24 @@
 | `marketplaces` | [MarketplaceView](#marketplaceview)[] | 是 | — |
 | `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
 
+### POST /api/v1/marketplace/info
+
+市场内插件列表（读上一次刷新的缓存，不触发网络）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `name` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+
+**响应类型**：`MarketplacePluginsResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `marketplace` | [MarketplaceView](#marketplaceview) | 是 | — |
+| `plugins` | [MarketplacePluginView](#marketplacepluginview)[] | 是 | — |
+| `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | 清单里被跳过的条目原因（来源不被支持、字段非法等） |
+
 ### POST /api/v1/marketplace/create
 
 登记市场来源
@@ -2034,6 +2053,24 @@
 | `lastError` | string | 否 | — |
 | `pluginCount` | number | 是 | 清单里的条目数；没刷新过为 0 |
 
+### MarketplacePluginView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | — |
+| `description` | string | 是 | — |
+| `version` | string | 是 | — |
+| `installedId` | string \| null | 是 | 已安装时的插件 id（`<name>@<marketplace>`）；未安装为 null |
+| `updateAvailable` | boolean | 是 | 已安装且可更新；未安装恒为 false |
+
+### PluginDiagnosticView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `level` | "error" \| "warning" \| "info" | 是 | — |
+| `component` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
+| `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
+
 ### AgentView
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -2352,14 +2389,6 @@
 | `options` | string[] | 否 | `select` 的候选值 |
 | `multiple` | boolean | 否 | 允许多选（`select`） |
 | `sensitive` | boolean | 否 | 敏感值：不回显（服务端只回传是否已设置） |
-
-### PluginDiagnosticView
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `level` | "error" \| "warning" \| "info" | 是 | — |
-| `component` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
-| `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
 
 ### QuestionOption
 

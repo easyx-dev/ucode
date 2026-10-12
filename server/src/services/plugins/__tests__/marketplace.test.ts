@@ -231,3 +231,55 @@ describe("网络市场", () => {
     assert.ok(existsSync(join(pluginsDir, "marketplaces", "git-market", "marketplace.json")));
   });
 });
+
+describe("市场内插件列表", () => {
+  it("刷新后读缓存条目，并标出哪些已装、哪些可更新", async () => {
+    const { service, state } = setup();
+    const dir = makeMarket({
+      name: "my-market",
+      plugins: [
+        { name: "installed-one", version: "1.0.0", description: "已装" },
+        { name: "fresh-one", version: "2.0.0" },
+      ],
+    });
+    service.create({ name: "my-market", source: { source: "directory", path: dir } });
+    await service.refresh({ name: "my-market" });
+
+    state.set({
+      ...state.get(),
+      installed: [
+        {
+          id: "installed-one@my-market",
+          name: "installed-one",
+          version: "0.9.0",
+          source: { source: "directory", path: dir },
+          marketplace: "my-market",
+          path: dir,
+          scope: "user",
+          enabled: true,
+          installedAt: "2026-01-01T00:00:00.000Z",
+          updateAvailable: true,
+        },
+      ],
+    });
+
+    const info = service.info({ name: "my-market" });
+    assert.equal(info.marketplace.name, "my-market");
+    assert.deepEqual(
+      info.plugins.map((item) => [item.name, item.installedId, item.updateAvailable]),
+      [
+        ["installed-one", "installed-one@my-market", true],
+        ["fresh-one", null, false],
+      ],
+    );
+  });
+
+  it("从没刷新过的市场返回空列表，不报错", () => {
+    const { service } = setup();
+    const dir = makeMarket({ plugins: [] });
+    service.create({ name: "empty-market", source: { source: "directory", path: dir } });
+
+    assert.deepEqual(service.info({ name: "empty-market" }).plugins, []);
+    assert.throws(() => service.info({ name: "nope" }), /市场不存在/);
+  });
+});

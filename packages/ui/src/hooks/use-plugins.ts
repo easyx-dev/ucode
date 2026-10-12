@@ -1,6 +1,7 @@
 /** 插件与市场的 React 绑定：状态与写操作都在 SDK plugins store，失败由 ErrorToaster 统一提示 */
 import type {
   MarketplaceCreateRequest,
+  MarketplacePluginsResponse,
   MarketplacesListResponse,
   PluginCreateRequest,
   PluginsListResponse,
@@ -21,6 +22,8 @@ export function usePlugins(): {
   addMarketplace: (input: MarketplaceCreateRequest) => Promise<boolean>;
   removeMarketplace: (name: string) => Promise<boolean>;
   refreshMarketplace: (name: string) => Promise<boolean>;
+  /** 市场内插件列表：点开才取 */
+  catalog: (name: string) => Promise<MarketplacePluginsResponse | null>;
 } {
   const client = useClient();
   const state = useStore(client.plugins);
@@ -39,5 +42,6 @@ export function usePlugins(): {
     addMarketplace: async (input) => (await client.plugins.addMarketplace(input)) !== null,
     removeMarketplace: (name) => client.plugins.removeMarketplace(name),
     refreshMarketplace: async (name) => (await client.plugins.refreshMarketplace(name)) !== null,
+    catalog: (name: string) => client.plugins.catalog(name),
   };
 }

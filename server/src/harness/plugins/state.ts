@@ -50,6 +50,16 @@ const marketplaceRecordSchema = z.object({
   lastModified: z.string().optional(),
   /** 内容摘要：url 市场记响应哈希，git 市场记克隆副本的内容哈希 */
   integrity: z.string().optional(),
+  /** 上一次成功刷新出的条目：市场内插件列表直接读它，不再扫盘 / 打网络 */
+  catalog: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().default(""),
+        version: z.string().default("0.0.0"),
+      }),
+    )
+    .optional(),
 });
 
 const installedPluginRecordSchema = z.object({

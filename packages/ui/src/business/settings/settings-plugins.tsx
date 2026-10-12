@@ -4,7 +4,7 @@
  * 执行类组件（hooks / 扩展 / bin）按来源门控：第三方市场来的只出诊断、不注入运行时，
  * 所以界面上要**直接说明**哪些组件没有生效（见 `plans/plugins.md` 第五章）。
  */
-import type { PluginCreateRequest } from "@ucode/contracts";
+import type { MarketplacePluginsResponse, PluginCreateRequest } from "@ucode/contracts";
 import { FolderInput, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,7 +13,9 @@ import { Badge } from "../../base/badge";
 import { Button } from "../../base/button";
 import { Input } from "../../base/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
+import { Spinner } from "../../base/spinner";
 import { usePlugins } from "../../hooks/use-plugins";
+import { openDirectoryPickerDialog } from "../directory-picker-dialog";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
 /** 安装来源：与安装入参的来源类型一一对应 */
@@ -26,6 +28,7 @@ export function SettingsPlugins() {
     {},
   );
   const [purge, setPurge] = useState<string | null>(null);
+  const [installing, setInstalling] = useState(false);
   const {
     plugins,
     marketplaces,
@@ -37,7 +40,10 @@ export function SettingsPlugins() {
     addMarketplace,
     removeMarketplace,
     refreshMarketplace,
+    catalog,
   } = usePlugins();
+  const [openCatalog, setOpenCatalog] = useState<string | null>(null);
+  const [catalogEntries, setCatalogEntries] = useState<MarketplacePluginsResponse["plugins"]>([]);
   const [sourceKind, setSourceKind] = useState<SourceKind>("directory");
   const [sourceValue, setSourceValue] = useState("");
   const [ref, setRef] = useState("");
@@ -58,6 +64,8 @@ export function SettingsPlugins() {
   const installFromSource = async () => {
     const value = sourceValue.trim();
     if (!value) return;
+    // 网络来源可能要拉几十秒：按钮先进入进行中状态，避免看不到反应重复点
+    setInstalling(true);
     const source: PluginCreateRequest["source"] =
       sourceKind === "directory"
         ? { source: "directory", path: value }
@@ -68,10 +76,30 @@ export function SettingsPlugins() {
             : sourceKind === "github"
               ? { source: "github", repo: value, ...(ref.trim() ? { ref: ref.trim() } : {}) }
               : { source: "git", url: value, ...(ref.trim() ? { ref: ref.trim() } : {}) };
-    if (await install({ source })) {
-      setSourceValue("");
-      setRef("");
+    try {
+      if (await install({ source })) {
+        setSourceValue("");
+        setRef("");
+      }
+    } finally {
+      setInstalling(false);
     }
+  };
+
+  /** `directory` 类型的配置项走系统目录选择器；`file` 类型仍是文本框（浏览器拿不到可靠的文件路径） */
+  const pickDirectory = async (apply: (path: string) => void): Promise<void> => {
+    const picked = await openDirectoryPickerDialog();
+    if (picked) apply(picked);
+  };
+
+  const toggleCatalog = async (name: string) => {
+    if (openCatalog === name) {
+      setOpenCatalog(null);
+      return;
+    }
+    setOpenCatalog(name);
+    const data = await catalog(name);
+    setCatalogEntries(data?.plugins ?? []);
   };
 
   const addLocalMarket = async () => {
@@ -90,7 +118,7 @@ export function SettingsPlugins() {
         <div className="flex items-start justify-between gap-4">
           <p className="text-xs leading-relaxed text-foreground-subtle">
             {t(
-              "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本轮安装只支持本地目录（不复制内容，改完重拉即可生效）；来自第三方市场的钩子、扩展与命令目录不会注入运行时。",
+              "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本地目录来源不复制内容（改完重拉即可生效），网络来源会复制进插件缓存；来自第三方市场的钩子、扩展与命令目录不会注入运行时。",
             )}
           </p>
         </div>
@@ -127,10 +155,14 @@ export function SettingsPlugins() {
             variant="outline"
             size="sm"
             onClick={() => void installFromSource()}
-            disabled={!sourceValue.trim()}
+            disabled={!sourceValue.trim() || installing}
           >
-            <FolderInput className="size-icon-base" />
-            {t("安装")}
+            {installing ? (
+              <Spinner className="size-icon-base" />
+            ) : (
+              <FolderInput className="size-icon-base" />
+            )}
+            {installing ? t("安装中…") : t("安装")}
           </Button>
         </div>
       </div>
@@ -348,7 +380,7 @@ export function SettingsPlugins() {
         <SettingsRow
           title={t("插件市场")}
           description={t(
-            "市场是一份插件清单（marketplace.json）。本轮只支持本地目录市场；内置的 Claude 官方市场是 git 源，等网络底座落地后才可刷新。",
+            "市场是一份插件清单（marketplace.json），可来自本地目录、url 直链或 git 仓库；刷新后点「查看插件」看目录内容。内置的 Claude 官方市场是 git 源。",
           )}
           control={
             <span className="text-xs text-foreground-subtle">
@@ -378,6 +410,9 @@ export function SettingsPlugins() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => void toggleCatalog(market.name)}>
+              {openCatalog === market.name ? t("收起") : t("查看插件")}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => void refreshMarketplace(market.name)}>
               <RefreshCw className="size-icon-base" />
               {t("刷新")}
@@ -391,6 +426,36 @@ export function SettingsPlugins() {
           </div>
         </div>
       ))}
+
+      {openCatalog ? (
+        <div className="space-y-1 rounded-xl border border-dashed px-4 py-3">
+          {catalogEntries.length === 0 ? (
+            <p className="text-xs text-foreground-subtle">
+              {t("该市场还没有插件（或尚未刷新）。")}
+            </p>
+          ) : (
+            catalogEntries.map((entry) => (
+              <div
+                key={entry.name}
+                className="flex items-center justify-between gap-4 text-xs text-foreground-subtle"
+              >
+                <span className="min-w-0 truncate">
+                  <span className="font-mono">{entry.name}</span>
+                  {entry.description ? ` · ${entry.description}` : ""}
+                </span>
+                <span className="shrink-0">
+                  v{entry.version}
+                  {entry.installedId === null
+                    ? ""
+                    : entry.updateAvailable
+                      ? ` · ${t("已安装，可更新")}`
+                      : ` · ${t("已安装")}`}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <Input

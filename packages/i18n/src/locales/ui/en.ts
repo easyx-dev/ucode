@@ -776,6 +776,12 @@ export default {
   "预览 {{path}}": "Preview {{path}}",
 
   安装: "Install",
+  "安装中…": "Installing…",
+  查看插件: "View plugins",
+  已安装: "Installed",
+  "已安装，可更新": "Installed, update available",
+  "该市场还没有插件（或尚未刷新）。":
+    "This marketplace has no plugins (or has not been refreshed yet).",
   安装来源: "Source",
   本地目录: "Local folder",
   压缩包链接: "Archive URL",
@@ -819,10 +825,10 @@ export default {
   市场目录: "Marketplace folder",
   "含 marketplace.json 的目录": "Folder containing marketplace.json",
   "状态文件：{{path}}": "State file: {{path}}",
-  "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本轮安装只支持本地目录（不复制内容，改完重拉即可生效）；来自第三方市场的钩子、扩展与命令目录不会注入运行时。":
-    "Plugins bundle skills, commands, agents, hooks and MCP servers. This round only installs from a local folder (contents are referenced, not copied, so reloading picks up your edits); hooks, extensions and command binaries from third-party marketplaces are never injected.",
+  "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本地目录来源不复制内容（改完重拉即可生效），网络来源会复制进插件缓存；来自第三方市场的钩子、扩展与命令目录不会注入运行时。":
+    "Plugins bundle skills, commands, agents, hooks and MCP servers. Local folders are referenced rather than copied (reload picks up your edits); network sources are copied into the plugin cache. Hooks, extensions and command binaries from third-party marketplaces are never injected.",
   "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对随包与本地登记的插件开放）。":
     "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to bundled and locally registered plugins.",
-  "市场是一份插件清单（marketplace.json）。本轮只支持本地目录市场；内置的 Claude 官方市场是 git 源，等网络底座落地后才可刷新。":
-    "A marketplace is a plugin catalog (marketplace.json). Only local folders are supported this round; the built-in Claude marketplace is a git source and can be refreshed once the network layer lands.",
+  "市场是一份插件清单（marketplace.json），可来自本地目录、url 直链或 git 仓库；刷新后点「查看插件」看目录内容。内置的 Claude 官方市场是 git 源。":
+    "A marketplace is a plugin catalog (marketplace.json) served from a local folder, a direct URL or a git repository. Refresh, then browse it with View plugins. The built-in Claude marketplace is a git source.",
 };

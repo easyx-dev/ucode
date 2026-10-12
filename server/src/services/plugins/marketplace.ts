@@ -14,6 +14,8 @@ import {
   type MarketplaceCreateInput,
   type MarketplaceDeleteInput,
   type MarketplaceDeleteResponse,
+  type MarketplaceInfoInput,
+  type MarketplacePluginsResponse,
   type MarketplaceRefreshInput,
   type MarketplacesListResponse,
   type MarketplaceView,
@@ -28,7 +30,11 @@ import {
 import type { SessionEventBus } from "../../core/event-bus";
 import { env } from "../../env";
 import { describeError } from "../../harness/plugins/diagnostic";
-import { parseMarketplaceCatalog, readMarketplaceCatalog } from "../../harness/plugins/marketplace";
+import {
+  type MarketplaceCatalogEntry,
+  parseMarketplaceCatalog,
+  readMarketplaceCatalog,
+} from "../../harness/plugins/marketplace";
 import { hashDirectory } from "../../harness/plugins/source-hash";
 import type {
   PluginMarketplaceRecord,
@@ -64,6 +70,8 @@ const defaultSourceRunner: SourceRunner = async (file, args, options) => {
 };
 
 export type MarketplaceService = {
+  /** 市场内插件列表：读状态里缓存的条目（列接口不打网络、不扫盘） */
+  info(input: MarketplaceInfoInput): MarketplacePluginsResponse;
   list(): MarketplacesListResponse;
   create(input: MarketplaceCreateInput): MarketplaceWriteResponse;
   delete(input: MarketplaceDeleteInput): MarketplaceDeleteResponse;
@@ -135,6 +143,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       etag?: string | null;
       lastModified?: string | null;
       integrity?: string;
+      catalog?: MarketplaceCatalogEntry[];
     },
   ): void => {
     commit((current) => ({
@@ -151,6 +160,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           ...(patch.etag ? { etag: patch.etag } : {}),
           ...(patch.lastModified ? { lastModified: patch.lastModified } : {}),
           ...(patch.integrity === undefined ? {} : { integrity: patch.integrity }),
+          ...(patch.catalog === undefined ? {} : { catalog: patch.catalog }),
         };
       }),
     }));
@@ -179,7 +189,11 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     });
 
     if (response.status === 304) {
-      recordRefresh(record.name, { refreshedOk: true, pluginCount: record.pluginCount });
+      recordRefresh(record.name, {
+        refreshedOk: true,
+        pluginCount: record.pluginCount,
+        catalog: record.catalog,
+      });
       return;
     }
     if (response.status < 200 || response.status >= 300) {
@@ -200,6 +214,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     recordRefresh(record.name, {
       refreshedOk: true,
       pluginCount: catalog.entries.length,
+      catalog: catalog.entries,
       etag: response.etag,
       lastModified: response.lastModified,
       integrity: createHash("sha256").update(response.body).digest("hex"),
@@ -235,11 +250,37 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     recordRefresh(record.name, {
       refreshedOk: true,
       pluginCount: catalog.entries.length,
+      catalog: catalog.entries,
       integrity: hashDirectory(target)?.hash,
     });
   };
 
   return {
+    info(input) {
+      const record = requireMarketplace(input.name);
+      const installedByName = new Map(
+        state
+          .get()
+          .installed.filter((item) => item.marketplace === record.name)
+          .map((item) => [item.name, item]),
+      );
+
+      return {
+        marketplace: toView(record),
+        plugins: (record.catalog ?? []).map((entry) => {
+          const installed = installedByName.get(entry.name);
+          return {
+            name: entry.name,
+            description: entry.description,
+            version: entry.version,
+            installedId: installed?.id ?? null,
+            updateAvailable: installed?.updateAvailable === true,
+          };
+        }),
+        diagnostics: [],
+      };
+    },
+
     list: () => ({
       marketplaces: state.get().marketplaces.map(toView),
       statePath: state.path,
@@ -303,6 +344,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           recordRefresh(record.name, {
             refreshedOk: true,
             pluginCount: catalog.entries.length,
+            catalog: catalog.entries,
             integrity: hashDirectory(marketDir)?.hash,
           });
         } else if (source.source === "url") {

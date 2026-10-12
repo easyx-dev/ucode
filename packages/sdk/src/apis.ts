@@ -43,6 +43,7 @@ import type {
   InteractionRespondResponse,
   MarketplaceCreateRequest,
   MarketplaceDeleteResponse,
+  MarketplacePluginsResponse,
   MarketplacesListResponse,
   MarketplaceWriteResponse,
   McpDeleteResponse,
@@ -298,6 +299,8 @@ export const createApis = (options: ApisOptions = {}) => {
     },
     marketplace: {
       list: () => transport.post<MarketplacesListResponse>("marketplace/list"),
+      info: (name: string) =>
+        transport.post<MarketplacePluginsResponse>("marketplace/info", { name }),
       create: (body: MarketplaceCreateRequest) =>
         transport.post<MarketplaceWriteResponse>("marketplace/create", body),
       remove: (name: string) =>

@@ -48,6 +48,9 @@ export const marketplaceDeleteInputSchema = z.object({ name: marketplaceNameSche
 
 export const marketplaceRefreshInputSchema = z.object({ name: marketplaceNameSchema });
 
+/** 市场内插件列表：读上一次刷新出的条目（不触发网络） */
+export const marketplaceInfoInputSchema = z.object({ name: marketplaceNameSchema });
+
 export type MarketplaceSourceInput = z.infer<typeof marketplaceSourceSchema>;
 export type MarketplaceListRequest = z.input<typeof marketplaceListInputSchema>;
 export type MarketplaceListInput = z.infer<typeof marketplaceListInputSchema>;
@@ -57,3 +60,5 @@ export type MarketplaceDeleteRequest = z.input<typeof marketplaceDeleteInputSche
 export type MarketplaceDeleteInput = z.infer<typeof marketplaceDeleteInputSchema>;
 export type MarketplaceRefreshRequest = z.input<typeof marketplaceRefreshInputSchema>;
 export type MarketplaceRefreshInput = z.infer<typeof marketplaceRefreshInputSchema>;
+export type MarketplaceInfoRequest = z.input<typeof marketplaceInfoInputSchema>;
+export type MarketplaceInfoInput = z.infer<typeof marketplaceInfoInputSchema>;

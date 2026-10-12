@@ -1,10 +1,12 @@
 /** /api/v1/marketplace：插件市场来源的登记、移除与刷新 */
 import {
   type MarketplaceDeleteResponse,
+  type MarketplacePluginsResponse,
   type MarketplacesListResponse,
   type MarketplaceWriteResponse,
   marketplaceCreateInputSchema,
   marketplaceDeleteInputSchema,
+  marketplaceInfoInputSchema,
   marketplaceListInputSchema,
   marketplaceRefreshInputSchema,
 } from "@ucode/contracts";
@@ -19,6 +21,11 @@ export const createMarketplaceRoute = (services: Services) => {
 
   router.post("/list", jsonBody(marketplaceListInputSchema), (c) => {
     const response: MarketplacesListResponse = services.marketplaces.list();
+    return c.json(ok(response));
+  });
+
+  router.post("/info", jsonBody(marketplaceInfoInputSchema), (c) => {
+    const response: MarketplacePluginsResponse = services.marketplaces.info(c.req.valid("json"));
     return c.json(ok(response));
   });
 

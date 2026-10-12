@@ -548,6 +548,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "marketplace",
+    action: "info",
+    method: "POST",
+    input: "marketplaceInfoInputSchema",
+    requestType: "MarketplaceInfoInput",
+    output: "MarketplacePluginsResponse",
+    summary: "市场内插件列表（读上一次刷新的缓存，不触发网络）",
+  },
+  {
+    domain: "marketplace",
     action: "create",
     method: "POST",
     input: "marketplaceCreateInputSchema",
