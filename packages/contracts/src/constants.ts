@@ -553,7 +553,7 @@ export const PROMPT_MAX_CONTEXTS = 32;
 
 /**
  * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：
- * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 内置。
+ * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 插件 → 内置。
  * 提示词命令只会有 `project` / `global` / `builtin` 三种。
  */
 export const COMMAND_ASSET_SOURCES = [
@@ -561,6 +561,7 @@ export const COMMAND_ASSET_SOURCES = [
   "agents-project",
   "global",
   "agents-user",
+  "plugin",
   "builtin",
 ] as const;
 
@@ -571,8 +572,8 @@ export const AGENT_KINDS = ["primary", "subagent"] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
-/** 角色来源：内置 / 项目 `.ucode` / 全局 `$APP_HOME`（自定义 subagent 与 primary 共用） */
-export const AGENT_SOURCES = ["builtin", "project", "global"] as const;
+/** 角色来源：内置 / 项目 `.ucode` / 全局 `$APP_HOME` / 插件（自定义 subagent 与 primary 共用） */
+export const AGENT_SOURCES = ["builtin", "project", "global", "plugin"] as const;
 
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 

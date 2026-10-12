@@ -212,6 +212,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 | --- | --- | --- |
 | `routes/` | 协议适配：Hono 路由、zod 校验、封套、SSE | 只做 HTTP 适配，不写业务判断 |
 | `services/` | 业务与胶水：用例编排、进程生命周期、跨组件连线 | 被 routes 调用；`lifecycle.ts` / `config.ts` 是两个进程级入口 |
+| `harness/plugins/` | 插件宿主：清单、组件解析、注册表与来源门控 | 接缝层，不被 `harness/{pi,setup,features}`、`core`、`platform` 反向依赖 |
 | `core/` | 内核·会话运行态 | 持有 `AgentSession` 或进程内运行态（池、占位、挂起请求、事件流） |
 | `harness/` | 基于 pi 的能力 | 直接构造 / 转换 / 驱动 pi 的对象与数据结构 |
 | `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
@@ -234,7 +235,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   - 模块内的 `utils/`（如 `harness/utils/`）只在模块内使用、作用域不出模块，因此**允许有 IO 与业务语义**；
     它本来就不该被模块外引用。
   新增一个方法时的选择：多个模块都要用 → 顶层 `utils/`（得是纯函数）；只在本模块内共用 → 本模块的 `utils/`。
-- `harness/` 分三组 + 一个公共方法目录：
+- `harness/` 分四组 + 一个公共方法目录：
   - `pi/`：与 pi 的数据 / 对象互转（`runtime` / `provider-config` / `session-index` / `records` / `serialize` /
     `projection` / `plan-state` / `compaction-skip` / `run-settings`）；只依赖 contracts、`harness/utils` 与顶层 `utils`；
   - `setup/`：一次装配所需的全部（`session-config` / `agents` / `permissions` / `tools` / `prompt` / `mcp` /
@@ -243,6 +244,10 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
     `subagents` / `shell` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
     这批是「内置功能」，随包实现、随版本演进；它们**不是插件**（插件平台只承载资源与受信任的代码扩展，
     见 [`plans/plugins.md`](./plans/plugins.md)）；
+  - `plugins/`：插件宿主（`manifest` 清单发现与解析 / `components` 组件解析与路径校验 /
+    `registry` 注册表与来源门控 / `state` 状态结构与判定 / `sanitize` 命名 / `view` 视图映射）。
+    它是接缝层：`harness/{pi,setup,features}` 与 `core`、`platform` 不得反向依赖它；
+    `harness/plugins → core` 只许 `import type`。插件的文件读写与安装流程在 `services/plugins/`；
   - `utils/`：harness 内的公共方法（`text.ts` 取消息文本、`boundary.ts` 不可信内容的边界包裹与中和，
     后者的标签名单在 `packages/contracts`）。按下一段关于 `utils` 的定义，它只服务于 harness，
     **不要求纯函数**；`layers` 会拦下它反向依赖 `pi` / `setup` / `features`。
@@ -294,8 +299,10 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   由客户端按 `code` 查表渲染（见 `docs/api.md`「语言与本地化」）。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
 - `$APP_HOME`（默认 `~/.ucode`）是运行时数据目录与 agent 的默认工作目录，按「谁的资产」分两层：
-  `harness/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db`）；
-  另有全局命令、技能与角色目录 `skills/`、`prompts/`、`agents/` 直接放在 `$APP_HOME` 下。
+  `harness/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db` / `plugins.json` / `builtin/`）；
+  另有全局命令、技能与角色目录 `skills/`、`prompts/`、`agents/`、插件根 `plugins/`
+  （`cache/<market>/<plugin>/<version>` 安装副本、`marketplaces/<market>` 清单缓存、`data/<id>` 插件数据）
+  直接放在 `$APP_HOME` 下。
   不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
 - `$APP_HOME/app/config.json` 由服务根据 `POST /api/v1/config/update` 生成（模型 provider 与 apiKey 只存这一份，
   不再派生 `harness/models.json`），`app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。

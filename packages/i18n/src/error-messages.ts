@@ -37,6 +37,9 @@ export const errorMessageKeys = {
   git_failed: "git 执行失败",
   image_invalid: "图片无效：{{reason}}",
   payload_too_large: "附件超过大小上限（{{max}}）",
+  plugin_not_found: "插件不存在：{{id}}",
+  plugin_manifest_invalid: "插件清单无效：{{path}}",
+  plugin_component_invalid: "插件组件路径无效：{{path}}",
 } as const satisfies Record<ErrorCode, string>;
 
 /** key 的联合，供客户端 `t()` 的类型收窄 */

@@ -10,10 +10,13 @@ import {
   APP_DIRNAME,
   ATTACHMENTS_DIRNAME,
   AUTH_FILENAME,
+  BUILTIN_DIRNAME,
   CONFIG_FILENAME,
   DB_FILENAME,
   HARNESS_DIRNAME,
   MCP_CONFIG_FILENAME,
+  PLUGIN_STATE_FILENAME,
+  PLUGINS_DIRNAME,
   SERVICE_FILENAME,
   SESSIONS_DIRNAME,
   WORKSPACE_DIRNAME,
@@ -173,6 +176,12 @@ export const env = {
   configPath: resolve(appDir, CONFIG_FILENAME),
   /** pi 的 MCP 服务器配置（用户级）；设置页增删改写回这里 */
   mcpConfigPath: resolve(harnessDir, MCP_CONFIG_FILENAME),
+  /** 插件根：市场清单缓存、安装副本与插件数据目录 */
+  pluginsDir: resolve(homeDir, PLUGINS_DIRNAME),
+  /** 插件状态文件：登记表 + 用户配置 + 注册表代次（0600） */
+  pluginStatePath: resolve(appDir, PLUGIN_STATE_FILENAME),
+  /** 内置资产物化目录：随包技能真身与 manifest.json */
+  builtinDir: resolve(appDir, BUILTIN_DIRNAME),
   dbPath: resolve(appDir, DB_FILENAME),
   /** web 构建产物（由 pnpm build 生成，server 同源托管） */
   webDistDir: resolve(resourceRoot, "apps/web/dist"),
@@ -189,6 +198,8 @@ for (const dir of new Set([
   env.harnessDir,
   env.appDir,
   env.sessionsDir,
+  env.pluginsDir,
+  env.builtinDir,
 ])) {
   mkdirSync(dir, { recursive: true });
 }

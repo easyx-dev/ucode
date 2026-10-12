@@ -57,6 +57,14 @@
 
 - **新增依赖**：`@fontsource-variable/inter`（可选的界面字体，按需加载）。
 
+- **插件平台骨架（第一步：契约与宿主内核）**：新增契约域 `plugins` / `marketplace`（插件视图、诊断、
+  安装来源与市场来源的请求模型）与三个错误码（`plugin_not_found` / `plugin_manifest_invalid` /
+  `plugin_component_invalid`）；插件清单按「本品牌 → `.zcode-plugin` → `.claude-plugin`」三档识别、
+  可缺省（无清单按标准目录布局），组件路径必须落在插件根内（包含符号链接越界）；执行类组件
+  （hooks / `extensions` / bin）按来源门控，第三方市场来的只解析出诊断、**不注入运行时**。
+  运行时新增目录：`$APP_HOME/plugins`（市场清单缓存与插件数据）与 `$APP_HOME/app/plugins.json`
+  （登记表，0600）、`$APP_HOME/app/builtin`（内置资产物化）。接口与设置页尚未接入。
+
 ### 变更
 
 - **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用

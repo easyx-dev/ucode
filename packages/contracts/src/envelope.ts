@@ -101,6 +101,13 @@ export const ERROR_CODES = {
   imageInvalid: "image_invalid",
   /** 上传体积超过上限 */
   payloadTooLarge: "payload_too_large",
+
+  /** 插件未登记或已被移除 */
+  pluginNotFound: "plugin_not_found",
+  /** 插件清单缺失、无法解析或字段非法 */
+  pluginManifestInvalid: "plugin_manifest_invalid",
+  /** 插件组件不在插件根内，或声明的路径不存在 */
+  pluginComponentInvalid: "plugin_component_invalid",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

@@ -53,3 +53,52 @@ export const MEMORY_PROJECTS_DIRNAME = "projects";
 
 /** 记忆索引文件名：一行一条，指向同目录下的事实文件 */
 export const MEMORY_INDEX_FILENAME = "MEMORY.md";
+
+/** 插件根目录名（位于 APP_HOME 下）：`cache/` `marketplaces/` `data/` 三个子目录 */
+export const PLUGINS_DIRNAME = "plugins";
+
+/** 插件安装副本目录名（位于插件根下）：`cache/<market>/<plugin>/<version>` */
+export const PLUGIN_CACHE_DIRNAME = "cache";
+
+/** 市场清单缓存目录名（位于插件根下）：`marketplaces/<market>/marketplace.json` */
+export const PLUGIN_MARKETPLACES_DIRNAME = "marketplaces";
+
+/** 插件持久数据目录名（位于插件根下）：`data/<sanitized-plugin-id>`，即 `${*_PLUGIN_DATA}` */
+export const PLUGIN_DATA_DIRNAME = "data";
+
+/** 插件状态文件名（位于 app 目录下）：登记表 + 用户配置 + 注册表代次 */
+export const PLUGIN_STATE_FILENAME = "plugins.json";
+
+/** 市场清单文件名（位于市场目录 / 直链末尾） */
+export const PLUGIN_MARKETPLACE_FILENAME = "marketplace.json";
+
+/** 内置资产物化目录名（位于 app 目录下）：`skills/` 与 `manifest.json` */
+export const BUILTIN_DIRNAME = "builtin";
+
+/** 本品牌清单目录名（位于插件包内）：`.<slug>-plugin` */
+export const PLUGIN_MANIFEST_DIRNAME = `.${brand.slug}-plugin`;
+
+/** 兼容生态的清单目录名（位于插件包内），按识别顺序排在本品牌之后 */
+export const PLUGIN_COMPAT_MANIFEST_DIRNAMES = [".zcode-plugin", ".claude-plugin"] as const;
+
+/** 清单文件名（位于上面任一个清单目录内） */
+export const PLUGIN_MANIFEST_FILENAME = "plugin.json";
+
+/** 插件包内各组件的默认目录名：只在清单没显式声明时使用 */
+export const PLUGIN_SKILLS_DIRNAME = "skills";
+export const PLUGIN_COMMANDS_DIRNAME = "commands";
+export const PLUGIN_AGENTS_DIRNAME = "agents";
+export const PLUGIN_EXTENSIONS_DIRNAME = "extensions";
+export const PLUGIN_BIN_DIRNAME = "bin";
+
+/** 命令式 hook 的配置文件名（位于插件包内），与清单 `hooks` 键合并 */
+export const PLUGIN_HOOKS_FILENAME = "hooks/hooks.json";
+
+/** MCP 服务器配置文件名（位于插件包内），与清单 `mcpServers` 键合并 */
+export const PLUGIN_MCP_FILENAME = ".mcp.json";
+
+/** 技能真身文件名 */
+export const SKILL_FILENAME = "SKILL.md";
+
+/** Markdown 扩展名：命令 / 角色组件的文件后缀 */
+export const MARKDOWN_EXTENSION = ".md";

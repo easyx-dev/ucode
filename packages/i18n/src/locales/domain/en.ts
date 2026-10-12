@@ -37,4 +37,7 @@ export default {
   "git 执行失败": "git command failed",
   "图片无效：{{reason}}": "Invalid image: {{reason}}",
   "附件超过大小上限（{{max}}）": "Attachment exceeds the size limit ({{max}})",
+  "插件不存在：{{id}}": "No such plugin: {{id}}",
+  "插件清单无效：{{path}}": "Invalid plugin manifest: {{path}}",
+  "插件组件路径无效：{{path}}": "Invalid plugin component path: {{path}}",
 };

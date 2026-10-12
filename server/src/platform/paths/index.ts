@@ -69,5 +69,15 @@ export const parentPathOf = (path: string): string | null => {
   return parent === path ? null : parent;
 };
 
+/**
+ * `child` 是否就是 `parent` 或落在它内部（纯字符串判定，要求两者都是绝对路径）。
+ * 前缀比较必须带上分隔符，否则 `/a/bc` 会被误判成在 `/a/b` 内。
+ */
+export const isInsidePath = (parent: string, child: string): boolean => {
+  const base = resolve(parent);
+  const target = resolve(child);
+  return target === base || target.startsWith(`${base}${sep}`);
+};
+
 /** 平台路径转 posix（`\` → `/`）：权限规则匹配与展示统一用 `/`，屏蔽平台差异 */
 export const toPosixPath = (path: string): string => path.split(sep).join("/");

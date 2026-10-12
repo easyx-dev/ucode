@@ -1757,7 +1757,7 @@
 | `label` | string | 是 | 展示名 |
 | `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
 | `kind` | "primary" \| "subagent" | 是 | — |
-| `source` | "builtin" \| "project" \| "global" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" | 是 | — |
 | `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
 
 ### PromptCommandView
@@ -1767,7 +1767,7 @@
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
-| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -1775,7 +1775,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
-| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
 
 ### ModelUsage
 
@@ -1986,7 +1986,7 @@
 | `event` | "invoke" \| "hit" | 是 | 使用方式 |
 | `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
-| `source` | "builtin" \| "project" \| "global" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
