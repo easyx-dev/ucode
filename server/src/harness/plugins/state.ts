@@ -68,6 +68,11 @@ const installedPluginRecordSchema = z.object({
   integrity: z.string().optional(),
   /** 上次检查更新的结论：来源内容与该 integrity 不一致；缺省表示还没检查过 */
   updateAvailable: z.boolean().optional(),
+  /** 远端最新版本：npm / 清单能给出时记下 */
+  latestVersion: z.string().optional(),
+  /** url 来源下载时的条件请求凭据，供「检查更新」发 304 探测 */
+  etag: z.string().optional(),
+  lastModified: z.string().optional(),
   /** 上次检查更新的时间（ISO 8601） */
   checkedAt: z.string().optional(),
   /** 安装时间（ISO 8601） */

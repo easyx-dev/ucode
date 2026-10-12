@@ -15,6 +15,7 @@ export function usePlugins(): {
   marketplaces: MarketplacesListResponse | null;
   install: (input: PluginCreateRequest) => Promise<boolean>;
   setEnabled: (id: string, enabled: boolean) => Promise<boolean>;
+  setConfig: (id: string, config: Record<string, string | number | boolean>) => Promise<boolean>;
   uninstall: (id: string, purge?: boolean) => Promise<boolean>;
   refresh: (id: string) => Promise<boolean>;
   addMarketplace: (input: MarketplaceCreateRequest) => Promise<boolean>;
@@ -32,6 +33,7 @@ export function usePlugins(): {
       const body: PluginUpdateRequest = { id, enabled };
       return (await client.plugins.update(body)) !== null;
     },
+    setConfig: async (id, config) => (await client.plugins.update({ id, config })) !== null,
     uninstall: (id, purge = false) => client.plugins.remove(id, purge),
     refresh: async (id: string) => (await client.plugins.refresh(id)) !== null,
     addMarketplace: async (input) => (await client.plugins.addMarketplace(input)) !== null,

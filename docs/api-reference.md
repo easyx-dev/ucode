@@ -2013,8 +2013,12 @@
 | `path` | string | 是 | 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） |
 | `installedAt` | string | 是 | 安装时间（ISO 8601） |
 | `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
+| `componentRefs` | [PluginComponentRefView](#plugincomponentrefview)[] | 是 | 组件逐个列出：列表只给计数，详情页要名字 |
+| `userConfig` | [PluginUserConfigFieldView](#pluginuserconfigfieldview)[] | 是 | userConfig 的声明；没有配置项时为空数组 |
+| `config` | Record<string, string \| number \| boolean> | 是 | userConfig 的已存值；敏感项不在其中（只体现 `configured` 语义） |
 | `blockedComponents` | ("manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
-| `updateAvailable` | boolean | 是 | 来源内容是否已变（本地目录来源按内容哈希判定）。由「刷新市场」这类显式动作重算， 列表接口本身不打网络、不扫盘，只回显上次结论。 |
+| `updateAvailable` | boolean | 是 | 来源内容是否已变（目录来源按内容哈希、git 按 ls-remote 的 commit、npm 按 registry 版本、 url 按条件请求判定）。由「刷新市场」这类显式动作重算，列表接口本身不打网络、不扫盘， 只回显上次结论。 |
+| `latestVersion` | string | 否 | 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 |
 | `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
 | `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | — |
 
@@ -2327,6 +2331,27 @@
 | `mcp` | number | 是 | — |
 | `bin` | number | 是 | — |
 | `extensions` | number | 是 | — |
+
+### PluginComponentRefView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `group` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | — |
+| `name` | string | 是 | — |
+
+### PluginUserConfigFieldView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `key` | string | 是 | — |
+| `type` | string | 是 | 控件类型：string \| number \| boolean \| directory \| file \| select |
+| `title` | string | 是 | — |
+| `description` | string | 是 | — |
+| `required` | boolean | 是 | — |
+| `default` | string \| number \| false \| true | 否 | 缺省值；类型随 `type` |
+| `options` | string[] | 否 | `select` 的候选值 |
+| `multiple` | boolean | 否 | 允许多选（`select`） |
+| `sensitive` | boolean | 否 | 敏感值：不回显（服务端只回传是否已设置） |
 
 ### PluginDiagnosticView
 

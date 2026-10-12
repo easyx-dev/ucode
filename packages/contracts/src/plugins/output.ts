@@ -24,6 +24,30 @@ export type PluginComponentCounts = {
   extensions: number;
 };
 
+/** 插件声明的 userConfig 项：宿主按它渲染配置表单，类型由清单给出 */
+export type PluginUserConfigFieldView = {
+  key: string;
+  /** 控件类型：string | number | boolean | directory | file | select */
+  type: string;
+  title: string;
+  description: string;
+  required: boolean;
+  /** 缺省值；类型随 `type` */
+  default?: string | number | boolean;
+  /** `select` 的候选值 */
+  options?: string[];
+  /** 允许多选（`select`） */
+  multiple?: boolean;
+  /** 敏感值：不回显（服务端只回传是否已设置） */
+  sensitive?: boolean;
+};
+
+/** 组件清单里的一项：详情页按组分节展开 */
+export type PluginComponentRefView = {
+  group: PluginComponentGroup;
+  name: string;
+};
+
 export type PluginView = {
   /** 身份 `<name>@<marketplace>`；直接登记的本地目录用 `<name>@local` */
   id: string;
@@ -41,13 +65,22 @@ export type PluginView = {
   /** 安装时间（ISO 8601） */
   installedAt: string;
   components: PluginComponentCounts;
+  /** 组件逐个列出：列表只给计数，详情页要名字 */
+  componentRefs: PluginComponentRefView[];
+  /** userConfig 的声明；没有配置项时为空数组 */
+  userConfig: PluginUserConfigFieldView[];
+  /** userConfig 的已存值；敏感项不在其中（只体现 `configured` 语义） */
+  config: Record<string, string | number | boolean>;
   /** 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 */
   blockedComponents: PluginComponentGroup[];
   /**
-   * 来源内容是否已变（本地目录来源按内容哈希判定）。由「刷新市场」这类显式动作重算，
-   * 列表接口本身不打网络、不扫盘，只回显上次结论。
+   * 来源内容是否已变（目录来源按内容哈希、git 按 ls-remote 的 commit、npm 按 registry 版本、
+   * url 按条件请求判定）。由「刷新市场」这类显式动作重算，列表接口本身不打网络、不扫盘，
+   * 只回显上次结论。
    */
   updateAvailable: boolean;
+  /** 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 */
+  latestVersion?: string;
   /** 上次检查更新的时间（ISO 8601）；从没检查过则缺省 */
   checkedAt?: string;
   diagnostics: PluginDiagnosticView[];

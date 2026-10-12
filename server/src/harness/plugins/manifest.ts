@@ -163,6 +163,64 @@ export const manifestKeyDiagnostics = (raw: Record<string, unknown>): PluginDiag
   return result;
 };
 
+/** 一条 userConfig 声明：类型由清单给出，宿主按它渲染表单 */
+export type PluginUserConfigField = {
+  key: string;
+  type: string;
+  title: string;
+  description: string;
+  required: boolean;
+  default?: string | number | boolean;
+  options?: string[];
+  multiple?: boolean;
+  sensitive?: boolean;
+};
+
+const USER_CONFIG_TYPES = new Set(["string", "number", "boolean", "directory", "file", "select"]);
+
+/** 解析 userConfig：认不出类型的项只诊断（渲染不出控件，硬塞一个 input 反而误导） */
+const parseUserConfig = (
+  value: Record<string, unknown> | undefined,
+  diagnostics: PluginDiagnosticView[],
+): PluginUserConfigField[] => {
+  if (!value) return [];
+  const fields: PluginUserConfigField[] = [];
+  for (const [key, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) {
+      diagnostics.push(
+        keyDiagnostic("warning", "userConfig", `userConfig.${key} 不是对象，已忽略`),
+      );
+      continue;
+    }
+    const type = typeof raw.type === "string" ? raw.type : "string";
+    if (!USER_CONFIG_TYPES.has(type)) {
+      diagnostics.push(
+        keyDiagnostic("warning", "userConfig", `userConfig.${key} 的类型 ${type} 不认识，已忽略`),
+      );
+      continue;
+    }
+    const options = Array.isArray(raw.options)
+      ? raw.options.filter((item): item is string => typeof item === "string")
+      : undefined;
+    fields.push({
+      key,
+      type,
+      title: typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : key,
+      description: typeof raw.description === "string" ? raw.description.trim() : "",
+      required: raw.required === true,
+      ...(typeof raw.default === "string" ||
+      typeof raw.default === "number" ||
+      typeof raw.default === "boolean"
+        ? { default: raw.default }
+        : {}),
+      ...(options && options.length > 0 ? { options } : {}),
+      ...(raw.multiple === true ? { multiple: true } : {}),
+      ...(raw.sensitive === true ? { sensitive: true } : {}),
+    });
+  }
+  return fields;
+};
+
 /** 清单装载结果：清单本身 + 解析出的组件 + 诊断；诊断只描述问题，不阻断其它组件 */
 export type PluginManifestLoad = {
   /** 清单文件绝对路径；按标准目录布局装载时为 null */
@@ -174,6 +232,8 @@ export type PluginManifestLoad = {
   version: string;
   description: string;
   components: PluginComponentEntry[];
+  /** userConfig 的声明；清单里写坏的项只出诊断、不进这份表 */
+  userConfig: PluginUserConfigField[];
   /** 装配期注入用的目录（loader 收的是目录，不是逐个组件） */
   assets: PluginAssetDirs;
   diagnostics: PluginDiagnosticView[];
@@ -192,6 +252,7 @@ const degradedLoad = (
   version: "0.0.0",
   description: "",
   components: [],
+  userConfig: [],
   assets: EMPTY_ASSETS,
   diagnostics,
 });
@@ -202,7 +263,11 @@ const manifestLoad = (
   manifest: PluginManifest,
   name: string,
   diagnostics: PluginDiagnosticView[],
-  resolved: { components: PluginComponentEntry[]; assets: PluginAssetDirs },
+  resolved: {
+    components: PluginComponentEntry[];
+    userConfig: PluginUserConfigField[];
+    assets: PluginAssetDirs;
+  },
 ): PluginManifestLoad => ({
   file,
   manifest,
@@ -211,6 +276,7 @@ const manifestLoad = (
   version: manifest.version?.trim() || "0.0.0",
   description: manifest.description?.trim() || "",
   components: resolved.components,
+  userConfig: resolved.userConfig,
   assets: resolved.assets,
   diagnostics,
 });
@@ -227,6 +293,7 @@ export const loadPluginManifest = (root: string): PluginManifestLoad => {
     return {
       ...degradedLoad(name, null, resolved.diagnostics),
       components: resolved.entries,
+      userConfig: [],
       assets: resolved.assets,
     };
   }
@@ -256,8 +323,10 @@ export const loadPluginManifest = (root: string): PluginManifestLoad => {
   }
 
   const resolved = resolvePluginComponents({ root, manifest });
+  const userConfig = parseUserConfig(manifest.userConfig, diagnostics);
   return manifestLoad(file, manifest, resolvedName, [...diagnostics, ...resolved.diagnostics], {
     components: resolved.entries,
+    userConfig,
     assets: resolved.assets,
   });
 };

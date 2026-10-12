@@ -4,7 +4,7 @@
  * 执行类组件（hooks / 扩展 / bin）按来源门控：第三方市场来的只出诊断、不注入运行时，
  * 所以界面上要**直接说明**哪些组件没有生效（见 `plans/plugins.md` 第五章）。
  */
-import type { PluginView } from "@ucode/contracts";
+import type { PluginCreateRequest } from "@ucode/contracts";
 import { FolderInput, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,30 +12,66 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "../../base/badge";
 import { Button } from "../../base/button";
 import { Input } from "../../base/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
 import { usePlugins } from "../../hooks/use-plugins";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
+/** 安装来源：与安装入参的来源类型一一对应 */
+type SourceKind = "directory" | "url" | "npm" | "github" | "git";
+
 export function SettingsPlugins() {
   const { t } = useTranslation();
+  // 配置草稿按插件 id 分：同一屏可能同时改多个插件的配置
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string | number | boolean>>>(
+    {},
+  );
+  const [purge, setPurge] = useState<string | null>(null);
   const {
     plugins,
     marketplaces,
     install,
     setEnabled,
+    setConfig,
     uninstall,
     refresh,
     addMarketplace,
     removeMarketplace,
     refreshMarketplace,
   } = usePlugins();
-  const [path, setPath] = useState("");
+  const [sourceKind, setSourceKind] = useState<SourceKind>("directory");
+  const [sourceValue, setSourceValue] = useState("");
+  const [ref, setRef] = useState("");
   const [marketName, setMarketName] = useState("");
   const [marketPath, setMarketPath] = useState("");
 
-  const installFromPath = async () => {
-    const trimmed = path.trim();
-    if (!trimmed) return;
-    if (await install({ source: { source: "directory", path: trimmed } })) setPath("");
+  const sourcePlaceholder =
+    sourceKind === "directory"
+      ? t("插件目录的绝对路径")
+      : sourceKind === "url"
+        ? t("压缩包直链（.zip / .tgz）")
+        : sourceKind === "npm"
+          ? t("包名，可带版本：@scope/name@1.2.3")
+          : sourceKind === "github"
+            ? t("owner/repo")
+            : t("Git 仓库地址");
+
+  const installFromSource = async () => {
+    const value = sourceValue.trim();
+    if (!value) return;
+    const source: PluginCreateRequest["source"] =
+      sourceKind === "directory"
+        ? { source: "directory", path: value }
+        : sourceKind === "url"
+          ? { source: "url", url: value }
+          : sourceKind === "npm"
+            ? { source: "npm", package: value }
+            : sourceKind === "github"
+              ? { source: "github", repo: value, ...(ref.trim() ? { ref: ref.trim() } : {}) }
+              : { source: "git", url: value, ...(ref.trim() ? { ref: ref.trim() } : {}) };
+    if (await install({ source })) {
+      setSourceValue("");
+      setRef("");
+    }
   };
 
   const addLocalMarket = async () => {
@@ -58,16 +94,43 @@ export function SettingsPlugins() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={sourceKind} onValueChange={(value) => setSourceKind(value as SourceKind)}>
+            <SelectTrigger className="w-32" aria-label={t("安装来源")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="directory">{t("本地目录")}</SelectItem>
+              <SelectItem value="url">{t("压缩包链接")}</SelectItem>
+              <SelectItem value="npm">{t("npm 包")}</SelectItem>
+              <SelectItem value="github">{t("GitHub 仓库")}</SelectItem>
+              <SelectItem value="git">{t("Git 仓库")}</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            placeholder={t("插件目录的绝对路径")}
-            aria-label={t("插件目录")}
+            className="min-w-64 flex-1"
+            value={sourceValue}
+            onChange={(event) => setSourceValue(event.target.value)}
+            placeholder={sourcePlaceholder}
+            aria-label={t("安装来源")}
           />
-          <Button variant="outline" size="sm" onClick={installFromPath} disabled={!path.trim()}>
+          {sourceKind === "github" || sourceKind === "git" ? (
+            <Input
+              className="w-32"
+              value={ref}
+              onChange={(event) => setRef(event.target.value)}
+              placeholder={t("分支 / 标签")}
+              aria-label={t("分支 / 标签")}
+            />
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void installFromSource()}
+            disabled={!sourceValue.trim()}
+          >
             <FolderInput className="size-icon-base" />
-            {t("从目录安装")}
+            {t("安装")}
           </Button>
         </div>
       </div>
@@ -79,6 +142,19 @@ export function SettingsPlugins() {
       ) : null}
 
       {plugins?.plugins.map((plugin) => {
+        const draft = drafts[plugin.id] ?? {};
+        const setDraft = (
+          update: (
+            prev: Record<string, string | number | boolean>,
+          ) => Record<string, string | number | boolean>,
+        ): void => setDrafts((prev) => ({ ...prev, [plugin.id]: update(prev[plugin.id] ?? {}) }));
+        const saveConfig = async (): Promise<void> => {
+          const values = drafts[plugin.id] ?? {};
+          if (Object.keys(values).length === 0) return;
+          if (await setConfig(plugin.id, values)) {
+            setDrafts((prev) => ({ ...prev, [plugin.id]: {} }));
+          }
+        };
         const sourceLabel =
           plugin.source === "official"
             ? t("随包官方")
@@ -133,7 +209,20 @@ export function SettingsPlugins() {
                   <RefreshCw className="size-icon-base" />
                   {t("重拉")}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => void uninstall(plugin.id)}>
+                <label className="flex items-center gap-1 text-xs text-foreground-subtle">
+                  <input
+                    type="checkbox"
+                    checked={purge === plugin.id}
+                    aria-label={t("卸载并清理缓存")}
+                    onChange={(event) => setPurge(event.target.checked ? plugin.id : null)}
+                  />
+                  {t("清理缓存")}
+                </label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void uninstall(plugin.id, purge === plugin.id)}
+                >
                   <Trash2 className="size-icon-base" />
                   {t("卸载")}
                 </Button>
@@ -149,6 +238,94 @@ export function SettingsPlugins() {
                   },
                 )}
               </p>
+            ) : null}
+
+            {plugin.componentRefs.length > 0 ? (
+              <details className="rounded-lg border border-dashed px-3 py-2">
+                <summary className="cursor-pointer text-xs text-foreground-subtle">
+                  {t("组件（{{count}}）", { count: plugin.componentRefs.length })}
+                </summary>
+                <div className="mt-2 space-y-1">
+                  {plugin.componentRefs.map((entry) => (
+                    <p
+                      key={`${entry.group}-${entry.name}`}
+                      className="font-mono text-xs break-all text-foreground-subtle"
+                    >
+                      {entry.group}: {entry.name}
+                    </p>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            {plugin.userConfig.length > 0 ? (
+              <div className="space-y-2 rounded-lg border border-dashed px-3 py-2">
+                {plugin.userConfig.map((field) => (
+                  <div key={field.key} className="block space-y-1">
+                    <span className="text-xs font-medium">
+                      {field.title}
+                      {field.required ? <span className="text-destructive"> *</span> : null}
+                    </span>
+                    {field.description ? (
+                      <span className="block text-xs text-foreground-subtle">
+                        {field.description}
+                      </span>
+                    ) : null}
+                    {field.type === "boolean" ? (
+                      <input
+                        type="checkbox"
+                        checked={draft[field.key] === true}
+                        aria-label={field.title}
+                        onChange={(event) =>
+                          setDraft((prev) => ({ ...prev, [field.key]: event.target.checked }))
+                        }
+                      />
+                    ) : field.type === "select" && field.options ? (
+                      <Select
+                        value={String(draft[field.key] ?? field.options?.[0] ?? "")}
+                        onValueChange={(value) =>
+                          setDraft((prev) => ({ ...prev, [field.key]: value }))
+                        }
+                      >
+                        <SelectTrigger aria-label={field.title}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={String(draft[field.key] ?? "")}
+                        type={field.type === "number" ? "number" : "text"}
+                        aria-label={field.title}
+                        placeholder={field.sensitive ? t("已设置（留空表示不改）") : t("未设置")}
+                        onChange={(event) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            [field.key]:
+                              field.type === "number" && event.target.value !== ""
+                                ? Number(event.target.value)
+                                : event.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void saveConfig()}
+                  disabled={Object.keys(draft).length === 0}
+                >
+                  {t("保存配置")}
+                </Button>
+              </div>
             ) : null}
 
             {plugin.diagnostics.length > 0 ? (

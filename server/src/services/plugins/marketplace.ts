@@ -47,7 +47,7 @@ export type MarketplaceServiceDeps = {
   /** 市场增删会影响插件的来源档位判定，故同样触发会话按新代次重装 */
   onRegistryChange?: (revision: number) => void;
   /** 清单刷新成功后顺带重算已装插件的「来源是否已变」（由插件服务提供） */
-  onCatalogRefreshed?: () => void;
+  onCatalogRefreshed?: () => Promise<number>;
   /** 出网取流（url 市场）；测试可替换 */
   fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
   /** 进程调用（git 市场）；测试可替换 */
@@ -319,7 +319,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           );
         }
         // 刷新市场是「显式检查更新」的入口：顺手把已装插件的来源变动算出来
-        onCatalogRefreshed?.();
+        await onCatalogRefreshed?.();
       } catch (error) {
         // 用户显式刷新把失败报出去；内置市场只记账，不打扰
         reportSourceFailure(record, error);

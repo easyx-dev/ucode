@@ -11,6 +11,7 @@ import type { ServerControlEvent } from "@ucode/contracts";
 import { PLUGIN_MANIFEST_DIRNAME } from "../../../constants/dirs";
 import type { SessionEventBus } from "../../../core/event-bus";
 import { createPluginService } from "..";
+import { defaultSourceRunner, type SourceRunner } from "../sources";
 import { PluginStateStore } from "../state";
 
 const created: string[] = [];
@@ -40,7 +41,7 @@ const makePluginTree = (root: string, name: string, version = "1.0.0"): string =
 const makePlugin = (name: string, version = "1.0.0"): string =>
   makePluginTree(makeDir(), name, version);
 
-const setup = (input: { pluginsDir?: string } = {}) => {
+const setup = (input: { pluginsDir?: string; run?: SourceRunner } = {}) => {
   const statePath = join(makeDir("plugin-state-"), "plugins.json");
   const pluginsDir = input.pluginsDir ?? makeDir("plugin-root-");
   const state = new PluginStateStore(statePath);
@@ -55,6 +56,12 @@ const setup = (input: { pluginsDir?: string } = {}) => {
     events,
     pluginsDir,
     onRegistryChange: (revision) => revisions.push(revision),
+    // 默认不给进程调用：检查更新要么注入替身，要么走「判定不出来」的分支（测试不出网）
+    run:
+      input.run ??
+      (async () => {
+        throw new Error("测试里不连网");
+      }),
   });
   return { state, statePath, pluginsDir, service, frames, revisions };
 };
@@ -482,7 +489,7 @@ describe("来源已变检测", () => {
     assert.equal(record?.updateAvailable, false);
     assert.ok(record?.checkedAt);
 
-    assert.equal(service.checkUpdates(), 0, "内容没变就不算新版本");
+    assert.equal(await service.checkUpdates(), 0, "内容没变就不算新版本");
     assert.equal(service.list().plugins[0]?.updateAvailable, false);
 
     // 改一处内容：下次检查应标出「来源已变」
@@ -491,7 +498,7 @@ describe("来源已变检测", () => {
       "---\ndescription: 改过\n---\n正文",
       "utf8",
     );
-    assert.equal(service.checkUpdates(), 1);
+    assert.equal(await service.checkUpdates(), 1);
     const view = service.list().plugins[0];
     assert.equal(view?.updateAvailable, true);
     assert.ok(view?.checkedAt);
@@ -499,10 +506,10 @@ describe("来源已变检测", () => {
     // 重拉 = 接受当前内容
     await service.refresh({ id: "my-plugin@local" });
     assert.equal(service.list().plugins[0]?.updateAvailable, false);
-    assert.equal(service.checkUpdates(), 0);
+    assert.equal(await service.checkUpdates(), 0);
   });
 
-  it("非目录来源不参与这次判定（网络来源待包拉取落地）", () => {
+  it("判定不出来时保持原样（离线 / 命令失败都不写结论）", async () => {
     const { service, state } = setup();
     state.set({
       ...state.get(),
@@ -513,6 +520,7 @@ describe("来源已变检测", () => {
           version: "1.0.0",
           source: { source: "npm", package: "some-plugin" },
           path: "/tmp/remote",
+          integrity: "sha256:old",
           scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
@@ -520,7 +528,133 @@ describe("来源已变检测", () => {
       ],
     });
 
-    assert.equal(service.checkUpdates(), 0);
+    // 默认不注入 run / fetch：判定失败，既不标已变也不刷新检查时间
+    assert.equal(await service.checkUpdates(), 0);
     assert.equal(service.list().plugins[0]?.updateAvailable, false);
+    assert.equal(service.list().plugins[0]?.checkedAt, undefined);
+  });
+});
+
+describe("按来源的版本判定", () => {
+  const installAt = (
+    state: ReturnType<typeof setup>["state"],
+    record: Parameters<typeof state.set>[0]["installed"] extends (infer T)[] | undefined
+      ? Partial<T>
+      : never,
+  ): void => {
+    state.set({
+      ...state.get(),
+      installed: [
+        {
+          id: "p@local",
+          name: "p",
+          version: "1.0.0",
+          scope: "user",
+          enabled: true,
+          installedAt: "2026-01-01T00:00:00.000Z",
+          ...record,
+        } as never,
+      ],
+    });
+  };
+
+  it("git 来源：ls-remote 的 commit 与已装 revision 不一致即标已变", async () => {
+    const repo = makeDir("plugin-repo-");
+    makePluginTree(repo, "git-plugin");
+    const git = (...args: string[]): void => {
+      execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+
+    // 这个用例要真的跑 git：注入默认实现而不是测试替身
+    const { service, state } = setup({ run: defaultSourceRunner });
+    const created = await service.create({
+      source: { source: "git", url: repo, path: "." },
+      scope: "user",
+      enabled: true,
+    });
+    const record = state.get().installed[0];
+    assert.match(record?.integrity ?? "", /^[0-9a-f]{40}$/, "安装时记下克隆到的 commit");
+
+    assert.equal(await service.checkUpdates(), 0, "远端没动就不算新版本");
+
+    writeFileSync(join(repo, "new-file.md"), "改动", "utf8");
+    git("add", "-A");
+    git("commit", "-qm", "second");
+    assert.equal(await service.checkUpdates(), 1, "远端有新 commit 即标已变");
+    assert.equal(service.list().plugins[0]?.updateAvailable, true);
+
+    await service.refresh({ id: created.plugin.id });
+    assert.equal(service.list().plugins[0]?.updateAvailable, false);
+    assert.equal(await service.checkUpdates(), 0);
+  });
+
+  it("npm 来源：registry 的版本与已装版本比，并回填 latestVersion", async () => {
+    const run: SourceRunner = async (file, args) => {
+      assert.equal(file, "npm");
+      assert.deepEqual(args.slice(0, 2), ["view", "demo-pkg"]);
+      return { stdout: "1.4.0\n" };
+    };
+    const { service, state } = setup({ run });
+    installAt(state, { source: { source: "npm", package: "demo-pkg" }, path: "/tmp/p" });
+
+    assert.equal(await service.checkUpdates(), 1);
+    const view = service.list().plugins[0];
+    assert.equal(view?.updateAvailable, true);
+    assert.equal(view?.latestVersion, "1.4.0");
+  });
+
+  it("url 来源：304 视为未变，200 即标已变", async () => {
+    const state = new PluginStateStore(join(makeDir(), "plugins.json"));
+    state.load();
+    state.set({
+      ...state.get(),
+      installed: [
+        {
+          id: "u@local",
+          name: "u",
+          version: "1.0.0",
+          source: { source: "url", url: "https://example.com/pkg.zip" },
+          path: "/tmp/u",
+          scope: "user",
+          enabled: true,
+          installedAt: "2026-01-01T00:00:00.000Z",
+          etag: 'W/"v1"',
+          integrity: "sha256:old",
+        },
+      ],
+    });
+
+    const statuses = [304, 200];
+    const service = createPluginService({
+      state,
+      events: { emitControl: () => undefined } as unknown as SessionEventBus,
+      pluginsDir: makeDir(),
+      run: async () => {
+        throw new Error("不该走到进程调用");
+      },
+      fetch: async (input) => {
+        assert.equal(input.headers?.["if-none-match"], 'W/"v1"', "条件请求带上已存 etag");
+        return {
+          url: new URL(input.url),
+          status: statuses.shift() ?? 304,
+          body: new Uint8Array([1, 2, 3]),
+          truncated: false,
+          contentType: null,
+          etag: null,
+          lastModified: null,
+        };
+      },
+    });
+
+    assert.equal(await service.checkUpdates(), 0, "304：内容未变");
+    assert.equal(service.list().plugins[0]?.updateAvailable, false);
+
+    assert.equal(await service.checkUpdates(), 1, "200：内容变了");
+    assert.equal(service.list().plugins[0]?.updateAvailable, true);
   });
 });

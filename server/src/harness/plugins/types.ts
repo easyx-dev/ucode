@@ -7,6 +7,7 @@
 import type { PluginComponentGroup, PluginDiagnosticView, PluginSource } from "@ucode/contracts";
 
 import type { PluginHookBinding } from "./hooks";
+import type { PluginUserConfigField } from "./manifest";
 
 /** 清单解析出的一个组件：路径已归一化，且校验过落在插件根内 */
 export type PluginComponentEntry = {
@@ -85,14 +86,20 @@ export type PluginDescriptor = {
   /** 安装目录绝对路径 */
   root: string;
   installedAt: string;
-  /** 来源内容是否已变（本地目录来源按内容哈希判定；由显式「检查更新」的动作写入） */
+  /** 来源内容是否已变（由显式「检查更新」的动作写入） */
   updateAvailable: boolean;
+  /** 远端最新版本：npm / 清单能给出时才有 */
+  latestVersion?: string;
   /** 上次检查更新的时间（ISO 8601） */
   checkedAt?: string;
   /** 解析出的组件；未启用也照样解析，供设置页展示与排查 */
   components: PluginComponentEntry[];
   /** 装配期注入用的目录（技能 / 命令 / 扩展） */
   assets: PluginAssetDirs;
+  /** userConfig 的声明；宿主按它渲染配置表单 */
+  userConfig: PluginUserConfigField[];
+  /** userConfig 的已存值 */
+  config: Record<string, string | number | boolean>;
   /** 插件声明的子角色（slug 已加插件前缀） */
   agents: PluginAgentFile[];
   /** 插件声明的命令式 hook（已按事件映射好；来源门控决定挂不挂） */

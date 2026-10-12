@@ -20,7 +20,8 @@
     "format": "biome format --write .",
     "smoke": "pnpm -F @ucode/server smoke",
     "eval": "pnpm -F @ucode/server eval",
-    "api:docs": "tsx scripts/api-docs/generate.ts"
+    "api:docs": "tsx scripts/api-docs/generate.ts",
+    "plugin:docs": "tsx scripts/plugin-docs/generate.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^1.0.2",

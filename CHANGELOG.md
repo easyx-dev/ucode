@@ -85,6 +85,14 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **版本判定与设置页细节（第六步与界面）**：检查更新按来源分派——目录按内容哈希、url 发条件请求
+  （304 即未变）、npm 比 registry 版本（回填 `latestVersion`）、git / github 比 `git ls-remote` 的 commit；
+  判定做不了（离线、命令失败）不写结论也不刷新检查时间。设置页：安装区可选五种来源，
+  插件卡片能展开组件清单、按清单声明渲染 `userConfig` 表单（字符串 / 数字 / 布尔 / 目录 / 文件 / 下拉，
+  敏感项不回显）、卸载时可勾选清理缓存。
+- **插件文档**：`docs/plugin-authoring.md` 由 `plugin-create` 技能真身生成（`pnpm plugin:docs`，
+  `pnpm verify` 的 plugin-docs 比对漂移）；新增面向使用者的 `docs/plugins.md`。
+
 - **网络底座与包拉取（第五步）**：新增 `platform/net`（从 `harness/setup/tools/ssrf.ts` 上提 `assertPublicUrl`
   与手动重定向取流 `publicFetch`，webfetch 反向引用同一份）；新增依赖 `fflate`（zip）与 `tar`（tgz）。
   插件来源支持 url / npm / github / git：复制型来源先落暂存目录，读完清单拿到版本号后搬进

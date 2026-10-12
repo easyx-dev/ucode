@@ -27,8 +27,17 @@ export const toPluginView = (descriptor: PluginDescriptor): PluginView => ({
   path: descriptor.root,
   installedAt: descriptor.installedAt,
   components: toPluginComponentCounts(descriptor),
+  componentRefs: descriptor.components.map((entry) => ({ group: entry.group, name: entry.name })),
+  userConfig: descriptor.userConfig.map((field) => ({ ...field })),
+  // 敏感值不回显：只保留非敏感项
+  config: Object.fromEntries(
+    Object.entries(descriptor.config).filter(
+      ([key]) => descriptor.userConfig.find((field) => field.key === key)?.sensitive !== true,
+    ),
+  ),
   blockedComponents: descriptor.blocked,
   updateAvailable: descriptor.updateAvailable,
+  ...(descriptor.latestVersion ? { latestVersion: descriptor.latestVersion } : {}),
   ...(descriptor.checkedAt ? { checkedAt: descriptor.checkedAt } : {}),
   diagnostics: descriptor.diagnostics,
 });

@@ -36,8 +36,11 @@ export type StagedSource = {
   path: string;
   /** 是否为复制型的暂存目录（调用方要么把它搬走，要么清理掉） */
   staged: boolean;
-  /** 内容摘要：url 记响应哈希、directory 记目录内容哈希 */
+  /** 内容摘要：url 记响应哈希、directory 记目录内容哈希、git 记克隆出的 commit */
   integrity?: string;
+  /** url 来源的条件请求凭据：检查更新时用它发 304 探测 */
+  etag?: string;
+  lastModified?: string;
 };
 
 /** 进程调用：默认 execa；测试可替换 */
@@ -47,7 +50,7 @@ export type SourceRunner = (
   options: { timeout: number },
 ) => Promise<{ stdout: string }>;
 
-const defaultRunner: SourceRunner = async (file, args, options) => {
+export const defaultSourceRunner: SourceRunner = async (file, args, options) => {
   const result = await execa(file, args, { timeout: options.timeout, reject: true });
   return { stdout: typeof result.stdout === "string" ? result.stdout : "" };
 };
@@ -128,6 +131,8 @@ const stageFromUrl = async (
     path: descendToPackageRoot(dir),
     staged: true,
     integrity: createHash("sha256").update(response.body).digest("hex"),
+    ...(response.etag ? { etag: response.etag } : {}),
+    ...(response.lastModified ? { lastModified: response.lastModified } : {}),
   };
 };
 
@@ -136,7 +141,7 @@ const stageFromNpm = async (
   source: Extract<PluginSourceSpec, { source: "npm" }>,
   input: StagePluginSourceInput,
 ): Promise<StagedSource> => {
-  const run = input.run ?? defaultRunner;
+  const run = input.run ?? defaultSourceRunner;
   const dir = makeStagingDir(input.stagingRoot, "npm");
   await run(
     "npm",
@@ -158,7 +163,7 @@ const stageFromGit = async (
   source: Extract<PluginSourceSpec, { source: "git" | "github" }>,
   input: StagePluginSourceInput,
 ): Promise<StagedSource> => {
-  const run = input.run ?? defaultRunner;
+  const run = input.run ?? defaultSourceRunner;
   const url = source.source === "git" ? source.url : `https://github.com/${source.repo}.git`;
   const dir = makeStagingDir(input.stagingRoot, "git");
   const args = ["clone", "--depth", "1"];
@@ -168,7 +173,18 @@ const stageFromGit = async (
 
   const root = source.path ? join(dir, source.path) : dir;
   if (!existsSync(root)) throw new SourceError(`仓内路径不存在：${source.path ?? ""}`);
-  return { path: root, staged: true };
+
+  // 记下克隆到的 commit：检查更新时用 `git ls-remote` 的同一个值比对
+  let revision: string | undefined;
+  try {
+    const result = await run("git", ["-C", dir, "rev-parse", "HEAD"], {
+      timeout: PLUGIN_GIT_TIMEOUT_MS,
+    });
+    revision = result.stdout.trim() || undefined;
+  } catch {
+    // 拿不到 revision 就不记：只是这次没法做「有没有新版」的判定
+  }
+  return { path: root, staged: true, ...(revision ? { integrity: revision } : {}) };
 };
 
 /**

@@ -23,6 +23,7 @@ import { PLUGIN_CACHE_DIRNAME, PLUGIN_DATA_DIRNAME } from "../../constants/dirs"
 import type { SessionEventBus } from "../../core/event-bus";
 import { env } from "../../env";
 import type { PluginHookBinding } from "../../harness/plugins/hooks";
+import type { PluginUserConfigField } from "../../harness/plugins/manifest";
 import {
   findManifestFile,
   PLUGIN_NAME_PATTERN,
@@ -46,10 +47,12 @@ import type {
   PluginRegistry,
 } from "../../harness/plugins/types";
 import { toPluginView } from "../../harness/plugins/view";
+import { type PublicFetchResult, publicFetch } from "../../platform/net";
 import { isInsidePath, resolveExistingPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
-import { stagePluginSource } from "./sources";
+import { defaultSourceRunner, type SourceRunner, stagePluginSource } from "./sources";
 import type { PluginStateStore } from "./state";
+import { checkSourceUpdate } from "./updates";
 
 export type PluginServiceDeps = {
   state: PluginStateStore;
@@ -58,6 +61,10 @@ export type PluginServiceDeps = {
   onRegistryChange?: (revision: number) => void;
   /** 插件根（`purge` 只删它里面的内容）；缺省取 `env.pluginsDir`，测试可覆盖 */
   pluginsDir?: string;
+  /** 检查更新用的进程调用（git ls-remote / npm view）；测试可替换 */
+  run?: SourceRunner;
+  /** 检查更新用的出网取流（url 来源的条件请求）；测试可替换 */
+  fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
 };
 
 export type PluginService = {
@@ -80,11 +87,41 @@ export type PluginService = {
    * 重算已装插件的「来源是否已变」：本地目录来源按内容哈希比对，写回 `updateAvailable` 与检查时间。
    * 只在显式动作（刷新市场 / 重拉）里跑——列表接口不做这类扫描。返回结果变化的插件数。
    */
-  checkUpdates(): number;
+  checkUpdates(): Promise<number>;
   create(input: PluginCreateInput): Promise<PluginWriteResponse>;
   update(input: PluginUpdateInput): PluginWriteResponse;
   delete(input: PluginDeleteInput): PluginDeleteResponse;
   refresh(input: PluginRefreshInput): Promise<PluginWriteResponse>;
+};
+
+/** 校验 userConfig 的值：只认清单声明过的键，类型按声明收敛（未知键是笔误，不能静默存下来） */
+const assertUserConfig = (
+  fields: readonly PluginUserConfigField[],
+  values: Record<string, string | number | boolean>,
+): void => {
+  const declared = new Map(fields.map((field) => [field.key, field]));
+  for (const [key, value] of Object.entries(values)) {
+    const field = declared.get(key);
+    if (!field) {
+      throw new AppError(ERROR_CODES.invalidRequest, `未声明的配置项：${key}`, 400, undefined, {
+        key,
+      });
+    }
+    const actual = typeof value;
+    const expected =
+      field.type === "select" || field.type === "directory" || field.type === "file"
+        ? "string"
+        : field.type;
+    if (actual !== expected) {
+      throw new AppError(
+        ERROR_CODES.invalidRequest,
+        `配置项 ${key} 需要 ${expected}，收到 ${actual}`,
+        400,
+        undefined,
+        { key },
+      );
+    }
+  }
 };
 
 /** 只接受本地目录来源；其余来源在包拉取落地前明确拒绝，并带上来源名供客户端渲染 */
@@ -247,16 +284,39 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
           .filter((entry) => entry.group === "bin" && entry.path)
           .map((entry) => entry.path as string),
       ),
-    checkUpdates: () => {
+    async checkUpdates() {
       const now = new Date().toISOString();
+      const records = state.get().installed;
+      const checked = await Promise.all(
+        records.map(async (item) => {
+          try {
+            return await checkSourceUpdate({
+              record: item,
+              at: now,
+              run: deps.run ?? defaultSourceRunner,
+              fetch: deps.fetch ?? publicFetch,
+            });
+          } catch {
+            // 判定失败按「这次不判定」处理：不写结论、也不刷新 checkedAt
+            return null;
+          }
+        }),
+      );
+
       let changed = 0;
-      const next = state.get().installed.map((item) => {
-        const integrity = directoryIntegrity(item.source);
-        if (integrity === undefined) return item;
-        const updateAvailable = item.integrity !== undefined && item.integrity !== integrity;
-        if (updateAvailable && item.updateAvailable !== true) changed += 1;
-        return { ...item, updateAvailable, checkedAt: now };
+      const next = records.map((item, index) => {
+        const update = checked[index];
+        if (!update) return item;
+        if (update.updateAvailable && item.updateAvailable !== true) changed += 1;
+        return {
+          ...item,
+          updateAvailable: update.updateAvailable,
+          ...(update.latestVersion === undefined ? {} : { latestVersion: update.latestVersion }),
+          ...(update.integrity === undefined ? {} : { integrity: update.integrity }),
+          checkedAt: now,
+        };
       });
+
       // 结论有变化才推进代次：否则每次刷新市场都会把内存会话打回一轮
       if (changed > 0) commit((current) => ({ ...current, installed: next }));
       else state.set({ ...state.get(), installed: next });
@@ -317,6 +377,8 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
             enabled: input.enabled,
             installedAt: new Date().toISOString(),
             ...(integrity === undefined ? {} : { integrity }),
+            ...(staged.etag ? { etag: staged.etag } : {}),
+            ...(staged.lastModified ? { lastModified: staged.lastModified } : {}),
             updateAvailable: false,
             checkedAt: new Date().toISOString(),
           },
@@ -327,6 +389,10 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
 
     update(input) {
       const record = state.requirePlugin(input.id);
+      if (input.config) {
+        const declared = registry().plugins.find((item) => item.id === record.id)?.userConfig ?? [];
+        assertUserConfig(declared, input.config);
+      }
       commit((current) => ({
         ...current,
         installed: current.installed.map((item) =>
