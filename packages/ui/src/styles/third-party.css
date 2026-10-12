@@ -60,3 +60,15 @@
 .diff-tailwindcss-wrapper .opacity-\[0\.5\] {
   opacity: 1;
 }
+
+/*
+ * diff 里的语法高亮取色：库对 `.diff-line-syntax-raw *` 写了未分层的 `color: var(--diff-view-light, inherit)`，
+ * 而 base.css 里按 `--shiki-light` / `--shiki-dark` 取色的规则在 `@layer base` 中，层叠上输给未分层规则，
+ * token 颜色会被压成 inherit（高亮丢失）。这里在库样式之后、用更高的特异性把取色规则补回来。
+ */
+.diff-tailwindcss-wrapper .diff-style-root .diff-line-syntax-raw [style*="--shiki-light"] {
+  color: var(--shiki-light);
+}
+.dark .diff-tailwindcss-wrapper .diff-style-root .diff-line-syntax-raw [style*="--shiki-light"] {
+  color: var(--shiki-dark);
+}
