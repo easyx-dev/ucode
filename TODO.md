@@ -21,16 +21,17 @@
 
 ## 需求 · 插件平台（架构定稿，待实施）
 
-**目标**：插件是一等公民——产品功能以插件形态实现。宿主提供一级接缝（模式、提示词、界面插槽、
-事件、统一调用端点、会话生命周期钩子、插件状态存储），内置插件与第三方插件共用同一套清单、接缝与 API，
-差别只在来源与信任。
+**目标**（本轮收窄）：插件是**资源与受信任代码的打包单位**——把 skills / commands / agents / hooks /
+MCP / bin / 代码模块打包成可启停、可分发、可升级的单元，兼容 Claude Code / ZCode 插件的目录与清单。
+出口开箱两个市场（自有官方市场 + `claude-plugins-official`）；**执行类组件按来源门控**：
+第三方市场的 hooks / bin / 扩展只解析出诊断、不注入运行时（对齐 ZCode 的兼容策略）。
+**不再包括**：插件定义主模式、插件贡献界面、插件接会话钩子、能力授权与授权表——逐条理由见方案第十一章。
 
-**方案**：[`plans/plugins.md`](./plans/plugins.md)（平台架构、宿主 API、迁移路线）、
-[`plans/plugin-format.md`](./plans/plugin-format.md)（包格式与 Claude / ZCode 兼容）、
-[`plans/plugin-market.md`](./plans/plugin-market.md)（市场、拉取、版本检查与更新）。
+**方案**：[`plans/plugins.md`](./plans/plugins.md)（单文档：定位、包格式与兼容、装载与热重载、信任、
+市场与版本、内置资产、落位与验收）。
 
-**待办要点**：按 `plugins.md` 第十二节的八步实施；迁移顺序 `plan` → `goal`；
-迁移的完成判据是内核硬编码清空（该文第十一节）；市场按 `plugin-market.md` 第十节的三步推进。
+**待办要点**：按该文第九章实施（合同 → 资源接入 → 执行类组件 → 设置页与内置资产 → 市场 → 热重载收尾）；
+动手前先看该文 10.1「要先改的内核代码」。
 
 ---
 
@@ -81,12 +82,33 @@
    与 `agent-browser` 的关键差别就在这里：它支持 `--profile Default` 复用真实登录态、`--auto-connect`
    挂上正在跑的 Chrome——能力更强，但那是把用户的全部登录态交给 agent，需另行拍板。
 
-**待确认**：插件形态（是否走现有扩展机制 / 独立包）、是否给「需要登录态的流程」开口子（以及怎么隔离）、
-动作集按上面到哪一档为止。
+**待确认**：做到哪一档为止（动作集、是否给「需要登录态的流程」开口子以及怎么隔离）。
 
-**本轮不做**：插件机制本身还在「暂缓」清单里，且这道题的第一句就是形态未拍板——留在 TODO 里等指令。
-附一条调研结论：`plans/plugins.md` 的插件跑在 server 进程内，**物理上驱动不了 Electron**，所以就算插件
-机制先落地，浏览器 / 桌面端那套「服务端挂起 + 客户端执行」的桥仍要单独做（见 `plans/builtin-browser.md`）。
+**与前一条的关系**：这道题**不能做成第三方插件**——插件平台已收窄为「资源打包 + 代码型扩展」，
+没有界面贡献、没有会话级 API（见 `plans/plugins.md` 第十一章）；而它既要一套「服务端挂起 + 客户端执行」
+的桥（插件宿主跑在 server 进程内，**物理上够不到 Electron 与浏览器**），又要截图 / 操作面板这类界面。
+所以它要么作为**内置能力**（含那套桥）做，要么等「插件改界面」这件事另开一版（届时照 Claude 的 mods
+模型：代码型事件 + 重绘 + 画不出来就降级，见 `plans/plugins.md` 第十一章末行）。方案见
+[`plans/builtin-browser.md`](./plans/builtin-browser.md)。
+
+---
+
+## 需求 · 内核瘦身：模式不再写死在核心里
+
+**现象**：`mode === "build"` / `mode !== "plan"` 这类分支散在内核与路由里（记忆工具注册、
+`bindExtensions`、目标续跑、`isPlanPending`、设置目标的模式检查等），`SESSION_MODES` 同时被
+角色注册表、路由与界面当成「模式清单」的事实源。原本打算靠「把 plan / goal 迁成插件」一并解决，
+但插件平台已收窄（不再接受插件定义模式），所以这是**内核内部重构**，单独跟进。
+
+**待办**：把模式清单收敛到注册表一处（`hasPrimaryMode` 已是入口），把内核里按 slug 判断的分支换成
+能力 / 声明（如「本模式会不会有待确认的计划」由角色声明给出）。涉及的位置：
+`harness/setup/session-config.ts:286-288`（记忆工具）、`harness/setup/prompt/index.ts:39`（提示词里的记忆工具）、
+`core/pool.ts:726`（`bindExtensions`）、`core/pool.ts:1044-1050`（`isPlanPending`）、
+`routes/sessions/index.ts:230-236`（切走 build 即暂停目标）、`routes/goals/index.ts:57`、
+`harness/features/goal/index.ts:180`、`harness/setup/agents/profiles.ts:72`、
+`routes/agents/index.ts:36-42`、`harness/setup/agents/custom.ts:251,265`，界面侧
+`packages/ui/src/business/mode-picker.tsx:14,27,53` 与 `packages/ui/src/lib/mode.ts:5-30`。
+动手前重新盘一遍，行号会漂。
 
 ---
 

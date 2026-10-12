@@ -241,7 +241,8 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
     `assets` / `budget`）；
   - `features/`：会话跑起来之后的能力（`goal` / `memory` / `prune` / `telemetry` / `title` / `usage` /
     `subagents` / `shell` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
-    这批是「内置功能」，后续按 [`plans/plugins.md`](./plans/plugins.md) 逐块迁成插件，迁完后应消失；
+    这批是「内置功能」，随包实现、随版本演进；它们**不是插件**（插件平台只承载资源与受信任的代码扩展，
+    见 [`plans/plugins.md`](./plans/plugins.md)）；
   - `utils/`：harness 内的公共方法（`text.ts` 取消息文本、`boundary.ts` 不可信内容的边界包裹与中和，
     后者的标签名单在 `packages/contracts`）。按下一段关于 `utils` 的定义，它只服务于 harness，
     **不要求纯函数**；`layers` 会拦下它反向依赖 `pi` / `setup` / `features`。
