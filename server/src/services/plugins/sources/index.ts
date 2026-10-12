@@ -33,10 +33,15 @@ export class SourceError extends Error {
 }
 
 export type StagedSource = {
-  /** 插件包根目录：可以直接交给清单解析 */
+  /** 插件包根目录：可以直接交给清单解析（可能是暂存目录里下钻一层后的那个子目录） */
   path: string;
   /** 是否为复制型的暂存目录（调用方要么把它搬走，要么清理掉） */
   staged: boolean;
+  /**
+   * 本次占用的**暂存目录顶层**（`mkdtemp` 出来的那个）。
+   * 与 `path` 不同时就说明 `path` 是它下面的子目录；清理要清这一层，别删整个 `.staging` 根。
+   */
+  stagingDir?: string;
   /** 内容摘要：url 记响应哈希、directory 记目录内容哈希、git 记克隆出的 commit */
   integrity?: string;
   /** url 来源的条件请求凭据：检查更新时用它发 304 探测 */
@@ -153,6 +158,7 @@ const stageFromUrl = async (
   return {
     path: descendToPackageRoot(dir),
     staged: true,
+    stagingDir: dir,
     integrity: createHash("sha256").update(response.body).digest("hex"),
     ...(response.etag ? { etag: response.etag } : {}),
     ...(response.lastModified ? { lastModified: response.lastModified } : {}),
@@ -179,7 +185,7 @@ const stageFromNpm = async (
   if (!existsSync(packageDir)) {
     throw new SourceError(`npm 包装完之后找不到：${source.package}`);
   }
-  return { path: descendToPackageRoot(packageDir), staged: true };
+  return { path: descendToPackageRoot(packageDir), staged: true, stagingDir: dir };
 };
 
 /** git / github 来源：浅克隆到暂存目录，`path` 指定包在仓内的位置 */
@@ -214,7 +220,12 @@ const stageFromGit = async (
   } catch {
     // 拿不到 revision 就不记：只是这次没法做「有没有新版」的判定
   }
-  return { path: root, staged: true, ...(revision ? { integrity: revision } : {}) };
+  return {
+    path: root,
+    staged: true,
+    stagingDir: dir,
+    ...(revision ? { integrity: revision } : {}),
+  };
 };
 
 /**

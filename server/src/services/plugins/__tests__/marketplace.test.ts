@@ -1,6 +1,6 @@
 /** services/plugins/marketplace：市场登记 / 移除 / 刷新（本地目录 / url / git），内置市场失败静默 */
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -243,6 +243,74 @@ describe("网络市场", () => {
     assert.equal(refreshed.marketplace.refreshedOk, true);
     assert.equal(refreshed.marketplace.pluginCount, 2);
     assert.ok(existsSync(join(pluginsDir, "marketplaces", "git-market", "marketplace.json")));
+  });
+
+  it("并发刷新同一个市场只克隆一次，且不互相删 staging（连点两下「刷新」的场景）", async () => {
+    const pluginsDir = makeDir();
+    let clones = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const run: SourceRunner = async (_file, args) => {
+      clones += 1;
+      const target = args[args.length - 1] ?? "";
+      mkdirSync(target, { recursive: true });
+      // 模拟克隆期间的写入：固定 staging 路径下，第二个刷新会在这里被删掉目录
+      writeFileSync(
+        join(target, "marketplace.json"),
+        JSON.stringify({ name: "race", plugins: [] }),
+        "utf8",
+      );
+      await gate;
+      assert.equal(
+        existsSync(join(target, "marketplace.json")),
+        true,
+        "克隆期间目录不该被别人清掉",
+      );
+      return { stdout: "" };
+    };
+    const { service } = setup({ run, pluginsDir });
+    service.create({ name: "race", source: { source: "github", repo: "owner/repo" } });
+
+    const first = service.refresh({ name: "race" });
+    const second = service.refresh({ name: "race" });
+    release();
+    const [a, b] = await Promise.all([first, second]);
+
+    assert.equal(clones, 1, "同一市场的并发刷新共用同一次尝试");
+    assert.equal(a.marketplace.refreshedOk, true);
+    assert.equal(b.marketplace.refreshedOk, true);
+    assert.equal(a.marketplace.lastRefreshAt, b.marketplace.lastRefreshAt);
+
+    const marketsDir = join(pluginsDir, "marketplaces");
+    assert.deepEqual(
+      readdirSync(marketsDir).filter((entry) => entry.includes(".staging")),
+      [],
+      "staging 目录装完即清，不留残留",
+    );
+    assert.ok(existsSync(join(marketsDir, "race", "marketplace.json")));
+  });
+
+  it("上次失败留下的 staging 残留会被清掉，不影响这次刷新", async () => {
+    const pluginsDir = makeDir();
+    const leftover = join(pluginsDir, "marketplaces", "dirty.staging");
+    mkdirSync(leftover, { recursive: true });
+    const run: SourceRunner = async (_file, args) => {
+      const target = args[args.length - 1] ?? "";
+      mkdirSync(target, { recursive: true });
+      writeFileSync(
+        join(target, "marketplace.json"),
+        JSON.stringify({ name: "dirty", plugins: [] }),
+        "utf8",
+      );
+      return { stdout: "" };
+    };
+    const { service } = setup({ run, pluginsDir });
+    service.create({ name: "dirty", source: { source: "github", repo: "owner/repo" } });
+    await service.refresh({ name: "dirty" });
+
+    assert.equal(existsSync(leftover), false, "老式固定名的残留被清掉");
   });
 });
 

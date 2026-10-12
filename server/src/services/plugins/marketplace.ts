@@ -6,8 +6,8 @@
  * 内置市场（如 `claude-plugins-official`）刷新失败只落 `lastError`，用户显式刷新则把失败报出去。
  */
 
-import { createHash } from "node:crypto";
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import type { PluginDiagnosticView, PluginsListResponse } from "@ucode/contracts";
@@ -91,6 +91,23 @@ export type MarketplaceService = {
   refresh(input: MarketplaceRefreshInput): Promise<MarketplaceWriteResponse>;
 };
 
+/**
+ * 清掉这个市场留下的 staging 目录（历史残留或上次失败留下的）。
+ * 只在刷新串行、且本次克隆已经搬到目标路径之后调用——此时不会有别的克隆在用这些路径。
+ */
+const cleanStagingLeftovers = (root: string, name: string, keep: string): void => {
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry === keep || !entry.startsWith(`${name}.staging`)) continue;
+    rmSync(join(root, entry), { recursive: true, force: true });
+  }
+};
+
 /** 来源的展示用字面量：设置页只读它，不 parse 结构 */
 const sourceLabel = (source: PluginSourceSpec): string => {
   switch (source.source) {
@@ -121,6 +138,13 @@ const toView = (record: PluginMarketplaceRecord): MarketplaceView => ({
 
 export const createMarketplaceService = (deps: MarketplaceServiceDeps): MarketplaceService => {
   const { state, events, onRegistryChange, onCatalogRefreshed } = deps;
+
+  /**
+   * 同一市场的刷新串行：并发调用共用同一次尝试。
+   * 不串行会有两种破坏——克隆互相删 `.git`（git 报 `could not lock config file`），
+   * 以及两次 `renameSync` 争同一个目标路径。连点两下「刷新」就能触发。
+   */
+  const inFlight = new Map<string, Promise<{ marketplace: MarketplaceView; revision: number }>>();
 
   const requireMarketplace = (name: string): PluginMarketplaceRecord => {
     const record = state.get().marketplaces.find((item) => item.name === name);
@@ -278,10 +302,12 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     const run = deps.run ?? defaultSourceRunner;
     const root = resolve(deps.pluginsDir ?? env.pluginsDir, PLUGIN_MARKETPLACES_DIRNAME);
     const target = join(root, record.name);
-    const staging = join(root, `${record.name}.staging`);
+    // staging 目录**每次独立**：固定路径下两次并发克隆会互相删掉 `.git`（git 报
+    // `could not lock config file .../.git/config`）。刷新已按市场串行（见 `refresh`），
+    // 但独立路径让「同机多实例 / 上一次留下的残留」也不会撞车。
+    const staging = `${target}.staging-${randomUUID().slice(0, 8)}`;
 
     const url = source.source === "git" ? source.url : `https://github.com/${source.repo}.git`;
-    rmSync(staging, { recursive: true, force: true });
     mkdirSync(dirname(staging), { recursive: true });
     try {
       const args = ["clone", "--depth", "1"];
@@ -290,6 +316,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       await run("git", args, { timeout: PLUGIN_GIT_TIMEOUT_MS });
       rmSync(target, { recursive: true, force: true });
       renameSync(staging, target);
+      cleanStagingLeftovers(root, record.name, staging);
     } catch (error) {
       rmSync(staging, { recursive: true, force: true });
       throw error instanceof Error ? error : new SourceError(String(error));
@@ -303,6 +330,48 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       diagnostics: catalog.diagnostics,
       integrity: hashDirectory(target)?.hash,
     });
+  };
+
+  const runRefresh = async (
+    name: string,
+  ): Promise<{ marketplace: MarketplaceView; revision: number }> => {
+    const record = requireMarketplace(name);
+    const source = record.source;
+
+    try {
+      if (source.source === "directory") {
+        const marketDir = resolveTargetPath(source.path);
+        const catalog = readMarketplaceCatalog(marketDir, record.name);
+        recordRefresh(record.name, {
+          refreshedOk: true,
+          pluginCount: catalog.entries.length,
+          catalog: resolveEntrySources(catalog.entries, marketDir),
+          diagnostics: catalog.diagnostics,
+          integrity: hashDirectory(marketDir)?.hash,
+        });
+      } else if (source.source === "url") {
+        await refreshUrlMarket(record, source);
+      } else if (source.source === "git" || source.source === "github") {
+        await refreshGitMarket(record, source);
+      } else {
+        throw new AppError(
+          ERROR_CODES.marketplaceInvalid,
+          `市场来源尚未支持：${source.source}`,
+          400,
+          undefined,
+          { reason: source.source },
+        );
+      }
+      // 刷新市场是「显式检查更新」的入口：顺手把已装插件的来源变动算出来
+      await onCatalogRefreshed?.();
+    } catch (error) {
+      // 用户显式刷新把失败报出去；内置市场只记账，不打扰
+      reportSourceFailure(record, error);
+    }
+    return {
+      marketplace: toView(requireMarketplace(record.name)),
+      revision: state.get().revision,
+    };
   };
 
   return {
@@ -384,44 +453,12 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       return { removed: true, orphanedPlugins, revision: state.get().revision };
     },
 
-    async refresh(input) {
-      const record = requireMarketplace(input.name);
-      const source = record.source;
-
-      try {
-        if (source.source === "directory") {
-          const marketDir = resolveTargetPath(source.path);
-          const catalog = readMarketplaceCatalog(marketDir, record.name);
-          recordRefresh(record.name, {
-            refreshedOk: true,
-            pluginCount: catalog.entries.length,
-            catalog: resolveEntrySources(catalog.entries, marketDir),
-            diagnostics: catalog.diagnostics,
-            integrity: hashDirectory(marketDir)?.hash,
-          });
-        } else if (source.source === "url") {
-          await refreshUrlMarket(record, source);
-        } else if (source.source === "git" || source.source === "github") {
-          await refreshGitMarket(record, source);
-        } else {
-          throw new AppError(
-            ERROR_CODES.marketplaceInvalid,
-            `市场来源尚未支持：${source.source}`,
-            400,
-            undefined,
-            { reason: source.source },
-          );
-        }
-        // 刷新市场是「显式检查更新」的入口：顺手把已装插件的来源变动算出来
-        await onCatalogRefreshed?.();
-      } catch (error) {
-        // 用户显式刷新把失败报出去；内置市场只记账，不打扰
-        reportSourceFailure(record, error);
-      }
-      return {
-        marketplace: toView(requireMarketplace(record.name)),
-        revision: state.get().revision,
-      };
+    refresh(input) {
+      const pending = inFlight.get(input.name);
+      if (pending) return pending;
+      const attempt = runRefresh(input.name).finally(() => inFlight.delete(input.name));
+      inFlight.set(input.name, attempt);
+      return attempt;
     },
   };
 };

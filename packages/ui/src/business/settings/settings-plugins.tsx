@@ -30,6 +30,7 @@ export function SettingsPlugins() {
   );
   const [purge, setPurge] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [refreshingMarket, setRefreshingMarket] = useState<string | null>(null);
   // 生效开关按当前会话的工作目录算：切会话即换一套项目覆盖
   const cwd = useWorkbench()?.cwd ?? null;
   const {
@@ -445,9 +446,18 @@ export function SettingsPlugins() {
             <Button variant="ghost" size="sm" onClick={() => void toggleCatalog(market.name)}>
               {openCatalog === market.name ? t("收起") : t("查看插件")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => void refreshMarketplace(market.name)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              // 刷新期间禁用：连点会并发拉同一个市场（服务端已按市场串行，这里给出反馈）
+              disabled={refreshingMarket === market.name}
+              onClick={() => {
+                setRefreshingMarket(market.name);
+                void refreshMarketplace(market.name).finally(() => setRefreshingMarket(null));
+              }}
+            >
               <RefreshCw className="size-icon-base" />
-              {t("刷新")}
+              {refreshingMarket === market.name ? t("刷新中…") : t("刷新")}
             </Button>
             {market.builtin ? null : (
               <Button variant="ghost" size="sm" onClick={() => void removeMarketplace(market.name)}>

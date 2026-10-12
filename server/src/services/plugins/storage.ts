@@ -40,7 +40,7 @@ export type PluginStorage = {
   stagingRootFor(marketplace: string | undefined): string;
   /** 把暂存目录搬进 `cache/<市场>/<插件>/<版本>`；本地目录来源不复制，原样返回源目录 */
   placeStaged(input: {
-    staged: { path: string; staged: boolean };
+    staged: { path: string; staged: boolean; stagingDir?: string };
     marketplace: string | undefined;
     name: string;
     version: string;
@@ -84,6 +84,16 @@ export const createPluginStorage = (input: { pluginsDir: string }): PluginStorag
       return readdirSync(dir);
     } catch {
       return [];
+    }
+  };
+
+  /** 暂存根空了就收掉（别在缓存里留一个空目录）；读不到或非空都当无事发生 */
+  const sweepEmptyStagingRoot = (stagingRoot: string): void => {
+    try {
+      if (readdirSync(stagingRoot).length === 0)
+        rmSync(stagingRoot, { recursive: true, force: true });
+    } catch {
+      // 根不存在（别人已清）或读不到：不影响结果
     }
   };
 
@@ -144,8 +154,10 @@ export const createPluginStorage = (input: { pluginsDir: string }): PluginStorag
         orphanAt(finalDir);
         renameSync(staged.staged.path, finalDir);
       } finally {
-        // 暂存目录一律不留在盘上：它会污染内容哈希与组件扫描
-        rmSync(staged.stagingRoot, { recursive: true, force: true });
+        // 只清**本次**占用的那个暂存目录（`mkdtemp` 的顶层；`path` 可能是它下面的子目录），
+        // 不删整个 `.staging` 根：同一市场里两次并发安装共用一个根，删根会端掉另一个还没克隆完的目录
+        rmSync(staged.staged.stagingDir ?? staged.staged.path, { recursive: true, force: true });
+        sweepEmptyStagingRoot(staged.stagingRoot);
       }
       return finalDir;
     },

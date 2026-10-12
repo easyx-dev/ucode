@@ -781,6 +781,7 @@ export default {
 
   安装: "Install",
   重装: "Reinstall",
+  "刷新中…": "Refreshing…",
   "安装中…": "Installing…",
   查看插件: "View plugins",
   已安装: "Installed",
