@@ -51,3 +51,9 @@ export const toComponentToken = (
 /** 显示名：`<plugin>:<component>`，只用于界面与 `/` 菜单，不进底层标识 */
 export const toComponentLabel = (pluginName: string, componentName: string): string =>
   `${pluginName}:${componentName}`;
+
+/**
+ * 插件数据目录名：插件 id 里的 `@` 等字符不能进目录名，除字母、数字、`_`、`-` 外一律换成 `-`
+ * （与 Claude 的 `${*_PLUGIN_DATA}` 同一口径，大小写保留）。
+ */
+export const toDataDirName = (pluginId: string): string => pluginId.replace(/[^a-zA-Z0-9_-]/g, "-");

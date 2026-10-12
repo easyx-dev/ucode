@@ -27,7 +27,7 @@ import type {
 import { BUILTIN_PROMPT_COMMANDS, type BuiltinPromptCommand } from "./builtin";
 import { type CommandAssetPath, type CommandAssetPathInput, commandAssetPaths } from "./paths";
 
-export type { CommandAssetPath, CommandAssetPaths } from "./paths";
+export type { CommandAssetPath, CommandAssetPaths, PluginCommandAssets } from "./paths";
 export { commandAssetPaths } from "./paths";
 
 /** 内置命令的合成路径前缀；磁盘上不存在这个名字，只用来把来源标成 `builtin` */

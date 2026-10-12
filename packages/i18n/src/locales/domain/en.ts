@@ -40,4 +40,6 @@ export default {
   "插件不存在：{{id}}": "No such plugin: {{id}}",
   "插件清单无效：{{path}}": "Invalid plugin manifest: {{path}}",
   "插件组件路径无效：{{path}}": "Invalid plugin component path: {{path}}",
+  "插件来源不受支持：{{source}}": "Unsupported plugin source: {{source}}",
+  "市场配置无效：{{reason}}": "Invalid marketplace: {{reason}}",
 };

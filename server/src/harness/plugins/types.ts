@@ -15,6 +15,19 @@ export type PluginComponentEntry = {
   path: string | null;
 };
 
+/**
+ * 装配期注入用的目录：loader 的 `additionalSkillPaths` / `additionalPromptTemplatePaths` /
+ * `additionalExtensionPaths` 收的是目录或文件路径，不是逐个组件，所以单独留一份。
+ */
+export type PluginAssetDirs = {
+  /** 技能目录（含 SKILL.md 的目录，或容纳技能目录的父目录） */
+  skills: string[];
+  /** 命令目录（`*.md` 的所在目录） */
+  prompts: string[];
+  /** pi 扩展的文件路径 */
+  extensions: string[];
+};
+
 /** 注册表里的一个插件：登记信息 + 清单装载结果 + 来源门控结论 */
 export type PluginDescriptor = {
   id: string;
@@ -30,6 +43,8 @@ export type PluginDescriptor = {
   installedAt: string;
   /** 解析出的组件；未启用也照样解析，供设置页展示与排查 */
   components: PluginComponentEntry[];
+  /** 装配期注入用的目录（技能 / 命令 / 扩展） */
+  assets: PluginAssetDirs;
   /** 因来源为第三方市场而不注入运行时的执行类组件分组 */
   blocked: PluginComponentGroup[];
   diagnostics: PluginDiagnosticView[];

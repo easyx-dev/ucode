@@ -40,7 +40,13 @@ import {
   resolveThinkingLevel,
   usesDefaultToolSet,
 } from "./agents";
-import { commandAssetPaths, type SkillIndex, skillIndexOf, withBuiltinPrompts } from "./assets";
+import {
+  commandAssetPaths,
+  type PluginCommandAssets,
+  type SkillIndex,
+  skillIndexOf,
+  withBuiltinPrompts,
+} from "./assets";
 import { type ContextBudget, contextBudgetOf } from "./budget";
 import { mcpExtension } from "./mcp";
 import {
@@ -114,6 +120,8 @@ export type SessionAssemblyInput = {
   promptSource?: PromptSource;
   /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
   harnessDir?: string;
+  /** 启用插件贡献的技能 / 命令目录；由调用方从插件注册表算出（装配层不读插件状态） */
+  pluginAssets?: PluginCommandAssets;
 };
 
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
@@ -146,9 +154,13 @@ const createSessionLoader = async (
   settingsManager: SettingsManager,
   variant: PromptVariant,
 ): Promise<{ loader: DefaultResourceLoader; skills: SkillIndex }> => {
-  // 命令与技能只认我们的目录（全局 $APP_HOME + 项目祖先的项目配置目录 + .agents 兼容），
+  // 命令与技能只认我们的目录（全局 $APP_HOME + 项目祖先的项目配置目录 + .agents 兼容 + 启用插件），
   // 不读 pi 默认的技能目录与 cwd/.pi/*；顺序即同名优先级（pi first-wins）
-  const assetPaths = commandAssetPaths({ cwd: input.cwd, appHome: env.homeDir });
+  const assetPaths = commandAssetPaths({
+    cwd: input.cwd,
+    appHome: env.homeDir,
+    ...(input.pluginAssets ? { plugin: input.pluginAssets } : {}),
+  });
   const gate = {
     cwd: input.cwd,
     // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效

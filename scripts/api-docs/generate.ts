@@ -29,6 +29,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   attachments: "附件",
   agents: "角色",
   mcp: "MCP 服务器",
+  plugins: "插件",
+  marketplace: "插件市场",
   goals: "目标模式",
   stats: "使用统计",
 };

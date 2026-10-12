@@ -135,3 +135,57 @@ describe("SessionPool 子智能体清单", () => {
     assert.deepEqual(pool.runningSubagentsOf("s1"), []);
   });
 });
+
+describe("SessionPool.recycleForPluginChange", () => {
+  /** 造一个只带交互中转的池：这里只验证回收计划，其它依赖都不被触达 */
+  const createPoolWithInteractions = (pending: (sessionId: string) => boolean) => {
+    const events = new SessionEventBus();
+    const interactions = new InteractionBroker(events);
+    interactions.list = (sessionId) =>
+      pending(sessionId)
+        ? ([{ kind: "question" }] as unknown as ReturnType<InteractionBroker["list"]>)
+        : [];
+    const pool = new SessionPool(
+      {} as unknown as PiRuntime,
+      { find: () => undefined } as unknown as SessionRepository,
+      events,
+      () => ({ provider: "brave", apiKey: "", baseUrl: "" }),
+      { allow: {} as unknown as SessionAllowStore, interactions },
+      { discardReview: () => undefined } as unknown as MemoryService,
+      { forget: () => undefined } as unknown as GoalService,
+      { forget: () => undefined } as unknown as UsageService,
+    );
+    const internals = pool as unknown as {
+      entries: Map<string, { stale: boolean }>;
+      generation: number;
+      pluginRevision: number;
+      isPlanPending: (sessionId: string) => boolean;
+    };
+    internals.isPlanPending = (sessionId) => sessionId === "planning";
+    for (const id of ["idle", "waiting", "planning"]) internals.entries.set(id, { stale: false });
+    return { pool, internals };
+  };
+
+  it("空闲会话立刻回收，有待答交互或待确认计划的只标脏", () => {
+    const { pool, internals } = createPoolWithInteractions((id) => id === "waiting");
+
+    pool.recycleForPluginChange(4);
+
+    assert.equal(internals.entries.has("idle"), false, "空闲会话下次访问按新代次重装");
+    assert.equal(internals.entries.get("waiting")?.stale, true, "等用户回答的会话不被打回");
+    assert.equal(internals.entries.get("planning")?.stale, true, "待确认计划的会话不被打回");
+    assert.equal(internals.pluginRevision, 4, "插件代次被记下，供装配期比对");
+  });
+
+  it("标脏后的挂起态会话在答完前一直不被回收", () => {
+    const { pool, internals } = createPoolWithInteractions((id) => id === "waiting");
+    pool.recycleForPluginChange(1);
+
+    // 落定 / 清扫都会走这里：仍挂着待答交互时不能回收
+    assert.equal(
+      (pool as unknown as { recycleIfStale: (id: string) => boolean }).recycleIfStale("waiting"),
+      false,
+    );
+    assert.equal(internals.entries.has("waiting"), true);
+  });
+});

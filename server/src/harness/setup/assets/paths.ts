@@ -39,6 +39,17 @@ export type CommandAssetPathInput = {
   appHome: string;
   /** 用户主目录，`~/.agents/skills` 的父目录；缺省取 `os.homedir()`，测试可覆盖 */
   userHome?: string;
+  /**
+   * 启用插件贡献的技能 / 命令目录。由调用方从插件注册表算出后传进来——
+   * 装配层不反向依赖插件宿主（见 AGENTS.md 的 layers 约束）。
+   */
+  plugin?: PluginCommandAssets;
+};
+
+/** 插件贡献的技能 / 命令目录；优先级排在用户目录之后、内置资产之前 */
+export type PluginCommandAssets = {
+  skills: string[];
+  prompts: string[];
 };
 
 const isDirectory = (path: string): boolean => {
@@ -70,6 +81,10 @@ export const commandAssetPaths = (input: CommandAssetPathInput): CommandAssetPat
     (dir) => dir !== userHome && dir !== appHome,
   );
 
+  // 插件的技能 / 命令目录排在用户档之后：同名时用户手写的仍胜出，内置资产恒垫底
+  const pluginPaths = (paths: readonly string[] | undefined): CommandAssetPath[] =>
+    (paths ?? []).map((path) => ({ path, source: "plugin" as const }));
+
   const projectConfigSubdirs = (sub: string, source: CommandAssetSource): CommandAssetPath[] =>
     dirs.map((dir) => ({ path: resolve(dir, PROJECT_CONFIG_DIRNAME, sub), source }));
   const agentsSubdirs = (sub: string, source: CommandAssetSource): CommandAssetPath[] =>
@@ -80,11 +95,13 @@ export const commandAssetPaths = (input: CommandAssetPathInput): CommandAssetPat
     ...agentsSubdirs(SKILLS_DIRNAME, "agents-project"),
     { path: resolve(appHome, SKILLS_DIRNAME), source: "global" },
     { path: resolve(userHome, AGENTS_COMPAT_DIRNAME, SKILLS_DIRNAME), source: "agents-user" },
+    ...pluginPaths(input.plugin?.skills),
   ]);
 
   const prompts = existingUnique([
     ...projectConfigSubdirs(PROMPTS_DIRNAME, "project"),
     { path: resolve(appHome, PROMPTS_DIRNAME), source: "global" },
+    ...pluginPaths(input.plugin?.prompts),
   ]);
 
   return { skills, prompts };

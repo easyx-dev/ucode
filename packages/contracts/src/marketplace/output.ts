@@ -22,6 +22,20 @@ export type MarketplacesListResponse = {
   statePath: string;
 };
 
+/** 市场登记 / 刷新的统一回执 */
+export type MarketplaceWriteResponse = {
+  marketplace: MarketplaceView;
+  revision: number;
+};
+
+export type MarketplaceDeleteResponse = {
+  /** 是否命中并移除了登记；目标不存在时报错，故恒为 true */
+  removed: boolean;
+  /** 被移除市场下已登记的插件 id（只移除登记，不动磁盘内容） */
+  orphanedPlugins: string[];
+  revision: number;
+};
+
 export type MarketplacePluginView = {
   name: string;
   description: string;

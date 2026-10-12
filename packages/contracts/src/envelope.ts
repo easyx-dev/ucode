@@ -108,6 +108,10 @@ export const ERROR_CODES = {
   pluginManifestInvalid: "plugin_manifest_invalid",
   /** 插件组件不在插件根内，或声明的路径不存在 */
   pluginComponentInvalid: "plugin_component_invalid",
+  /** 安装来源不受支持（尚未实现的来源，或来源本身不可用） */
+  pluginSourceInvalid: "plugin_source_invalid",
+  /** 市场未登记、来源不受支持或清单读不出来 */
+  marketplaceInvalid: "marketplace_invalid",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

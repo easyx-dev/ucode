@@ -31,7 +31,10 @@ import { AppError } from "../../platform/response";
 import { isRecord } from "../../utils/object";
 import { resolvePluginComponents } from "./components";
 import { describeError, diagnostic } from "./diagnostic";
-import type { PluginComponentEntry } from "./types";
+import type { PluginAssetDirs, PluginComponentEntry } from "./types";
+
+/** 降级装载时的空资产集：共用同一个常量，免得每处造一份 */
+const EMPTY_ASSETS: PluginAssetDirs = { skills: [], prompts: [], extensions: [] };
 
 /** 清单 `name` 的字符集：同时是插件 id 的前半段与 token 来源 */
 export const PLUGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
@@ -171,6 +174,8 @@ export type PluginManifestLoad = {
   version: string;
   description: string;
   components: PluginComponentEntry[];
+  /** 装配期注入用的目录（loader 收的是目录，不是逐个组件） */
+  assets: PluginAssetDirs;
   diagnostics: PluginDiagnosticView[];
 };
 
@@ -187,6 +192,7 @@ const degradedLoad = (
   version: "0.0.0",
   description: "",
   components: [],
+  assets: EMPTY_ASSETS,
   diagnostics,
 });
 
@@ -196,7 +202,7 @@ const manifestLoad = (
   manifest: PluginManifest,
   name: string,
   diagnostics: PluginDiagnosticView[],
-  components: PluginComponentEntry[],
+  resolved: { components: PluginComponentEntry[]; assets: PluginAssetDirs },
 ): PluginManifestLoad => ({
   file,
   manifest,
@@ -204,7 +210,8 @@ const manifestLoad = (
   displayName: manifest.displayName?.trim() || name,
   version: manifest.version?.trim() || "0.0.0",
   description: manifest.description?.trim() || "",
-  components,
+  components: resolved.components,
+  assets: resolved.assets,
   diagnostics,
 });
 
@@ -217,7 +224,11 @@ export const loadPluginManifest = (root: string): PluginManifestLoad => {
   const file = findManifestFile(root);
   if (!file) {
     const resolved = resolvePluginComponents({ root, manifest: null });
-    return { ...degradedLoad(name, null, resolved.diagnostics), components: resolved.entries };
+    return {
+      ...degradedLoad(name, null, resolved.diagnostics),
+      components: resolved.entries,
+      assets: resolved.assets,
+    };
   }
 
   const read = readManifestObject(file);
@@ -245,11 +256,8 @@ export const loadPluginManifest = (root: string): PluginManifestLoad => {
   }
 
   const resolved = resolvePluginComponents({ root, manifest });
-  return manifestLoad(
-    file,
-    manifest,
-    resolvedName,
-    [...diagnostics, ...resolved.diagnostics],
-    resolved.entries,
-  );
+  return manifestLoad(file, manifest, resolvedName, [...diagnostics, ...resolved.diagnostics], {
+    components: resolved.entries,
+    assets: resolved.assets,
+  });
 };

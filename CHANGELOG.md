@@ -63,7 +63,15 @@
   可缺省（无清单按标准目录布局），组件路径必须落在插件根内（包含符号链接越界）；执行类组件
   （hooks / `extensions` / bin）按来源门控，第三方市场来的只解析出诊断、**不注入运行时**。
   运行时新增目录：`$APP_HOME/plugins`（市场清单缓存与插件数据）与 `$APP_HOME/app/plugins.json`
-  （登记表，0600）、`$APP_HOME/app/builtin`（内置资产物化）。接口与设置页尚未接入。
+  （登记表，0600）、`$APP_HOME/app/builtin`（内置资产物化）。
+
+- **插件登记表接口与装配接入（第一步：路由与注入）**：新增 `POST /api/v1/plugins/{list,create,update,
+delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `plugin_source_invalid`；`purge` 只清插件根内
+  与插件数据目录，不删用户自己的源目录）与 `POST /api/v1/marketplace/{list,create,delete,refresh}`
+  （本轮只读本地目录市场的 `marketplace.json`；内置市场刷新失败静默落 `lastError`）。
+  启用插件贡献的技能 / 命令目录并入会话装配与 `commands/list`（来源标 `plugin`，同名时用户手写的仍胜出、
+  内置垫底）；插件登记表变化后内存会话按新代次重装，且**待答交互与待确认计划的会话不被打回**（同时修掉
+  配置变更打回等审批会话的老问题）。
 
 ### 变更
 

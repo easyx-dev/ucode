@@ -1,6 +1,7 @@
 /** 事件流契约：全局 /events 的帧结构、事件名与序号语义 */
 import type { ConfigSnapshot } from "./config/output";
 import type { McpListResponse } from "./mcp/output";
+import type { PluginsListResponse } from "./plugins/output";
 import type { ProjectListResponse } from "./projects/output";
 
 /**
@@ -80,6 +81,11 @@ export type ServerControlEvent =
   /** MCP 服务器配置变更：客户端据此刷新列表 */
   | { type: "mcp_changed"; mcp: McpListResponse }
   /** 项目变更（改名、写回最近的会话参数）：客户端据此刷新项目行 */
-  | { type: "projects_changed"; projects: ProjectListResponse };
+  | { type: "projects_changed"; projects: ProjectListResponse }
+  /**
+   * 插件登记表变更（安装 / 启停 / 卸载 / 重拉）：客户端据此刷新插件列表与市场区块；
+   * 内存会话按 revision 在空闲后重装。
+   */
+  | { type: "plugins_changed"; revision: number; plugins: PluginsListResponse };
 
 export type ServerEvent = ServerControlEvent | ServerEventPayload;

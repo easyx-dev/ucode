@@ -28,10 +28,12 @@ import { isInsidePath, toPosixPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
 import { describeError, diagnostic } from "./diagnostic";
 import type { PluginManifest } from "./manifest";
-import type { PluginComponentEntry } from "./types";
+import type { PluginAssetDirs, PluginComponentEntry } from "./types";
 
 export type PluginComponents = {
   entries: PluginComponentEntry[];
+  /** 装配期注入用的目录；与逐条组件分开收，loader 要的是目录而不是每个组件 */
+  assets: PluginAssetDirs;
   diagnostics: PluginDiagnosticView[];
 };
 
@@ -44,6 +46,7 @@ type ComponentPathSpec = {
 type ComponentContext = {
   root: string;
   diagnostics: PluginDiagnosticView[];
+  assets: PluginAssetDirs;
 };
 
 export const isDirectory = (path: string): boolean => {
@@ -174,6 +177,7 @@ const collectSkills = (
   for (const spec of specs) {
     const dir = resolveComponent(ctx, spec.raw, "skills", true);
     if (!dir) continue;
+    ctx.assets.skills.push(dir);
     // 声明直接指向某个技能目录（自身含 SKILL.md）时按单个技能收，两种写法都能用
     if (isFile(join(dir, SKILL_FILENAME))) {
       entries.push({ group: "skills", name: basename(dir), path: dir });
@@ -211,6 +215,7 @@ const collectCommands = (
       reportMissing(ctx, spec, "commands", "命令目录");
       continue;
     }
+    ctx.assets.prompts.push(dir);
     // 子目录扁平化：`db/migrate.md` → `db:migrate`
     for (const relative of listMarkdownFiles(dir)) {
       const name = toPosixPath(relative).replace(/\.md$/, "").split("/").join(":");
@@ -252,6 +257,7 @@ const collectExtensions = (
   for (const spec of specs) {
     const target = resolveComponent(ctx, spec.raw, "extensions");
     if (!target) continue;
+    ctx.assets.extensions.push(target);
     if (isFile(target)) {
       entries.push({ group: "extensions", name: basename(target), path: target });
       continue;
@@ -310,12 +316,23 @@ const uniqueEntries = (entries: readonly PluginComponentEntry[]): PluginComponen
   });
 };
 
+/** 资产目录去重（声明与默认路径叠加时会重复），保持出现顺序 */
+const uniqueAssets = (assets: PluginAssetDirs): PluginAssetDirs => ({
+  skills: [...new Set(assets.skills)],
+  prompts: [...new Set(assets.prompts)],
+  extensions: [...new Set(assets.extensions)],
+});
+
 /** 解析一个插件包的全部组件；`manifest` 为 null 表示按标准目录布局装载 */
 export const resolvePluginComponents = (input: {
   root: string;
   manifest: PluginManifest | null;
 }): PluginComponents => {
-  const ctx: ComponentContext = { root: input.root, diagnostics: [] };
+  const ctx: ComponentContext = {
+    root: input.root,
+    diagnostics: [],
+    assets: { skills: [], prompts: [], extensions: [] },
+  };
   const entries: PluginComponentEntry[] = [];
   const manifest = input.manifest;
 
@@ -327,5 +344,9 @@ export const resolvePluginComponents = (input: {
   collectFileComponent(ctx, "mcp", PLUGIN_MCP_COMPONENT_PATH, manifest?.mcpServers, entries);
   collectBin(ctx, entries);
 
-  return { entries: uniqueEntries(entries), diagnostics: ctx.diagnostics };
+  return {
+    entries: uniqueEntries(entries),
+    assets: uniqueAssets(ctx.assets),
+    diagnostics: ctx.diagnostics,
+  };
 };

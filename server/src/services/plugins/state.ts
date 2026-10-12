@@ -21,7 +21,7 @@ import { AppError } from "../../platform/response";
 export class PluginStateStore {
   private state: PluginState = emptyPluginState();
 
-  constructor(private readonly path: string = env.pluginStatePath) {}
+  constructor(readonly path: string = env.pluginStatePath) {}
 
   load(): PluginState {
     if (!existsSync(this.path)) return this.set(emptyPluginState());

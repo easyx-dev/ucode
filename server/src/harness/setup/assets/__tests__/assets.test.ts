@@ -75,6 +75,35 @@ describe("commandAssetPaths", () => {
       ["project", "global"],
     );
   });
+
+  it("插件资产排在用户档之后、内置之前", () => {
+    const root = makeTemp();
+    const appHome = makeTemp();
+    const userHome = makeTemp();
+    const pluginSkills = makeTemp();
+    const pluginPrompts = makeTemp();
+    mkdirSync(join(root, ".git"), { recursive: true });
+    mkdirSync(join(root, PROJECT_CONFIG_DIRNAME, "skills"), { recursive: true });
+    mkdirSync(join(appHome, "skills"), { recursive: true });
+    mkdirSync(join(userHome, ".agents", "skills"), { recursive: true });
+    mkdirSync(join(appHome, "prompts"), { recursive: true });
+
+    const paths = commandAssetPaths({
+      cwd: root,
+      appHome,
+      userHome,
+      plugin: { skills: [pluginSkills], prompts: [pluginPrompts] },
+    });
+
+    assert.deepEqual(
+      paths.skills.map((item) => item.source),
+      ["project", "global", "agents-user", "plugin"],
+    );
+    assert.deepEqual(
+      paths.prompts.map((item) => item.source),
+      ["global", "plugin"],
+    );
+  });
 });
 
 describe("loadCommandAssets", () => {
@@ -164,5 +193,36 @@ describe("loadCommandAssets", () => {
       assets.prompts.map((prompt) => [prompt.name, prompt.source, prompt.description]),
       [["review", "project", "项目版审查"]],
     );
+  });
+
+  it("插件贡献的技能与命令进 `/` 菜单，来源标 plugin，且用户同名仍胜出", async () => {
+    const { root, appHome, userHome } = layout();
+    const pluginSkills = makeTemp();
+    const pluginPrompts = makeTemp();
+    writeSkill(pluginSkills, "audit", "插件技能");
+    writePrompt(pluginPrompts, "audit", "插件命令");
+    // 用户自己写了同名命令：应当胜出
+    writePrompt(join(appHome, "prompts"), "audit", "用户命令");
+
+    const assets = await loadCommandAssets({
+      cwd: root,
+      appHome,
+      userHome,
+      harnessDir: makeTemp(),
+      plugin: { skills: [pluginSkills], prompts: [pluginPrompts] },
+    });
+
+    assert.deepEqual(
+      assets.skills.map((skill) => [skill.name, skill.source]),
+      [["audit", "plugin"]],
+    );
+    assert.deepEqual(
+      assets.prompts.map((prompt) => [prompt.name, prompt.source]),
+      [
+        ["audit", "global"],
+        ["review", "builtin"],
+      ],
+    );
+    assert.equal(assets.prompts.find((prompt) => prompt.name === "audit")?.description, "用户命令");
   });
 });

@@ -53,6 +53,7 @@ const describePlugin = (
       displayName: record.name,
       description: "",
       components: [],
+      assets: { skills: [], prompts: [], extensions: [] },
       blocked: [],
       diagnostics: [diagnostic("error", "manifest", `安装目录不存在：${record.path}`)],
     };
@@ -67,6 +68,7 @@ const describePlugin = (
     description: load.description,
     version: load.version,
     components: load.components,
+    assets: load.assets,
     blocked: blockedGroups(load.components, source),
     diagnostics: load.diagnostics,
   };

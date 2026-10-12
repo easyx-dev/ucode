@@ -53,3 +53,18 @@ export type PluginsListResponse = {
   /** 注册表代次：变更入口推进它，会话按它决定是否重建 */
   revision: number;
 };
+
+/** 安装 / 启停 / 重拉的统一回执：变更后的插件视图与新的代次 */
+export type PluginWriteResponse = {
+  plugin: PluginView;
+  revision: number;
+  /** 契约视图之外的登记信息不回显；客户端刷新列表即可拿到其它插件 */
+};
+
+export type PluginDeleteResponse = {
+  /** 是否命中并移除了登记；目标不存在时报错，故恒为 true */
+  removed: boolean;
+  /** 是否连磁盘内容一并清理（`purge`）；本地目录来源的内容不会被删 */
+  purged: boolean;
+  revision: number;
+};

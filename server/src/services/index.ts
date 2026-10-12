@@ -29,6 +29,8 @@ import { RateLimiter } from "./auth/rate-limit";
 import { SessionService } from "./auth/sessions";
 import { createConfigService } from "./config";
 import { createLifecycle } from "./lifecycle";
+import { createPluginService, type PluginService, PluginStateStore } from "./plugins";
+import { createMarketplaceService, type MarketplaceService } from "./plugins/marketplace";
 import { ProjectService } from "./projects";
 
 export type Services = {
@@ -64,6 +66,10 @@ export type Services = {
   };
   /** 更新配置：落盘 + 按需重建 ModelRuntime，并把内存会话回收成「下次访问按新配置重装」 */
   applyConfig(patch: AppConfigPatchInput): Promise<void>;
+  /** 插件登记表：安装 / 启停 / 卸载 / 重拉，落 `$APP_HOME/app/plugins.json` */
+  plugins: PluginService;
+  /** 插件市场来源：登记 / 移除 / 刷新 */
+  marketplaces: MarketplaceService;
   /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
   /** 关闭共享的 SQLite 连接 */
@@ -130,6 +136,16 @@ export const createServices = async (registration: ServiceRegistration): Promise
   );
   const memory = new MemoryService(() => config.get().memory);
   const goals = new GoalService(sessions, usage, events);
+  // 插件在池之前建：池的装配需要它的资产目录；而它的变更回收又用回池，两边都是延迟取值
+  const pluginState = new PluginStateStore();
+  pluginState.load();
+  const pluginDeps = {
+    state: pluginState,
+    events,
+    onRegistryChange: (revision: number) => pool.recycleForPluginChange(revision),
+  };
+  const plugins = createPluginService(pluginDeps);
+  const marketplaces = createMarketplaceService(pluginDeps);
   const pool = new SessionPool(
     runtime,
     sessions,
@@ -142,6 +158,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     memory,
     goals,
     usage,
+    () => plugins.commandAssets(),
   );
   // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话
   const titles = new TitleService({
@@ -178,6 +195,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
     usage,
     goals,
     titles,
+    plugins,
+    marketplaces,
     auth: {
       credentials,
       sessions: authSessions,

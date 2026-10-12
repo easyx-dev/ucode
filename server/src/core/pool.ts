@@ -65,7 +65,7 @@ import {
   subagentProfile,
   usesDefaultToolSet,
 } from "../harness/setup/agents";
-import type { SkillIndex } from "../harness/setup/assets";
+import type { PluginCommandAssets, SkillIndex } from "../harness/setup/assets";
 import { matchSkillHit, matchSkillInvoke } from "../harness/setup/assets/skill-hit";
 import type { PermissionRule, SessionAllowStore } from "../harness/setup/permissions";
 import { assembleSession, contextBudgetFor } from "../harness/setup/session-config";
@@ -131,6 +131,8 @@ export class SessionPool {
   private readonly subagents = new Map<string, Map<string, SubagentSnapshot>>();
   /** 配置代次：每换一次运行时自增，用来识别「装配跨过了配置变更」的实例 */
   private generation = 0;
+  /** 插件登记表代次：与配置代次分开推进，两者任一变化都让内存实例重装 */
+  private pluginRevision = 0;
   /** 每步耗时归因：把模型往返拆成首 token / 解码 / 工具三段，写进会话条目 */
   private readonly telemetry = new StepTelemetry();
   private sweeper: NodeJS.Timeout | null = null;
@@ -152,6 +154,11 @@ export class SessionPool {
     private readonly goals: GoalService,
     /** 使用统计：落定后随 `session_updated` 一起下发累计用量 */
     private readonly usage: UsageService,
+    /**
+     * 启用插件贡献的技能 / 命令目录（装配期注入）。由 services 从插件注册表算出后传入：
+     * harness/setup 与 core 都不反向依赖插件宿主。
+     */
+    private readonly pluginAssets: () => PluginCommandAssets = () => ({ skills: [], prompts: [] }),
   ) {
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
     // 否则侧栏与通知只能等到下一次摘要刷新才知道这条会话停在了用户身上
@@ -618,6 +625,7 @@ export class SessionPool {
     // 装配要跨 await（loader 重建、MCP 连接），期间配置可能被换掉；
     // 那时回收计划扫不到这个还没入池的实例，只能靠代次比对补标脏
     const generation = this.generation;
+    const pluginRevision = this.pluginRevision;
     const record = this.repository.find(sessionId);
     // 只为已存在的会话建实例：没有记录就没有可用的 cwd（见 run.ts 的同款前置检查）
     if (!record) {
@@ -676,6 +684,7 @@ export class SessionPool {
       ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
       ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
       agentRegistry: registry,
+      pluginAssets: this.pluginAssets(),
       websearch: this.websearch,
       permission: {
         listGrants: () => this.permissions.allow.list(interactionSessionId),
@@ -838,7 +847,7 @@ export class SessionPool {
         lastUsed: Date.now(),
         unsubscribe,
         // 装配期间配置被换过：这一轮仍用这份旧装配跑完，下次访问按新配置重建
-        stale: generation !== this.generation,
+        stale: generation !== this.generation || pluginRevision !== this.pluginRevision,
         cwd,
         skills: assembled.skills,
         skillHits: new Set(),
@@ -1115,11 +1124,41 @@ export class SessionPool {
     for (const sessionId of plan.dispose) this.dispose(sessionId);
   }
 
+  /**
+   * 插件登记表变更后的会话回收：语义与配置变更是同一套（不打断进行中的一轮），
+   * 但**保护范围更宽**：装 / 卸 / 启停插件的频率远高于改配置，正在等审批或等计划确认的会话
+   * 被打回会很扎眼，所以挂起态一并等下去，只标脏。
+   */
+  recycleForPluginChange(revision: number): void {
+    this.pluginRevision = revision;
+    const plan = planRecycle(
+      [...this.entries.keys()].map((id) => ({ id, active: this.isProtected(id) })),
+    );
+    for (const sessionId of plan.markStale) {
+      const entry = this.entries.get(sessionId);
+      if (entry) entry.stale = true;
+    }
+    for (const sessionId of plan.dispose) this.dispose(sessionId);
+  }
+
+  /**
+   * 是否「不能立刻丢」：生成中 / 正在处理落定动作 / 有待答交互 / 有待确认的计划。
+   * 后两种都没有实例在跑，但打回它们等于把用户正看着的审批与计划清掉。
+   */
+  private isProtected(sessionId: string): boolean {
+    return (
+      this.isActive(sessionId) ||
+      this.settling.has(sessionId) ||
+      this.permissions.interactions.list(sessionId).length > 0 ||
+      this.isPlanPending(sessionId)
+    );
+  }
+
   /** 标脏的实例已空闲就回收；还在跑或正处理落定动作时留给下一处兜底 */
   private recycleIfStale(sessionId: string): boolean {
     const entry = this.entries.get(sessionId);
     if (!entry?.stale) return false;
-    if (this.isActive(sessionId) || this.settling.has(sessionId)) return false;
+    if (this.isProtected(sessionId)) return false;
     return this.dispose(sessionId);
   }
 

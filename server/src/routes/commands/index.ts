@@ -36,6 +36,7 @@ export const createCommandsRoute = (services: Services) => {
       cwd: resolveCwd(services, input),
       appHome: env.homeDir,
       harnessDir: env.harnessDir,
+      plugin: services.plugins.commandAssets(),
     });
     return c.json(ok(assets));
   });

@@ -64,6 +64,15 @@
 | POST | `/api/v1/mcp/list` | 列出已配置的 MCP 服务器 |
 | POST | `/api/v1/mcp/upsert` | 按 name 覆盖写入 MCP 服务器 |
 | POST | `/api/v1/mcp/delete` | 按 name 删除 MCP 服务器 |
+| POST | `/api/v1/plugins/list` | 列出已登记的插件、组件摘要与诊断 |
+| POST | `/api/v1/plugins/create` | 按来源安装并登记插件（本轮只支持本地目录来源） |
+| POST | `/api/v1/plugins/update` | 启停插件或写入 userConfig 的值 |
+| POST | `/api/v1/plugins/delete` | 移除插件登记（purge 时一并清理缓存与插件数据） |
+| POST | `/api/v1/plugins/refresh` | 按来源重读插件清单并推进代次 |
+| POST | `/api/v1/marketplace/list` | 列出已登记的市场与刷新状态 |
+| POST | `/api/v1/marketplace/create` | 登记市场来源 |
+| POST | `/api/v1/marketplace/delete` | 移除市场登记（下挂插件只失去来源，内容不删） |
+| POST | `/api/v1/marketplace/refresh` | 刷新市场清单（本轮只支持本地目录市场） |
 | POST | `/api/v1/agents/list` | 列出可选的 primary / subagent 角色 |
 | POST | `/api/v1/attachments` | 上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库） |
 | GET | `/api/v1/attachments/:id` | 按 id 返回附件原始字节（非 JSON，不走封套） |
@@ -1185,6 +1194,239 @@
 | `removed` | boolean | 是 | 是否命中并删除了条目；目标不存在时为 false |
 | `configPath` | string | 是 | — |
 
+## 插件（`plugins`）
+
+### POST /api/v1/plugins/list
+
+列出已登记的插件、组件摘要与诊断
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`PluginsListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `plugins` | [PluginView](#pluginview)[] | 是 | — |
+| `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
+| `revision` | number | 是 | 注册表代次：变更入口推进它，会话按它决定是否重建 |
+
+### POST /api/v1/plugins/create
+
+按来源安装并登记插件（本轮只支持本地目录来源）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | object（source = "directory" \| "url" \| "npm" \| "github" \| "git"） | 是 | — | — |
+| `marketplace` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 否 | — | 归属市场；缺省表示直接登记本地目录（信任档位 local） |
+| `scope` | "user" \| "project" | 否 | `user` | 项目级插件默认不启用，由状态文件或本次入参决定 |
+| `enabled` | boolean | 否 | `true` | — |
+
+**source（source = "directory"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "directory" | 是 | — | — |
+| `path` | string（长度≥1） | 是 | — | 仓内子目录；插件包不在仓根时用它 |
+
+**source（source = "url"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "url" | 是 | — | — |
+| `url` | string（长度≥1，格式 `^https:\/\/`） | 是 | — | — |
+| `headers` | Record<string, string> | 否 | — | 仅 url 来源支持：下载 `.zip` / `.tgz` 时的附加请求头 |
+
+**source（source = "npm"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "npm" | 是 | — | — |
+| `package` | string（长度≥1） | 是 | — | — |
+
+**source（source = "github"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "github" | 是 | — | — |
+| `repo` | string（格式 `^[\w.-]+\/[\w.-]+$`） | 是 | — | — |
+| `path` | string | 否 | — | 仓内子目录；插件包不在仓根时用它 |
+| `ref` | string | 否 | — | — |
+
+**source（source = "git"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "git" | 是 | — | — |
+| `url` | string（长度≥1） | 是 | — | — |
+| `path` | string | 否 | — | 仓内子目录；插件包不在仓根时用它 |
+| `ref` | string | 否 | — | — |
+
+**响应类型**：`PluginWriteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `plugin` | [PluginView](#pluginview) | 是 | — |
+| `revision` | number | 是 | — |
+
+### POST /api/v1/plugins/update
+
+启停插件或写入 userConfig 的值
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `id` | string（格式 `^[a-z0-9][a-z0-9._-]{0,127}@[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+| `enabled` | boolean | 否 | — | — |
+| `config` | Record<string, string \| number \| boolean> | 否 | — | `userConfig` 的值；类型由清单声明，这里只承载标量 |
+
+**响应类型**：`PluginWriteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `plugin` | [PluginView](#pluginview) | 是 | — |
+| `revision` | number | 是 | — |
+
+### POST /api/v1/plugins/delete
+
+移除插件登记（purge 时一并清理缓存与插件数据）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `id` | string（格式 `^[a-z0-9][a-z0-9._-]{0,127}@[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+| `purge` | boolean | 否 | `false` | — |
+
+**响应类型**：`PluginDeleteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `removed` | boolean | 是 | 是否命中并移除了登记；目标不存在时报错，故恒为 true |
+| `purged` | boolean | 是 | 是否连磁盘内容一并清理（`purge`）；本地目录来源的内容不会被删 |
+| `revision` | number | 是 | — |
+
+### POST /api/v1/plugins/refresh
+
+按来源重读插件清单并推进代次
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `id` | string（格式 `^[a-z0-9][a-z0-9._-]{0,127}@[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+
+**响应类型**：`PluginWriteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `plugin` | [PluginView](#pluginview) | 是 | — |
+| `revision` | number | 是 | — |
+
+## 插件市场（`marketplace`）
+
+### POST /api/v1/marketplace/list
+
+列出已登记的市场与刷新状态
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`MarketplacesListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `marketplaces` | [MarketplaceView](#marketplaceview)[] | 是 | — |
+| `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
+
+### POST /api/v1/marketplace/create
+
+登记市场来源
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `name` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+| `source` | object（source = "directory" \| "url" \| "github" \| "git"） | 是 | — | — |
+
+**source（source = "directory"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "directory" | 是 | — | — |
+| `path` | string（长度≥1） | 是 | — | 指向含 `marketplace.json` 的目录；条目里的相对路径相对它解析 |
+
+**source（source = "url"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "url" | 是 | — | — |
+| `url` | string（长度≥1，格式 `^https:\/\/`） | 是 | — | `marketplace.json` 直链；这种市场里没有本地仓库，条目必须用显式来源 |
+
+**source（source = "github"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "github" | 是 | — | — |
+| `repo` | string（格式 `^[\w.-]+\/[\w.-]+$`） | 是 | — | — |
+| `ref` | string | 否 | — | — |
+
+**source（source = "git"）**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | "git" | 是 | — | — |
+| `url` | string（长度≥1） | 是 | — | `marketplace.json` 直链；这种市场里没有本地仓库，条目必须用显式来源 |
+| `ref` | string | 否 | — | — |
+
+**响应类型**：`MarketplaceWriteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `marketplace` | [MarketplaceView](#marketplaceview) | 是 | — |
+| `revision` | number | 是 | — |
+
+### POST /api/v1/marketplace/delete
+
+移除市场登记（下挂插件只失去来源，内容不删）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `name` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+
+**响应类型**：`MarketplaceDeleteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `removed` | boolean | 是 | 是否命中并移除了登记；目标不存在时报错，故恒为 true |
+| `orphanedPlugins` | string[] | 是 | 被移除市场下已登记的插件 id（只移除登记，不动磁盘内容） |
+| `revision` | number | 是 | — |
+
+### POST /api/v1/marketplace/refresh
+
+刷新市场清单（本轮只支持本地目录市场）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `name` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 是 | — | — |
+
+**响应类型**：`MarketplaceWriteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `marketplace` | [MarketplaceView](#marketplaceview) | 是 | — |
+| `revision` | number | 是 | — |
+
 ## 角色（`agents`）
 
 ### POST /api/v1/agents/list
@@ -1443,6 +1685,14 @@
 | --- | --- | --- | --- |
 | `type` | "projects_changed" | 是 | — |
 | `projects` | [ProjectListResponse](#projectlistresponse) | 是 | — |
+
+**取值之一（type = "plugins_changed"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "plugins_changed" | 是 | — |
+| `revision` | number | 是 | — |
+| `plugins` | [PluginsListResponse](#pluginslistresponse) | 是 | — |
 
 **事件名（`type`）**
 
@@ -1749,6 +1999,35 @@
 | `timeout` | number | 否 | — |
 | `headers` | Record<string, string> | 否 | — |
 
+### PluginView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 身份 `<name>@<marketplace>`；直接登记的本地目录用 `<name>@local` |
+| `name` | string | 是 | 清单里的 name，缺省取安装目录名 |
+| `displayName` | string | 是 | 界面显示名，缺省与 `name` 相同 |
+| `description` | string | 是 | — |
+| `version` | string | 是 | — |
+| `source` | "official" \| "local" \| "market" | 是 | 信任档位：执行类组件是否注入按它判定 |
+| `enabled` | boolean | 是 | — |
+| `path` | string | 是 | 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） |
+| `installedAt` | string | 是 | 安装时间（ISO 8601） |
+| `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
+| `blockedComponents` | ("manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
+| `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | — |
+
+### MarketplaceView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 市场身份，插件 id 的后半段 |
+| `source` | string | 是 | 来源的展示用字面量：目录路径 / url / `owner/repo` |
+| `builtin` | boolean | 是 | 随包内置的市场：刷新失败只落 `lastError`，不出用户可见错误 |
+| `lastRefreshAt` | string | 否 | — |
+| `refreshedOk` | boolean | 是 | 上一次刷新是否成功；从没刷新过为 false |
+| `lastError` | string | 否 | — |
+| `pluginCount` | number | 是 | 清单里的条目数；没刷新过为 0 |
+
 ### AgentView
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1757,7 +2036,7 @@
 | `label` | string | 是 | 展示名 |
 | `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
 | `kind` | "primary" \| "subagent" | 是 | — |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" | 是 | — |
+| `source` | "project" \| "builtin" \| "global" \| "plugin" | 是 | — |
 | `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
 
 ### PromptCommandView
@@ -1767,7 +2046,7 @@
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -1775,7 +2054,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
+| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
 
 ### ModelUsage
 
@@ -1847,6 +2126,14 @@
 | --- | --- | --- | --- |
 | `total` | number | 是 | — |
 | `projects` | [ProjectSummary](#projectsummary)[] | 是 | — |
+
+### PluginsListResponse
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `plugins` | [PluginView](#pluginview)[] | 是 | — |
+| `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
+| `revision` | number | 是 | 注册表代次：变更入口推进它，会话按它决定是否重建 |
 
 ### CatalogModel
 
@@ -1986,7 +2273,7 @@
 | `event` | "invoke" \| "hit" | 是 | 使用方式 |
 | `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
@@ -2026,6 +2313,26 @@
 | `oldLine` | number \| null | 是 | — |
 | `newLine` | number \| null | 是 | — |
 | `text` | string | 是 | 行内容（不含前导的 +/-/空格） |
+
+### PluginComponentCounts
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `skills` | number | 是 | — |
+| `commands` | number | 是 | — |
+| `agents` | number | 是 | — |
+| `hooks` | number | 是 | — |
+| `mcp` | number | 是 | — |
+| `bin` | number | 是 | — |
+| `extensions` | number | 是 | — |
+
+### PluginDiagnosticView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `level` | "error" \| "warning" \| "info" | 是 | — |
+| `component` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
+| `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
 
 ### QuestionOption
 

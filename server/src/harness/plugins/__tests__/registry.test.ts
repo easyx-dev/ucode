@@ -225,5 +225,11 @@ describe("视图映射", () => {
     assert.equal(view.path, path);
     assert.equal(view.source, "market");
     assert.deepEqual(view.blockedComponents, ["hooks", "extensions", "bin"]);
+    // 装配期注入的资产目录与逐条组件分开：loader 收的是目录
+    assert.deepEqual(descriptor.assets, {
+      skills: [join(path, "skills")],
+      prompts: [],
+      extensions: [join(path, "extensions")],
+    });
   });
 });
