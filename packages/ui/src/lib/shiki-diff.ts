@@ -1,9 +1,9 @@
 /**
  * diff 视图的 shiki 高亮适配：把项目现成的高亮引擎接进 `@git-diff-view/react`。
  *
- * 官方适配层（`@git-diff-view/shiki`）把主题写死成 github light / dark，那等于再引一套配色；
- * 这里换成 `lib/shiki-theme` 的主题——颜色全是 `var(--code-*)`，于是 diff 里的高亮与消息流的代码块、
- * 文件预览同一口径，深浅色跟着设计 token 走，也不需要 `.hljs-*` 那套类映射。
+ * 官方适配层（`@git-diff-view/shiki`）自带一套引擎与主题；这里改接项目现成的 `lib/shiki` 引擎——
+ * 内置 GitHub 明暗双主题，token 只带 `--shiki-light` / `--shiki-dark` 变量，由 `base.css` 按 `.dark` 取用，
+ * 于是 diff 里的高亮与消息流的代码块、文件预览同一口径，也不需要 `.hljs-*` 那套类映射。
  *
  * 库要求 `getAST` **同步**返回 HAST，而语言是按需异步加载的：调用方先 `createDiffHighlighter`
  * 把语言备好，再打开 `diffViewHighlight`；备好之前铺纯文本，不阻塞渲染。
@@ -31,7 +31,7 @@ export const createDiffHighlighter = async (
 
   const adapter: DiffShikiHighlighter = {
     name: HIGHLIGHTER_NAME,
-    // `style`：着色写在 AST 节点的 inline style 上（值即 `var(--code-*)`），不走 CSS 类
+    // `style`：着色写在 AST 节点的 inline style 上（值是 `--shiki-light` / `--shiki-dark` 变量），不走 CSS 类
     type: "style",
     get maxLineToIgnoreSyntax() {
       return maxLine;

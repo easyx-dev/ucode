@@ -13,7 +13,7 @@ describe("createDiffHighlighter", () => {
     assert.equal(await createDiffHighlighter("notes.unknown"), null);
   });
 
-  it("语言就绪后给出适配器，着色值取自 --code-* 变量", async () => {
+  it("语言就绪后给出适配器，着色值是 GitHub 明暗双主题的 --shiki-* 变量", async () => {
     const highlighter = await createDiffHighlighter("typescript");
     assert.ok(highlighter);
     assert.equal(highlighter.hasRegisteredCurrentLang("typescript"), true);
@@ -21,7 +21,8 @@ describe("createDiffHighlighter", () => {
 
     const ast = (highlighter.getAST as AstOf)("const answer = 1;\n", "a.ts", "typescript");
     assert.ok(ast, "语言已就绪时必须给出 AST");
-    assert.match(JSON.stringify(ast), /var\(--code-/, "着色值必须是设计 token 变量");
+    assert.match(JSON.stringify(ast), /--shiki-light/, "着色值必须带明暗双主题变量");
+    assert.match(JSON.stringify(ast), /--shiki-dark/, "着色值必须带明暗双主题变量");
   });
 
   it("大段代码退回纯文本（与文件预览同一套阈值）", async () => {

@@ -13,7 +13,8 @@
  *
  * diff 视图（@git-diff-view/react）：库把配色收敛成一组 `--diff-*` 变量，深浅色由 token 自己跟随，
  * 不再分 light / dark 两套。语法高亮由我们注册的 shiki 适配器着色（`lib/shiki-diff.ts`），
- * 取值是 `--code-*`，所以这里不需要再映射库自带的 `.hljs-*` 配色。
+ * token 自己带 `--shiki-light` / `--shiki-dark`（见 `lib/shiki.ts`），所以这里不需要再映射库自带的
+ * `.hljs-*` 配色。
  */
 .diff-tailwindcss-wrapper[data-theme] .diff-style-root {
   --diff-border--: var(--border);

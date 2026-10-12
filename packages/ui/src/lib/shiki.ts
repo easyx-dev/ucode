@@ -15,7 +15,13 @@ import { createHighlighterCore, type HighlighterCore, type ThemedToken } from "s
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 import { LANGS, resolveLanguageId, shouldHighlight } from "./shiki-languages";
-import { CODE_THEME_NAME, codeTheme } from "./shiki-theme";
+
+/**
+ * 内置 GitHub 明暗主题，双主题输出：token 不带固定颜色，只带 `--shiki-light` / `--shiki-dark` 两个变量，
+ * 由 `base.css` 里的规则按 `.dark` 取用，所以切换深浅色不需要重新高亮。
+ */
+const THEMES = { light: "github-light", dark: "github-dark" } as const;
+const THEME_OPTIONS = { themes: THEMES, defaultColor: false } as const;
 
 let highlighter: Promise<HighlighterCore> | null = null;
 /** 已就绪的实例：同步高亮（diff 的适配器）只能用它 */
@@ -26,7 +32,7 @@ const loaded = new Set<string>();
 const getHighlighter = async (): Promise<HighlighterCore> => {
   highlighter ??= createHighlighterCore({
     langs: [],
-    themes: [codeTheme],
+    themes: [import("shiki/themes/github-light.mjs"), import("shiki/themes/github-dark.mjs")],
     engine: createJavaScriptRegexEngine(),
   });
   engine ??= await highlighter;
@@ -68,7 +74,7 @@ export const highlightLines = async (
   if (id === null || !shouldHighlight(code, id)) return null;
   if (!(await prepareLanguage(language))) return null;
   try {
-    return engine?.codeToTokens(code, { lang: id, theme: CODE_THEME_NAME }).tokens ?? null;
+    return engine?.codeToTokens(code, { lang: id, ...THEME_OPTIONS }).tokens ?? null;
   } catch {
     return null;
   }
@@ -83,7 +89,7 @@ export const highlightToHast = (code: string, language: string | null): DiffAST 
   if (engine === null || id === null || !loaded.has(id)) return null;
   if (!shouldHighlight(code, id)) return null;
   try {
-    return engine.codeToHast(code, { lang: id, theme: CODE_THEME_NAME }) as DiffAST;
+    return engine.codeToHast(code, { lang: id, ...THEME_OPTIONS }) as DiffAST;
   } catch {
     return null;
   }

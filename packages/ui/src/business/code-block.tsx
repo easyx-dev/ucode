@@ -32,7 +32,7 @@ export function CodeBlock({
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: 同一行内的 token 按顺序排列，无自然 id
                   key={tokenIndex}
-                  style={{ color: token.color }}
+                  style={token.htmlStyle}
                 >
                   {token.content}
                 </span>

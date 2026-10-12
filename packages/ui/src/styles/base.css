@@ -60,6 +60,17 @@
 }
 
 /*
+ * 语法高亮（shiki 内置 GitHub 明暗双主题）：token 只带 `--shiki-light` / `--shiki-dark` 两个变量，
+ * 这里按 `.dark` 取用，所以切换深浅色不需要重新高亮。消息流代码块、文件预览与 diff 视图（HAST 行内 style）共用。
+ */
+[style*="--shiki-light"] {
+  color: var(--shiki-light);
+}
+.dark [style*="--shiki-light"] {
+  color: var(--shiki-dark);
+}
+
+/*
  * 呼吸类动画在减弱动效偏好下一律关闭（颜色过渡与加载指示的旋转保留：
  * 前者不引起前庭不适，后者是必要的状态信号）。位移类动效由组件自己兜底。
  */

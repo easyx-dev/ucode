@@ -233,21 +233,8 @@
   --elevation-dialog: 0 calc(var(--base-unit) * 3) calc(var(--base-unit) * 8) var(--shadow-strong);
   --elevation-edge: 0 calc(var(--base-unit) * -0.25) calc(var(--base-unit) * 0.5) var(--shadow-soft);
 
-  /* 语法高亮：只给 shiki 的内联着色用，取值全部来自上面的语义层 */
-  --code-foreground: var(--foreground);
-  --code-background: transparent;
-  --code-comment: var(--foreground-subtle);
-  --code-punctuation: var(--foreground-subtle);
-  --code-keyword: var(--chart-4);
-  --code-string: var(--chart-2);
-  --code-number: var(--chart-3);
-  --code-function: var(--chart-1);
-  --code-type: var(--chart-5);
-  --code-tag: var(--chart-4);
-  --code-property: var(--foreground);
-  --code-variable: var(--foreground);
-  --code-link: var(--link);
-  --code-invalid: var(--destructive);
+  /* 语法高亮不给令牌：shiki 用内置 GitHub 明暗双主题，token 自己带
+     `--shiki-light` / `--shiki-dark`，由 base.css 按 `.dark` 取用（见 lib/shiki.ts） */
 }
 
 /*

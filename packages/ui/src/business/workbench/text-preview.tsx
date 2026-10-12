@@ -5,6 +5,7 @@
  * 两者共用同一套行容器，因此不会跳到别处。大文件按 `PREVIEW_MAX_LINES` 截断渲染，
  * 只影响界面，不改服务端返回的内容。
  */
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useHighlightedLines } from "../../hooks/use-highlighted-lines";
@@ -39,7 +40,7 @@ export function TextPreview({ path, text }: { path: string; text: string }) {
                     <span
                       // biome-ignore lint/suspicious/noArrayIndexKey: 同一行内的 token 按顺序排列，无自然 id
                       key={tokenIndex}
-                      style={{ color: token.color }}
+                      style={token.htmlStyle as CSSProperties}
                     >
                       {token.content}
                     </span>
