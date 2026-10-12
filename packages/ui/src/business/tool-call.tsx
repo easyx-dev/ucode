@@ -173,11 +173,11 @@ const toDiffRows = (lines: readonly { type: DiffRowType; text: string }[]): Diff
 
 type ToolCallProps = {
   entry: ToolEntry;
-  /** 追加在输出下方的内容（如子智能体内联进度） */
-  children?: ReactNode;
+  /** 行内尾部：收起状态下也看得见的入口（如子智能体的「查看进度」） */
+  trailing?: ReactNode;
 };
 
-export function ToolCall({ entry, children }: ToolCallProps) {
+export function ToolCall({ entry, trailing }: ToolCallProps) {
   const { t } = useTranslation();
   const Icon = KIND_ICON[toolKindOf(entry.name)];
   const input = toolInputOf(entry.name, entry.args);
@@ -192,7 +192,7 @@ export function ToolCall({ entry, children }: ToolCallProps) {
   // 一律默认折叠：失败与执行中由状态图标提示，要不要看细节由用户决定
   const [open, setOpen] = useState(false);
 
-  const hasBody = diff !== null || showArgs || output !== "" || Boolean(children);
+  const hasBody = diff !== null || showArgs || output !== "";
   const statusLabel = entry.running ? t("执行中") : entry.isError ? t("失败") : t("完成");
 
   return (
@@ -216,6 +216,7 @@ export function ToolCall({ entry, children }: ToolCallProps) {
             </span>
           ) : null}
         </span>
+        {trailing}
         <span
           className="flex shrink-0 items-center"
           role="img"
@@ -257,7 +258,6 @@ export function ToolCall({ entry, children }: ToolCallProps) {
           {!hasBody && entry.running ? (
             <p className="text-xs text-foreground-subtle">{t("执行中")}</p>
           ) : null}
-          {children}
         </div>
       </CollapsibleContent>
     </Collapsible>

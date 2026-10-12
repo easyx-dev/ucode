@@ -21,7 +21,7 @@ import {
 import { subagentSessionIdOf } from "../lib/tool-view";
 import type { ChatItem, EditMessagePayload, SubagentStreams } from "../lib/types";
 import { MessageRow } from "./message-row";
-import { SubagentProgress, SubagentSessionLink } from "./subagent-progress";
+import { SubagentEntry } from "./subagent-entry";
 
 /** 首屏尚未测量时的行高估计；实测后由 ResizeObserver 校正，只影响未渲染行的滚动条长度 */
 const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
@@ -56,6 +56,8 @@ type MessageListProps = {
   sentTick?: number;
   /** 打开子会话（子智能体工具卡中的入口） */
   onOpenSession?: (sessionId: string) => void;
+  /** 打开活动面板并定位到某个子智能体（工具行上的入口） */
+  onOpenActivity?: (toolCallId: string) => void;
   /** 从某条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话）；返回是否已受理 */
@@ -72,6 +74,7 @@ export function MessageList({
   resetKey,
   sentTick,
   onOpenSession,
+  onOpenActivity,
   onFork,
   onEdit,
 }: MessageListProps) {
@@ -114,27 +117,41 @@ export function MessageList({
     paddingEnd: 32,
   });
 
-  const renderExtra = useCallback(
+  // 工具行里的子智能体入口：工具卡默认收起，入口不跟着藏——不展开也看得见它在跑。
+  // 它有实时进度记录时点开活动面板并定位到那一条；没有记录的（历史条目）按结果里的 task_id 直接开小窗
+  const renderToolTrailing = useCallback(
     (entry: ToolEntry) => {
       const stream = subagents?.[entry.id];
-      if (stream) return <SubagentProgress stream={stream} onOpenSession={onOpenSession} />;
-      // 跑完的子智能体不在进度快照里了，但结果留着 task_id：事后回看也走同一个详情小窗
-      if (!onOpenSession) return null;
+      if (stream && onOpenActivity) {
+        return (
+          <SubagentEntry
+            status={stream.done ? (stream.isError ? "failed" : "done") : "running"}
+            description={stream.description}
+            onOpen={() => onOpenActivity(entry.id)}
+          />
+        );
+      }
+      // 跑完的子智能体仍留在进度清单里（标 done），但断流重取或更早的会话只有结果里的 task_id
+      if (stream || !onOpenSession) return null;
       const sessionId = subagentSessionIdOf(entry);
       return sessionId ? (
-        <SubagentSessionLink sessionId={sessionId} onOpenSession={onOpenSession} />
+        <SubagentEntry
+          description=""
+          label={t("查看子会话")}
+          onOpen={() => onOpenSession(sessionId)}
+        />
       ) : null;
     },
-    [subagents, onOpenSession],
+    [subagents, onOpenActivity, onOpenSession, t],
   );
   const context = useMemo(
     () => ({
-      renderExtra,
+      renderToolTrailing,
       ...(compacting ? { compacting } : {}),
       ...(onFork ? { onFork } : {}),
       ...(onEdit ? { onEdit } : {}),
     }),
-    [renderExtra, compacting, onFork, onEdit],
+    [renderToolTrailing, compacting, onFork, onEdit],
   );
 
   const setFollowingBoth = useCallback((next: boolean) => {

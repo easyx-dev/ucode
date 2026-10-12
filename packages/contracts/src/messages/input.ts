@@ -6,6 +6,9 @@ import { sessionIdSchema } from "../sessions/input";
 
 export const messageListInputSchema = z.object({ sessionId: sessionIdSchema });
 
+/** 单独读一次后台服务清单（面板打开时用）；服务端在响应前重探一次再返回 */
+export const messageServicesInputSchema = z.object({ sessionId: sessionIdSchema });
+
 /**
  * 附件引用：`id` 是上传接口返回的内容 hash（64 位小写 hex，sha256）。
  * 图片与非图片都用同一套引用；服务端按入库的 mimeType 决定发给模型还是只做引用。
@@ -65,6 +68,8 @@ export const messageCompactInputSchema = z.object({
 
 export type MessageListRequest = z.input<typeof messageListInputSchema>;
 export type MessageListInput = z.infer<typeof messageListInputSchema>;
+export type MessageServicesRequest = z.input<typeof messageServicesInputSchema>;
+export type MessageServicesInput = z.infer<typeof messageServicesInputSchema>;
 export type MessageEditRequest = z.input<typeof messageEditInputSchema>;
 export type MessageEditInput = z.infer<typeof messageEditInputSchema>;
 export type MessageCompactRequest = z.input<typeof messageCompactInputSchema>;

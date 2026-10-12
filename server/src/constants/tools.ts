@@ -35,6 +35,27 @@ export const SHELL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 /** shell 命令里允许出现的固定空等（秒）：这以上的 `sleep` 直接拦下，让模型改用工具自身的等待能力 */
 export const SHELL_SLEEP_MIN_SECONDS = 1;
 
+/** 后台服务单端口探活的连接超时 */
+export const SERVICE_PROBE_TIMEOUT_MS = 300;
+
+/**
+ * 后台服务的「执行后」探测窗口：命令返回时服务往往还没 listen（`pnpm dev &` 立即返回），
+ * 所以在窗口内按间隔重试，直到能连上或超预算
+ */
+export const SERVICE_PROBE_RETRY_WINDOW_MS = 1_000;
+
+/** 后台服务「执行后」探测的重试间隔 */
+export const SERVICE_PROBE_RETRY_INTERVAL_MS = 100;
+
+/** 判定后台服务时旁路保留的命令输出上限（只用于找端口线索） */
+export const SERVICE_OUTPUT_CAPTURE_MAX_BYTES = 64 * 1024;
+
+/** 单会话追踪的后台服务条数上限；超出时丢最旧的已停止项，监听中的一律保留 */
+export const SERVICE_MAX_TRACKED_PER_SESSION = 20;
+
+/** 后台服务清单里命令原文的展示长度上限 */
+export const SERVICE_COMMAND_MAX_CHARS = 200;
+
 /** `@` 单次引用的文件数上限（目录展开后一并计入） */
 export const CONTEXT_MAX_FILES = 64;
 

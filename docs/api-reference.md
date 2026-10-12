@@ -43,6 +43,7 @@
 | POST | `/api/v1/projects/list` | 项目列表（按 cwd 归口的展示名与最近的会话参数） |
 | POST | `/api/v1/projects/update` | 重命名项目（name 传 null 即清空，界面回落目录末段） |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
+| POST | `/api/v1/messages/services` | 会话的后台服务清单（响应前重探一次，供活动面板用） |
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
 | POST | `/api/v1/messages/edit` | 编辑一条已发送的用户消息并重发 |
 | POST | `/api/v1/messages/interrupt` | 中断当前生成 |
@@ -755,8 +756,26 @@
 | `cwd` | string | 是 | 会话工作目录 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
 | `subagents` | [SubagentSnapshot](#subagentsnapshot)[] | 是 | 仍在进行的子智能体；断流重连后客户端据此重建/收敛嵌套进度 |
+| `services` | [BackgroundService](#backgroundservice)[] | 是 | 本会话当前可连的后台服务；断流重连后客户端以它为准替换本地清单 |
 | `seq` | number | 是 | 快照序号：本响应已包含到该序号为止的全部事件效果。 客户端订阅后丢弃 seq <= 它的实时帧，可无缝接续。 |
 | `liveMessageId` | string | 否 | 投影出的在途消息 id；前端据此把该条标记为生成中 |
+
+### POST /api/v1/messages/services
+
+会话的后台服务清单（响应前重探一次，供活动面板用）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+
+**响应类型**：`MessageServicesResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `services` | [BackgroundService](#backgroundservice)[] | 是 | — |
 
 ### POST /api/v1/messages/prompt
 
@@ -1663,7 +1682,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
+| `type` | "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "service_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
 | `sessionId` | string | 是 | — |
 | `seq` | number | 是 | — |
 | `data` | unknown | 是 | — |
@@ -1742,6 +1761,7 @@
 - `subagent_start`
 - `subagent_end`
 - `goal_update`
+- `service_update`
 - `session_created`
 - `session_updated`
 - `session_archived`
@@ -1911,6 +1931,18 @@
 | `toolCallId` | string | 是 | 父会话里发起这次委派的工具调用 id |
 | `sessionId` | string | 是 | 子会话 id |
 | `description` | string | 是 | 任务简称（服务端已按长度截断） |
+
+### BackgroundService
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 端口十进制字符串；同端口重复起即覆盖同一条 |
+| `command` | string | 是 | 起服务的命令原文（已截断） |
+| `cwd` | string | 是 | 命令的工作目录 |
+| `port` | number | 是 | 观测到的回环端口 |
+| `url` | string | 是 | 服务端拼好的访问地址（`http://127.0.0.1:<port>`） |
+| `startedAt` | string | 是 | 首次观测到该端口可连的时刻（ISO 8601 UTC） |
+| `updatedAt` | string | 是 | 最后一次确认可连的时刻（ISO 8601 UTC）；服务端用它收敛清单上限 |
 
 ### PendingInteraction
 

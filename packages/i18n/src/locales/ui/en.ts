@@ -315,6 +315,8 @@ export default {
   // Messages
   思考过程: "Reasoning",
   子智能体过程: "Subagent progress",
+  查看进度: "View progress",
+  "{{n}} 个子智能体": "{{n}} subagents",
   "（扩展消息）": "(extended message)",
   对话已压缩: "Conversation compacted",
   目标完成: "Goal completed",
@@ -622,8 +624,16 @@ export default {
   生成出错已暂停: "Paused: error",
   因受阻暂停: "Paused: blocked",
   目标轮次: "Goal rounds",
+  目标进行中: "Goal in progress",
   设置预算: "Set budget",
   "输入 token 上限，留空表示不限": "Enter a token limit; leave it empty for no limit",
+
+  // Session activity panel
+  会话活动: "Session activity",
+  后台服务: "Background services",
+  "{{n}} 个服务": "{{n}} services",
+  复制地址: "Copy address",
+  当前没有进行中的活动: "No activity in progress",
 
   // Composer commands
   内置动作: "Built-in",

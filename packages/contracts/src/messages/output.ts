@@ -92,6 +92,31 @@ export type SubagentSnapshot = {
   description: string;
 };
 
+/**
+ * bash 命令调起的后台服务（按端口观测到的运行态）。
+ *
+ * 清单里只会有**上一次观测时可连**的服务：探不到即被移除，所以条目上没有状态字段
+ * （「在册」就等于「刚确认过在跑」）。只保留在进程内存：服务生命周期短、不需要回溯，
+ * **不落会话条目**，口径与 `SubagentSnapshot` 一致。
+ * `id` 是端口的十进制字符串——一个端口一条，同端口重复起即覆盖。
+ */
+export type BackgroundService = {
+  /** 端口十进制字符串；同端口重复起即覆盖同一条 */
+  id: string;
+  /** 起服务的命令原文（已截断） */
+  command: string;
+  /** 命令的工作目录 */
+  cwd: string;
+  /** 观测到的回环端口 */
+  port: number;
+  /** 服务端拼好的访问地址（`http://127.0.0.1:<port>`） */
+  url: string;
+  /** 首次观测到该端口可连的时刻（ISO 8601 UTC） */
+  startedAt: string;
+  /** 最后一次确认可连的时刻（ISO 8601 UTC）；服务端用它收敛清单上限 */
+  updatedAt: string;
+};
+
 export type MessageListResponse = SessionScoped & {
   messages: MessageDTO[];
   /** 是否已有落盘会话文件 */
@@ -102,6 +127,8 @@ export type MessageListResponse = SessionScoped & {
   running: boolean;
   /** 仍在进行的子智能体；断流重连后客户端据此重建/收敛嵌套进度 */
   subagents: SubagentSnapshot[];
+  /** 本会话当前可连的后台服务；断流重连后客户端以它为准替换本地清单 */
+  services: BackgroundService[];
   /**
    * 快照序号：本响应已包含到该序号为止的全部事件效果。
    * 客户端订阅后丢弃 seq <= 它的实时帧，可无缝接续。
@@ -109,6 +136,15 @@ export type MessageListResponse = SessionScoped & {
   seq: number;
   /** 投影出的在途消息 id；前端据此把该条标记为生成中 */
   liveMessageId?: string;
+};
+
+/**
+ * 后台服务清单的单独读取：面板打开时用它拿「此刻」的状态，
+ * 不为一份小清单重取整段消息历史（`messages/list` 是会话全量投影）。
+ * 服务端在响应前重探一次，返回的即最新观测结果。
+ */
+export type MessageServicesResponse = SessionScoped & {
+  services: BackgroundService[];
 };
 
 /** prompt 的受理回执：生成本身由服务端后台推进，与本请求无关 */

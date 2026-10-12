@@ -14,6 +14,7 @@ import type { EditMessagePayload, PromptPayload, SubagentStreams } from "../../t
 import {
   applyChildFrame,
   applyFrame,
+  asServices,
   createEngine,
   EMPTY_STATE,
   type Engine,
@@ -34,6 +35,11 @@ export type MessagesStore = {
   seed: (sessionId: string) => void;
   /** 强制取一次快照（如首条消息受理后，用权威条目替换乐观消息） */
   refresh: (sessionId: string) => void;
+  /**
+   * 重探并刷新后台服务清单（活动面板打开时调）。
+   * 走单独的轻量接口，不重取整段消息历史。
+   */
+  refreshServices: (sessionId: string) => Promise<void>;
   /** 发送一条消息并乐观插入；返回是否被服务端受理 */
   send: (sessionId: string, payload: PromptPayload) => Promise<boolean>;
   /** 编辑一条用户消息并重发；引用与附件一并带上，刷新由 transcript_reset 事件驱动 */
@@ -121,6 +127,8 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
         }),
         running: snapshot.running,
         subagents: runningSubagents,
+        // 服务清单是全量运行态：快照里没有的即已停止，直接以快照为准
+        services: asServices(snapshot.services),
         // 快照不携带压缩进度与压缩结果提示：压缩中收到快照（如切换会话回来）时只能退回统一的「工作中」提示
         compacting: false,
         compactionNotice: null,
@@ -227,6 +235,12 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
 
     refresh(sessionId) {
       void hydrate(sessionId, ensure(sessionId));
+    },
+
+    async refreshServices(sessionId) {
+      const engine = ensure(sessionId);
+      const snapshot = await deps.apis.messages.services(sessionId);
+      patch(engine, { services: asServices(snapshot.services) });
     },
 
     async send(sessionId, payload) {

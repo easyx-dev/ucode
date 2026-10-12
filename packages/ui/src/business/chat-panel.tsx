@@ -1,7 +1,7 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
 import { cn } from "cn";
 import { Bot } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
 import type { ChatController } from "../hooks/use-chat";
@@ -15,6 +15,7 @@ import { type GoalCommand, parseGoalCommand } from "../lib/goal-command";
 import { buildGoalTurns } from "../lib/goal-turns";
 import { relativizeContextRefs } from "../lib/message-chips";
 import { draftSeedOf, projectLabel, projectOf } from "../lib/project";
+import { buildSessionActivity } from "../lib/session-activity";
 import { isWorkspaceSession } from "../lib/session-groups";
 import {
   type ChatItem,
@@ -39,6 +40,7 @@ import { MessageList } from "./message-list";
 import { PermissionRequest } from "./permission-request";
 import { PlanDecisionForm } from "./plan-decision-form";
 import { QuestionRequest } from "./question-request";
+import { SessionActivityDock } from "./session-activity-dock";
 import { openSubagentSessionDialog } from "./subagent-session-dialog";
 import { WelcomePanel } from "./welcome-panel";
 
@@ -173,6 +175,28 @@ export function ChatPanel({
   const openSubagent = useCallback((sessionId: string): void => {
     void openSubagentSessionDialog(sessionId);
   }, []);
+  /** 活动面板：从工具行的入口点进来时带上要定位的子智能体；`null` 表示用户还没选过展开态 */
+  const [activityOpen, setActivityOpen] = useState<boolean | null>(null);
+  const [activityFocus, setActivityFocus] = useState<string | null>(null);
+  const activity = useMemo(
+    () =>
+      buildSessionActivity({
+        subagents: chat.subagents,
+        services: chat.services,
+        goal: goal ?? null,
+        goalTurns,
+      }),
+    [chat.subagents, chat.services, goal, goalTurns],
+  );
+  const openActivity = useCallback((toolCallId?: string): void => {
+    setActivityFocus(toolCallId ?? null);
+    setActivityOpen(true);
+  }, []);
+  // 面板打开时重探一次后台服务：清单是运行态，命令之外的进程把服务停了只有这一问能发现
+  const refreshServices = chat.refreshServices;
+  useEffect(() => {
+    if (activityOpen) void refreshServices();
+  }, [activityOpen, refreshServices]);
   const projects = useProjects();
   const draftKey = composerKeyOf(session?.id ?? null);
   const draft = composer.drafts[draftKey] ?? emptyDraft();
@@ -319,18 +343,31 @@ export function ChatPanel({
       ) : null}
 
       {hero ? null : (
-        <MessageList
-          items={chat.items}
-          subagents={chat.subagents}
-          loading={chat.loadingHistory}
-          working={chat.streaming}
-          compacting={chat.compacting}
-          resetKey={session?.id ?? ""}
-          sentTick={sentTick}
-          onOpenSession={openSubagent}
-          onFork={isChild ? undefined : onFork}
-          onEdit={isChild || chat.streaming ? undefined : handleEdit}
-        />
+        // 活动面板与悬浮胶囊挂在对话区右下角：包一层 relative 容器，与消息列表同级（子会话不挂）
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <MessageList
+            items={chat.items}
+            subagents={chat.subagents}
+            loading={chat.loadingHistory}
+            working={chat.streaming}
+            compacting={chat.compacting}
+            resetKey={session?.id ?? ""}
+            sentTick={sentTick}
+            onOpenSession={openSubagent}
+            onOpenActivity={isChild ? undefined : openActivity}
+            onFork={isChild ? undefined : onFork}
+            onEdit={isChild || chat.streaming ? undefined : handleEdit}
+          />
+          {isChild ? null : (
+            <SessionActivityDock
+              activity={activity}
+              open={activityOpen}
+              focusToolCallId={activityFocus}
+              onOpenChange={setActivityOpen}
+              onOpenSubagent={openSubagent}
+            />
+          )}
+        </div>
       )}
 
       {/* 完成后收起状态条：目标在哪儿结束由对话里的「目标完成」细线负责，条不再常驻 */}

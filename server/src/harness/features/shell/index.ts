@@ -1,5 +1,6 @@
 /**
- * agent 侧 shell 的兜底装配：命令预检 + 非交互环境注入 + 空转看门狗 + 默认总时长上限。
+ * agent 侧 shell 的兜底装配：命令预检 + 非交互环境注入 + 空转看门狗 + 默认总时长上限
+ * （另有可选的后台服务观测，见 `services.ts`）。
  *
  * 用「同名注册即替换」覆盖 pi 内置的 `bash`：pi 没有执行期钩子，`BashToolOptions`
  * 只能在构造工具时传入，所以只能整体接管这个工具（注册名一致，权限规则与工具集
@@ -15,24 +16,34 @@ import { SHELL_COMMAND_TIMEOUT_SECONDS, SHELL_IDLE_TIMEOUT_MS } from "../../../c
 import { withBlockedCommands } from "./blocked";
 import { createNonInteractiveSpawnHook } from "./env";
 import { withShellGuard } from "./guard";
+import { type ServiceWatchHooks, withServiceWatch } from "./services";
 
 export const createShellExtension =
   (
     input: {
       /** 插件 `bin/` 目录（可信来源），追加到命令的 PATH 末尾 */
       pluginBinDirs?: readonly string[];
+      /** 后台服务观测钩子；不给即不探测（子会话、测试与评测脚本） */
+      services?: ServiceWatchHooks;
     } = {},
   ): ExtensionFactory =>
   (pi) => {
     // 首参是拿不到会话上下文时的兜底目录；注册工具由 pi 提供 ctx，实际用 ctx.cwd
     const definition = createBashToolDefinition(process.cwd(), {
       spawnHook: createNonInteractiveSpawnHook(input.pluginBinDirs),
-      // 预检在最外层：命中就直接不进进程，看门狗与环境钩子都省下
+      // 预检在最外层：命中就直接不进进程，看门狗与环境钩子都省下；
+      // 服务观测夹在本地执行与看门狗之间——拦下的命令不会进探测，而看门狗的超时与中断
+      // 以异常穿过它，`finally` 里照常结算（覆盖「命令被中止但服务已 detach 存活」）
       operations: withBlockedCommands(
-        withShellGuard(createLocalBashOperations(), {
-          idlenessMs: SHELL_IDLE_TIMEOUT_MS,
-          defaultTimeoutSeconds: SHELL_COMMAND_TIMEOUT_SECONDS,
-        }),
+        withShellGuard(
+          input.services
+            ? withServiceWatch(createLocalBashOperations(), input.services)
+            : createLocalBashOperations(),
+          {
+            idlenessMs: SHELL_IDLE_TIMEOUT_MS,
+            defaultTimeoutSeconds: SHELL_COMMAND_TIMEOUT_SECONDS,
+          },
+        ),
       ),
     });
 

@@ -24,6 +24,7 @@ import { overrideOf, type SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
 import type { MemoryService } from "../features/memory";
 import { createShellExtension } from "../features/shell";
+import type { ServiceWatchHooks } from "../features/shell/services";
 import type { SubagentHooks } from "../features/subagents";
 import type { PiRuntime } from "../pi/runtime";
 import type { PluginHookBinding } from "../plugins/hooks";
@@ -119,6 +120,11 @@ export type SessionAssemblyInput = {
   memory?: MemoryService;
   /** 目标结算工具（`goal_complete` / `goal_blocked`）；只在会话有 active 目标时注入 */
   goal?: GoalToolHooks;
+  /**
+   * 后台服务观测：由会话池按会话构造后注入（面板只服务主会话，子会话不提供）。
+   * 装配层不读运行态，只把它转给 shell 那层。
+   */
+  services?: ServiceWatchHooks;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
@@ -230,7 +236,10 @@ const createSessionLoader = async (
           ]
         : []),
       // shell 兜底：同名覆盖内置 bash，保证命令不会停下来等交互输入（见 harness/features/shell）
-      createShellExtension({ pluginBinDirs: input.pluginBinDirs }),
+      createShellExtension({
+        pluginBinDirs: input.pluginBinDirs,
+        ...(input.services ? { services: input.services } : {}),
+      }),
       createCodemodeExtension({ mode: "on" }),
       ...discoveryExtension,
       ...(mcp ? [mcp] : []),

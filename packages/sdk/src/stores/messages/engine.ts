@@ -2,7 +2,7 @@
  * 单个会话流的引擎：消息列表、生成态与子智能体进度的 store，以及事件归并。
  * 由 `createSessionStreams` 按 sessionId 复用。
  */
-import type { CompactionNotice, ServerEventPayload } from "@ucode/contracts";
+import type { BackgroundService, CompactionNotice, ServerEventPayload } from "@ucode/contracts";
 
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
@@ -46,6 +46,11 @@ export type SessionStreamState = {
   pending: boolean;
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents: SubagentStreams;
+  /**
+   * 本会话观测到的后台服务（bash 起的服务，按端口一条）。
+   * 服务端下发全量帧，所以这边不做增量归并，收到即整份替换。
+   */
+  services: BackgroundService[];
   loadingHistory: boolean;
   error: ApiError | null;
 };
@@ -76,6 +81,7 @@ export const EMPTY_STATE: SessionStreamState = {
   compactionNotice: null,
   pending: false,
   subagents: {},
+  services: [],
   loadingHistory: false,
   error: null,
 };
@@ -138,6 +144,13 @@ export const applyChildFrame = (
       : { ...stream, items: reduceEvent(stream.items, frame.type, frame.data) },
   );
 };
+
+/**
+ * 全量服务清单（事件帧与快照共用）：载荷不可信，非数组或缺失一律当作「没有服务」。
+ * 服务清单是整份替换的运行态，缺了只会让面板少一段，不该让界面崩掉。
+ */
+export const asServices = (data: unknown): BackgroundService[] =>
+  Array.isArray(data) ? (data as BackgroundService[]) : [];
 
 /** 按事件到达时间维护当前 assistant 消息的思考计时；返回本帧可挂到条目上的耗时字段 */
 const trackStreamTiming = (engine: Engine, frame: ServerEventPayload): { thinkingMs?: number } => {
@@ -216,6 +229,11 @@ export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
       done: true,
       isError: Boolean(data.isError),
     }));
+    return;
+  }
+
+  if (frame.type === "service_update") {
+    patch(engine, { services: asServices(frame.data) });
     return;
   }
 

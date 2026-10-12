@@ -199,6 +199,12 @@
   - `transcript_reset`：载荷 `{ fromEntryId }`，活动分支或可见历史已改变（编辑重发、追加界面标记、上下文压缩），
     客户端应重取快照；它不参与 `seq` 切分（收到即整表重取）
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发
+  - 后台服务（`service_update`）：载荷是**全量** `BackgroundService[]`——bash 命令调起的常驻服务，
+    按端口一条（`{ id, command, cwd, port, url, startedAt, updatedAt }`）。清单只含**当前可连**的服务：
+    探不到的会被服务端移出，所以条目上没有状态字段；全量替换比 `start` / `end` 对更省心智
+  - `messages/list` 的快照还带 `subagents` 与 `services`：两者都不落盘（前者是进行中的委派、
+    后者是当前可连的后台服务），断流重连后客户端以快照为准收敛。只要服务清单用
+    `messages/services`（响应前重探一次，不重取整段消息历史）
 - **控制帧**（无 `sessionId` / `seq`）：`server.connected`、
   `{ type: "error", sessionId?, code, message, params? }`、
   `{ type: "config_changed", config: ConfigSnapshot }`（配置已变更，客户端据此重取 models / health）、

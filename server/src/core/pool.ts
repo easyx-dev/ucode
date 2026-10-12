@@ -6,6 +6,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import {
+  type BackgroundService,
   COMPACTION_RECORD_CUSTOM_TYPE,
   type CompactionRecord,
   DEFAULT_PERMISSION_MODE,
@@ -39,6 +40,7 @@ import { parseGoalState } from "../harness/features/goal/state";
 import type { PromptImage } from "../harness/features/image";
 import type { MemoryService } from "../harness/features/memory";
 import { pruneToolOutputs } from "../harness/features/prune";
+import type { ServiceWatchHooks } from "../harness/features/shell/services";
 import { type SubagentHooks, SubagentSlots, spawnSubagent } from "../harness/features/subagents";
 import { StepTelemetry } from "../harness/features/telemetry";
 import type { UsageService } from "../harness/features/usage";
@@ -74,6 +76,7 @@ import type { GoalToolHooks } from "../harness/setup/tools/goal";
 import { logger } from "../platform/logger";
 import { AppError } from "../platform/response";
 import { isRecord } from "../utils/object";
+import { BackgroundServices } from "./background-services";
 import type { SessionEventBus } from "./event-bus";
 import type { InteractionBroker, InteractionSource } from "./interactions";
 import { planRecycle } from "./recycle";
@@ -130,6 +133,8 @@ export class SessionPool {
    * 所以这里留一份清单随 `messages/list` 快照下发（见 `runningSubagentsOf`）。
    */
   private readonly subagents = new Map<string, Map<string, SubagentSnapshot>>();
+  /** 后台服务运行态：与 `subagents` 同为内存态，状态本身不进池的字段（见 `BackgroundServices`） */
+  private readonly backgroundServices: BackgroundServices;
   /** 配置代次：每换一次运行时自增，用来识别「装配跨过了配置变更」的实例 */
   private generation = 0;
   /** 插件登记表代次：与配置代次分开推进，两者任一变化都让内存实例重装 */
@@ -168,6 +173,7 @@ export class SessionPool {
       mcpServers: () => [],
     },
   ) {
+    this.backgroundServices = new BackgroundServices(events);
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
     // 否则侧栏与通知只能等到下一次摘要刷新才知道这条会话停在了用户身上
     this.events.subscribe((frame) => {
@@ -237,6 +243,25 @@ export class SessionPool {
    */
   runningSubagentsOf(sessionId: string): SubagentSnapshot[] {
     return [...(this.subagents.get(sessionId)?.values() ?? [])];
+  }
+
+  /** 快照用：该会话观测到的后台服务；断流重连后客户端以它为准替换本地清单 */
+  listServicesOf(sessionId: string): BackgroundService[] {
+    return this.backgroundServices.listOf(sessionId);
+  }
+
+  /** 归档 / 删除会话时清掉它的服务清单；池的空闲回收不动它（服务进程可能还在跑） */
+  forgetServices(sessionId: string): void {
+    this.backgroundServices.forget(sessionId);
+  }
+
+  /**
+   * 重探并回传后台服务：活动面板打开时用。
+   * 走单独一条轻量接口而不是重取 `messages/list`——后者是整段会话历史的全量投影。
+   */
+  async refreshServices(sessionId: string): Promise<BackgroundService[]> {
+    await this.backgroundServices.refresh(sessionId);
+    return this.backgroundServices.listOf(sessionId);
   }
 
   /** 维护进行中清单；载荷不可信，拿不到 toolCallId 就当没有这次委派 */
@@ -548,6 +573,16 @@ export class SessionPool {
     }
   }
 
+  /**
+   * 后台服务观测入口：bash 命令结算后由 shell 那层回调（见 `harness/features/shell/services`）。
+   * 拿不到 pid，服务只能按端口归因；清单本身留在 `BackgroundServices` 里，池只持有它。
+   */
+  private serviceWatchHooks(record: SessionRecord): ServiceWatchHooks {
+    return {
+      observe: (observation) => this.backgroundServices.observe(record.id, observation),
+    };
+  }
+
   /** 主会话的委派钩子：并发上限按父会话计数，满了排队等空位（见 `SubagentSlots`） */
   private subagentHooks(
     record: SessionRecord,
@@ -695,6 +730,8 @@ export class SessionPool {
       ...(parentRules ? { parentRules } : {}),
       ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
       ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
+      // 服务观测只给主会话：面板只服务主会话，子会话起的服务不进清单
+      ...(isSubagent ? {} : { services: this.serviceWatchHooks(record) }),
       agentRegistry: registry,
       pluginAssets: this.plugin.commandAssets(cwd),
       pluginExtensionPaths: this.plugin.extensionPaths(cwd),
@@ -838,6 +875,12 @@ export class SessionPool {
         // 记忆回顾挂在 `agent_settled`：一轮（含排队的后续输入）彻底落定后才回顾，
         // 避免把半截结论固化成项目记忆；目标续跑同为落定后动作
         this.memory.review(sessionId, session);
+        // 长驻服务的状态一般在本轮的 bash 结算时就更新过了，落定时再补一次：
+        // 「命令之外的进程把服务停了 / 起了」只有这里会发现。刷新的失败不能浮到微任务外（未捕获的
+        // rejection 会结束进程），就地记一条日志
+        void this.backgroundServices
+          .refresh(sessionId)
+          .catch((error: unknown) => logger.warn({ sessionId, error }, "后台服务状态刷新失败"));
         // 落定后的两件事会争回收时机：目标要续跑就用旧装配把这一轮跑完，
         // 所以配置回收排在它们之后（settling 期间不回收）
         this.settling.add(sessionId);

@@ -21,6 +21,8 @@ import type { ProjectListResponse } from "./projects/output";
  * - `interaction_request` / `interaction_resolved`：权限审批与提问
  * - `subagent_start` / `subagent_end`：子智能体与父会话 toolCall 的关联
  * - `goal_update`：`GoalView | null`
+ * - `service_update`：**全量** `BackgroundService[]`（只含当前可连的服务，探不到的已移除）。
+ *   清单小、随时可能增删，全量替换比 `start` / `end` 对更省心智，客户端的快照收敛退化成一次赋值
  * - `session_created`：`SessionSummary`，新建 / 分叉 / 子智能体创建
  * - `session_updated`：`{ session: SessionSummary; usage?: UsageTotals; contextUsage?: ContextUsage | null }`，
  *   改名 / 换模型 / 落定后摘要刷新 / 运行态与状态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
@@ -46,6 +48,7 @@ export const EVENT_NAMES = [
   "subagent_start",
   "subagent_end",
   "goal_update",
+  "service_update",
   "session_created",
   "session_updated",
   "session_archived",

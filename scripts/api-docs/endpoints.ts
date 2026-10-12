@@ -297,6 +297,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "messages",
+    action: "services",
+    method: "POST",
+    input: "messageServicesInputSchema",
+    requestType: "MessageServicesInput",
+    output: "MessageServicesResponse",
+    summary: "会话的后台服务清单（响应前重探一次，供活动面板用）",
+  },
+  {
+    domain: "messages",
     action: "prompt",
     method: "POST",
     input: "promptInputSchema",

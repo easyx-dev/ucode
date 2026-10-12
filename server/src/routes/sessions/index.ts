@@ -319,10 +319,11 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
 
   for (const id of targets) {
     services.pool.dispose(id);
-    // 会话归档后，挂起的审批与「本会话恒允」都失去意义；目标状态一并清掉
+    // 会话归档后，挂起的审批与「本会话恒允」都失去意义；目标状态与服务清单一并清掉
     services.interactions.forget(id);
     services.permissions.clear(id);
     services.sessions.setGoal(id, null);
+    services.pool.forgetServices(id);
     services.sessions.archive(id);
     // 先广播归档再清序号：客户端只按 type 处理，seq 不参与列表口径
     services.events.emitSessionArchived(id);

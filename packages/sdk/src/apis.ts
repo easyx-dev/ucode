@@ -57,6 +57,8 @@ import type {
   MessageInterruptResponse,
   MessageListRequest,
   MessageListResponse,
+  MessageServicesRequest,
+  MessageServicesResponse,
   ModelsResponse,
   PairingCreateOutput,
   PluginCreateRequest,
@@ -315,6 +317,11 @@ export const createApis = (options: ApisOptions = {}) => {
         transport.post<MessageListResponse>("messages/list", {
           sessionId,
         } satisfies MessageListRequest),
+      /** 后台服务清单的单独读取；比 `list` 轻得多，活动面板打开时用它 */
+      services: (sessionId: string) =>
+        transport.post<MessageServicesResponse>("messages/services", {
+          sessionId,
+        } satisfies MessageServicesRequest),
       prompt: (body: PromptRequest) =>
         transport.post<PromptAdmittedResponse>("messages/prompt", body),
       /** 编辑一条用户消息并重发；旧分支保留，客户端靠 transcript_reset 事件刷新 */

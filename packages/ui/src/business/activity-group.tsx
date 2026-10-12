@@ -79,13 +79,13 @@ type ActivityGroupProps = {
   legs: ChatLeg[];
   /** 本轮以此收尾时的页脚 */
   footer?: ChatFooter;
-  /** 每次调用追加的内容（如子智能体内联进度） */
-  renderExtra?: (entry: ToolEntry) => ReactNode;
+  /** 工具行内的尾部入口（如子智能体的「查看进度」）；收起状态下也看得见 */
+  renderTrailing?: (entry: ToolEntry) => ReactNode;
   /** 从该条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
 };
 
-export function ActivityGroup({ legs, footer, renderExtra, onFork }: ActivityGroupProps) {
+export function ActivityGroup({ legs, footer, renderTrailing, onFork }: ActivityGroupProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const only = legs.length === 1 ? legs[0] : undefined;
@@ -97,7 +97,7 @@ export function ActivityGroup({ legs, footer, renderExtra, onFork }: ActivityGro
   if (only?.kind === "tool") {
     return (
       <div className="group">
-        <ToolCall entry={only.entry}>{renderExtra?.(only.entry)}</ToolCall>
+        <ToolCall entry={only.entry} trailing={renderTrailing?.(only.entry)} />
         {footerNode}
       </div>
     );
@@ -128,9 +128,7 @@ export function ActivityGroup({ legs, footer, renderExtra, onFork }: ActivityGro
                   thinkingMs={leg.item.timing?.thinkingMs}
                 />
               ) : (
-                <ToolCall key={leg.key} entry={leg.entry}>
-                  {renderExtra?.(leg.entry)}
-                </ToolCall>
+                <ToolCall key={leg.key} entry={leg.entry} trailing={renderTrailing?.(leg.entry)} />
               ),
             )}
           </div>

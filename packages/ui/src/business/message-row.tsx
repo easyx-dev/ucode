@@ -22,8 +22,8 @@ import { WorkingIndicator } from "./working-indicator";
 
 /** 每行的上下文：由列表统一构造，避免逐行重建回调 */
 export type MessageRowContext = {
-  /** 工具条目追加的内容（如子智能体内联进度） */
-  renderExtra?: (entry: ToolEntry) => ReactNode;
+  /** 工具行内的尾部入口（如子智能体的「查看进度」） */
+  renderToolTrailing?: (entry: ToolEntry) => ReactNode;
   /** 正在压缩上下文：尾部的进行中提示据此换文案，且不报本轮耗时 */
   compacting?: boolean;
   /** 从该条消息分叉（仅主对话） */
@@ -84,7 +84,7 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
       <ActivityGroup
         legs={row.node.legs}
         footer={row.footer}
-        renderExtra={context.renderExtra}
+        renderTrailing={context.renderToolTrailing}
         onFork={context.onFork}
       />
     );

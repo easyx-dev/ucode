@@ -1,5 +1,10 @@
 /** 会话消息流：订阅 SDK 的 messages store，装配「无会话时先建会话再投递」的发送流程 */
-import type { CompactionNotice, SessionCreateRequest, SessionSummary } from "@ucode/contracts";
+import type {
+  BackgroundService,
+  CompactionNotice,
+  SessionCreateRequest,
+  SessionSummary,
+} from "@ucode/contracts";
 import type { ChatItem, EditMessagePayload, SubagentStreams } from "@ucode/sdk";
 import { useCallback, useRef, useState } from "react";
 
@@ -18,6 +23,8 @@ export type ChatController = {
   items: ChatItem[];
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents: SubagentStreams;
+  /** 本会话观测到的后台服务（bash 起的服务，按端口一条） */
+  services: BackgroundService[];
   streaming: boolean;
   /** 本轮进行的是上下文压缩：尾部提示据此换文案 */
   compacting: boolean;
@@ -37,6 +44,8 @@ export type ChatController = {
   ackCompactionNotice: () => void;
   /** 忽略本次计划的决策表单；表单收起由 transcript_reset 事件驱动 */
   ignorePlan: () => Promise<void>;
+  /** 重探并刷新后台服务清单；活动面板打开时调 */
+  refreshServices: () => Promise<void>;
   /** 批准计划：服务端注入开工指令并起一轮（模式由调用方先切回 build） */
   approvePlan: () => Promise<void>;
 };
@@ -110,6 +119,12 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     client.messages.ackCompactionNotice(sessionId);
   }, [client, sessionId]);
 
+  /** 重探并刷新后台服务清单；活动面板打开时调（服务是运行态，只有这一问能拿到「此刻」） */
+  const refreshServices = useCallback(async (): Promise<void> => {
+    if (!sessionId) return;
+    await client.messages.refreshServices(sessionId);
+  }, [client, sessionId]);
+
   const ignorePlan = useCallback(async (): Promise<void> => {
     if (!sessionId) return;
     await client.messages.ignorePlan(sessionId);
@@ -125,6 +140,7 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
   return {
     items: stream.items,
     subagents: stream.subagents,
+    services: stream.services,
     // 在途的三种情况合并成一个「进行中」：列表尾部据此显示工作中提示
     streaming: stream.running || sending || stream.pending,
     compacting: stream.compacting,
@@ -138,5 +154,6 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     ackCompactionNotice,
     ignorePlan,
     approvePlan,
+    refreshServices,
   };
 }

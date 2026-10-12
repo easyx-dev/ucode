@@ -6,10 +6,12 @@ import {
   type MessageIgnorePlanResponse,
   type MessageInterruptResponse,
   type MessageListResponse,
+  type MessageServicesResponse,
   messageApprovePlanInputSchema,
   messageCompactInputSchema,
   messageEditInputSchema,
   messageListInputSchema,
+  messageServicesInputSchema,
   PLAN_IGNORED_CUSTOM_TYPE,
   type PromptAdmittedResponse,
   promptInputSchema,
@@ -62,10 +64,20 @@ export const createMessagesRoute = (services: Services) => {
         running: services.pool.isActive(sessionId),
         // 嵌套进度不落盘：断流重连后客户端靠这份清单收敛（快照里没有的即已结束）
         subagents: services.pool.runningSubagentsOf(sessionId),
+        // 后台服务同样只是运行态：快照里没有的即已不再可连（重探发生在 bash 结算与落定时）
+        services: services.pool.listServicesOf(sessionId),
         seq,
         ...projection,
       } satisfies MessageListResponse),
     );
+  });
+
+  // 后台服务清单的单独读取：活动面板打开时用它拿「此刻」的状态——
+  // 不为一份小清单重取整段消息历史（/list 是会话全量投影，随历史线性变重）
+  router.post("/services", jsonBody(messageServicesInputSchema), async (c) => {
+    const { sessionId } = c.req.valid("json");
+    const tracked = await services.pool.refreshServices(sessionId);
+    return c.json(ok({ sessionId, services: tracked } satisfies MessageServicesResponse));
   });
 
   // 只做受理：真正的生成在服务端后台推进，结果统一走 /events
