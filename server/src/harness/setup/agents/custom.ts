@@ -17,9 +17,10 @@ import { z } from "zod";
 import { CUSTOM_AGENT_MAX_BYTES, CUSTOM_AGENT_SLUG_MAX_LENGTH } from "../../../constants/agents";
 import { AGENTS_DIRNAME, PROJECT_CONFIG_DIRNAME } from "../../../constants/dirs";
 import { ancestorDirs } from "../../../platform/paths";
+import type { PluginAgentFile } from "../../plugins/types";
 import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS, KNOWN_TOOL_NAMES } from "../tools/names";
 import { SUBAGENT_PROFILES } from "./profiles";
-import type { AgentProfile, ToolSelection } from "./types";
+import type { AgentCapability, AgentProfile, ToolSelection } from "./types";
 
 /** 采集到的自定义角色错误：文件保留在磁盘上，只有这一个角色被跳过 */
 export type CustomAgentError = {
@@ -41,6 +42,11 @@ export type AgentRegistryInput = {
   appHome: string;
   /** 用户主目录（祖先链终点）；缺省取 `os.homedir()`，测试可覆盖 */
   userHome?: string;
+  /**
+   * 启用插件声明的子角色（由插件宿主解析好、调用方注入）。
+   * 插件角色一律是子角色，slug 已带插件前缀，与项目 / 全局角色不会撞名。
+   */
+  pluginAgents?: readonly PluginAgentFile[];
 };
 
 /** 文件名即 slug：小写字母开头、kebab-case，保证能安全用作会话字段与工具入参枚举 */
@@ -269,7 +275,46 @@ const placeAgent = (
 };
 
 /**
- * 加载角色注册表：内置打底，逐个合并角色文件（项目近者优先，其次全局）。
+ * 工具档位：显式白名单优先；只给了黑名单时按「已知工具减去它」算白名单；
+ * 两者都没有则继承父会话（`inherit` 会与父能力取交集，不会放大）。
+ */
+const pluginToolSelection = (agent: PluginAgentFile): AgentCapability["toolSelection"] => {
+  if (agent.tools.length > 0) {
+    const allowed = agent.tools.filter((tool) => KNOWN_TOOL_NAMES.has(tool));
+    return allowed.length > 0 ? { kind: "allowlist", tools: allowed } : { kind: "inherit" };
+  }
+  if (agent.disallowedTools.length > 0) {
+    const denied = new Set(agent.disallowedTools);
+    return { kind: "allowlist", tools: [...KNOWN_TOOL_NAMES].filter((tool) => !denied.has(tool)) };
+  }
+  return { kind: "inherit" };
+};
+
+/** 插件角色落位：一律子角色，来源标 `plugin` */
+const placePluginAgent = (
+  registry: AgentRegistry,
+  seen: { subagent: Set<string> },
+  agent: PluginAgentFile,
+): void => {
+  if (seen.subagent.has(agent.slug)) return;
+  registry.subagents[agent.slug] = {
+    slug: agent.slug,
+    kind: "subagent",
+    label: agent.label,
+    description: agent.description,
+    promptSection: agent.promptSection,
+    capability: {
+      toolSelection: pluginToolSelection(agent),
+      permissions: [],
+      ...(agent.model ? { model: agent.model } : {}),
+    },
+    source: "plugin",
+  };
+  seen.subagent.add(agent.slug);
+};
+
+/**
+ * 加载角色注册表：内置打底，逐个合并角色文件（项目近者优先，其次全局），最后并入插件角色。
  * 目录不存在等于没有自定义角色；单个文件失败只记入 `errors`，不影响其余角色。
  */
 export const loadAgentRegistry = (input: AgentRegistryInput): AgentRegistry => {
@@ -297,6 +342,9 @@ export const loadAgentRegistry = (input: AgentRegistryInput): AgentRegistry => {
       }
     }
   }
+
+  // 插件角色排在最后：slug 带前缀，与上面两档不会撞名；万一撞了就保留先到者
+  for (const agent of input.pluginAgents ?? []) placePluginAgent(registry, seen, agent);
 
   return registry;
 };

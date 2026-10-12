@@ -15,6 +15,7 @@ import { SettingsMemory } from "./settings-memory";
 import { SettingsModels } from "./settings-models";
 import { SettingsNav } from "./settings-nav";
 import { SettingsPage } from "./settings-page";
+import { SettingsPlugins } from "./settings-plugins";
 import { SettingsRemoteAccess } from "./settings-remote-access";
 import { useSettingsSectionMeta } from "./settings-sections";
 import { SettingsWebsearch } from "./settings-websearch";
@@ -98,6 +99,12 @@ function SectionContent({
       return (
         <SettingsPage title={meta.mcp.label}>
           <SettingsMcp />
+        </SettingsPage>
+      );
+    case "plugins":
+      return (
+        <SettingsPage title={meta.plugins.label}>
+          <SettingsPlugins />
         </SettingsPage>
       );
     case "remote":

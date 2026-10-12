@@ -359,15 +359,15 @@ MCP servers 与**可信官方** hooks 投进现有能力域；来自非官方第
   `sha256` / `fetchedAt` / `lastError`。刷新失败**保留上次缓存**并出诊断；**内置的那两个市场**
   失败只落 `lastError`、不出用户可见错误（它们不是强依赖）。
 
-**开箱内置的两个市场**（与 ZCode 的 `DEFAULT_PLUGIN_MARKETPLACES` 同形同源，见
+**开箱内置的市场**（与 ZCode 的 `DEFAULT_PLUGIN_MARKETPLACES` 同形同源，见
 [`zai-org/ZCode`](https://github.com/zai-org/ZCode) 的 `packages/shared/src/plugin-marketplaces.ts`）：
 
-| id | 来源 | 说明 |
+| id | 来源 | 状态 |
 | --- | --- | --- |
-| `<slug>-plugins-official` | CDN 上的 `marketplace.json` 直链 | 我们自己的官方市场；本地随包的 seed 分片与 CDN 分片在发现时合并 |
-| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | Claude Code 官方市场；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
+| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | **已内置**；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
+| `<slug>-plugins-official` | CDN 上的 `marketplace.json` 直链 | **待接入**：CDN 地址未定，不在这里编造地址；定下来再补一行，并带上随包 seed 分片与 CDN 分片的合并 |
 
-两条约定：首次启动把这两个写入状态（用户可删，卸载只移除登记、不碰已有缓存）；
+两条约定：首次启动把内置市场写入状态（用户可删，卸载只移除登记、不碰已有缓存）；
 市场身份用 id、插件身份用 `<name>@<marketplace>`（例：`hello@my-market`）——状态文件的 key、日志、
 会话里的引用都用这个形状（磁盘目录另按来源分，见 6.3）。id 进目录名时只保留字母、数字、`_`、`-`，
 其余字符一律替换为 `-`。

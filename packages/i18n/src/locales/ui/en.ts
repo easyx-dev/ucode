@@ -774,4 +774,37 @@ export default {
   "仅列出前 {{value}} 项，共 {{total}} 项":
     "Only the first {{value}} of {{total}} entries are listed",
   "预览 {{path}}": "Preview {{path}}",
+
+  插件: "Plugins",
+  随包官方: "Bundled / official",
+  本地登记: "Registered locally",
+  第三方市场: "Third-party marketplace",
+  角色: "Agents",
+  钩子: "Hooks",
+  扩展: "Extensions",
+  命令目录: "Command binaries",
+  卸载: "Uninstall",
+  "来源已变更，可重拉": "Source changed; reload to pick it up",
+  重拉: "Reload",
+  移除: "Remove",
+  尚未刷新: "Not refreshed yet",
+  "{{count}} 个来源": "{{count}} sources",
+  "{{count}} 个插件": "{{count}} plugins",
+  从目录安装: "Install from folder",
+  插件目录: "Plugin folder",
+  插件目录的绝对路径: "Absolute path to the plugin folder",
+  没有组件: "No components",
+  "还没有安装插件。": "No plugins installed yet.",
+  登记市场: "Register marketplace",
+  市场名: "Marketplace name",
+  "市场名（小写字母、数字与 - . _）": "Marketplace name (lowercase letters, digits, - . _)",
+  市场目录: "Marketplace folder",
+  "含 marketplace.json 的目录": "Folder containing marketplace.json",
+  "状态文件：{{path}}": "State file: {{path}}",
+  "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本轮安装只支持本地目录（不复制内容，改完重拉即可生效）；来自第三方市场的钩子、扩展与命令目录不会注入运行时。":
+    "Plugins bundle skills, commands, agents, hooks and MCP servers. This round only installs from a local folder (contents are referenced, not copied, so reloading picks up your edits); hooks, extensions and command binaries from third-party marketplaces are never injected.",
+  "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对随包与本地登记的插件开放）。":
+    "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to bundled and locally registered plugins.",
+  "市场是一份插件清单（marketplace.json）。本轮只支持本地目录市场；内置的 Claude 官方市场是 git 源，等网络底座落地后才可刷新。":
+    "A marketplace is a plugin catalog (marketplace.json). Only local folders are supported this round; the built-in Claude marketplace is a git source and can be refreshed once the network layer lands.",
 };

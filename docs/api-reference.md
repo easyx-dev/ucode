@@ -2014,6 +2014,8 @@
 | `installedAt` | string | 是 | 安装时间（ISO 8601） |
 | `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
 | `blockedComponents` | ("manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
+| `updateAvailable` | boolean | 是 | 来源内容是否已变（本地目录来源按内容哈希判定）。由「刷新市场」这类显式动作重算， 列表接口本身不打网络、不扫盘，只回显上次结论。 |
+| `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
 | `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | — |
 
 ### MarketplaceView

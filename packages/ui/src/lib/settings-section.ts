@@ -11,6 +11,7 @@ export const SETTINGS_SECTION_IDS = [
   "memory",
   "websearch",
   "mcp",
+  "plugins",
   "remote",
 ] as const;
 
@@ -23,7 +24,7 @@ export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number];
 /** 导航分组：每组内的分区按数组顺序渲染 */
 export const SETTINGS_GROUP_SECTIONS: Record<SettingsGroupId, readonly SettingsSectionId[]> = {
   basics: ["appearance", "models", "defaults"],
-  agent: ["memory", "websearch", "mcp"],
+  agent: ["memory", "websearch", "mcp", "plugins"],
   service: ["remote"],
 };
 

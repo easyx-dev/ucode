@@ -43,6 +43,13 @@ export type PluginView = {
   components: PluginComponentCounts;
   /** 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 */
   blockedComponents: PluginComponentGroup[];
+  /**
+   * 来源内容是否已变（本地目录来源按内容哈希判定）。由「刷新市场」这类显式动作重算，
+   * 列表接口本身不打网络、不扫盘，只回显上次结论。
+   */
+  updateAvailable: boolean;
+  /** 上次检查更新的时间（ISO 8601）；从没检查过则缺省 */
+  checkedAt?: string;
   diagnostics: PluginDiagnosticView[];
 };
 

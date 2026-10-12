@@ -59,8 +59,12 @@ const installedPluginRecordSchema = z.object({
   path: z.string().min(1),
   scope: z.enum(["user", "project"]).default("user"),
   enabled: z.boolean().default(true),
-  /** 内容摘要（url / npm 来源记下），供版本比对 */
+  /** 内容摘要：本地目录来源记目录内容哈希，url / npm 记下载摘要 */
   integrity: z.string().optional(),
+  /** 上次检查更新的结论：来源内容与该 integrity 不一致；缺省表示还没检查过 */
+  updateAvailable: z.boolean().optional(),
+  /** 上次检查更新的时间（ISO 8601） */
+  checkedAt: z.string().optional(),
   /** 安装时间（ISO 8601） */
   installedAt: z.string(),
   /** `userConfig` 的已存值 */

@@ -41,6 +41,10 @@ import type {
   InteractionListResponse,
   InteractionRespondRequest,
   InteractionRespondResponse,
+  MarketplaceCreateRequest,
+  MarketplaceDeleteResponse,
+  MarketplacesListResponse,
+  MarketplaceWriteResponse,
   McpDeleteResponse,
   McpListResponse,
   McpUpsertRequest,
@@ -54,6 +58,13 @@ import type {
   MessageListResponse,
   ModelsResponse,
   PairingCreateOutput,
+  PluginCreateRequest,
+  PluginDeleteRequest,
+  PluginDeleteResponse,
+  PluginRefreshRequest,
+  PluginsListResponse,
+  PluginUpdateRequest,
+  PluginWriteResponse,
   ProjectListResponse,
   ProjectSummary,
   ProjectUpdateRequest,
@@ -271,6 +282,28 @@ export const createApis = (options: ApisOptions = {}) => {
       list: () => transport.post<McpListResponse>("mcp/list"),
       upsert: (body: McpUpsertRequest) => transport.post<McpWriteResponse>("mcp/upsert", body),
       remove: (name: string) => transport.post<McpDeleteResponse>("mcp/delete", { name }),
+    },
+    plugins: {
+      list: () => transport.post<PluginsListResponse>("plugins/list"),
+      create: (body: PluginCreateRequest) =>
+        transport.post<PluginWriteResponse>("plugins/create", body),
+      update: (body: PluginUpdateRequest) =>
+        transport.post<PluginWriteResponse>("plugins/update", body),
+      remove: (body: PluginDeleteRequest) =>
+        transport.post<PluginDeleteResponse>("plugins/delete", body),
+      refresh: (id: string) =>
+        transport.post<PluginWriteResponse>("plugins/refresh", {
+          id,
+        } satisfies PluginRefreshRequest),
+    },
+    marketplace: {
+      list: () => transport.post<MarketplacesListResponse>("marketplace/list"),
+      create: (body: MarketplaceCreateRequest) =>
+        transport.post<MarketplaceWriteResponse>("marketplace/create", body),
+      remove: (name: string) =>
+        transport.post<MarketplaceDeleteResponse>("marketplace/delete", { name }),
+      refresh: (name: string) =>
+        transport.post<MarketplaceWriteResponse>("marketplace/refresh", { name }),
     },
     messages: {
       list: (sessionId: string) =>

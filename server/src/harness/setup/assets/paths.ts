@@ -12,11 +12,14 @@ import type { CommandAssetSource } from "@ucode/contracts";
 
 import {
   AGENTS_COMPAT_DIRNAME,
+  APP_DIRNAME,
+  BUILTIN_DIRNAME,
   PROJECT_CONFIG_DIRNAME,
   PROMPTS_DIRNAME,
   SKILLS_DIRNAME,
 } from "../../../constants/dirs";
 import { ancestorDirs } from "../../../platform/paths";
+import type { PluginCommandAssets } from "../../plugins/types";
 
 export type CommandAssetPath = {
   /** 已归一化为绝对路径的目录 */
@@ -46,11 +49,8 @@ export type CommandAssetPathInput = {
   plugin?: PluginCommandAssets;
 };
 
-/** 插件贡献的技能 / 命令目录；优先级排在用户目录之后、内置资产之前 */
-export type PluginCommandAssets = {
-  skills: string[];
-  prompts: string[];
-};
+/** 插件贡献的技能 / 命令目录的类型在插件宿主（`harness/plugins/types`），这里只透传 */
+export type { PluginCommandAssets };
 
 const isDirectory = (path: string): boolean => {
   try {
@@ -96,6 +96,8 @@ export const commandAssetPaths = (input: CommandAssetPathInput): CommandAssetPat
     { path: resolve(appHome, SKILLS_DIRNAME), source: "global" },
     { path: resolve(userHome, AGENTS_COMPAT_DIRNAME, SKILLS_DIRNAME), source: "agents-user" },
     ...pluginPaths(input.plugin?.skills),
+    // 内置技能物化在 `$APP_HOME/app/builtin/skills`：恒为最后一档，磁盘 / 用户同名者胜出
+    { path: resolve(appHome, APP_DIRNAME, BUILTIN_DIRNAME, SKILLS_DIRNAME), source: "builtin" },
   ]);
 
   const prompts = existingUnique([

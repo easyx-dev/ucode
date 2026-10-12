@@ -1,4 +1,6 @@
 /** agent 侧 shell 的非交互环境：覆盖所有会在无 tty 时分页或拉起编辑器的入口 */
+import { delimiter } from "node:path";
+
 import type { BashSpawnHook } from "@earendil-works/pi-coding-agent";
 
 /**
@@ -27,8 +29,24 @@ export const withNonInteractiveEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
   ...NON_INTERACTIVE_ENV,
 });
 
-/** spawn 钩子：命令执行前合并非交互环境 */
-export const nonInteractiveSpawnHook: BashSpawnHook = (context) => ({
-  ...context,
-  env: withNonInteractiveEnv(context.env),
-});
+/**
+ * 把插件 `bin/` 目录追加到 PATH 末尾：只影响这条命令的环境，不动服务进程。
+ * 追加而非前置，系统命令与用户自己的 PATH 顺序都不受扰动。
+ */
+export const withPluginPath = (
+  env: NodeJS.ProcessEnv,
+  dirs: readonly string[],
+): NodeJS.ProcessEnv => {
+  if (dirs.length === 0) return env;
+  const current = env.PATH ?? "";
+  const appended = dirs.join(delimiter);
+  return { ...env, PATH: current ? `${current}${delimiter}${appended}` : appended };
+};
+
+/** spawn 钩子：命令执行前合并非交互环境，并追加插件 bin 目录 */
+export const createNonInteractiveSpawnHook =
+  (pluginBinDirs: readonly string[] = []): BashSpawnHook =>
+  (context) => ({
+    ...context,
+    env: withPluginPath(withNonInteractiveEnv(context.env), pluginBinDirs),
+  });

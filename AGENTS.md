@@ -245,9 +245,11 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
     这批是「内置功能」，随包实现、随版本演进；它们**不是插件**（插件平台只承载资源与受信任的代码扩展，
     见 [`plans/plugins.md`](./plans/plugins.md)）；
   - `plugins/`：插件宿主（`manifest` 清单发现与解析 / `components` 组件解析与路径校验 /
-    `registry` 注册表与来源门控 / `state` 状态结构与判定 / `sanitize` 命名 / `view` 视图映射）。
-    它是接缝层：`harness/{pi,setup,features}` 与 `core`、`platform` 不得反向依赖它；
-    `harness/plugins → core` 只许 `import type`。插件的文件读写与安装流程在 `services/plugins/`；
+    `agent-file` 插件角色解析 / `hooks` + `hooks-runner` hook 解析与执行 / `marketplace` 市场清单读取 /
+    `sanitize` 命名 / `registry` 注册表与来源门控 / `state` 状态结构与判定 / `view` 视图映射）。
+    它是接缝层：`core`、`platform` 与 `harness/pi` 不得依赖它；`harness/setup` 只许**类型**依赖
+    （数据由调用方注入：`PluginContributions`），`harness/plugins → core` 也只许 `import type`。
+    插件的文件读写与安装流程在 `services/plugins/`；
   - `utils/`：harness 内的公共方法（`text.ts` 取消息文本、`boundary.ts` 不可信内容的边界包裹与中和，
     后者的标签名单在 `packages/contracts`）。按下一段关于 `utils` 的定义，它只服务于 harness，
     **不要求纯函数**；`layers` 会拦下它反向依赖 `pi` / `setup` / `features`。

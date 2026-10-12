@@ -22,6 +22,7 @@ import {
 import { PLUGIN_DATA_DIRNAME } from "../../constants/dirs";
 import type { SessionEventBus } from "../../core/event-bus";
 import { env } from "../../env";
+import type { PluginHookBinding } from "../../harness/plugins/hooks";
 import {
   findManifestFile,
   PLUGIN_NAME_PATTERN,
@@ -30,15 +31,20 @@ import {
 } from "../../harness/plugins/manifest";
 import { buildPluginRegistry } from "../../harness/plugins/registry";
 import { toDataDirName } from "../../harness/plugins/sanitize";
+import { hashDirectory } from "../../harness/plugins/source-hash";
 import {
   type InstalledPluginRecord,
   type PluginSourceSpec,
   type PluginState,
   toPluginId,
 } from "../../harness/plugins/state";
-import type { PluginRegistry } from "../../harness/plugins/types";
+import type {
+  PluginAgentFile,
+  PluginCommandAssets,
+  PluginDescriptor,
+  PluginRegistry,
+} from "../../harness/plugins/types";
 import { toPluginView } from "../../harness/plugins/view";
-import type { PluginCommandAssets } from "../../harness/setup/assets";
 import { isInsidePath, resolveExistingPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
 import type { PluginStateStore } from "./state";
@@ -60,6 +66,19 @@ export type PluginService = {
   enabled(): InstalledPluginRecord[];
   /** 启用插件贡献的技能 / 命令目录：装配期注入与 `/` 菜单共用同一份 */
   commandAssets(): PluginCommandAssets;
+  /** 启用插件声明的子角色：角色注册表（装配 + `agents/list`）共用 */
+  agentProfiles(): PluginAgentFile[];
+  /** 可信来源插件的 pi 扩展路径；第三方市场的扩展不注入（来源门控，见 plans/plugins.md 第五章） */
+  extensionPaths(): string[];
+  /** 可信来源插件的 bin 目录；第三方市场的不注入 */
+  binDirs(): string[];
+  /** 可信来源插件的命令式 hook；第三方市场的不挂载 */
+  hooks(): PluginHookBinding[];
+  /**
+   * 重算已装插件的「来源是否已变」：本地目录来源按内容哈希比对，写回 `updateAvailable` 与检查时间。
+   * 只在显式动作（刷新市场 / 重拉）里跑——列表接口不做这类扫描。返回结果变化的插件数。
+   */
+  checkUpdates(): number;
   create(input: PluginCreateInput): PluginWriteResponse;
   update(input: PluginUpdateInput): PluginWriteResponse;
   delete(input: PluginDeleteInput): PluginDeleteResponse;
@@ -128,6 +147,20 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
     });
   };
 
+  /** 本地目录来源的内容哈希；算不出来（不存在 / 超限）时返回 undefined，表示这次不判定 */
+  const directoryIntegrity = (source: PluginSourceSpec): string | undefined =>
+    source.source === "directory" ? (hashDirectory(source.path)?.hash ?? undefined) : undefined;
+
+  /** 取可信来源插件（`official` / `local`）的某类资产：第三方市场的一律过滤掉 */
+  const trustedAssets = (pick: (descriptor: PluginDescriptor) => string[]): string[] => {
+    const paths: string[] = [];
+    for (const descriptor of registry().plugins) {
+      if (!descriptor.enabled || descriptor.source === "market") continue;
+      paths.push(...pick(descriptor));
+    }
+    return [...new Set(paths)];
+  };
+
   const viewOf = (id: string): PluginView => {
     const descriptor = registry().plugins.find((item) => item.id === id);
     if (!descriptor) {
@@ -160,6 +193,26 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       }
       return { skills: [...new Set(skills)], prompts: [...new Set(prompts)] };
     },
+    agentProfiles: () =>
+      registry()
+        .plugins.filter((item) => item.enabled)
+        .flatMap((item) => item.agents),
+    // 执行类组件的来源门控在这里收口：第三方市场的只出诊断，不进装配
+    extensionPaths: () => trustedAssets((item) => item.assets.extensions),
+    hooks: () => {
+      const bindings: PluginHookBinding[] = [];
+      for (const descriptor of registry().plugins) {
+        if (!descriptor.enabled || descriptor.source === "market") continue;
+        bindings.push(...descriptor.hooks);
+      }
+      return bindings;
+    },
+    binDirs: () =>
+      trustedAssets((item) =>
+        item.components
+          .filter((entry) => entry.group === "bin" && entry.path)
+          .map((entry) => entry.path as string),
+      ),
 
     create(input) {
       const path = assertDirectorySource(input.source);
@@ -207,10 +260,32 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
             scope: input.scope,
             enabled: input.enabled,
             installedAt: new Date().toISOString(),
+            // 本地目录来源记内容哈希：它是后续「来源已变」判定的基线
+            ...(directoryIntegrity(input.source) === undefined
+              ? {}
+              : { integrity: directoryIntegrity(input.source) as string }),
+            updateAvailable: false,
+            checkedAt: new Date().toISOString(),
           },
         ],
       }));
       return write(id);
+    },
+
+    checkUpdates() {
+      const now = new Date().toISOString();
+      let changed = 0;
+      const next = state.get().installed.map((item) => {
+        const integrity = directoryIntegrity(item.source);
+        if (integrity === undefined) return item;
+        const updateAvailable = item.integrity !== undefined && item.integrity !== integrity;
+        if (updateAvailable && item.updateAvailable !== true) changed += 1;
+        return { ...item, updateAvailable, checkedAt: now };
+      });
+      // 结论有变化才推进代次：否则每次刷新市场都会把内存会话打回一轮
+      if (changed > 0) commit((current) => ({ ...current, installed: next }));
+      else state.set({ ...state.get(), installed: next });
+      return changed;
     },
 
     update(input) {
@@ -246,6 +321,7 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       const record = state.requirePlugin(input.id);
       const path = assertDirectorySource(record.source);
       const manifest = readManifestForInstall(path);
+      const integrity = directoryIntegrity(record.source);
       commit((current) => ({
         ...current,
         installed: current.installed.map((item) =>
@@ -256,6 +332,9 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
                 path,
                 ...(manifest?.name ? { name: manifest.name } : {}),
                 ...(manifest?.version ? { version: manifest.version } : {}),
+                ...(integrity === undefined ? {} : { integrity }),
+                updateAvailable: false,
+                checkedAt: new Date().toISOString(),
               },
         ),
       }));

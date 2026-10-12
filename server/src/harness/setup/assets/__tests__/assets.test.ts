@@ -195,6 +195,30 @@ describe("loadCommandAssets", () => {
     );
   });
 
+  it("内置技能目录排在最后，来源标 builtin，磁盘同名者胜出", async () => {
+    const { root, appHome, userHome } = layout();
+    // 物化后的内置技能：`$APP_HOME/app/builtin/skills/<id>/SKILL.md`
+    writeSkill(join(appHome, "app", "builtin", "skills"), "plugin-create", "内置：创建插件");
+    writeSkill(join(appHome, "app", "builtin", "skills"), "dup", "内置版");
+    writeSkill(join(appHome, "skills"), "dup", "全局版");
+
+    const assets = await loadCommandAssets({
+      cwd: root,
+      appHome,
+      userHome,
+      harnessDir: makeTemp(),
+    });
+
+    assert.deepEqual(
+      assets.skills.map((skill) => [skill.name, skill.source]),
+      [
+        ["dup", "global"],
+        ["plugin-create", "builtin"],
+      ],
+    );
+    assert.equal(assets.skills.find((skill) => skill.name === "dup")?.description, "全局版");
+  });
+
   it("插件贡献的技能与命令进 `/` 菜单，来源标 plugin，且用户同名仍胜出", async () => {
     const { root, appHome, userHome } = layout();
     const pluginSkills = makeTemp();

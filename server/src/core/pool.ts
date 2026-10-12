@@ -52,6 +52,7 @@ import {
 } from "../harness/pi/run-settings";
 import type { PiRuntime } from "../harness/pi/runtime";
 import { managerToIndex } from "../harness/pi/session-index";
+import type { PluginContributions } from "../harness/plugins/types";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -155,10 +156,16 @@ export class SessionPool {
     /** 使用统计：落定后随 `session_updated` 一起下发累计用量 */
     private readonly usage: UsageService,
     /**
-     * 启用插件贡献的技能 / 命令目录（装配期注入）。由 services 从插件注册表算出后传入：
+     * 启用插件贡献的资产目录与子角色（装配期注入）。由 services 从插件注册表算出后传入：
      * harness/setup 与 core 都不反向依赖插件宿主。
      */
-    private readonly pluginAssets: () => PluginCommandAssets = () => ({ skills: [], prompts: [] }),
+    private readonly plugin: PluginContributions = {
+      commandAssets: () => ({ skills: [], prompts: [] }),
+      agents: () => [],
+      extensionPaths: () => [],
+      binDirs: () => [],
+      hooks: () => [],
+    },
   ) {
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
     // 否则侧栏与通知只能等到下一次摘要刷新才知道这条会话停在了用户身上
@@ -655,7 +662,11 @@ export class SessionPool {
     }
 
     // 自定义角色按 cwd 祖先链 + 全局目录现读：用户新加 / 改角色文件后，新建或重开的会话即生效
-    const registry = loadAgentRegistry({ cwd, appHome: env.homeDir });
+    const registry = loadAgentRegistry({
+      cwd,
+      appHome: env.homeDir,
+      pluginAgents: this.plugin.agents(),
+    });
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
     }
@@ -684,7 +695,10 @@ export class SessionPool {
       ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
       ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
       agentRegistry: registry,
-      pluginAssets: this.pluginAssets(),
+      pluginAssets: this.plugin.commandAssets(),
+      pluginExtensionPaths: this.plugin.extensionPaths(),
+      pluginBinDirs: this.plugin.binDirs(),
+      pluginHooks: this.plugin.hooks(),
       websearch: this.websearch,
       permission: {
         listGrants: () => this.permissions.allow.list(interactionSessionId),

@@ -74,7 +74,11 @@ export const createAgentsRoute = (services: Services) => {
 
   router.post("/list", jsonBody(agentsListInputSchema), (c) => {
     const input = c.req.valid("json");
-    const registry = loadAgentRegistry({ cwd: resolveCwd(services, input), appHome: env.homeDir });
+    const registry = loadAgentRegistry({
+      cwd: resolveCwd(services, input),
+      appHome: env.homeDir,
+      pluginAgents: services.plugins.agentProfiles(),
+    });
     return c.json(
       ok({
         primary: primaryViews(registry),

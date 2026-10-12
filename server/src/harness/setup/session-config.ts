@@ -26,6 +26,8 @@ import type { MemoryService } from "../features/memory";
 import { createShellExtension } from "../features/shell";
 import type { SubagentHooks } from "../features/subagents";
 import type { PiRuntime } from "../pi/runtime";
+import type { PluginHookBinding } from "../plugins/hooks";
+import { createPluginHooksExtension } from "../plugins/hooks-runner";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -122,6 +124,15 @@ export type SessionAssemblyInput = {
   harnessDir?: string;
   /** 启用插件贡献的技能 / 命令目录；由调用方从插件注册表算出（装配层不读插件状态） */
   pluginAssets?: PluginCommandAssets;
+  /**
+   * 可信来源插件的 pi 扩展文件路径。第三方市场的扩展由插件宿主拦下，这里拿到的一定可信——
+   * 装配层不做来源判定。
+   */
+  pluginExtensionPaths?: string[];
+  /** 可信来源插件的 `bin/` 目录：追加到本会话 bash 的 PATH 末尾 */
+  pluginBinDirs?: string[];
+  /** 可信来源插件的命令式 hook 绑定；第三方市场的不在此列（来源门控） */
+  pluginHooks?: PluginHookBinding[];
 };
 
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
@@ -190,14 +201,31 @@ const createSessionLoader = async (
     settingsManager,
     noSkills: true,
     noPromptTemplates: true,
+    // 关掉 pi 的隐式扩展扫描（`<agentDir>/extensions`）：那是绕过插件信任清单的旁路通道，
+    // 扩展一律由上面的 additionalExtensionPaths 显式给（损失：`$APP_HOME/harness/extensions` 不再自动加载）
+    noExtensions: true,
     additionalSkillPaths: assetPaths.skills.map((item) => item.path),
     additionalPromptTemplatePaths: assetPaths.prompts.map((item) => item.path),
+    // 插件扩展同样只认我们的清单：`noExtensions` 关掉了 pi 的隐式扫描，这里显式给路径
+    ...(input.pluginExtensionPaths && input.pluginExtensionPaths.length > 0
+      ? { additionalExtensionPaths: [...input.pluginExtensionPaths] }
+      : {}),
     // 内置命令补在磁盘目录之后：`/` 菜单与 `promptTemplates` 必须看到同一集合，否则选得中但展开不出来
     promptsOverride: withBuiltinPrompts,
     extensionFactories: [
       createPermissionExtension(gate),
+      // 插件 hook 排在权限之后：权限先判定，hook 只能再收紧（两者取并集即「任一阻断就阻断」）
+      ...(input.pluginHooks && input.pluginHooks.length > 0
+        ? [
+            createPluginHooksExtension({
+              bindings: input.pluginHooks,
+              cwd: input.cwd,
+              sessionId: input.record?.id ?? "",
+            }),
+          ]
+        : []),
       // shell 兜底：同名覆盖内置 bash，保证命令不会停下来等交互输入（见 harness/features/shell）
-      createShellExtension(),
+      createShellExtension({ pluginBinDirs: input.pluginBinDirs }),
       createCodemodeExtension({ mode: "on" }),
       ...discoveryExtension,
       ...(mcp ? [mcp] : []),

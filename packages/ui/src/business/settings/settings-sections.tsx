@@ -4,6 +4,7 @@ import {
   Globe,
   type LucideIcon,
   Network,
+  Package,
   Palette,
   Plug,
   SlidersHorizontal,
@@ -24,6 +25,7 @@ export const useSettingsSectionMeta = (): Record<SettingsSectionId, SettingsSect
     memory: { label: t("记忆"), icon: Brain },
     websearch: { label: t("联网搜索"), icon: Globe },
     mcp: { label: t("MCP 服务器"), icon: Plug },
+    plugins: { label: t("插件"), icon: Package },
     remote: { label: t("远程访问"), icon: Network },
   };
 };

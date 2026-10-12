@@ -57,3 +57,11 @@ export const PLUGIN_BIN_COMPONENT_PATH = `./${PLUGIN_BIN_DIRNAME}`;
 
 /** 组件目录的递归深度上限：命令子目录会扁平化，但不该为病态目录结构无限挖下去 */
 export const PLUGIN_COMPONENT_SCAN_MAX_DEPTH = 5;
+
+/** 目录内容哈希的上限：超过就不算哈希（返回 null），避免把大仓库拖成慢查询 */
+export const PLUGIN_HASH_MAX_FILES = 2000;
+export const PLUGIN_HASH_MAX_BYTES = 8 * 1024 * 1024;
+export const PLUGIN_HASH_MAX_DEPTH = 6;
+
+/** 目录内容哈希跳过的目录：版本库与依赖不参与「插件内容变没变」的判断 */
+export const PLUGIN_HASH_SKIP_DIRNAMES = [".git", "node_modules"] as const;

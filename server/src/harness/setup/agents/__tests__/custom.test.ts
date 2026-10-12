@@ -197,3 +197,74 @@ describe("parseCustomAgent", () => {
     });
   });
 });
+
+describe("插件角色", () => {
+  const pluginAgent = (
+    over: Partial<{
+      slug: string;
+      tools: string[];
+      disallowedTools: string[];
+      model: string;
+    }> = {},
+  ) => ({
+    slug: over.slug ?? "my-plugin-reviewer",
+    label: "Reviewer",
+    description: "审查改动",
+    promptSection: "正文",
+    tools: over.tools ?? [],
+    disallowedTools: over.disallowedTools ?? [],
+    ...(over.model ? { model: over.model } : {}),
+  });
+
+  it("落成子角色并标来源 plugin，主模式不受影响", () => {
+    const registry = loadAgentRegistry({
+      cwd: "/tmp",
+      appHome: "/tmp",
+      pluginAgents: [pluginAgent()],
+    });
+
+    const placed = registry.subagents["my-plugin-reviewer"];
+    assert.equal(placed?.kind, "subagent");
+    assert.equal(placed?.source, "plugin");
+    assert.equal(placed?.promptSection, "正文");
+    assert.deepEqual(placed?.capability.toolSelection, { kind: "inherit" });
+    assert.deepEqual(registry.primary, {}, "插件角色不做主模式");
+    assert.deepEqual(registry.errors, []);
+  });
+
+  it("工具档位：白名单优先，只给黑名单时按已知工具减去它", () => {
+    const allow = loadAgentRegistry({
+      cwd: "/tmp",
+      appHome: "/tmp",
+      pluginAgents: [pluginAgent({ tools: ["read", "grep", "not-a-tool"] })],
+    });
+    assert.deepEqual(allow.subagents["my-plugin-reviewer"]?.capability.toolSelection, {
+      kind: "allowlist",
+      tools: ["read", "grep"],
+    });
+
+    const deny = loadAgentRegistry({
+      cwd: "/tmp",
+      appHome: "/tmp",
+      pluginAgents: [pluginAgent({ disallowedTools: ["bash", "edit"] })],
+    });
+    const selection = deny.subagents["my-plugin-reviewer"]?.capability.toolSelection;
+    assert.equal(selection?.kind, "allowlist");
+    const tools = selection?.kind === "allowlist" ? selection.tools : [];
+    assert.ok(tools.length > 0);
+    assert.ok(!tools.includes("bash"));
+    assert.ok(!tools.includes("edit"));
+    assert.ok(tools.includes("read"));
+  });
+
+  it("模型声明透传，权限规则留空（插件的权限只能由模式侧收紧）", () => {
+    const registry = loadAgentRegistry({
+      cwd: "/tmp",
+      appHome: "/tmp",
+      pluginAgents: [pluginAgent({ model: "gpt-5" })],
+    });
+
+    assert.equal(registry.subagents["my-plugin-reviewer"]?.capability.model, "gpt-5");
+    assert.deepEqual(registry.subagents["my-plugin-reviewer"]?.capability.permissions, []);
+  });
+});

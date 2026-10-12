@@ -1,9 +1,8 @@
 /**
  * 内置提示词命令：正文写在源码里，`pnpm build` 打成单文件后照样可读。
  *
- * 仓库自带的 `.agents/commands/review.md` 换个工作目录就不存在了，所以把它做成内置命令；
- * 优先级最低——项目与全局提示词目录的同名命令覆盖它（见 `paths.ts`）。
- * 正文里保留 `$ARGUMENTS` 等占位，由 `expand.ts` 在投递前替换。
+ * 它是内置资产（`kind: "prompt"`）的一种，注册表在 `./index.ts`；优先级最低——
+ * 项目与全局提示词目录的同名命令覆盖它。正文保留 `$ARGUMENTS` 等占位，由 `expand.ts` 投递前替换。
  */
 export type BuiltinPromptCommand = {
   /** 命令名，即 `/name` 里的 name */

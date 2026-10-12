@@ -5,14 +5,18 @@
  * （见 `plans/plugins.md` 4.4）。每次按状态现算，不做模块级缓存；进程内的缓存对象由装配层
  * 持有并随 revision 失效。
  */
+
+import { readFileSync } from "node:fs";
 import {
   PLUGIN_EXECUTABLE_GROUPS,
   type PluginComponentGroup,
   type PluginDiagnosticView,
 } from "@ucode/contracts";
 
+import { loadPluginAgents } from "./agent-file";
 import { isDirectory } from "./components";
-import { diagnostic } from "./diagnostic";
+import { describeError, diagnostic } from "./diagnostic";
+import { loadPluginHooks, type PluginHookBinding } from "./hooks";
 import { loadPluginManifest } from "./manifest";
 import {
   type InstalledPluginRecord,
@@ -32,14 +36,48 @@ const blockedGroups = (
   return PLUGIN_EXECUTABLE_GROUPS.filter((group) => present.has(group));
 };
 
+/**
+ * hooks 的来源：清单写成对象 / 数组时是内联定义，写成字符串（或默认布局）时是文件。
+ * 文件读不出来只记诊断——一个坏 hook 不该让整包不可用。
+ */
+const readHooksSource = (input: {
+  pluginId: string;
+  pluginRoot: string;
+  file: string | null;
+  inline: unknown;
+}): { value: unknown; source: string; diagnostics: PluginDiagnosticView[] } => {
+  if (input.inline !== undefined && typeof input.inline !== "string") {
+    return { value: input.inline, source: "清单 hooks", diagnostics: [] };
+  }
+  if (!input.file) return { value: undefined, source: "hooks", diagnostics: [] };
+  try {
+    return {
+      value: JSON.parse(readFileSync(input.file, "utf8")) as unknown,
+      source: "hooks/hooks.json",
+      diagnostics: [],
+    };
+  } catch (error) {
+    return {
+      value: undefined,
+      source: "hooks/hooks.json",
+      diagnostics: [
+        diagnostic("error", "hooks", `hooks/hooks.json：读不出来（${describeError(error)}）`),
+      ],
+    };
+  }
+};
+
 const describePlugin = (
   record: InstalledPluginRecord,
   marketplaces: readonly PluginMarketplaceRecord[],
+  takenAgentSlugs: Set<string>,
 ): PluginDescriptor => {
   const source = pluginSourceOf(record, marketplaces);
   const base = {
     id: record.id,
     version: record.version,
+    updateAvailable: record.updateAvailable === true,
+    ...(record.checkedAt ? { checkedAt: record.checkedAt } : {}),
     source,
     enabled: record.enabled,
     root: record.path,
@@ -54,12 +92,37 @@ const describePlugin = (
       description: "",
       components: [],
       assets: { skills: [], prompts: [], extensions: [] },
+      agents: [],
+      hooks: [],
       blocked: [],
       diagnostics: [diagnostic("error", "manifest", `安装目录不存在：${record.path}`)],
     };
   }
 
   const load = loadPluginManifest(record.path);
+  const hooksFile = load.components.find((entry) => entry.group === "hooks")?.path ?? null;
+  const hooksSource = readHooksSource({
+    pluginId: record.id,
+    pluginRoot: record.path,
+    file: hooksFile,
+    inline: load.manifest?.hooks,
+  });
+  const hooksLoad: { bindings: PluginHookBinding[]; diagnostics: PluginDiagnosticView[] } =
+    hooksSource.value === undefined
+      ? { bindings: [], diagnostics: [] }
+      : loadPluginHooks({
+          pluginId: record.id,
+          pluginRoot: record.path,
+          source: hooksSource.source,
+          value: hooksSource.value,
+        });
+  const agentLoad = loadPluginAgents({
+    pluginName: load.name,
+    files: load.components
+      .filter((entry) => entry.group === "agents" && entry.path)
+      .map((entry) => entry.path as string),
+    taken: takenAgentSlugs,
+  });
   return {
     ...base,
     // 名称与版本以清单为准：升级换目录后不必回写登记表的快照
@@ -69,8 +132,15 @@ const describePlugin = (
     version: load.version,
     components: load.components,
     assets: load.assets,
+    agents: agentLoad.agents,
+    hooks: hooksLoad.bindings,
     blocked: blockedGroups(load.components, source),
-    diagnostics: load.diagnostics,
+    diagnostics: [
+      ...load.diagnostics,
+      ...agentLoad.diagnostics,
+      ...hooksSource.diagnostics,
+      ...hooksLoad.diagnostics,
+    ],
   };
 };
 
@@ -82,6 +152,8 @@ export const buildPluginRegistry = (state: {
 }): PluginRegistry => {
   const diagnostics: PluginDiagnosticView[] = [];
   const seen = new Set<string>();
+  // 角色 slug 的占用集合跨插件共享：同名插件 token 撞车时靠它加哈希后缀
+  const takenAgentSlugs = new Set<string>();
   const plugins: PluginDescriptor[] = [];
 
   for (const record of state.installed) {
@@ -105,7 +177,7 @@ export const buildPluginRegistry = (state: {
         ),
       );
     }
-    plugins.push(describePlugin(record, state.marketplaces));
+    plugins.push(describePlugin(record, state.marketplaces, takenAgentSlugs));
   }
 
   return { revision: state.revision, plugins, diagnostics };

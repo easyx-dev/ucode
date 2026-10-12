@@ -73,6 +73,29 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   内置垫底）；插件登记表变化后内存会话按新代次重装，且**待答交互与待确认计划的会话不被打回**（同时修掉
   配置变更打回等审批会话的老问题）。
 
+- **插件角色与执行类组件接入装配**：插件 `agents/*.md` 按 Claude 语义解析成一律子角色（slug 带
+  `<pluginToken>-` 前缀，`mode` / 模型别名 / 不认识的字段只出诊断），并入角色注册表（`/` 选择器与
+  `subagent` 工具都能看到）；可信来源（随包 / 本地登记）插件的 `extensions/` 与 `bin/` 注入会话
+  （扩展走 `additionalExtensionPaths`，`bin/` 追加到命令 PATH 末尾），第三方市场的一律只出诊断。
+  **行为变更**：会话装配显式关闭 pi 的隐式扩展扫描（`<agentDir>/extensions`）——`$APP_HOME/harness/extensions`
+  不再自动加载，扩展只能经插件清单进入（那是绕过插件信任清单的旁路通道）。
+
+- **内置资产与两个内置技能**：内置资产注册表统一收 `prompt`（原 `/review` 命令迁入）与 `skill` 两类，
+  技能物化到 `$APP_HOME/app/builtin/skills/<id>/` 并记 `manifest.json`（id / 版本 / 内容哈希 / 来源 / 时间）；
+  物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
+  随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
+
+- **本地目录来源的「已变更」检测**：安装与重拉时记目录内容哈希（有界走查：文件数 / 字节数 / 深度上限，
+  跳过 `.git` 与 `node_modules`）；显式刷新市场时重算并标出 `updateAvailable` 与检查时间——
+  列表接口本身不扫盘、不打网络。设置页在已变更的插件上显示提示。
+
+- **插件 hooks 注入与插件设置页**：`hooks/hooks.json` 按 Claude 语义解析（事件映射、`matcher`、`timeout`、
+  `async` 仅通知类事件），命令式 hook 起子进程并按事件喂 JSON（`SessionStart` / `UserPromptSubmit` /
+  `PreToolUse` / `PostToolUse` / `PostToolUseFailure` / `Stop`）；`exit 2` 与 stdout 的 `block` 决策阻断调用，
+  与权限的 `deny` 取并集（hook 扩展挂在权限扩展之后，只能再收紧），执行失败与超时都不阻断。第三方市场的
+  hook 同样只出诊断、不挂载。设置页新增「插件」分页（本地目录安装、启停 / 重拉 / 卸载、诊断、市场来源
+  登记与刷新），SDK 新增 `plugins` store 并消费 `plugins_changed` 控制帧。
+
 ### 变更
 
 - **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用

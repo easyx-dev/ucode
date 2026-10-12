@@ -33,6 +33,8 @@ export type MarketplaceServiceDeps = {
   events: SessionEventBus;
   /** 市场增删会影响插件的来源档位判定，故同样触发会话按新代次重装 */
   onRegistryChange?: (revision: number) => void;
+  /** 清单刷新成功后顺带重算已装插件的「来源是否已变」（由插件服务提供） */
+  onCatalogRefreshed?: () => void;
 };
 
 export type MarketplaceService = {
@@ -71,7 +73,7 @@ const toView = (record: PluginMarketplaceRecord): MarketplaceView => ({
 });
 
 export const createMarketplaceService = (deps: MarketplaceServiceDeps): MarketplaceService => {
-  const { state, events, onRegistryChange } = deps;
+  const { state, events, onRegistryChange, onCatalogRefreshed } = deps;
 
   const requireMarketplace = (name: string): PluginMarketplaceRecord => {
     const record = state.get().marketplaces.find((item) => item.name === name);
@@ -197,6 +199,8 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       try {
         const catalog = readMarketplaceCatalog(resolveTargetPath(record.source.path), record.name);
         recordRefresh(record.name, { refreshedOk: true, pluginCount: catalog.entries.length });
+        // 刷新市场是「显式检查更新」的入口：顺手把已装插件的来源变动算出来
+        onCatalogRefreshed?.();
       } catch (error) {
         // 用户显式刷新：把失败报出去；内置市场只记账，不打扰
         if (!record.builtin) throw error;

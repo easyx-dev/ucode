@@ -37,6 +37,11 @@ export {
   type SessionStreamState,
 } from "./stores/messages";
 export { createModelsStore, type ModelsState, type ModelsStore } from "./stores/models";
+export {
+  createPluginsStore,
+  type PluginsState,
+  type PluginsStore,
+} from "./stores/plugins";
 export { createSessionsStore, type SessionsState, type SessionsStore } from "./stores/sessions";
 export { createStatusStore, type StatusStore } from "./stores/status";
 export { createUsageStore, type UsageState, type UsageStore } from "./stores/usage";

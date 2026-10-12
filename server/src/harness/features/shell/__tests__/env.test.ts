@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 
 import { createLocalBashOperations } from "@earendil-works/pi-coding-agent";
 
-import { nonInteractiveSpawnHook, withNonInteractiveEnv } from "../env";
+import { createNonInteractiveSpawnHook, withNonInteractiveEnv, withPluginPath } from "../env";
 
 describe("withNonInteractiveEnv", () => {
   it("覆盖同名变量（用户 shell 的 EDITOR / PAGER 正是挂起来源），保留其余变量", () => {
@@ -30,7 +30,7 @@ describe("withNonInteractiveEnv", () => {
   });
 
   it("spawn 钩子只换环境，不动命令与工作目录", () => {
-    const context = nonInteractiveSpawnHook({
+    const context = createNonInteractiveSpawnHook()({
       command: "git rebase --continue",
       cwd: "/tmp/project",
       env: { GIT_EDITOR: "vim" },
@@ -48,7 +48,7 @@ describe("withNonInteractiveEnv", () => {
       t.skip("环境里没有 git");
       return;
     }
-    const context = nonInteractiveSpawnHook({
+    const context = createNonInteractiveSpawnHook()({
       command: 'printf \'%s|%s\' "$(git var GIT_EDITOR)" "$(git var GIT_PAGER)"',
       cwd: tmpdir(),
       env: { ...process.env, GIT_EDITOR: "vim", GIT_PAGER: "less" },
@@ -62,5 +62,32 @@ describe("withNonInteractiveEnv", () => {
 
     assert.equal(result.exitCode, 0);
     assert.equal(chunks.join(""), "true|cat");
+  });
+});
+
+describe("withPluginPath", () => {
+  it("把插件 bin 目录追加到 PATH 末尾，不遮蔽系统命令", () => {
+    const merged = withPluginPath({ PATH: "/usr/bin:/bin" }, ["/plugins/a/bin", "/plugins/b/bin"]);
+    assert.equal(merged.PATH?.split(":").slice(0, 2).join(":"), "/usr/bin:/bin");
+    assert.ok(merged.PATH?.endsWith("/plugins/a/bin:/plugins/b/bin"));
+  });
+
+  it("没有目录时原样返回；PATH 缺失时只放插件目录", () => {
+    const env = { PATH: "/usr/bin" };
+    assert.equal(withPluginPath(env, []), env);
+    assert.equal(withPluginPath({}, ["/plugins/a/bin"]).PATH, "/plugins/a/bin");
+  });
+
+  it("spawn 钩子把插件目录与非交互环境一起合上", () => {
+    const context = createNonInteractiveSpawnHook(["/plugins/a/bin"])({
+      command: "echo hi",
+      cwd: "/tmp",
+      env: { PATH: "/usr/bin" },
+      signal: new AbortController().signal,
+    } as never);
+
+    assert.equal(context.env.EDITOR, "true");
+    assert.ok(context.env.PATH?.startsWith("/usr/bin"));
+    assert.ok(context.env.PATH?.endsWith("/plugins/a/bin"));
   });
 });

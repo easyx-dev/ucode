@@ -24,7 +24,8 @@ import type {
   SkillCommandView,
 } from "@ucode/contracts";
 
-import { BUILTIN_PROMPT_COMMANDS, type BuiltinPromptCommand } from "./builtin";
+import { builtinPromptCommands } from "../../plugins/builtin";
+import type { BuiltinPromptCommand } from "../../plugins/builtin/prompts";
 import { type CommandAssetPath, type CommandAssetPathInput, commandAssetPaths } from "./paths";
 
 export type { CommandAssetPath, CommandAssetPaths, PluginCommandAssets } from "./paths";
@@ -52,9 +53,9 @@ const toBuiltinTemplate = (command: BuiltinPromptCommand): PromptTemplate => {
  */
 const builtinPrompts = (taken: readonly PromptTemplate[]): PromptTemplate[] => {
   const names = new Set(taken.map((template) => template.name));
-  return BUILTIN_PROMPT_COMMANDS.filter((command) => !names.has(command.name)).map(
-    toBuiltinTemplate,
-  );
+  return builtinPromptCommands()
+    .filter((command) => !names.has(command.name))
+    .map(toBuiltinTemplate);
 };
 
 /**

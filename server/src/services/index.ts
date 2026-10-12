@@ -19,9 +19,11 @@ import { TitleService } from "../harness/features/title";
 import { UsageService } from "../harness/features/usage";
 import { appendSessionRecord } from "../harness/pi/records";
 import { PiRuntime } from "../harness/pi/runtime";
+import { materializeBuiltinAssets } from "../harness/plugins/builtin/materialize";
 import { hasPrimaryMode, loadAgentRegistry } from "../harness/setup/agents";
 import { contextBudgetOf } from "../harness/setup/budget";
 import { SessionAllowStore } from "../harness/setup/permissions";
+import { logger } from "../platform/logger";
 import type { ServiceRegistration } from "../platform/service-registration";
 import { CredentialStore } from "./auth/credentials";
 import { PairingStore } from "./auth/pairing";
@@ -87,6 +89,11 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const pairing = new PairingStore();
   const loginLimiter = new RateLimiter();
   const runtime = new PiRuntime();
+  // 内置资产物化早于第一次装配与 `/` 菜单列举；失败只记诊断，不让服务起不来
+  const builtin = materializeBuiltinAssets({ builtinDir: env.builtinDir });
+  for (const message of builtin.diagnostics) {
+    logger.warn({ message, module: "plugins.builtin" }, "内置资产物化有诊断");
+  }
   const events = new SessionEventBus();
   const projects = new ProjectService({
     repository: new ProjectRepository(db),
@@ -145,7 +152,10 @@ export const createServices = async (registration: ServiceRegistration): Promise
     onRegistryChange: (revision: number) => pool.recycleForPluginChange(revision),
   };
   const plugins = createPluginService(pluginDeps);
-  const marketplaces = createMarketplaceService(pluginDeps);
+  const marketplaces = createMarketplaceService({
+    ...pluginDeps,
+    onCatalogRefreshed: () => plugins.checkUpdates(),
+  });
   const pool = new SessionPool(
     runtime,
     sessions,
@@ -158,7 +168,13 @@ export const createServices = async (registration: ServiceRegistration): Promise
     memory,
     goals,
     usage,
-    () => plugins.commandAssets(),
+    {
+      commandAssets: () => plugins.commandAssets(),
+      agents: () => plugins.agentProfiles(),
+      extensionPaths: () => plugins.extensionPaths(),
+      binDirs: () => plugins.binDirs(),
+      hooks: () => plugins.hooks(),
+    },
   );
   // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话
   const titles = new TitleService({

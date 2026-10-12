@@ -13,28 +13,35 @@ import {
 
 import { SHELL_COMMAND_TIMEOUT_SECONDS, SHELL_IDLE_TIMEOUT_MS } from "../../../constants/tools";
 import { withBlockedCommands } from "./blocked";
-import { nonInteractiveSpawnHook } from "./env";
+import { createNonInteractiveSpawnHook } from "./env";
 import { withShellGuard } from "./guard";
 
-export const createShellExtension = (): ExtensionFactory => (pi) => {
-  // 首参是拿不到会话上下文时的兜底目录；注册工具由 pi 提供 ctx，实际用 ctx.cwd
-  const definition = createBashToolDefinition(process.cwd(), {
-    spawnHook: nonInteractiveSpawnHook,
-    // 预检在最外层：命中就直接不进进程，看门狗与环境钩子都省下
-    operations: withBlockedCommands(
-      withShellGuard(createLocalBashOperations(), {
-        idlenessMs: SHELL_IDLE_TIMEOUT_MS,
-        defaultTimeoutSeconds: SHELL_COMMAND_TIMEOUT_SECONDS,
-      }),
-    ),
-  });
+export const createShellExtension =
+  (
+    input: {
+      /** 插件 `bin/` 目录（可信来源），追加到命令的 PATH 末尾 */
+      pluginBinDirs?: readonly string[];
+    } = {},
+  ): ExtensionFactory =>
+  (pi) => {
+    // 首参是拿不到会话上下文时的兜底目录；注册工具由 pi 提供 ctx，实际用 ctx.cwd
+    const definition = createBashToolDefinition(process.cwd(), {
+      spawnHook: createNonInteractiveSpawnHook(input.pluginBinDirs),
+      // 预检在最外层：命中就直接不进进程，看门狗与环境钩子都省下
+      operations: withBlockedCommands(
+        withShellGuard(createLocalBashOperations(), {
+          idlenessMs: SHELL_IDLE_TIMEOUT_MS,
+          defaultTimeoutSeconds: SHELL_COMMAND_TIMEOUT_SECONDS,
+        }),
+      ),
+    });
 
-  pi.registerTool({
-    ...definition,
-    // 执行约束都是这里注入的，而 pi 的 timeout 参数说明仍写着「没有默认超时」，得补上
-    description: withExecutionConstraints(definition.description),
-  });
-};
+    pi.registerTool({
+      ...definition,
+      // 执行约束都是这里注入的，而 pi 的 timeout 参数说明仍写着「没有默认超时」，得补上
+      description: withExecutionConstraints(definition.description),
+    });
+  };
 
 /** 把服务侧的执行约束接到工具描述末尾：模型只从这个描述知道哪些写法会被拦下或中止 */
 const withExecutionConstraints = (description: string | undefined): string => {

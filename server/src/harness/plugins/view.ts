@@ -28,6 +28,8 @@ export const toPluginView = (descriptor: PluginDescriptor): PluginView => ({
   installedAt: descriptor.installedAt,
   components: toPluginComponentCounts(descriptor),
   blockedComponents: descriptor.blocked,
+  updateAvailable: descriptor.updateAvailable,
+  ...(descriptor.checkedAt ? { checkedAt: descriptor.checkedAt } : {}),
   diagnostics: descriptor.diagnostics,
 });
 

@@ -222,3 +222,242 @@ describe("装配期资产目录", () => {
     assert.deepEqual(service.commandAssets(), { skills: [], prompts: [] });
   });
 });
+
+describe("执行类组件的来源门控", () => {
+  const makePluginWithExecutables = (name: string): string => {
+    const root = makeDir();
+    mkdirSync(join(root, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
+    writeFileSync(
+      join(root, PLUGIN_MANIFEST_DIRNAME, "plugin.json"),
+      JSON.stringify({ name, version: "1.0.0" }),
+      "utf8",
+    );
+    mkdirSync(join(root, "extensions"), { recursive: true });
+    writeFileSync(join(root, "extensions", "main.ts"), "export {};\n", "utf8");
+    mkdirSync(join(root, "bin"), { recursive: true });
+    writeFileSync(join(root, "bin", "run"), "#!/bin/sh\n", "utf8");
+    return root;
+  };
+
+  const createInMarket = (
+    service: ReturnType<typeof setup>["service"],
+    state: ReturnType<typeof setup>["state"],
+    root: string,
+    marketplace: string,
+    builtin: boolean,
+  ): void => {
+    state.set({
+      ...state.get(),
+      marketplaces: [
+        ...state.get().marketplaces,
+        {
+          name: marketplace,
+          source: { source: "github", repo: "owner/repo" },
+          builtin,
+          refreshedOk: false,
+          pluginCount: 0,
+        },
+      ],
+    });
+    service.create({
+      source: { source: "directory", path: root },
+      marketplace,
+      scope: "user",
+      enabled: true,
+    });
+  };
+
+  it("本地与官方来源注入扩展与 bin；第三方市场只出诊断", () => {
+    const { service, state } = setup();
+    const local = makePluginWithExecutables("local-plugin");
+    service.create({ source: { source: "directory", path: local }, scope: "user", enabled: true });
+
+    const official = makePluginWithExecutables("official-plugin");
+    createInMarket(service, state, official, "our-official", true);
+
+    const thirdParty = makePluginWithExecutables("market-plugin");
+    createInMarket(service, state, thirdParty, "third-party", false);
+
+    const real = (path: string): string => join(realpathSync(path), "");
+    assert.deepEqual(
+      service.extensionPaths().sort(),
+      [real(join(local, "extensions")), real(join(official, "extensions"))].sort(),
+    );
+    assert.deepEqual(
+      service.binDirs().sort(),
+      [real(join(local, "bin")), real(join(official, "bin"))].sort(),
+    );
+
+    const blocked = service.registry().plugins.find((item) => item.name === "market-plugin");
+    assert.deepEqual(blocked?.blocked, ["extensions", "bin"], "第三方市场被标为不注入");
+  });
+
+  it("插件停用后它的扩展与 bin 也不再注入", () => {
+    const { service } = setup();
+    const root = makePluginWithExecutables("local-plugin");
+    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    assert.equal(service.extensionPaths().length, 1);
+
+    service.update({ id: "local-plugin@local", enabled: false });
+    assert.deepEqual(service.extensionPaths(), []);
+    assert.deepEqual(service.binDirs(), []);
+  });
+});
+
+describe("插件子角色", () => {
+  it("启用插件的角色进 agentProfiles，停用后退出", () => {
+    const { service } = setup();
+    const root = makeDir();
+    mkdirSync(join(root, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
+    writeFileSync(
+      join(root, PLUGIN_MANIFEST_DIRNAME, "plugin.json"),
+      JSON.stringify({ name: "agent-plugin" }),
+      "utf8",
+    );
+    mkdirSync(join(root, "agents"), { recursive: true });
+    writeFileSync(
+      join(root, "agents", "reviewer.md"),
+      "---\ndescription: 审查改动\ntools: Read, Grep\n---\n\n正文\n",
+      "utf8",
+    );
+
+    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    assert.deepEqual(
+      service.agentProfiles().map((agent) => [agent.slug, agent.tools]),
+      [["agent-plugin-reviewer", ["read", "grep"]]],
+    );
+
+    service.update({ id: "agent-plugin@local", enabled: false });
+    assert.deepEqual(service.agentProfiles(), []);
+  });
+});
+
+describe("hooks 的来源门控与解析", () => {
+  const makePluginWithHooks = (name: string, hooks: unknown): string => {
+    const root = makeDir();
+    mkdirSync(join(root, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
+    writeFileSync(
+      join(root, PLUGIN_MANIFEST_DIRNAME, "plugin.json"),
+      JSON.stringify({ name, version: "1.0.0" }),
+      "utf8",
+    );
+    mkdirSync(join(root, "hooks"), { recursive: true });
+    writeFileSync(join(root, "hooks", "hooks.json"), JSON.stringify(hooks), "utf8");
+    return root;
+  };
+
+  const bindHooks = {
+    hooks: {
+      PreToolUse: [{ matcher: "^bash$", hooks: [{ type: "command", command: "guard.sh" }] }],
+      PermissionRequest: [{ hooks: [{ command: "never.sh" }] }],
+    },
+  };
+
+  it("本地来源的 hooks 解析成绑定并标出被忽略的事件；第三方市场的不挂载", () => {
+    const { service, state } = setup();
+    const local = makePluginWithHooks("local-hooks", bindHooks);
+    service.create({ source: { source: "directory", path: local }, scope: "user", enabled: true });
+
+    const hooks = service.hooks();
+    assert.equal(hooks.length, 1);
+    assert.equal(hooks[0]?.event, "PreToolUse");
+    assert.equal(hooks[0]?.matcher, "^bash$");
+    assert.equal(hooks[0]?.pluginRoot, join(realpathSync(local), ""));
+    const local_descriptor = service.registry().plugins.find((item) => item.name === "local-hooks");
+    assert.match(
+      local_descriptor?.diagnostics.map((item) => item.message).join("\n") ?? "",
+      /事件 PermissionRequest 本轮不实现/,
+    );
+
+    const thirdParty = makePluginWithHooks("market-hooks", bindHooks);
+    state.set({
+      ...state.get(),
+      marketplaces: [
+        ...state.get().marketplaces,
+        {
+          name: "third-party",
+          source: { source: "github", repo: "owner/repo" },
+          builtin: false,
+          refreshedOk: false,
+          pluginCount: 0,
+        },
+      ],
+    });
+    service.create({
+      source: { source: "directory", path: thirdParty },
+      marketplace: "third-party",
+      scope: "user",
+      enabled: true,
+    });
+
+    assert.equal(service.hooks().length, 1, "第三方市场的 hook 不进挂载表");
+    assert.deepEqual(
+      service.registry().plugins.find((item) => item.name === "market-hooks")?.blocked,
+      ["hooks"],
+    );
+  });
+
+  it("停用插件后它的 hook 也退出挂载表", () => {
+    const { service } = setup();
+    const root = makePluginWithHooks("local-hooks", bindHooks);
+    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    assert.equal(service.hooks().length, 1);
+
+    service.update({ id: "local-hooks@local", enabled: false });
+    assert.deepEqual(service.hooks(), []);
+  });
+});
+
+describe("来源已变检测", () => {
+  it("安装时记目录内容哈希；目录改动后 checkUpdates 标出新版本，重拉后清掉", () => {
+    const { service, state } = setup();
+    const root = makePlugin("my-plugin");
+    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+
+    const record = state.get().installed[0];
+    assert.match(record?.integrity ?? "", /^[0-9a-f]{64}$/, "安装即记录内容哈希");
+    assert.equal(record?.updateAvailable, false);
+    assert.ok(record?.checkedAt);
+
+    assert.equal(service.checkUpdates(), 0, "内容没变就不算新版本");
+    assert.equal(service.list().plugins[0]?.updateAvailable, false);
+
+    // 改一处内容：下次检查应标出「来源已变」
+    writeFileSync(
+      join(root, "skills", "review", "SKILL.md"),
+      "---\ndescription: 改过\n---\n正文",
+      "utf8",
+    );
+    assert.equal(service.checkUpdates(), 1);
+    const view = service.list().plugins[0];
+    assert.equal(view?.updateAvailable, true);
+    assert.ok(view?.checkedAt);
+
+    // 重拉 = 接受当前内容
+    service.refresh({ id: "my-plugin@local" });
+    assert.equal(service.list().plugins[0]?.updateAvailable, false);
+    assert.equal(service.checkUpdates(), 0);
+  });
+
+  it("非目录来源不参与这次判定（网络来源待包拉取落地）", () => {
+    const { service, state } = setup();
+    state.set({
+      ...state.get(),
+      installed: [
+        {
+          id: "remote@local",
+          name: "remote",
+          version: "1.0.0",
+          source: { source: "npm", package: "some-plugin" },
+          path: "/tmp/remote",
+          scope: "user",
+          enabled: true,
+          installedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(service.checkUpdates(), 0);
+    assert.equal(service.list().plugins[0]?.updateAvailable, false);
+  });
+});
