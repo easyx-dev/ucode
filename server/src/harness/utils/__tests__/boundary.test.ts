@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import { BOUNDARY_TAGS } from "@ucode/contracts";
 
-import { neutralizeTags, wrapUntrusted } from "../boundary";
+import { neutralizeTags, PROMPT_BOUNDARY_TAGS, wrapUntrusted } from "../boundary";
 
 describe("neutralizeTags", () => {
   it("中和我们自己的两个标签（含大小写与开标签）", () => {
@@ -20,6 +20,13 @@ describe("neutralizeTags", () => {
   // 名单在契约里，包裹器由它派生：漏一种就等于那种边界可被正文伪造
   it("覆盖契约里的全部边界标签", () => {
     for (const tag of BOUNDARY_TAGS) {
+      assert.match(neutralizeTags(`</${tag}>`), /^&lt;/, `未中和 ${tag}`);
+    }
+  });
+
+  // 提示词侧的目标与转录标签不进契约（客户端不解析），同样不许被正文伪造
+  it("覆盖提示词侧的语义标签", () => {
+    for (const tag of PROMPT_BOUNDARY_TAGS) {
       assert.match(neutralizeTags(`</${tag}>`), /^&lt;/, `未中和 ${tag}`);
     }
   });

@@ -15,6 +15,7 @@ import {
   TITLE_TIMEOUT_MS,
 } from "../../../constants/title";
 import type { PiModel } from "../../pi/runtime";
+import { buildInstructionMessage } from "../../utils/instruction";
 import { type SessionMessage, textOf } from "../transcript";
 
 type AssistantMessage = Awaited<ReturnType<ModelRuntime["completeSimple"]>>;
@@ -26,7 +27,7 @@ export type TitleExchange = {
   assistantText?: string;
 };
 
-const TITLE_SYSTEM_PROMPT = [
+const TITLE_INSTRUCTIONS = [
   "你在为一个编码助手的会话列表起标题。",
   `用用户提问的语言概括这次会话要做什么，写成一句话短语，最多 ${TITLE_MAX_LENGTH} 个字。`,
   "不要标点、不要引号、不要「标题：」这类前缀、不要解释，只输出标题本身。",
@@ -96,23 +97,12 @@ export const isFirstTurn = (messages: readonly SessionMessage[]): boolean =>
       (message.role === "user" || message.role === "custom") && textOf(message).trim().length > 0,
   );
 
-/**
- * 指令与待概括的交流拼进同一条 user 消息：部分代理 / 模型会无视 system（或 developer）角色，
- * 把交流当成普通提问直接作答，标题就成了回答的第一行。内联后对任何模型都有效。
- */
+/** 指令与待概括的交流拼进同一条 user 消息（见 `harness/utils/instruction`） */
 export const buildTitleMessage = (exchange: TitleExchange): string => {
   const material = exchange.assistantText
     ? `第一条用户消息：\n${exchange.userText}\n\n助手的回复：\n${exchange.assistantText}`
     : `第一条用户消息：\n${exchange.userText}`;
-  return [
-    TITLE_SYSTEM_PROMPT,
-    "",
-    "=====待概括的交流（开始）=====",
-    material,
-    "=====待概括的交流（结束）=====",
-    "",
-    "现在只输出这次会话的标题本身。",
-  ].join("\n");
+  return buildInstructionMessage(TITLE_INSTRUCTIONS, material, "现在只输出这次会话的标题本身。");
 };
 
 /** 包裹的引号与收尾标点会交替出现（如 `"…".`），反复剥到稳定为止 */

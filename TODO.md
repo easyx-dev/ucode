@@ -11,6 +11,31 @@
 
 ---
 
+## 待定 · 模型无视系统提示词时的会话级退化
+
+**现象**：部分代理 / 模型会整条丢掉 `system`（与 `developer`）角色的消息（实测 `local/ucas-max`：两种角色都无视，
+指令内联进 user 才生效）。pi 把所有指令都放在这一处 system，且**没有**「system 并入 user」的兼容开关——
+`compat` 只有 `supportsDeveloperRole` / `supportsMidConvoSystemMessages`，后者的降级也只是合并回首条 system。
+
+后果：plan 不主动调 `present_plan`、AGENTS.md 与注释 / 验证约定不生效、技能自动命中失效
+（`/skill:name` 显式调用与工具 description 不受影响）、`codemode` / `deferred` 型 MCP 服务器不可见、
+记忆索引与外部内容边界声明失效。**硬机制不受影响**：只读模式的工具白名单、权限规则、路径校验照旧，不会越权。
+后台辅助调用（标题 / 记忆回顾 / goal 校验）已把指令内联进 user 消息（见 `harness/utils/instruction`），不受此影响。
+
+**待办**：给模型加一次「是否遵守 system」的探测（挂在设置页连通性测试或拉取模型上），把结论落到模型配置并在
+会话里提示；不做会话级兜底——每轮追加约束会让上下文膨胀、提示缓存失效，且治不了技能清单与 MCP。
+
+---
+
+## 待定 · goal 校验输出无法解析时的止损
+
+**现象**：校验解析不出 JSON 时按「未达成」处理，而「无进展」计数看的是主会话的 assistant 活动、不是校验结论
+（`harness/features/goal/verify.ts`）——主会话一直在干活时，校验每轮都判未达成，目标会持续续跑、白烧 token。
+
+**待办**：连续 N 次解析失败即暂停目标并下发原因；N 与文案待定。
+
+---
+
 ## 暂缓（等明确指令再启动）
 
 - **中继服务**：方案见 [`plans/relay.md`](./plans/relay.md)，前置的服务化与鉴权已落地；
