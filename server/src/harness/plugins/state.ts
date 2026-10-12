@@ -39,35 +39,11 @@ export const isLocalMarketplace = (name: string | undefined): boolean =>
  *
  * 自有官方市场（`<slug>-plugins-official`）等它的 CDN 直链定下来再加——不在这里编造地址。
  */
-/** ZCode 官方市场的清单直链；与它仓库里的 `DEFAULT_PLUGIN_MARKETPLACES` 保持一致 */
-export const ZCODE_OFFICIAL_MARKETPLACE_URL =
-  "https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json";
-
-/**
- * 开箱内置的市场：与 ZCode 的 `DEFAULT_PLUGIN_MARKETPLACES` 同形同源
- * （`zai-org/ZCode` 的 `packages/shared/src/plugin-marketplaces.ts`）。
- *
- * `builtin` 与 `trust` 是两件事：前者是「随包写入状态、刷新失败静默」，后者是「它的执行类组件
- * （hooks / extensions / bin）能不能注入运行时」。ZCode 官方市场是**别人的**市场，且它的插件里
- * 确实带可执行脚本（如 `video2code` 的 `hooks/*.py`），所以默认只给 `market` 档：
- * 技能 / 命令 / MCP 照常可用，代码类组件只出诊断、不注入。
- */
 export const DEFAULT_PLUGIN_MARKETPLACES: readonly PluginMarketplaceRecord[] = [
   {
     name: "claude-plugins-official",
     source: { source: "github", repo: "anthropics/claude-plugins-official" },
     builtin: true,
-    trust: "official",
-    refreshedOk: false,
-    pluginCount: 0,
-  },
-  {
-    // ZCode 官方唯一市场：清单走 CDN。它在自家 Agent 里会把「随包 seed 分片」与 CDN 分片合并，
-    // 我们只读 CDN 清单（没有 seed 分片这一步，见 plans/plugins.md 6.2）。
-    name: "zcode-plugins-official",
-    source: { source: "url", url: ZCODE_OFFICIAL_MARKETPLACE_URL },
-    builtin: true,
-    trust: "market",
     refreshedOk: false,
     pluginCount: 0,
   },
@@ -79,11 +55,6 @@ const marketplaceRecordSchema = z.object({
   source: pluginSourceSchema,
   /** 随包内置：刷新失败只落 `lastError`，不出用户可见错误 */
   builtin: z.boolean().default(false),
-  /**
-   * 执行类组件的信任档位：`official` 才注入 hooks / extensions / bin。
-   * 与 `builtin` 分开是因为「随包内置」不等于「我们担保它的代码」。
-   */
-  trust: z.enum(["official", "market"]).default("market"),
   lastRefreshAt: z.string().optional(),
   /** 上一次刷新是否成功；从没刷新过为 false */
   refreshedOk: z.boolean().default(false),
@@ -187,7 +158,7 @@ export const parsePluginId = (id: string): { name: string; marketplace: string }
 };
 
 /**
- * 信任档位：市场声明 `trust: "official"` 的算 `official`，用户显式登记的本地目录算 `local`，
+ * 信任档位：随包 / 我们官方市场来的算 `official`，用户显式登记的本地目录算 `local`，
  * 其余市场一律 `market`（执行类组件只出诊断）。
  */
 export const pluginSourceOf = (
@@ -196,7 +167,7 @@ export const pluginSourceOf = (
 ): PluginSource => {
   if (isLocalMarketplace(record.marketplace)) return "local";
   const marketplace = marketplaces.find((item) => item.name === record.marketplace);
-  return marketplace?.trust === "official" ? "official" : "market";
+  return marketplace?.builtin ? "official" : "market";
 };
 
 /** 一个插件在某个工作目录里的生效开关 */

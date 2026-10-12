@@ -429,8 +429,6 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
             name: input.name,
             source: input.source,
             builtin: false,
-            // 用户自己登记的市场一律 market 档：执行类组件只出诊断（见 plans/plugins.md 第五章）
-            trust: "market",
             refreshedOk: false,
             pluginCount: 0,
           },

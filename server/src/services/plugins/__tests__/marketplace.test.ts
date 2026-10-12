@@ -86,10 +86,10 @@ describe("市场登记", () => {
     assert.equal(created.marketplace.refreshedOk, false);
     assert.equal(created.revision, 1);
 
-    // 两个随包内置的市场先在场，本地登记追加在它们之后
+    // 内置的 Claude 官方市场随初始状态就在，本地登记追加在它之后
     assert.deepEqual(
       service.list().marketplaces.map((item) => item.name),
-      ["claude-plugins-official", "zcode-plugins-official", "my-market"],
+      ["claude-plugins-official", "my-market"],
     );
   });
 

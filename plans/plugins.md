@@ -368,16 +368,10 @@ MCP servers 与**可信官方** hooks 投进现有能力域；来自非官方第
 **开箱内置的市场**（与 ZCode 的 `DEFAULT_PLUGIN_MARKETPLACES` 同形同源，见
 [`zai-org/ZCode`](https://github.com/zai-org/ZCode) 的 `packages/shared/src/plugin-marketplaces.ts`）：
 
-| id | 来源 | 档位 | 状态 |
-| --- | --- | --- | --- |
-| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | `official` | **已内置**；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
-| `zcode-plugins-official` | `https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json`（url 直链，与 ZCode 仓库同名同址） | `market` | **已内置**：33 个条目，全是 `url + zip` 来源，可一键安装。它在自家 Agent 里会把「随包 seed 分片」与 CDN 分片合并，**我们只读 CDN 清单** |
-| `<slug>-plugins-official` | CDN 上的 `marketplace.json` 直链 | `official` | **待接入**：CDN 地址未定，不在这里编造地址；定下来再补一行，并带上随包 seed 分片与 CDN 分片的合并 |
-
-`builtin`（随包写入状态 + 刷新失败静默）与信任档位是**两件事**（`marketplaceRecordSchema.trust`）：
-前者解决「用户开箱就能看到市场」，后者决定「它的 hooks / extensions / bin 能不能注入运行时」。
-ZCode 官方市场是别人的市场，且它的插件确实带可执行脚本（`video2code` 的 `hooks/*.py`），
-所以默认 `market` 档——技能 / 命令 / MCP 照常可用，代码类组件只出诊断。要提档就改这一处字段。
+| id | 来源 | 状态 |
+| --- | --- | --- |
+| `claude-plugins-official` | `anthropics/claude-plugins-official`（git 简写） | **已内置**；GitHub 不可达时刷新必然失败，这种失败**静默处理** |
+| `<slug>-plugins-official` | CDN 上的 `marketplace.json` 直链 | **待接入**：CDN 地址未定，不在这里编造地址；定下来再补一行，并带上随包 seed 分片与 CDN 分片的合并 |
 
 两条约定：首次启动把内置市场写入状态（用户可删，卸载只移除登记、不碰已有缓存）；
 市场身份用 id、插件身份用 `<name>@<marketplace>`（例：`hello@my-market`）——状态文件的 key、日志、
