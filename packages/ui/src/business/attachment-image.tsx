@@ -9,8 +9,8 @@ import { cn } from "cn";
 import { Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAttachmentUrl } from "../hooks/use-attachment-url";
-import { FullscreenToolbarButton } from "./fullscreen-dialog";
 import { openImagePreview } from "./image-preview-dialog";
+import { ToolbarIconButton } from "./toolbar-icon-button";
 
 export function AttachmentImage({
   alt,
@@ -47,13 +47,13 @@ export function AttachmentImage({
           src={source}
         />
       </button>
-      <FullscreenToolbarButton
+      <ToolbarIconButton
         className="absolute top-2 right-2 bg-card/80 opacity-0 backdrop-blur-sm transition group-hover/image:opacity-100 focus-visible:opacity-100"
         label={t("全屏查看")}
         onClick={open}
       >
         <Maximize2 />
-      </FullscreenToolbarButton>
+      </ToolbarIconButton>
     </span>
   );
 }

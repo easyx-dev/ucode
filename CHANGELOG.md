@@ -55,6 +55,11 @@
   Tailwind 内置调色板变量并用 `color-mix(in oklab, …)` 合成；`theme.css` 拆成
   `tokens.css` / `base.css` / `markdown.css` / `third-party.css` / `themes/`，入口 `theme.css` 只负责按序 `@import`。
 
+- **Markdown 表格：排版调整与表格操作区**：单元格与正文同字号（表格是读的东西，不降档）且默认不换行——
+  列多时靠卡片自己横向滚，不把内容挤成竖条；表头加淡底色。卡片上方新增一行表格级操作（自动换行开关、
+  复制为 Markdown、导出 CSV、全屏查看）：复制与导出读眼前这张表的 DOM，转义复用 `streamdown` 的表格工具
+  （与它内建控件同一口径，不另存一份 markdown 源）；换行偏好落 `localStorage` 且同屏表格共用。
+
 - **新增依赖**：`@fontsource-variable/inter`（可选的界面字体，按需加载）。
 
 ### 变更
