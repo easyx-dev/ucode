@@ -126,3 +126,26 @@ MCP / bin / 代码模块打包成可启停、可分发、可升级的单元，�
 
 **明确不做**（见该文第十节）：追踪 pid 与「停止服务」、`lsof` 全机端口 diff、落 `ucode.service` 条目、
 跨会话聚合、执行期定时探测。
+
+---
+
+## 需求 · 大对话的消息列表改成窗口化加载
+
+**现象**：`POST /api/v1/messages/list` 是**全量**返回——契约入参只有 `sessionId`，服务端把整段历史投影成
+`MessageDTO[]` 一次下发。实测会话 `c03f8645`（JSONL 5.31 MB、1466 条 message 条目）一次返回
+**3.84 MB / 1482 条消息**，服务端耗时约 40 ms；体积大头是 assistant 正文与 thinking（2.32 MB）、
+工具结果（1.48 MB），单条最大 ~64 KB（`read` 的一次长输出原始 121 KB）。会话越长这份响应越大
+（工作区里已有 20 MB 的 JSONL）。界面只虚拟化了 DOM（`packages/ui/src/business/message-list.tsx` 用
+`@tanstack/react-virtual`），传输、解析与 store 归并仍是全量。
+
+**待办要点**（先定口径再动手）：
+
+- 契约：`packages/contracts/src/messages/` 的 `messageListInputSchema` 加游标与条数，
+  `MessageListResponse` 补「是否还有更早」与游标；
+- server：`routes/messages/index.ts` + `harness/pi/serialize.ts` 的投影按窗口切片。
+  两个既有约束不能破——`seq` 与投影必须在同一同步块内取（客户端按 seq 切实时帧），
+  `transcriptStates` 必须沿完整路径推进（否则压缩点之后丢档位）；
+- SDK / UI：滚动到顶加载更早，`packages/sdk` 的 messages store 做归并。
+
+**注意**：不能简单截断——权限审批、压缩记录、目标记录这类 `custom` 条目是界面回放用的，窗口化时要保留；
+另外要定长工具输出（单条几十 KB 的 `read` / `webfetch`）是否在列表投影里截断、展开时再取。
