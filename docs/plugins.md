@@ -30,8 +30,14 @@
 | url | 清单直链；用 `ETag` / `Last-Modified` 做条件请求，内容没变就不重复下载 |
 | git / github | 浅克隆清单仓；清单可在 `.<slug>-plugin` / `.zcode-plugin` / `.claude-plugin` 下或仓根 |
 
-内置 `claude-plugins-official`（Claude Code 官方市场）。它**不是强依赖**：
-GitHub 不可达时刷新失败只记在状态里，不弹错误。
+随包内置两个市场，都**不是强依赖**（刷新失败只记在状态里，不弹错误）：
+
+| 市场 | 来源 | 代码类组件 |
+| --- | --- | --- |
+| `claude-plugins-official` | Claude Code 官方市场（git 源） | 注入 |
+| `zcode-plugins-official` | ZCode 官方市场（CDN 直链） | **不注入**——它的插件带可执行脚本，按「来源即信任」只给 `market` 档（技能 / 命令 / MCP 照常可用） |
+
+两个市场都可以删（删除只移除登记，不动已有缓存）。
 
 ## 安全边界
 

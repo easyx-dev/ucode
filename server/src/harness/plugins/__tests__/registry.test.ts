@@ -44,10 +44,15 @@ const makePluginDir = (name: string): string => {
   return root;
 };
 
-const marketplace = (name: string, builtin: boolean): PluginMarketplaceRecord => ({
+const marketplace = (
+  name: string,
+  builtin: boolean,
+  trust: PluginMarketplaceRecord["trust"] = builtin ? "official" : "market",
+): PluginMarketplaceRecord => ({
   name,
   source: { source: "github", repo: "owner/repo" },
   builtin,
+  trust,
   refreshedOk: false,
   pluginCount: 0,
 });

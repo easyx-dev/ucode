@@ -85,6 +85,12 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **内置 ZCode 官方市场，并把「随包内置」与信任档位分开**：随包多一个 `zcode-plugins-official`
+  （`https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json`，与 ZCode 仓库同名同址，33 个条目、
+  全是可安装的 `url + zip` 来源）。市场记录新增 `trust` 字段：`builtin` 只表示「随包写入状态 +
+  刷新失败静默」，`official` 才注入 hooks / extensions / bin。ZCode 官方市场默认 `market` 档——
+  它的插件确实带可执行脚本（如 `video2code` 的 `hooks/*.py`），默认只出诊断、不注入。
+
 - **并发刷新同一个插件市场不再互相破坏**：git / github 市场的 staging 目录改成每次独立
   （`<市场>.staging-<随机>`），并按市场对刷新做并发去重——原先固定路径下，连点两下「刷新」
   会让两个克隆互相删掉对方的 `.git`，git 报 `could not lock config file .../.git/config` 而双双失败。

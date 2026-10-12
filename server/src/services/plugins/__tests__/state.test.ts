@@ -124,6 +124,7 @@ describe("纯逻辑", () => {
         name: "builtin-market",
         source: { source: "github", repo: "owner/repo" } as const,
         builtin: true,
+        trust: "official" as const,
         refreshedOk: false,
         pluginCount: 0,
       },
@@ -145,6 +146,31 @@ describe("纯逻辑", () => {
       "official",
     );
     assert.equal(pluginSourceOf({ ...base, marketplace: "third-party" }, marketplaces), "market");
+  });
+
+  it("随包内置不等于官方信任：ZCode 官方市场是 market 档，Claude 官方市场是 official", () => {
+    const marketplaces = DEFAULT_PLUGIN_MARKETPLACES;
+    const zcode = marketplaces.find((item) => item.name === "zcode-plugins-official");
+    const claude = marketplaces.find((item) => item.name === "claude-plugins-official");
+    assert.equal(zcode?.builtin, true, "随包内置：刷新失败静默");
+    assert.equal(zcode?.trust, "market", "它的插件带 hooks 脚本，默认只出诊断不注入");
+    assert.equal(claude?.trust, "official");
+
+    const record = {
+      id: "x@zcode-plugins-official",
+      name: "x",
+      version: "0.0.0",
+      source: { source: "url", url: "https://example.invalid/p.zip" } as const,
+      marketplace: "zcode-plugins-official",
+      path: "/p",
+      enabled: true,
+      installedAt: "2026-01-01T00:00:00.000Z",
+    };
+    assert.equal(pluginSourceOf(record, marketplaces), "market");
+    assert.equal(
+      pluginSourceOf({ ...record, marketplace: "claude-plugins-official" }, marketplaces),
+      "official",
+    );
   });
 
   it("覆盖按 local > project > user 生效，只翻已登记插件的开关", () => {
