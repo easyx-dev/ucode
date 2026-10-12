@@ -228,6 +228,7 @@ export default {
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
   图表: "Diagram",
+  表格: "Table",
   "图表渲染中…": "Rendering diagram…",
   图表预览: "Diagram preview",
   全屏查看: "View fullscreen",
@@ -240,6 +241,8 @@ export default {
   重置缩放: "Reset zoom",
   关闭预览: "Close preview",
   表格预览: "Table preview",
+  "导出 CSV": "Export CSV",
+  "复制为 Markdown": "Copy as Markdown",
   "表格全屏预览：表格自己横向滚动":
     "Table fullscreen preview: the table scrolls horizontally on its own",
   图片全屏预览: "Image fullscreen preview",
@@ -709,7 +712,8 @@ export default {
   // Desktop shell（无标题栏窗口里自绘的窗口控件）
   关闭窗口: "Close window",
   最小化窗口: "Minimize window",
-  缩放窗口: "Zoom window",
+  进入全屏: "Enter full screen",
+  退出全屏: "Exit full screen",
 
   // Workbench（右侧第三栏：活动栏 + 侧栏 + 编辑器区）
   工作台: "Workbench",
@@ -751,7 +755,7 @@ export default {
   双栏: "Split",
   全部展开: "Expand all",
   全部收起: "Collapse all",
-  自动换行: "Wrap lines",
+  自动换行: "Wrap text",
   全部改动: "All changes",
   "{{value}} 个文件": "{{value}} files",
   堆叠查看全部改动: "View every change stacked",

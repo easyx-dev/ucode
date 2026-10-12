@@ -15,7 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "../base/dropdown-menu";
 import { useZoomableViewport, type ZoomableViewport } from "../hooks/use-zoom-viewport";
-import { FullscreenDialog, FullscreenToolbarButton } from "./fullscreen-dialog";
+import { FullscreenDialog } from "./fullscreen-dialog";
+import { ToolbarIconButton } from "./toolbar-icon-button";
 
 /** 缩放档位：比例下拉里的候选 */
 const ZOOM_PRESETS = [0.5, 1, 2] as const;
@@ -26,9 +27,9 @@ function ZoomToolbar({ viewport }: { viewport: ZoomableViewport }) {
 
   return (
     <>
-      <FullscreenToolbarButton label={t("缩小")} onClick={() => viewport.zoomBy(0.85)}>
+      <ToolbarIconButton label={t("缩小")} onClick={() => viewport.zoomBy(0.85)}>
         <ZoomOut />
-      </FullscreenToolbarButton>
+      </ToolbarIconButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -53,9 +54,9 @@ function ZoomToolbar({ viewport }: { viewport: ZoomableViewport }) {
           <DropdownMenuItem onSelect={viewport.reset}>{t("重置缩放")}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <FullscreenToolbarButton label={t("放大")} onClick={() => viewport.zoomBy(1.18)}>
+      <ToolbarIconButton label={t("放大")} onClick={() => viewport.zoomBy(1.18)}>
         <ZoomIn />
-      </FullscreenToolbarButton>
+      </ToolbarIconButton>
     </>
   );
 }

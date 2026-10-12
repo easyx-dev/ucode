@@ -2,7 +2,8 @@
  * 窗口镶边：无标题栏窗口顶部的「标题条」几何（主进程与渲染层同一口径）。
  *
  * 只有 macOS 走无标题栏——系统标题栏去掉，系统红绿灯也一并隐藏（`setWindowButtonVisibility(false)`），
- * 关窗 / 最小化 / 缩放改由界面上的三颗点承担（`renderer/components/window-controls.tsx`）。
+ * 关窗 / 最小化 / 全屏改由界面上的三颗点承担（`renderer/components/window-controls.tsx`），
+ * 绿点的 ⌥ 变体是最大化 / 还原；拖拽区双击也能最大化（系统标题栏双击），但那是系统那套。
  * 位置由我们定，所以不需要迁就系统的灯位；其他平台保留系统边框与系统控件，这里的一切都不生效。
  */
 export const isFrameless = (platform: NodeJS.Platform): boolean => platform === "darwin";

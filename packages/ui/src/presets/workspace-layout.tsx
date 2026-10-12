@@ -59,6 +59,7 @@ import { lastTurnPresentedPlan } from "../lib/plan";
 import { projectOf, projectSeedOf } from "../lib/project";
 import { isWorkspaceSession } from "../lib/session-groups";
 import { DEFAULT_SETTINGS_SECTION, type SettingsSectionId } from "../lib/settings-section";
+import { readStorage, writeStorage } from "../lib/storage";
 import type {
   ChatItem,
   EditMessagePayload,
@@ -100,22 +101,10 @@ const SIDEBAR_COLLAPSED_KEY = `${brand.slug}-sidebar-collapsed`;
 const WORKBENCH_OPEN_KEY = `${brand.slug}-workbench-open`;
 
 /** 读出上次的侧栏收起状态；读不到时默认展开 */
-const readSidebarCollapsed = (): boolean => {
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+const readSidebarCollapsed = (): boolean => readStorage(SIDEBAR_COLLAPSED_KEY) === "1";
 
 /** 读出上次的工作台展开状态；读不到时默认收起 */
-const readWorkbenchOpen = (): boolean => {
-  try {
-    return window.localStorage.getItem(WORKBENCH_OPEN_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+const readWorkbenchOpen = (): boolean => readStorage(WORKBENCH_OPEN_KEY) === "1";
 
 export function WorkspaceLayout({
   titleBarInset = 0,
@@ -241,11 +230,7 @@ export function WorkspaceLayout({
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
-      try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // 写不进去（隐私模式）不影响使用
-      }
+      writeStorage(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
       return next;
     });
   }, []);
@@ -253,11 +238,7 @@ export function WorkspaceLayout({
   /** 展开 / 收起工作台并落盘；移动端抽屉由 workbenchSheetOpen 单独管 */
   const applyWorkbenchOpen = useCallback((open: boolean) => {
     setWorkbenchOpen(open);
-    try {
-      window.localStorage.setItem(WORKBENCH_OPEN_KEY, open ? "1" : "0");
-    } catch {
-      // 写不进去（隐私模式）不影响使用
-    }
+    writeStorage(WORKBENCH_OPEN_KEY, open ? "1" : "0");
   }, []);
 
   /** 展开工作台；窄屏下同时唤出抽屉 */

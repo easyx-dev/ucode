@@ -55,6 +55,11 @@
   Tailwind 内置调色板变量并用 `color-mix(in oklab, …)` 合成；`theme.css` 拆成
   `tokens.css` / `base.css` / `markdown.css` / `third-party.css` / `themes/`，入口 `theme.css` 只负责按序 `@import`。
 
+- **Markdown 表格：排版调整与表格操作区**：单元格与正文同字号（表格是读的东西，不降档）且默认不换行——
+  列多时靠卡片自己横向滚，不把内容挤成竖条；表头加淡底色。卡片上方新增一行表格级操作（自动换行开关、
+  复制为 Markdown、导出 CSV、全屏查看）：复制与导出读眼前这张表的 DOM，转义复用 `streamdown` 的表格工具
+  （与它内建控件同一口径，不另存一份 markdown 源）；换行偏好落 `localStorage` 且同屏表格共用。
+
 - **新增依赖**：`@fontsource-variable/inter`（可选的界面字体，按需加载）。
 
 - **插件平台骨架（第一步：契约与宿主内核）**：新增契约域 `plugins` / `marketplace`（插件视图、诊断、
@@ -181,10 +186,11 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 ### 变更
 
 - **桌面端去掉系统标题栏，窗口控件改为自绘**：macOS 走 `titleBarStyle: hiddenInset` 并用
-  `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 缩放，
+  `setWindowButtonVisibility(false)` 收起系统红绿灯，位置不再受系统灯位牽制；界面自绘三颗点（关 / 最小化 / 全屏，
+  绿点 ⌥ 点击为最大化 / 还原，
   `windowControl` IPC，`lucide-react` 画符号），固定在左端，中线由布局实测并经 `--window-controls-center` 报给壳层：
   展开时落在侧栏顶部（取头部那行控件的中线再减去内容卡距顶的间距）、收起时落在对话区头部（直接取那行的控件中线，与行对齐）；
-  点直径 14px、横向占 86px。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-focus`）。
+  点直径 14px、横向占 86px。交互按交通灯惯例：悬停露出操作符号，失焦置灰（`desktop:window-state`，同时下发全屏态）。
   控件与拖拽条在最上层（新增 `z-chrome` 层级 + `window-control-*` 色），弹层遮罩不遮它们。
   常量在 `apps/desktop/src/shared/chrome.ts`。其他平台保留系统边框与系统控件。
 
@@ -212,7 +218,7 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   对话区头部在无标题栏窗口下整行可拖；另开 `acceptFirstMouse`——macOS 默认会把未聚焦窗口的第一次点击
   只当作激活，导致自绘的点与按钮「点一下没反应」。
 
-- **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 缩放符号）。
+- **新增依赖**：`lucide-react`（`apps/desktop` 直接用图标：自绘窗口控件里的关闭 / 最小化 / 全屏符号）。
 
 - **新增 `pnpm start:desktop`**：桌面端分 dev 与生产两种运行方式——dev 仍走 `pnpm dev:desktop`（渲染层 `:5174`
   的 Vite dev server，`DESKTOP_RENDERER_URL` 改由脚本声明，主进程不再自带默认端口）；生产由

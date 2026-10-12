@@ -6,6 +6,8 @@
  */
 import { brand } from "@ucode/brand";
 
+import { readStorage, writeStorage } from "./storage";
+
 /** 通知开关的持久化键：纯本机界面偏好，不进服务端配置 */
 const ENABLED_KEY = `${brand.slug}-notices-enabled`;
 
@@ -40,21 +42,10 @@ const readDesktopPort = (): DesktopNoticePort | null => {
 };
 
 /** 通知开关：读不到（首次、隐私模式）按开启处理 */
-export const readNoticeEnabled = (): boolean => {
-  try {
-    return window.localStorage.getItem(ENABLED_KEY) !== "0";
-  } catch {
-    return true;
-  }
-};
+export const readNoticeEnabled = (): boolean => readStorage(ENABLED_KEY) !== "0";
 
-export const writeNoticeEnabled = (enabled: boolean): void => {
-  try {
-    window.localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
-  } catch {
-    // 写不进去（隐私模式）不影响本次会话
-  }
-};
+export const writeNoticeEnabled = (enabled: boolean): void =>
+  writeStorage(ENABLED_KEY, enabled ? "1" : "0");
 
 /**
  * 浏览器通知：点击聚焦窗口并回到会话。

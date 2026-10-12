@@ -8,35 +8,8 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../base/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../base/dialog";
-
-/** 工具条上的纯图标按钮：`title` 与 `aria-label` 取同一份文案 */
-export function FullscreenToolbarButton({
-  children,
-  className,
-  label,
-  onClick,
-}: {
-  children: ReactNode;
-  className?: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      aria-label={label}
-      className={className}
-      onClick={onClick}
-      size="icon-sm"
-      title={label}
-      type="button"
-      variant="ghost"
-    >
-      {children}
-    </Button>
-  );
-}
+import { ToolbarIconButton } from "./toolbar-icon-button";
 
 export function FullscreenDialog({
   actions,
@@ -75,9 +48,9 @@ export function FullscreenDialog({
           <div className="min-w-0 truncate font-medium text-sm">{title}</div>
           <div className="flex shrink-0 items-center gap-1">
             {actions}
-            <FullscreenToolbarButton label={t("关闭预览")} onClick={onClose}>
+            <ToolbarIconButton label={t("关闭预览")} onClick={onClose}>
               <X />
-            </FullscreenToolbarButton>
+            </ToolbarIconButton>
           </div>
         </div>
         {children}

@@ -1,7 +1,8 @@
 /*
  * markdown 渲染（assistant 输出、md 预览、压缩摘要共用）。
  *
- * 层级只有两档：正文按基准字号与长文行高，代码块与表格降一档；标题不与正文拉开字号，靠字重区分。
+ * 字号分两档：正文与表格按基准字号与长文行高（表格是读的东西，不降档），代码块降一档；
+ * 标题不与正文拉开字号，靠字重区分。
  * 中文断行由 `@streamdown/cjk` 处理（`message-response.tsx` 接入），这里不要覆盖 word-break / line-break。
  */
 .md-content {
@@ -68,16 +69,23 @@
 /*
  * 表格：卡片里自己横向滚，分隔只靠横线（表头下一条、行间若干），不画网格。
  * 卡片画在 `table` 自身而不是外层容器上：`.md-content` 有三处入口（对话正文、md 预览、全屏表格预览），
- * 只有画在这一层才三处一致（`markdown-table.tsx` 的外层 div 只负责全屏按钮的定位）。
- * 单元格自带的 border / nowrap / 字号由下面几条盖回本仓库口径（streamdown 的 `divide-y` 落在 `:where()` 里，
+ * 只有画在这一层才三处一致（`markdown-table.tsx` 的外层 div 只承载表格上方的操作区）。
+ * 字号与正文一致（表格是读的，不降档；只把代码块降一档），单元格上下留够呼吸位。
+ * 单元格默认不换行：列多时由卡片自己横向滚，不把内容挤成竖条。
+ * 单元格自带的 border 由下面几条盖回本仓库口径（streamdown 的 `divide-y` 落在 `:where()` 里，
  * 零优先级，这里显式关掉，行线改由 `td` 表达，末行不画，交给卡片下边框收尾）。
  */
 .md-content table {
-  @apply block w-max max-w-full overflow-x-auto rounded-lg border border-border border-collapse text-xs;
+  @apply block w-max max-w-full overflow-x-auto rounded-lg border border-border border-collapse;
 }
 .md-content th,
 .md-content td {
-  @apply border-0 px-3 py-2 text-left align-top text-xs whitespace-normal;
+  @apply border-0 p-3 text-left align-top whitespace-nowrap;
+}
+/* 操作区的「自动换行」打开后按列宽折行；默认不换行的口径在上面 */
+.md-content .md-table-wrap th,
+.md-content .md-table-wrap td {
+  @apply whitespace-normal;
 }
 .md-content tbody tr {
   @apply border-0;
@@ -88,9 +96,9 @@
 .md-content thead tr:last-child th {
   @apply border-b border-border;
 }
-/* 表头不着色也不加重：与正文靠一条横线和弱一档的字色分开，避免顶上多出一条色块 */
+/* 表头用淡底色与正文分开（横线仍保留）；字仍取 medium + 弱一档字色 */
 .md-content thead {
-  @apply bg-transparent;
+  @apply bg-muted/50;
 }
 .md-content th {
   @apply font-medium text-foreground-subtle;

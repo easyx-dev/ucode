@@ -24,7 +24,7 @@
 - 恢复宽度用每个面板自己的 `defaultSize`，不用库的 `defaultLayout`（收起某栏后面板数会变，记忆会被忽略）。
 
 **无标题栏窗口**（macOS 桌面端，`titleBarStyle: hiddenInset`，系统红绿灯已隐藏）：窗口控件由界面自绘——
-三颗点（关 / 最小化 / 缩放）固定在左端，位置是我们定的，不跟任何系统灯位走，展开 / 收起侧栏都不移动：
+三颗点（关 / 最小化 / 全屏）固定在左端，位置是我们定的，不跟任何系统灯位走，展开 / 收起侧栏都不移动：
 
 | 状态 | 三颗点落在哪 | 让位方式 | 拖拽宿主（控件挂在它里面） |
 | --- | --- | --- | --- |
@@ -56,7 +56,10 @@
 - 点尺寸固定（`size-window-control`，14px，不随字号密度缩放）、左起 20px、间距 8px、尾部 8px、
   横向共 86px（`WINDOW_CONTROLS_WIDTH`）。
 - 交互按 macOS 交通灯的惯例：悬停整组时点内露出操作符号，窗口失焦时整组 `opacity-40`；
-  窗口焦点由主进程经 `desktop:window-focus` 下发，标题条在失焦时也一次点得动（`acceptFirstMouse`）。
+  窗口焦点与全屏态由主进程经 `desktop:window-state` 下发，标题条在失焦时也一次点得动（`acceptFirstMouse`）。
+- 绿点是**全屏**：点它进 / 出全屏，符号与文案随状态换（全屏时是朝里的那对箭头）；**⌥ 点击是最大化 / 还原**
+  （同一颗钮的 macOS 变体，AppKit 里它就叫 zoom button，动作 `zoom`；全屏期间不接 ⌥——全屏窗口不可缩放）。
+  拖拽区双击也能最大化（系统标题栏双击），但那条路受系统「双击窗口标题栏」设置影响，只能算第二条路。
 - 控件在最上层（`z-chrome`，见 DESIGN.md「层级」），弹层打开的遮罩盖不住它。
 - 常量与判定在 `apps/desktop/src/shared/chrome.ts`，布局侧只收 `titleBarInset` / `windowControlsWidth`
   / `windowControls`（web 不传，即 0 / 不渲染，界面不留空）。拖拽区用共享样式里的 `.window-drag`
@@ -140,6 +143,8 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 | 空态 | 品牌图 + 按时段问候语，与输入卡同属居中一列 |
 
 - 空态与对话态**共用同一个输入卡挂载点**（父节点不变）：hero 只让外层容器 `justify-center` 并把问候渲染在输入卡上方。
+- 输入区整列居中：已落会话时与消息列同宽（`max-w-4xl`），草稿态（`sessionId === null`）收窄到 `max-w-2xl`——
+  此时输入卡与问候语自成一块，与消息列无关；外层容器自身不铺底色（宿主面板已是 `bg-card`）。
 - 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型见 `components.md`），弹层开在触发钮上方（`side="top"`）；
   带副标题的模式 / 权限固定 `w-72`，只有档位名的思考收到 `w-40`。
 - 选择器的选项行：图标占一列（`items-start`），标题与副标题都从图标之后起排，间距 `gap-1.5` / `gap-1`；
@@ -152,13 +157,21 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 正文由 `styles/markdown.css` 的 `.md-content` 一层渲染，解析与流式交给 `streamdown`
 （唯一入口 `business/message-response.tsx`，对话正文、md 预览、压缩摘要共用）。
 
-- 层级只有两档：正文 `text-sm leading-prose`，代码块与表格 `text-xs`；标题不与正文拉开字号，靠字重。
+- 字号分两档：正文与表格 `text-sm leading-prose`（表格是读的东西，不降档），代码块 `text-xs`；标题不与正文拉开字号，靠字重。
 - 标题 `mt-5 mb-2`（首个元素不带上边距）；h1 用 `text-lg`、h2 用 `text-base`、h3 及以下 `text-sm`。
 - 表格是一张**卡片**：卡片画在 `table` 自身（`rounded-lg border border-border` + `w-max max-w-full overflow-x-auto`），
   三处 `.md-content` 入口（对话正文、md 预览、全屏表格预览）因此长得一样；
   分隔只用横线（表头下一条 `thead tr:last-child th`、行间若干 `tbody tr:not(:last-child) td`），末行不画，交给卡片下边框收尾；
-  表头不着色、字色弱一档（`text-foreground-subtle`），单元格 `px-3 py-2`；宽表仍然只滚表格自身。
+  表头 `bg-muted/50` 淡底色 + 字色弱一档（`text-foreground-subtle`），单元格 `p-3`（与正文同字号）且**默认不换行**
+  （列多时靠卡片自己横向滚，不把内容挤成竖条）；宽表仍然只滚表格自身。
   streamdown 默认那层「卡片 + 独立滚动容器」已由 `business/markdown-table.tsx` 整份替换，不要把它加回来。
+- 表格操作区：排在卡片**上方**、右对齐的一行（`min-h-7` 常驻占位，悬停或键盘聚焦时才现），
+  表格级操作统一加在这里（`business/markdown-table.tsx`，按钮取 `ToolbarIconButton` + `Tooltip`），不再盖在表格右上角。
+  当前四项：自动换行（开关，`aria-pressed` + 按下态底色，偏好落 localStorage 见 `lib/table-prefs.ts`——
+  对话列表是虚拟滚动的，只存在组件里的开关滚出去就没了；这一份偏好**同屏所有表格共用**，
+  模块级 store + `useSyncExternalStore`，见 `hooks/use-table-wrap.ts`）、复制为 Markdown、导出 CSV、全屏查看。
+  导出与复制都读眼前这张表的 DOM（`lib/table-export.ts`），转义交给 streamdown 的表格工具（与它内建控件同一口径），
+  不另存一份 markdown 源。
 - 正文图片：本站附件先取字节转 blob 再渲染（`business/attachment-image.tsx`）；外层用 `span`，因为正文里的图片常落在 `<p>` 里。
 - 列表标记用 `text-foreground-subtle`；GFM 任务列表去掉圆点。
 - 行内 code 与代码块都只换底色（`bg-muted`）不换色相；行内 code 取 `text-xs`，与正文的差距由底色承担。
