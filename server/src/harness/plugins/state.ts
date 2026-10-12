@@ -45,6 +45,11 @@ const marketplaceRecordSchema = z.object({
   lastError: z.string().optional(),
   /** 上一次成功刷新时的条目数 */
   pluginCount: z.number().int().nonnegative().default(0),
+  /** url 市场的条件请求凭据；本地 / git 市场不用 */
+  etag: z.string().optional(),
+  lastModified: z.string().optional(),
+  /** 内容摘要：url 市场记响应哈希，git 市场记克隆副本的内容哈希 */
+  integrity: z.string().optional(),
 });
 
 const installedPluginRecordSchema = z.object({

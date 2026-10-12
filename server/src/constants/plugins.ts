@@ -63,5 +63,21 @@ export const PLUGIN_HASH_MAX_FILES = 2000;
 export const PLUGIN_HASH_MAX_BYTES = 8 * 1024 * 1024;
 export const PLUGIN_HASH_MAX_DEPTH = 6;
 
+/** 压缩体上限（url 来源）：超过即拒绝，半截包比失败更难排查 */
+export const PLUGIN_PACKAGE_MAX_BYTES = 32 * 1024 * 1024;
+
+/** 解包上限：解包后总量与条目数，防解压炸弹 */
+export const PLUGIN_UNPACK_MAX_BYTES = 128 * 1024 * 1024;
+export const PLUGIN_UNPACK_MAX_ENTRIES = 5000;
+
+/** 出网超时：市场清单与插件包共用一个上限（小文件，慢就不等） */
+export const PLUGIN_FETCH_TIMEOUT_MS = 60_000;
+
+/** 市场清单体积上限 */
+export const PLUGIN_MARKETPLACE_MAX_BYTES = 4 * 1024 * 1024;
+
+/** git 克隆超时：源码包可能不小，但也不该无限等 */
+export const PLUGIN_GIT_TIMEOUT_MS = 120_000;
+
 /** 目录内容哈希跳过的目录：版本库与依赖不参与「插件内容变没变」的判断 */
 export const PLUGIN_HASH_SKIP_DIRNAMES = [".git", "node_modules"] as const;

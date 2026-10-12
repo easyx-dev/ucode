@@ -1,0 +1,195 @@
+/**
+ * 插件来源的拉取与暂存：把五种来源统一收敛成「一个可装载的目录」。
+ *
+ * 复制型来源（url / npm / git / github）先落到暂存目录，由调用方读完清单拿到版本号后再搬进
+ * `cache/<market>/<plugin>/<version>`；`directory` 来源**不复制**，直接引用用户自己的目录。
+ * 出网与进程调用都可注入，便于单测（真实实现是 `publicFetch` 与 `execa`）。
+ */
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
+
+import { execa } from "execa";
+
+import {
+  PLUGIN_FETCH_TIMEOUT_MS,
+  PLUGIN_GIT_TIMEOUT_MS,
+  PLUGIN_PACKAGE_MAX_BYTES,
+} from "../../../constants/plugins";
+import { findManifestFile } from "../../../harness/plugins/manifest";
+import { hashDirectory } from "../../../harness/plugins/source-hash";
+import type { PluginSourceSpec } from "../../../harness/plugins/state";
+import { type PublicFetchResult, publicFetch } from "../../../platform/net";
+import { resolveExistingPath } from "../../../platform/paths";
+import { detectArchiveFormat, unpackArchive } from "./unpack";
+
+/** 来源不可用：网络失败、非 2xx、包结构不对、进程调用失败，都归这一类 */
+export class SourceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SourceError";
+  }
+}
+
+export type StagedSource = {
+  /** 插件包根目录：可以直接交给清单解析 */
+  path: string;
+  /** 是否为复制型的暂存目录（调用方要么把它搬走，要么清理掉） */
+  staged: boolean;
+  /** 内容摘要：url 记响应哈希、directory 记目录内容哈希 */
+  integrity?: string;
+};
+
+/** 进程调用：默认 execa；测试可替换 */
+export type SourceRunner = (
+  file: string,
+  args: string[],
+  options: { timeout: number },
+) => Promise<{ stdout: string }>;
+
+const defaultRunner: SourceRunner = async (file, args, options) => {
+  const result = await execa(file, args, { timeout: options.timeout, reject: true });
+  return { stdout: typeof result.stdout === "string" ? result.stdout : "" };
+};
+
+export type StagePluginSourceInput = {
+  source: PluginSourceSpec;
+  /** 暂存根目录：复制型来源在它下面建临时目录 */
+  stagingRoot: string;
+  fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
+  run?: SourceRunner;
+};
+
+const makeStagingDir = (stagingRoot: string, prefix: string): string => {
+  mkdirSync(stagingRoot, { recursive: true });
+  return mkdtempSync(join(stagingRoot, `${prefix}-`));
+};
+
+/**
+ * 归档 / 仓库常把插件放在一层子目录里（`pkg/plugin.json`、`repo/plugins/foo/`）。
+ * 根目录没有插件特征时就往下走一层——只走一层，避免把任意深层结构当插件根。
+ */
+const descendToPackageRoot = (dir: string): string => {
+  const hasPackageMarker = (path: string): boolean =>
+    findManifestFile(path) !== null ||
+    ["skills", "commands", "agents", "hooks", "bin", "extensions", ".mcp.json"].some((name) =>
+      existsSync(join(path, name)),
+    );
+
+  if (hasPackageMarker(dir)) return dir;
+  const entries = listDirNames(dir);
+  const only = entries.length === 1 ? entries[0] : undefined;
+  if (!only) return dir;
+  const child = join(dir, only);
+  try {
+    return statSync(child).isDirectory() && hasPackageMarker(child) ? child : dir;
+  } catch {
+    return dir;
+  }
+};
+
+/** 目录下的条目名；读不出来就当空目录（调用方会按「找不到插件根」继续处理） */
+const listDirNames = (dir: string): string[] => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
+
+/** url 来源：取压缩体 → 解包到暂存目录 */
+const stageFromUrl = async (
+  source: Extract<PluginSourceSpec, { source: "url" }>,
+  input: StagePluginSourceInput,
+): Promise<StagedSource> => {
+  const fetchImpl = input.fetch ?? publicFetch;
+  const response = await fetchImpl({
+    url: source.url,
+    maxBytes: PLUGIN_PACKAGE_MAX_BYTES,
+    timeoutMs: PLUGIN_FETCH_TIMEOUT_MS,
+    ...(source.headers ? { headers: source.headers } : {}),
+  });
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new SourceError(`下载插件包失败：HTTP ${response.status} ${response.url.href}`);
+  }
+  if (response.truncated) {
+    throw new SourceError(`插件包超过上限（${PLUGIN_PACKAGE_MAX_BYTES} 字节）`);
+  }
+
+  const format = detectArchiveFormat(source.url, response.body);
+  if (!format) {
+    throw new SourceError("插件包既不是 zip 也不是 tgz，无法解包");
+  }
+
+  const dir = makeStagingDir(input.stagingRoot, "url");
+  await unpackArchive({ data: response.body, format, targetDir: dir });
+  return {
+    path: descendToPackageRoot(dir),
+    staged: true,
+    integrity: createHash("sha256").update(response.body).digest("hex"),
+  };
+};
+
+/** npm 来源：`npm install --prefix <暂存目录>` 后取 node_modules 下的包目录 */
+const stageFromNpm = async (
+  source: Extract<PluginSourceSpec, { source: "npm" }>,
+  input: StagePluginSourceInput,
+): Promise<StagedSource> => {
+  const run = input.run ?? defaultRunner;
+  const dir = makeStagingDir(input.stagingRoot, "npm");
+  await run(
+    "npm",
+    ["install", "--prefix", dir, "--no-save", "--no-audit", "--no-fund", source.package],
+    { timeout: PLUGIN_GIT_TIMEOUT_MS },
+  );
+
+  // 去掉版本后缀，作用域保留：npm 装出来的路径就是 `node_modules/<name>`（含 `@scope/`）
+  const name = source.package.replace(/@[^@/]+$/, "");
+  const packageDir = join(dir, "node_modules", ...name.split("/"));
+  if (!existsSync(packageDir)) {
+    throw new SourceError(`npm 包装完之后找不到：${source.package}`);
+  }
+  return { path: descendToPackageRoot(packageDir), staged: true };
+};
+
+/** git / github 来源：浅克隆到暂存目录，`path` 指定包在仓内的位置 */
+const stageFromGit = async (
+  source: Extract<PluginSourceSpec, { source: "git" | "github" }>,
+  input: StagePluginSourceInput,
+): Promise<StagedSource> => {
+  const run = input.run ?? defaultRunner;
+  const url = source.source === "git" ? source.url : `https://github.com/${source.repo}.git`;
+  const dir = makeStagingDir(input.stagingRoot, "git");
+  const args = ["clone", "--depth", "1"];
+  if (source.ref) args.push("--branch", source.ref);
+  args.push(url, dir);
+  await run("git", args, { timeout: PLUGIN_GIT_TIMEOUT_MS });
+
+  const root = source.path ? join(dir, source.path) : dir;
+  if (!existsSync(root)) throw new SourceError(`仓内路径不存在：${source.path ?? ""}`);
+  return { path: root, staged: true };
+};
+
+/**
+ * 把来源收敛成一个可装载的目录。`directory` 不复制（改源码即可重拉），其余来源落暂存目录。
+ */
+export const stagePluginSource = async (input: StagePluginSourceInput): Promise<StagedSource> => {
+  const { source } = input;
+  switch (source.source) {
+    case "directory": {
+      const path = resolveExistingPath(source.path, true);
+      const hash = hashDirectory(path)?.hash;
+      return { path, staged: false, ...(hash ? { integrity: hash } : {}) };
+    }
+    case "url":
+      return await stageFromUrl(source, input);
+    case "npm":
+      return await stageFromNpm(source, input);
+    case "git":
+    case "github":
+      return await stageFromGit(source, input);
+    default:
+      throw new SourceError(`不支持的来源：${basename(JSON.stringify(source))}`);
+  }
+};

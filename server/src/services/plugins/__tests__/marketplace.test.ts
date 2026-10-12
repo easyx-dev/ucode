@@ -1,6 +1,6 @@
-/** services/plugins/marketplace：市场登记 / 移除 / 刷新（本地目录市场），内置市场失败静默 */
+/** services/plugins/marketplace：市场登记 / 移除 / 刷新（本地目录 / url / git），内置市场失败静默 */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -9,6 +9,7 @@ import type { ServerControlEvent } from "@ucode/contracts";
 
 import type { SessionEventBus } from "../../../core/event-bus";
 import { createMarketplaceService } from "../marketplace";
+import type { SourceRunner } from "../sources";
 import { PluginStateStore } from "../state";
 
 const created: string[] = [];
@@ -25,14 +26,30 @@ const makeMarket = (manifest: unknown): string => {
   return dir;
 };
 
-const setup = () => {
+const setup = (over: { run?: SourceRunner; pluginsDir?: string } = {}) => {
   const state = new PluginStateStore(join(makeDir(), "plugins.json"));
   state.load();
   const frames: ServerControlEvent[] = [];
   const events = {
     emitControl: (frame: ServerControlEvent) => frames.push(frame),
   } as unknown as SessionEventBus;
-  return { state, service: createMarketplaceService({ state, events }), frames };
+  const pluginsDir = over.pluginsDir ?? makeDir();
+  return {
+    state,
+    pluginsDir,
+    frames,
+    service: createMarketplaceService({
+      state,
+      events,
+      pluginsDir,
+      // 默认不给网络与进程：测试要么注入替身，要么走失败分支
+      run:
+        over.run ??
+        (async () => {
+          throw new Error("测试里不连网");
+        }),
+    }),
+  };
 };
 
 afterEach(() => {
@@ -61,7 +78,7 @@ describe("市场登记", () => {
     );
   });
 
-  it("来源目录不存在、重名登记、未登记市场刷新都明确报错", () => {
+  it("来源目录不存在、重名登记、未登记市场刷新都明确报错", async () => {
     const { service } = setup();
     assert.throws(
       () =>
@@ -79,12 +96,12 @@ describe("市场登记", () => {
       () => service.create({ name: "my-market", source: { source: "directory", path: dir } }),
       /市场已登记/,
     );
-    assert.throws(() => service.refresh({ name: "nope" }), /市场不存在/);
+    await assert.rejects(service.refresh({ name: "nope" }), /市场不存在/);
   });
 });
 
 describe("市场刷新", () => {
-  it("本地目录市场读出条目数并清掉上一次错误", () => {
+  it("本地目录市场读出条目数并清掉上一次错误", async () => {
     const { service } = setup();
     const dir = makeMarket({
       name: "my-market",
@@ -92,27 +109,27 @@ describe("市场刷新", () => {
     });
     service.create({ name: "my-market", source: { source: "directory", path: dir } });
 
-    const refreshed = service.refresh({ name: "my-market" });
+    const refreshed = await service.refresh({ name: "my-market" });
     assert.equal(refreshed.marketplace.refreshedOk, true);
     assert.equal(refreshed.marketplace.pluginCount, 2, "缺 name 的条目被跳过");
     assert.ok(refreshed.marketplace.lastRefreshAt);
     assert.equal(refreshed.marketplace.lastError, undefined);
   });
 
-  it("清单读不出来时用户显式刷新报错，内置市场只记账", () => {
+  it("清单读不出来时用户显式刷新报错，内置市场只记账", async () => {
     const { service } = setup();
     const empty = makeDir();
     service.create({ name: "broken-market", source: { source: "directory", path: empty } });
-    assert.throws(
-      () => service.refresh({ name: "broken-market" }),
+    await assert.rejects(
+      service.refresh({ name: "broken-market" }),
       (error: unknown) =>
         error instanceof Error && (error as { code?: string }).code === "marketplace_invalid",
     );
 
-    // 内置的 claude-plugins-official 是 github 源，网络底座落地前刷新一律静默降级
-    const builtin = service.refresh({ name: "claude-plugins-official" });
+    // 内置的 claude-plugins-official 是 github 源：克隆失败只记账，不打扰用户
+    const builtin = await service.refresh({ name: "claude-plugins-official" });
     assert.equal(builtin.marketplace.refreshedOk, false);
-    assert.match(builtin.marketplace.lastError ?? "", /来源尚未支持/);
+    assert.match(builtin.marketplace.lastError ?? "", /测试里不连网/);
   });
 });
 
@@ -142,5 +159,75 @@ describe("市场移除", () => {
     assert.equal(removed.removed, true);
     assert.deepEqual(removed.orphanedPlugins, ["orphan@my-market"]);
     assert.equal(state.get().installed.length, 1, "插件登记保留，由用户决定怎么处理");
+  });
+});
+
+describe("网络市场", () => {
+  const catalogBody = (count: number): Uint8Array =>
+    new TextEncoder().encode(
+      JSON.stringify({
+        name: "remote-market",
+        plugins: Array.from({ length: count }, (_, index) => ({ name: `p${index}` })),
+      }),
+    );
+
+  it("url 市场：条件请求取清单，记 etag 与内容哈希；304 视为未变", async () => {
+    const calls: { headers?: Record<string, string> }[] = [];
+    const withFetch = setup();
+    const market = createMarketplaceService({
+      state: withFetch.state,
+      events: { emitControl: () => undefined } as unknown as SessionEventBus,
+      pluginsDir: withFetch.pluginsDir,
+      run: async () => ({ stdout: "" }),
+      fetch: async (input) => {
+        calls.push({ headers: input.headers });
+        return {
+          url: new URL(input.url),
+          status: calls.length === 1 ? 200 : 304,
+          body: catalogBody(2),
+          truncated: false,
+          contentType: "application/json",
+          etag: 'W/"abc"',
+          lastModified: null,
+        };
+      },
+    });
+
+    market.create({
+      name: "remote-market",
+      source: { source: "url", url: "https://example.com/marketplace.json" },
+    });
+    const first = await market.refresh({ name: "remote-market" });
+    assert.equal(first.marketplace.refreshedOk, true);
+    assert.equal(first.marketplace.pluginCount, 2);
+
+    const second = await market.refresh({ name: "remote-market" });
+    assert.equal(second.marketplace.refreshedOk, true);
+    assert.equal(second.marketplace.pluginCount, 2, "304 时保留上次条目数");
+    assert.equal(calls[1]?.headers?.["if-none-match"], 'W/"abc"', "第二次带条件请求头");
+  });
+
+  it("git 市场：克隆后读仓根的 marketplace.json，并记克隆副本的内容哈希", async () => {
+    const pluginsDir = makeDir();
+    const run: SourceRunner = async (file, args) => {
+      assert.equal(file, "git");
+      const target = args[args.length - 1] ?? "";
+      // git clone 会自己建目录，替身要把这一步补上
+      mkdirSync(target, { recursive: true });
+      writeFileSync(
+        join(target, "marketplace.json"),
+        JSON.stringify({ name: "git-market", plugins: [{ name: "a" }, { name: "b" }] }),
+        "utf8",
+      );
+      return { stdout: "" };
+    };
+    const { service } = setup({ run, pluginsDir });
+
+    service.create({ name: "git-market", source: { source: "github", repo: "owner/repo" } });
+    const refreshed = await service.refresh({ name: "git-market" });
+
+    assert.equal(refreshed.marketplace.refreshedOk, true);
+    assert.equal(refreshed.marketplace.pluginCount, 2);
+    assert.ok(existsSync(join(pluginsDir, "marketplaces", "git-market", "marketplace.json")));
   });
 });

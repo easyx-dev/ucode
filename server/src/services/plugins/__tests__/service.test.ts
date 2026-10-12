@@ -1,5 +1,6 @@
 /** services/plugins：安装 / 启停 / 卸载 / 重拉，以及装配期资产目录与变更广播 */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,9 +21,8 @@ const makeDir = (prefix = "plugin-svc-"): string => {
   return dir;
 };
 
-/** 造一个插件包：清单 + 一个技能 + 一个命令 */
-const makePlugin = (name: string, version = "1.0.0"): string => {
-  const root = makeDir();
+/** 在指定目录里造一个插件包：清单 + 一个技能 + 一个命令 */
+const makePluginTree = (root: string, name: string, version = "1.0.0"): string => {
   mkdirSync(join(root, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
   writeFileSync(
     join(root, PLUGIN_MANIFEST_DIRNAME, "plugin.json"),
@@ -35,6 +35,10 @@ const makePlugin = (name: string, version = "1.0.0"): string => {
   writeFileSync(join(root, "commands", "db", "migrate.md"), "正文", "utf8");
   return root;
 };
+
+/** 造一个独立的临时插件包目录 */
+const makePlugin = (name: string, version = "1.0.0"): string =>
+  makePluginTree(makeDir(), name, version);
 
 const setup = (input: { pluginsDir?: string } = {}) => {
   const statePath = join(makeDir("plugin-state-"), "plugins.json");
@@ -60,11 +64,11 @@ afterEach(() => {
 });
 
 describe("安装与登记", () => {
-  it("按本地目录安装：回执带视图与代次，并广播 plugins_changed", () => {
+  it("按本地目录安装：回执带视图与代次，并广播 plugins_changed", async () => {
     const { service, frames, revisions } = setup();
     const root = makePlugin("my-plugin");
 
-    const result = service.create({
+    const result = await service.create({
       source: { source: "directory", path: root },
       scope: "user",
       enabled: true,
@@ -88,57 +92,80 @@ describe("安装与登记", () => {
     assert.equal(frames[0]?.type === "plugins_changed" ? frames[0].plugins.plugins.length : -1, 1);
   });
 
-  it("未实现的来源明确拒绝，不做静默降级", () => {
-    const { service } = setup();
-    assert.throws(
-      () =>
-        service.create({ source: { source: "npm", package: "pkg" }, scope: "user", enabled: true }),
-      (error: unknown) =>
-        error instanceof Error && (error as { code?: string }).code === "plugin_source_invalid",
+  it("网络来源：git 装进版本化缓存目录，暂存目录不留盘", async () => {
+    const { service, pluginsDir } = setup();
+    const repo = makeDir("plugin-repo-");
+    makePluginTree(join(repo, "pkg"), "git-demo");
+    const git = (...args: string[]): void => {
+      execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+
+    const created = await service.create({
+      source: { source: "git", url: repo, path: "pkg" },
+      scope: "user",
+      enabled: true,
+    });
+
+    assert.equal(created.plugin.id, "git-demo@local");
+    assert.equal(created.plugin.path, join(pluginsDir, "cache", "local", "git-demo", "1.0.0"));
+    assert.equal(
+      existsSync(join(created.plugin.path, PLUGIN_MANIFEST_DIRNAME, "plugin.json")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(pluginsDir, "cache", "local", ".staging")),
+      false,
+      "暂存目录装完即清",
     );
   });
 
-  it("清单坏了直接失败；重复登记与未登记市场同样拒绝", () => {
+  it("清单坏了直接失败；重复登记与未登记市场同样拒绝", async () => {
     const { service } = setup();
     const broken = makeDir();
     mkdirSync(join(broken, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
     writeFileSync(join(broken, PLUGIN_MANIFEST_DIRNAME, "plugin.json"), "{oops", "utf8");
-    assert.throws(
-      () =>
-        service.create({
-          source: { source: "directory", path: broken },
-          scope: "user",
-          enabled: true,
-        }),
+    await assert.rejects(
+      service.create({
+        source: { source: "directory", path: broken },
+        scope: "user",
+        enabled: true,
+      }),
       (error: unknown) =>
         error instanceof Error && (error as { code?: string }).code === "plugin_manifest_invalid",
     );
 
     const root = makePlugin("dup");
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
-    assert.throws(
-      () =>
-        service.create({
-          source: { source: "directory", path: root },
-          scope: "user",
-          enabled: true,
-        }),
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
+    await assert.rejects(
+      service.create({
+        source: { source: "directory", path: root },
+        scope: "user",
+        enabled: true,
+      }),
       /插件已登记/,
     );
-    assert.throws(
-      () =>
-        service.create({
-          source: { source: "directory", path: root },
-          marketplace: "nope",
-          scope: "user",
-          enabled: true,
-        }),
+    await assert.rejects(
+      service.create({
+        source: { source: "directory", path: root },
+        marketplace: "nope",
+        scope: "user",
+        enabled: true,
+      }),
       (error: unknown) =>
         error instanceof Error && (error as { code?: string }).code === "marketplace_invalid",
     );
   });
 
-  it("归属内置市场时来源档位是 official", () => {
+  it("归属内置市场时来源档位是 official", async () => {
     const { service, state } = setup();
     state.set({
       ...state.get(),
@@ -154,7 +181,7 @@ describe("安装与登记", () => {
       ],
     });
     const root = makePlugin("official-plugin");
-    const result = service.create({
+    const result = await service.create({
       source: { source: "directory", path: root },
       marketplace: "my-official",
       scope: "user",
@@ -166,10 +193,14 @@ describe("安装与登记", () => {
 });
 
 describe("启停 / 卸载 / 重拉", () => {
-  it("启停只动开关，卸载移除登记，重拉按源目录更新版本", () => {
+  it("启停只动开关，卸载移除登记，重拉按源目录更新版本", async () => {
     const { service, state } = setup();
     const root = makePlugin("my-plugin", "1.0.0");
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
 
     const disabled = service.update({ id: "my-plugin@local", enabled: false });
     assert.equal(disabled.plugin.enabled, false);
@@ -180,7 +211,7 @@ describe("启停 / 卸载 / 重拉", () => {
       JSON.stringify({ name: "my-plugin", version: "2.0.0" }),
       "utf8",
     );
-    assert.equal(service.refresh({ id: "my-plugin@local" }).plugin.version, "2.0.0");
+    assert.equal((await service.refresh({ id: "my-plugin@local" })).plugin.version, "2.0.0");
 
     const removed = service.delete({ id: "my-plugin@local", purge: false });
     assert.equal(removed.removed, true);
@@ -189,11 +220,15 @@ describe("启停 / 卸载 / 重拉", () => {
     assert.throws(() => service.update({ id: "my-plugin@local", enabled: true }), /插件不存在/);
   });
 
-  it("purge 只删插件根内的内容与插件数据目录，不动用户自己的源目录", () => {
+  it("purge 只删插件根内的内容与插件数据目录，不动用户自己的源目录", async () => {
     const pluginsDir = makeDir("plugin-root-");
     const { service } = setup({ pluginsDir });
     const source = makePlugin("src-plugin");
-    service.create({ source: { source: "directory", path: source }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: source },
+      scope: "user",
+      enabled: true,
+    });
 
     // 数据目录预先造出来，验证 purge 会清它
     const dataDir = join(pluginsDir, "data", "src-plugin-local");
@@ -208,10 +243,14 @@ describe("启停 / 卸载 / 重拉", () => {
 });
 
 describe("装配期资产目录", () => {
-  it("只收启用插件的技能 / 命令目录，去重后给出", () => {
+  it("只收启用插件的技能 / 命令目录，去重后给出", async () => {
     const { service } = setup();
     const root = makePlugin("my-plugin");
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
 
     assert.deepEqual(service.commandAssets(), {
       skills: [join(realpathSync(root), "skills")],
@@ -239,13 +278,13 @@ describe("执行类组件的来源门控", () => {
     return root;
   };
 
-  const createInMarket = (
+  const createInMarket = async (
     service: ReturnType<typeof setup>["service"],
     state: ReturnType<typeof setup>["state"],
     root: string,
     marketplace: string,
     builtin: boolean,
-  ): void => {
+  ): Promise<void> => {
     state.set({
       ...state.get(),
       marketplaces: [
@@ -259,7 +298,7 @@ describe("执行类组件的来源门控", () => {
         },
       ],
     });
-    service.create({
+    await service.create({
       source: { source: "directory", path: root },
       marketplace,
       scope: "user",
@@ -267,16 +306,20 @@ describe("执行类组件的来源门控", () => {
     });
   };
 
-  it("本地与官方来源注入扩展与 bin；第三方市场只出诊断", () => {
+  it("本地与官方来源注入扩展与 bin；第三方市场只出诊断", async () => {
     const { service, state } = setup();
     const local = makePluginWithExecutables("local-plugin");
-    service.create({ source: { source: "directory", path: local }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: local },
+      scope: "user",
+      enabled: true,
+    });
 
     const official = makePluginWithExecutables("official-plugin");
-    createInMarket(service, state, official, "our-official", true);
+    await createInMarket(service, state, official, "our-official", true);
 
     const thirdParty = makePluginWithExecutables("market-plugin");
-    createInMarket(service, state, thirdParty, "third-party", false);
+    await createInMarket(service, state, thirdParty, "third-party", false);
 
     const real = (path: string): string => join(realpathSync(path), "");
     assert.deepEqual(
@@ -292,10 +335,14 @@ describe("执行类组件的来源门控", () => {
     assert.deepEqual(blocked?.blocked, ["extensions", "bin"], "第三方市场被标为不注入");
   });
 
-  it("插件停用后它的扩展与 bin 也不再注入", () => {
+  it("插件停用后它的扩展与 bin 也不再注入", async () => {
     const { service } = setup();
     const root = makePluginWithExecutables("local-plugin");
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
     assert.equal(service.extensionPaths().length, 1);
 
     service.update({ id: "local-plugin@local", enabled: false });
@@ -305,7 +352,7 @@ describe("执行类组件的来源门控", () => {
 });
 
 describe("插件子角色", () => {
-  it("启用插件的角色进 agentProfiles，停用后退出", () => {
+  it("启用插件的角色进 agentProfiles，停用后退出", async () => {
     const { service } = setup();
     const root = makeDir();
     mkdirSync(join(root, PLUGIN_MANIFEST_DIRNAME), { recursive: true });
@@ -321,7 +368,11 @@ describe("插件子角色", () => {
       "utf8",
     );
 
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
     assert.deepEqual(
       service.agentProfiles().map((agent) => [agent.slug, agent.tools]),
       [["agent-plugin-reviewer", ["read", "grep"]]],
@@ -353,10 +404,14 @@ describe("hooks 的来源门控与解析", () => {
     },
   };
 
-  it("本地来源的 hooks 解析成绑定并标出被忽略的事件；第三方市场的不挂载", () => {
+  it("本地来源的 hooks 解析成绑定并标出被忽略的事件；第三方市场的不挂载", async () => {
     const { service, state } = setup();
     const local = makePluginWithHooks("local-hooks", bindHooks);
-    service.create({ source: { source: "directory", path: local }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: local },
+      scope: "user",
+      enabled: true,
+    });
 
     const hooks = service.hooks();
     assert.equal(hooks.length, 1);
@@ -383,7 +438,7 @@ describe("hooks 的来源门控与解析", () => {
         },
       ],
     });
-    service.create({
+    await service.create({
       source: { source: "directory", path: thirdParty },
       marketplace: "third-party",
       scope: "user",
@@ -397,10 +452,14 @@ describe("hooks 的来源门控与解析", () => {
     );
   });
 
-  it("停用插件后它的 hook 也退出挂载表", () => {
+  it("停用插件后它的 hook 也退出挂载表", async () => {
     const { service } = setup();
     const root = makePluginWithHooks("local-hooks", bindHooks);
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
     assert.equal(service.hooks().length, 1);
 
     service.update({ id: "local-hooks@local", enabled: false });
@@ -409,10 +468,14 @@ describe("hooks 的来源门控与解析", () => {
 });
 
 describe("来源已变检测", () => {
-  it("安装时记目录内容哈希；目录改动后 checkUpdates 标出新版本，重拉后清掉", () => {
+  it("安装时记目录内容哈希；目录改动后 checkUpdates 标出新版本，重拉后清掉", async () => {
     const { service, state } = setup();
     const root = makePlugin("my-plugin");
-    service.create({ source: { source: "directory", path: root }, scope: "user", enabled: true });
+    await service.create({
+      source: { source: "directory", path: root },
+      scope: "user",
+      enabled: true,
+    });
 
     const record = state.get().installed[0];
     assert.match(record?.integrity ?? "", /^[0-9a-f]{64}$/, "安装即记录内容哈希");
@@ -434,7 +497,7 @@ describe("来源已变检测", () => {
     assert.ok(view?.checkedAt);
 
     // 重拉 = 接受当前内容
-    service.refresh({ id: "my-plugin@local" });
+    await service.refresh({ id: "my-plugin@local" });
     assert.equal(service.list().plugins[0]?.updateAvailable, false);
     assert.equal(service.checkUpdates(), 0);
   });

@@ -4,13 +4,17 @@
  * 宽松解析：条目级错误只跳过该条目并出诊断，清单整体坏了才抛 `marketplace_invalid`——
  * 与插件清单同一口径。条目的来源解析（相对路径 / github / npm）属于包拉取那一步。
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ERROR_CODES, type PluginDiagnosticView } from "@ucode/contracts";
 import { z } from "zod";
 
-import { PLUGIN_MARKETPLACE_FILENAME } from "../../constants/dirs";
+import {
+  PLUGIN_COMPAT_MANIFEST_DIRNAMES,
+  PLUGIN_MANIFEST_DIRNAME,
+  PLUGIN_MARKETPLACE_FILENAME,
+} from "../../constants/dirs";
 import { AppError } from "../../platform/response";
 import { isRecord } from "../../utils/object";
 import { describeError, diagnostic } from "./diagnostic";
@@ -40,20 +44,23 @@ const entrySchema = z.object({
   version: z.string().optional(),
 });
 
-/** 读本地目录市场的清单；文件缺失、不是 JSON 对象或字段类型不符都抛 `marketplace_invalid` */
-export const readMarketplaceCatalog = (
-  marketDir: string,
+/**
+ * 解析市场清单内容：url 市场喂响应正文，本地 / git 市场喂文件内容。
+ * 形状不对（不是 JSON 对象、`plugins` 不是数组）抛 `marketplace_invalid`；条目级问题只出诊断。
+ */
+export const parseMarketplaceCatalog = (
+  content: string,
   fallbackName: string,
+  origin: string,
 ): MarketplaceCatalog => {
-  const file = join(marketDir, PLUGIN_MARKETPLACE_FILENAME);
   const invalid = (reason: string, details?: unknown): AppError =>
-    new AppError(ERROR_CODES.marketplaceInvalid, `市场清单无效：${file}`, 400, details, {
+    new AppError(ERROR_CODES.marketplaceInvalid, `市场清单无效：${origin}`, 400, details, {
       reason,
     });
 
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(file, "utf8"));
+    raw = JSON.parse(content);
   } catch (error) {
     throw invalid(`读不出来（${describeError(error)}）`);
   }
@@ -78,4 +85,37 @@ export const readMarketplaceCatalog = (
   });
 
   return { name: parsed.data.name?.trim() || fallbackName, entries, diagnostics };
+};
+
+/**
+ * 市场清单文件的位置：与插件清单同一套三档识别（`.<slug>-plugin` → `.zcode-plugin` → `.claude-plugin`），
+ * 都没有再看仓根——Claude 官方市场仓就把清单放在 `.claude-plugin/marketplace.json`。
+ */
+export const findMarketplaceFile = (marketDir: string): string => {
+  for (const dirname of [PLUGIN_MANIFEST_DIRNAME, ...PLUGIN_COMPAT_MANIFEST_DIRNAMES]) {
+    const file = join(marketDir, dirname, PLUGIN_MARKETPLACE_FILENAME);
+    if (existsSync(file)) return file;
+  }
+  return join(marketDir, PLUGIN_MARKETPLACE_FILENAME);
+};
+
+/** 读本地目录市场的清单；文件缺失或形状不对都抛 `marketplace_invalid` */
+export const readMarketplaceCatalog = (
+  marketDir: string,
+  fallbackName: string,
+): MarketplaceCatalog => {
+  const file = findMarketplaceFile(marketDir);
+  let content: string;
+  try {
+    content = readFileSync(file, "utf8");
+  } catch (error) {
+    throw new AppError(
+      ERROR_CODES.marketplaceInvalid,
+      `市场清单无效：${file}`,
+      400,
+      describeError(error),
+      { reason: `读不出来（${describeError(error)}）` },
+    );
+  }
+  return parseMarketplaceCatalog(content, fallbackName, file);
 };

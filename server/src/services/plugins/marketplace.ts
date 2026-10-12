@@ -5,6 +5,10 @@
  * url / github / git 来源在公共网络底座落地前一律按「来源尚未支持」处理——内置市场（如
  * `claude-plugins-official`）失败只落 `lastError`，用户显式刷新则把失败报出去。
  */
+
+import { createHash } from "node:crypto";
+import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import {
   ERROR_CODES,
   type MarketplaceCreateInput,
@@ -15,17 +19,26 @@ import {
   type MarketplaceView,
   type MarketplaceWriteResponse,
 } from "@ucode/contracts";
-
+import { PLUGIN_MARKETPLACES_DIRNAME } from "../../constants/dirs";
+import {
+  PLUGIN_FETCH_TIMEOUT_MS,
+  PLUGIN_GIT_TIMEOUT_MS,
+  PLUGIN_MARKETPLACE_MAX_BYTES,
+} from "../../constants/plugins";
 import type { SessionEventBus } from "../../core/event-bus";
+import { env } from "../../env";
 import { describeError } from "../../harness/plugins/diagnostic";
-import { readMarketplaceCatalog } from "../../harness/plugins/marketplace";
+import { parseMarketplaceCatalog, readMarketplaceCatalog } from "../../harness/plugins/marketplace";
+import { hashDirectory } from "../../harness/plugins/source-hash";
 import type {
   PluginMarketplaceRecord,
   PluginSourceSpec,
   PluginState,
 } from "../../harness/plugins/state";
+import { type PublicFetchResult, publicFetch } from "../../platform/net";
 import { resolveExistingPath, resolveTargetPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
+import { SourceError, type SourceRunner } from "./sources";
 import type { PluginStateStore } from "./state";
 
 export type MarketplaceServiceDeps = {
@@ -35,13 +48,26 @@ export type MarketplaceServiceDeps = {
   onRegistryChange?: (revision: number) => void;
   /** 清单刷新成功后顺带重算已装插件的「来源是否已变」（由插件服务提供） */
   onCatalogRefreshed?: () => void;
+  /** 出网取流（url 市场）；测试可替换 */
+  fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
+  /** 进程调用（git 市场）；测试可替换 */
+  run?: SourceRunner;
+  /** 插件根：市场仓库的克隆副本落在 `marketplaces/<market>` 下 */
+  pluginsDir?: string;
+};
+
+/** 默认的进程调用：与来源拉取同一套（execa） */
+const defaultSourceRunner: SourceRunner = async (file, args, options) => {
+  const { execa } = await import("execa");
+  const result = await execa(file, args, { timeout: options.timeout, reject: true });
+  return { stdout: typeof result.stdout === "string" ? result.stdout : "" };
 };
 
 export type MarketplaceService = {
   list(): MarketplacesListResponse;
   create(input: MarketplaceCreateInput): MarketplaceWriteResponse;
   delete(input: MarketplaceDeleteInput): MarketplaceDeleteResponse;
-  refresh(input: MarketplaceRefreshInput): MarketplaceWriteResponse;
+  refresh(input: MarketplaceRefreshInput): Promise<MarketplaceWriteResponse>;
 };
 
 /** 来源的展示用字面量：设置页只读它，不 parse 结构 */
@@ -102,7 +128,14 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
   /** 刷新结果写回：成功时清掉上一次的 `lastError` */
   const recordRefresh = (
     name: string,
-    patch: { lastError?: string; pluginCount?: number; refreshedOk: boolean },
+    patch: {
+      lastError?: string;
+      pluginCount?: number;
+      refreshedOk: boolean;
+      etag?: string | null;
+      lastModified?: string | null;
+      integrity?: string;
+    },
   ): void => {
     commit((current) => ({
       ...current,
@@ -115,22 +148,95 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           lastRefreshAt: new Date().toISOString(),
           ...(patch.pluginCount === undefined ? {} : { pluginCount: patch.pluginCount }),
           ...(patch.lastError === undefined ? {} : { lastError: patch.lastError }),
+          ...(patch.etag ? { etag: patch.etag } : {}),
+          ...(patch.lastModified ? { lastModified: patch.lastModified } : {}),
+          ...(patch.integrity === undefined ? {} : { integrity: patch.integrity }),
         };
       }),
     }));
   };
 
-  /** 网络来源尚不可用：用户显式刷新时报错，内置市场静默记账 */
-  const reportUnsupportedSource = (record: PluginMarketplaceRecord): void => {
-    const error = new AppError(
-      ERROR_CODES.marketplaceInvalid,
-      `市场来源尚未支持：${record.source.source}`,
-      400,
-      undefined,
-      { reason: record.source.source },
-    );
+  /** 网络来源失败：用户显式刷新时报错，内置市场静默记账 */
+  const reportSourceFailure = (record: PluginMarketplaceRecord, error: unknown): void => {
     if (!record.builtin) throw error;
     recordRefresh(record.name, { refreshedOk: false, lastError: describeError(error) });
+  };
+
+  /** url 市场：条件请求取清单；304 视为未变 */
+  const refreshUrlMarket = async (
+    record: PluginMarketplaceRecord,
+    source: Extract<PluginMarketplaceRecord["source"], { source: "url" }>,
+  ): Promise<void> => {
+    const headers: Record<string, string> = { accept: "application/json" };
+    if (record.etag) headers["if-none-match"] = record.etag;
+    if (record.lastModified) headers["if-modified-since"] = record.lastModified;
+
+    const response = await (deps.fetch ?? publicFetch)({
+      url: source.url,
+      headers,
+      maxBytes: PLUGIN_MARKETPLACE_MAX_BYTES,
+      timeoutMs: PLUGIN_FETCH_TIMEOUT_MS,
+    });
+
+    if (response.status === 304) {
+      recordRefresh(record.name, { refreshedOk: true, pluginCount: record.pluginCount });
+      return;
+    }
+    if (response.status < 200 || response.status >= 300) {
+      throw new AppError(
+        ERROR_CODES.marketplaceInvalid,
+        `市场清单取不到：HTTP ${response.status} ${response.url.href}`,
+        400,
+        undefined,
+        { reason: `HTTP ${response.status}` },
+      );
+    }
+
+    const catalog = parseMarketplaceCatalog(
+      new TextDecoder().decode(response.body),
+      record.name,
+      response.url.href,
+    );
+    recordRefresh(record.name, {
+      refreshedOk: true,
+      pluginCount: catalog.entries.length,
+      etag: response.etag,
+      lastModified: response.lastModified,
+      integrity: createHash("sha256").update(response.body).digest("hex"),
+    });
+  };
+
+  /** git / github 市场：浅克隆到 `marketplaces/<market>`，清单取克隆副本的仓根 */
+  const refreshGitMarket = async (
+    record: PluginMarketplaceRecord,
+    source: Extract<PluginMarketplaceRecord["source"], { source: "git" | "github" }>,
+  ): Promise<void> => {
+    const run = deps.run ?? defaultSourceRunner;
+    const root = resolve(deps.pluginsDir ?? env.pluginsDir, PLUGIN_MARKETPLACES_DIRNAME);
+    const target = join(root, record.name);
+    const staging = join(root, `${record.name}.staging`);
+
+    const url = source.source === "git" ? source.url : `https://github.com/${source.repo}.git`;
+    rmSync(staging, { recursive: true, force: true });
+    mkdirSync(dirname(staging), { recursive: true });
+    try {
+      const args = ["clone", "--depth", "1"];
+      if (source.ref) args.push("--branch", source.ref);
+      args.push(url, staging);
+      await run("git", args, { timeout: PLUGIN_GIT_TIMEOUT_MS });
+      rmSync(target, { recursive: true, force: true });
+      renameSync(staging, target);
+    } catch (error) {
+      rmSync(staging, { recursive: true, force: true });
+      throw error instanceof Error ? error : new SourceError(String(error));
+    }
+
+    const catalog = readMarketplaceCatalog(target, record.name);
+    recordRefresh(record.name, {
+      refreshedOk: true,
+      pluginCount: catalog.entries.length,
+      integrity: hashDirectory(target)?.hash,
+    });
   };
 
   return {
@@ -186,25 +292,37 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       return { removed: true, orphanedPlugins, revision: state.get().revision };
     },
 
-    refresh(input) {
+    async refresh(input) {
       const record = requireMarketplace(input.name);
-      if (record.source.source !== "directory") {
-        reportUnsupportedSource(record);
-        return {
-          marketplace: toView(requireMarketplace(record.name)),
-          revision: state.get().revision,
-        };
-      }
+      const source = record.source;
 
       try {
-        const catalog = readMarketplaceCatalog(resolveTargetPath(record.source.path), record.name);
-        recordRefresh(record.name, { refreshedOk: true, pluginCount: catalog.entries.length });
+        if (source.source === "directory") {
+          const marketDir = resolveTargetPath(source.path);
+          const catalog = readMarketplaceCatalog(marketDir, record.name);
+          recordRefresh(record.name, {
+            refreshedOk: true,
+            pluginCount: catalog.entries.length,
+            integrity: hashDirectory(marketDir)?.hash,
+          });
+        } else if (source.source === "url") {
+          await refreshUrlMarket(record, source);
+        } else if (source.source === "git" || source.source === "github") {
+          await refreshGitMarket(record, source);
+        } else {
+          throw new AppError(
+            ERROR_CODES.marketplaceInvalid,
+            `市场来源尚未支持：${source.source}`,
+            400,
+            undefined,
+            { reason: source.source },
+          );
+        }
         // 刷新市场是「显式检查更新」的入口：顺手把已装插件的来源变动算出来
         onCatalogRefreshed?.();
       } catch (error) {
-        // 用户显式刷新：把失败报出去；内置市场只记账，不打扰
-        if (!record.builtin) throw error;
-        recordRefresh(record.name, { refreshedOk: false, lastError: describeError(error) });
+        // 用户显式刷新把失败报出去；内置市场只记账，不打扰
+        reportSourceFailure(record, error);
       }
       return {
         marketplace: toView(requireMarketplace(record.name)),

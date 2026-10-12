@@ -32,8 +32,10 @@ export const createMarketplaceRoute = (services: Services) => {
     return c.json(ok(response));
   });
 
-  router.post("/refresh", jsonBody(marketplaceRefreshInputSchema), (c) => {
-    const response: MarketplaceWriteResponse = services.marketplaces.refresh(c.req.valid("json"));
+  router.post("/refresh", jsonBody(marketplaceRefreshInputSchema), async (c) => {
+    const response: MarketplaceWriteResponse = await services.marketplaces.refresh(
+      c.req.valid("json"),
+    );
     return c.json(ok(response));
   });
 

@@ -16,8 +16,8 @@ import {
   WEBFETCH_MAX_TIMEOUT_MS,
   WEBFETCH_USER_AGENT,
 } from "../../../constants/tools";
+import { publicFetch } from "../../../platform/net";
 import { wrapUntrusted } from "../../utils/boundary";
-import { assertPublicUrl, BlockedTargetError } from "./ssrf";
 
 const webfetchSchema = Type.Object({
   url: Type.String({ description: "要抓取的 http/https 链接" }),
@@ -40,8 +40,6 @@ export type WebfetchDetails = {
   /** 返回给模型的格式：HTML 转 markdown，其余原样 */
   format: "markdown" | "text";
 };
-
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** 截断提示：抓取上限（网络 / 内存）与输出上限（上下文）分别说明，模型才知道要不要换个抓法 */
 const truncationNote = (fetched: boolean, output: boolean): string => {
@@ -81,68 +79,6 @@ const capForModel = (body: string): { body: string; truncated: boolean } => {
   };
 };
 
-/** 按字节上限读取响应体；到上限即停读并取消后续，避免为了一篇超大页面把内存吃满 */
-export const readBodyLimited = async (
-  body: ReadableStream<Uint8Array> | null,
-  limit: number,
-): Promise<{ text: string; bytes: number; truncated: boolean }> => {
-  if (!body) return { text: "", bytes: 0, truncated: false };
-
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  let bytes = 0;
-  let truncated = false;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes >= limit) {
-        text += decoder.decode(value.subarray(0, value.byteLength - (bytes - limit)), {
-          stream: true,
-        });
-        truncated = true;
-        break;
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-  return { text: `${text}${decoder.decode()}`, bytes: Math.min(bytes, limit), truncated };
-};
-
-/** 手动跟随重定向：每一跳都重新做目标准入，`redirect: "follow"` 做不到这件事 */
-const fetchDocument = async (
-  rawUrl: string,
-  timeoutMs: number,
-  signal: AbortSignal | undefined,
-): Promise<{ url: URL; response: Response }> => {
-  let target = await assertPublicUrl(rawUrl);
-  const timeout = AbortSignal.timeout(timeoutMs);
-
-  for (let hop = 0; hop <= WEBFETCH_MAX_REDIRECTS; hop += 1) {
-    const response = await fetch(target, {
-      redirect: "manual",
-      headers: {
-        accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-        "user-agent": WEBFETCH_USER_AGENT,
-      },
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-    });
-
-    if (!REDIRECT_STATUSES.has(response.status)) return { url: target, response };
-
-    const location = response.headers.get("location");
-    await response.body?.cancel().catch(() => undefined);
-    if (!location) throw new BlockedTargetError(`重定向缺少 Location：${target.href}`);
-    target = await assertPublicUrl(new URL(location, target));
-  }
-
-  throw new BlockedTargetError(`重定向超过 ${WEBFETCH_MAX_REDIRECTS} 次，已放弃`);
-};
-
 /** timeout 参数按秒收：缺省或非法回落默认值，超出上限即钳到上限 */
 const resolveTimeoutMs = (seconds: number | undefined): number => {
   if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) {
@@ -170,18 +106,24 @@ export const createWebfetchTool = () =>
     ],
     parameters: webfetchSchema,
     async execute(_toolCallId, { url, timeout }, signal) {
-      const { url: finalUrl, response } = await fetchDocument(
+      const fetched = await publicFetch({
         url,
-        resolveTimeoutMs(timeout),
-        signal,
-      );
+        maxBytes: WEBFETCH_MAX_BYTES,
+        timeoutMs: resolveTimeoutMs(timeout),
+        maxRedirects: WEBFETCH_MAX_REDIRECTS,
+        headers: {
+          accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+          "user-agent": WEBFETCH_USER_AGENT,
+        },
+        ...(signal ? { signal } : {}),
+      });
 
-      if (!response.ok) {
-        throw new Error(`抓取失败：HTTP ${response.status} ${finalUrl.href}`);
+      if (fetched.status < 200 || fetched.status >= 300) {
+        throw new Error(`抓取失败：HTTP ${fetched.status} ${fetched.url.href}`);
       }
 
-      const fetched = await readBodyLimited(response.body, WEBFETCH_MAX_BYTES);
-      const { body, format } = toBody(fetched.text, response.headers.get("content-type") ?? "");
+      const text = new TextDecoder().decode(fetched.body);
+      const { body, format } = toBody(text, fetched.contentType ?? "");
       const output = capForModel(body);
       const note = truncationNote(fetched.truncated, output.truncated);
 
@@ -189,12 +131,12 @@ export const createWebfetchTool = () =>
         content: [
           {
             type: "text",
-            text: wrapUntrusted("fetched", { url: finalUrl.href }, `${output.body}${note}`),
+            text: wrapUntrusted("fetched", { url: fetched.url.href }, `${output.body}${note}`),
           },
         ],
         details: {
-          url: finalUrl.href,
-          bytes: fetched.bytes,
+          url: fetched.url.href,
+          bytes: fetched.body.byteLength,
           truncated: fetched.truncated || output.truncated,
           format,
         },

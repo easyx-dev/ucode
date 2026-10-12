@@ -4,8 +4,8 @@
  * 安装只支持本地目录来源（`directory`，内容不复制）：url / npm / github / git 需要网络底座与解包，
  * 属市场那一步，本轮一律回 `plugin_source_invalid` 并说明原因，不做静默降级。
  */
-import { readFileSync, rmSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 
 import {
   ERROR_CODES,
@@ -19,7 +19,7 @@ import {
   type PluginWriteResponse,
 } from "@ucode/contracts";
 
-import { PLUGIN_DATA_DIRNAME } from "../../constants/dirs";
+import { PLUGIN_CACHE_DIRNAME, PLUGIN_DATA_DIRNAME } from "../../constants/dirs";
 import type { SessionEventBus } from "../../core/event-bus";
 import { env } from "../../env";
 import type { PluginHookBinding } from "../../harness/plugins/hooks";
@@ -34,6 +34,7 @@ import { toDataDirName } from "../../harness/plugins/sanitize";
 import { hashDirectory } from "../../harness/plugins/source-hash";
 import {
   type InstalledPluginRecord,
+  LOCAL_MARKETPLACE_NAME,
   type PluginSourceSpec,
   type PluginState,
   toPluginId,
@@ -47,6 +48,7 @@ import type {
 import { toPluginView } from "../../harness/plugins/view";
 import { isInsidePath, resolveExistingPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
+import { stagePluginSource } from "./sources";
 import type { PluginStateStore } from "./state";
 
 export type PluginServiceDeps = {
@@ -79,10 +81,10 @@ export type PluginService = {
    * 只在显式动作（刷新市场 / 重拉）里跑——列表接口不做这类扫描。返回结果变化的插件数。
    */
   checkUpdates(): number;
-  create(input: PluginCreateInput): PluginWriteResponse;
+  create(input: PluginCreateInput): Promise<PluginWriteResponse>;
   update(input: PluginUpdateInput): PluginWriteResponse;
   delete(input: PluginDeleteInput): PluginDeleteResponse;
-  refresh(input: PluginRefreshInput): PluginWriteResponse;
+  refresh(input: PluginRefreshInput): Promise<PluginWriteResponse>;
 };
 
 /** 只接受本地目录来源；其余来源在包拉取落地前明确拒绝，并带上来源名供客户端渲染 */
@@ -145,6 +147,38 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
         revision: next.revision,
       },
     });
+  };
+
+  /** 复制型来源的暂存根：按市场分目录，装完即清理（成功与失败都要） */
+  const stagingRootFor = (marketplace: string | undefined): string =>
+    resolve(pluginsDir, PLUGIN_CACHE_DIRNAME, marketplace ?? LOCAL_MARKETPLACE_NAME, ".staging");
+
+  /** 把暂存目录搬进版本化缓存目录；`staged` 为 false（本地目录来源）时原样返回 */
+  const placeStaged = (input: {
+    staged: { path: string; staged: boolean };
+    marketplace: string | undefined;
+    name: string;
+    version: string;
+    stagingRoot: string;
+  }): string => {
+    if (!input.staged.staged) return input.staged.path;
+    const finalDir = resolve(
+      pluginsDir,
+      PLUGIN_CACHE_DIRNAME,
+      input.marketplace ?? LOCAL_MARKETPLACE_NAME,
+      input.name,
+      input.version,
+    );
+    try {
+      mkdirSync(dirname(finalDir), { recursive: true });
+      // 同版本重拉：先清掉旧副本，避免新旧文件混在一起
+      rmSync(finalDir, { recursive: true, force: true });
+      renameSync(input.staged.path, finalDir);
+    } finally {
+      // 暂存目录一律不留在盘上：它会污染内容哈希与组件扫描
+      rmSync(input.stagingRoot, { recursive: true, force: true });
+    }
+    return finalDir;
   };
 
   /** 本地目录来源的内容哈希；算不出来（不存在 / 超限）时返回 undefined，表示这次不判定 */
@@ -213,66 +247,7 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
           .filter((entry) => entry.group === "bin" && entry.path)
           .map((entry) => entry.path as string),
       ),
-
-    create(input) {
-      const path = assertDirectorySource(input.source);
-      const manifest = readManifestForInstall(path);
-      const name = manifest?.name ?? basename(path);
-      if (!PLUGIN_NAME_PATTERN.test(name)) {
-        throw new AppError(
-          ERROR_CODES.pluginManifestInvalid,
-          `插件名不合法：${name}`,
-          400,
-          undefined,
-          {
-            path,
-          },
-        );
-      }
-      const marketplace = input.marketplace;
-      if (marketplace && !state.get().marketplaces.some((item) => item.name === marketplace)) {
-        throw new AppError(
-          ERROR_CODES.marketplaceInvalid,
-          `市场未登记：${marketplace}`,
-          400,
-          undefined,
-          {
-            reason: marketplace,
-          },
-        );
-      }
-      const id = toPluginId(name, marketplace);
-      if (state.get().installed.some((item) => item.id === id)) {
-        throw new AppError(ERROR_CODES.invalidRequest, `插件已登记：${id}`, 400, undefined, { id });
-      }
-
-      commit((current) => ({
-        ...current,
-        installed: [
-          ...current.installed,
-          {
-            id,
-            name,
-            version: manifest?.version?.trim() || "0.0.0",
-            source: input.source,
-            ...(marketplace ? { marketplace } : {}),
-            path,
-            scope: input.scope,
-            enabled: input.enabled,
-            installedAt: new Date().toISOString(),
-            // 本地目录来源记内容哈希：它是后续「来源已变」判定的基线
-            ...(directoryIntegrity(input.source) === undefined
-              ? {}
-              : { integrity: directoryIntegrity(input.source) as string }),
-            updateAvailable: false,
-            checkedAt: new Date().toISOString(),
-          },
-        ],
-      }));
-      return write(id);
-    },
-
-    checkUpdates() {
+    checkUpdates: () => {
       const now = new Date().toISOString();
       let changed = 0;
       const next = state.get().installed.map((item) => {
@@ -286,6 +261,68 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       if (changed > 0) commit((current) => ({ ...current, installed: next }));
       else state.set({ ...state.get(), installed: next });
       return changed;
+    },
+
+    async create(input) {
+      const marketplace = input.marketplace;
+      if (marketplace && !state.get().marketplaces.some((item) => item.name === marketplace)) {
+        throw new AppError(
+          ERROR_CODES.marketplaceInvalid,
+          `市场未登记：${marketplace}`,
+          400,
+          undefined,
+          { reason: marketplace },
+        );
+      }
+
+      const stagingRoot = stagingRootFor(marketplace);
+      const staged = await stagePluginSource({ source: input.source, stagingRoot });
+      const manifest = readManifestForInstall(staged.path);
+      const name = manifest?.name ?? basename(staged.path);
+      if (!PLUGIN_NAME_PATTERN.test(name)) {
+        rmSync(stagingRoot, { recursive: true, force: true });
+        throw new AppError(
+          ERROR_CODES.pluginManifestInvalid,
+          `插件名不合法：${name}`,
+          400,
+          undefined,
+          {
+            path: staged.path,
+          },
+        );
+      }
+
+      const id = toPluginId(name, marketplace);
+      if (state.get().installed.some((item) => item.id === id)) {
+        rmSync(stagingRoot, { recursive: true, force: true });
+        throw new AppError(ERROR_CODES.invalidRequest, `插件已登记：${id}`, 400, undefined, { id });
+      }
+
+      const version = manifest?.version?.trim() || "0.0.0";
+      const path = placeStaged({ staged, marketplace, name, version, stagingRoot });
+      const integrity = staged.integrity ?? directoryIntegrity(input.source);
+
+      commit((current) => ({
+        ...current,
+        installed: [
+          ...current.installed,
+          {
+            id,
+            name,
+            version,
+            source: input.source,
+            ...(marketplace ? { marketplace } : {}),
+            path,
+            scope: input.scope,
+            enabled: input.enabled,
+            installedAt: new Date().toISOString(),
+            ...(integrity === undefined ? {} : { integrity }),
+            updateAvailable: false,
+            checkedAt: new Date().toISOString(),
+          },
+        ],
+      }));
+      return write(id);
     },
 
     update(input) {
@@ -317,11 +354,22 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       return { removed: true, purged, revision: state.get().revision };
     },
 
-    refresh(input) {
+    async refresh(input) {
       const record = state.requirePlugin(input.id);
-      const path = assertDirectorySource(record.source);
-      const manifest = readManifestForInstall(path);
-      const integrity = directoryIntegrity(record.source);
+      const stagingRoot = stagingRootFor(record.marketplace);
+      const staged = await stagePluginSource({ source: record.source, stagingRoot });
+      const manifest = readManifestForInstall(staged.path);
+      const name = manifest?.name ?? record.name;
+      const version = manifest?.version?.trim() || record.version;
+      const path = placeStaged({
+        staged,
+        marketplace: record.marketplace,
+        name,
+        version,
+        stagingRoot,
+      });
+      const integrity = staged.integrity ?? directoryIntegrity(record.source);
+
       commit((current) => ({
         ...current,
         installed: current.installed.map((item) =>
@@ -330,8 +378,8 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
             : {
                 ...item,
                 path,
-                ...(manifest?.name ? { name: manifest.name } : {}),
-                ...(manifest?.version ? { version: manifest.version } : {}),
+                name,
+                version,
                 ...(integrity === undefined ? {} : { integrity }),
                 updateAvailable: false,
                 checkedAt: new Date().toISOString(),

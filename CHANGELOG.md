@@ -85,6 +85,15 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **网络底座与包拉取（第五步）**：新增 `platform/net`（从 `harness/setup/tools/ssrf.ts` 上提 `assertPublicUrl`
+  与手动重定向取流 `publicFetch`，webfetch 反向引用同一份）；新增依赖 `fflate`（zip）与 `tar`（tgz）。
+  插件来源支持 url / npm / github / git：复制型来源先落暂存目录，读完清单拿到版本号后搬进
+  `plugins/cache/<market>/<plugin>/<version>`；`directory` 来源仍不复制。解包按拒绝处理越界路径、
+  符号链接与硬链接，并有压缩体 32 MiB / 解包 128 MiB / 条目 5000 的上限。
+  市场刷新支持 url（条件请求 + `ETag` / `Last-Modified`，304 视为未变）与 git / github（浅克隆副本），
+  清单按三档识别（`.<slug>-plugin` → `.zcode-plugin` → `.claude-plugin`）再回落仓根——内置的
+  `claude-plugins-official` 因此可正常刷新（实测 315 个插件）。
+
 - **本地目录来源的「已变更」检测**：安装与重拉时记目录内容哈希（有界走查：文件数 / 字节数 / 深度上限，
   跳过 `.git` 与 `node_modules`）；显式刷新市场时重算并标出 `updateAvailable` 与检查时间——
   列表接口本身不扫盘、不打网络。设置页在已变更的插件上显示提示。

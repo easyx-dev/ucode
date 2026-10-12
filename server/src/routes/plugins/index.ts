@@ -23,8 +23,8 @@ export const createPluginsRoute = (services: Services) => {
     return c.json(ok(response));
   });
 
-  router.post("/create", jsonBody(pluginCreateInputSchema), (c) => {
-    const response: PluginWriteResponse = services.plugins.create(c.req.valid("json"));
+  router.post("/create", jsonBody(pluginCreateInputSchema), async (c) => {
+    const response: PluginWriteResponse = await services.plugins.create(c.req.valid("json"));
     return c.json(ok(response));
   });
 
@@ -38,8 +38,8 @@ export const createPluginsRoute = (services: Services) => {
     return c.json(ok(response));
   });
 
-  router.post("/refresh", jsonBody(pluginRefreshInputSchema), (c) => {
-    const response: PluginWriteResponse = services.plugins.refresh(c.req.valid("json"));
+  router.post("/refresh", jsonBody(pluginRefreshInputSchema), async (c) => {
+    const response: PluginWriteResponse = await services.plugins.refresh(c.req.valid("json"));
     return c.json(ok(response));
   });
 
