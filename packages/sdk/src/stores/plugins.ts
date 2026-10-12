@@ -20,6 +20,8 @@ export type PluginsState = {
   marketplaces: MarketplacesListResponse | null;
   /** 按市场名缓存的市场内插件列表：点开才取，刷新市场后清空 */
   catalogs: Record<string, MarketplacePluginsResponse>;
+  /** 安装 / 重拉的阶段提示；完成后由 plugins_changed 清空 */
+  progress: string | null;
   error: ApiError | null;
 };
 
@@ -45,6 +47,7 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
     plugins: null,
     marketplaces: null,
     catalogs: {},
+    progress: null,
     error: null,
   });
 
@@ -55,7 +58,7 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
         deps.apis.marketplace.list(),
       ]);
       // 列表重取意味着市场可能变了，市场内插件缓存一并作废
-      store.setState(() => ({ plugins, marketplaces, catalogs: {}, error: null }));
+      store.setState(() => ({ plugins, marketplaces, catalogs: {}, progress: null, error: null }));
     } catch (error) {
       store.setState((prev) => ({ ...prev, error: asApiError(error) }));
     }
@@ -63,8 +66,18 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
 
   // 控制帧带的是插件列表快照；市场列表随它一起重取（增删市场也会触发这帧）
   deps.events.onEvent((frame) => {
+    if (frame.type === "plugin_progress") {
+      store.setState((prev) => ({ ...prev, progress: frame.message }));
+      return;
+    }
     if (frame.type !== "plugins_changed") return;
-    store.setState((prev) => ({ ...prev, plugins: frame.plugins, catalogs: {}, error: null }));
+    store.setState((prev) => ({
+      ...prev,
+      plugins: frame.plugins,
+      catalogs: {},
+      progress: null,
+      error: null,
+    }));
     void deps.apis.marketplace
       .list()
       .then((marketplaces) => store.setState((prev) => ({ ...prev, marketplaces, error: null })))

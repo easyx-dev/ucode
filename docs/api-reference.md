@@ -1713,6 +1713,13 @@
 | `revision` | number | 是 | — |
 | `plugins` | [PluginsListResponse](#pluginslistresponse) | 是 | — |
 
+**取值之一（type = "plugin_progress"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `type` | "plugin_progress" | 是 | — |
+| `message` | string | 是 | — |
+
 **事件名（`type`）**
 
 - `message_start`
@@ -2062,6 +2069,47 @@
 | `version` | string | 是 | — |
 | `installedId` | string \| null | 是 | 已安装时的插件 id（`<name>@<marketplace>`）；未安装为 null |
 | `updateAvailable` | boolean | 是 | 已安装且可更新；未安装恒为 false |
+| `source` | object（source = "directory" \| "url" \| "npm" \| "github" \| "git"） \| null | 是 | 可直接安装的来源（相对路径在刷新时已按市场根解析）；解析不出来时为 null， 界面上的「安装」按钮据此禁用。 |
+
+**source（source = "directory"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source` | "directory" | 是 | — |
+| `path` | string | 是 | 本地目录；相对路径按安装时的进程 cwd 解析，登记后不再复制 |
+
+**source（source = "url"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source` | "url" | 是 | — |
+| `url` | string | 是 | — |
+| `headers` | Record<string, string> | 否 | 仅 url 来源支持：下载 `.zip` / `.tgz` 时的附加请求头 |
+
+**source（source = "npm"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source` | "npm" | 是 | — |
+| `package` | string | 是 | — |
+
+**source（source = "github"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source` | "github" | 是 | — |
+| `repo` | string | 是 | — |
+| `path` | string | 否 | 仓内子目录；插件包不在仓根时用它 |
+| `ref` | string | 否 | — |
+
+**source（source = "git"）**
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source` | "git" | 是 | — |
+| `url` | string | 是 | — |
+| `path` | string | 否 | — |
+| `ref` | string | 否 | — |
 
 ### PluginDiagnosticView
 

@@ -13,6 +13,8 @@ import { useStore } from "./use-store";
 
 export function usePlugins(): {
   plugins: PluginsListResponse | null;
+  /** 安装 / 重拉的阶段提示（来自 plugin_progress 帧），完成后自动清空 */
+  progress: string | null;
   marketplaces: MarketplacesListResponse | null;
   install: (input: PluginCreateRequest) => Promise<boolean>;
   setEnabled: (id: string, enabled: boolean) => Promise<boolean>;
@@ -30,6 +32,7 @@ export function usePlugins(): {
 
   return {
     plugins: state.plugins,
+    progress: state.progress,
     marketplaces: state.marketplaces,
     install: async (input) => (await client.plugins.create(input)) !== null,
     setEnabled: async (id: string, enabled: boolean) => {

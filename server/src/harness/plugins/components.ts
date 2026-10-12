@@ -323,6 +323,25 @@ const uniqueAssets = (assets: PluginAssetDirs): PluginAssetDirs => ({
   extensions: [...new Set(assets.extensions)],
 });
 
+/**
+ * 资源型文件（技能 / 命令 / 角色正文）里的 `${user_config.*}` 目前**不替换**：正文原样交给 pi，
+ * 我们不改写磁盘文件。装了带这种引用的插件要明确告知，不能让作者以为值注入进去了。
+ */
+const warnUserConfigInResources = (
+  manifest: PluginManifest | null,
+  diagnostics: PluginDiagnosticView[],
+): void => {
+  const declared = manifest?.userConfig;
+  if (!declared) return;
+  diagnostics.push(
+    diagnostic(
+      "info",
+      "userConfig",
+      `清单声明了 ${Object.keys(declared).length} 个配置项；技能 / 命令 / 角色正文里的 \${user_config.*} 本轮不替换（只有 hooks 命令与 MCP 配置会解析），需要值的插件请改用 \${*_PLUGIN_OPTION_<KEY>} 环境变量`,
+    ),
+  );
+};
+
 /** 解析一个插件包的全部组件；`manifest` 为 null 表示按标准目录布局装载 */
 export const resolvePluginComponents = (input: {
   root: string;
@@ -343,6 +362,7 @@ export const resolvePluginComponents = (input: {
   collectFileComponent(ctx, "hooks", PLUGIN_HOOKS_COMPONENT_PATH, manifest?.hooks, entries);
   collectFileComponent(ctx, "mcp", PLUGIN_MCP_COMPONENT_PATH, manifest?.mcpServers, entries);
   collectBin(ctx, entries);
+  warnUserConfigInResources(manifest, ctx.diagnostics);
 
   return {
     entries: uniqueEntries(entries),

@@ -57,6 +57,8 @@ const marketplaceRecordSchema = z.object({
         name: z.string(),
         description: z.string().default(""),
         version: z.string().default("0.0.0"),
+        /** 已解析的安装来源：相对路径在刷新时就按市场根落成绝对路径；解析不出来则缺省 */
+        source: pluginSourceSchema.optional(),
       }),
     )
     .optional(),

@@ -10,6 +10,7 @@ import type { PluginDiagnosticView } from "@ucode/contracts";
 import { z } from "zod";
 
 import { diagnostic } from "./diagnostic";
+import { resolvePluginVariables } from "./variables";
 
 /** Claude 事件名 → 本产品认识的事件。pi 没有独立的权限事件，`PermissionRequest` 不在此表内 */
 export const PLUGIN_HOOK_EVENTS = [
@@ -42,6 +43,10 @@ export type PluginHookBinding = {
   pluginId: string;
   /** 插件安装目录：喂给子进程做 `${*_PLUGIN_ROOT}` */
   pluginRoot: string;
+  /** 插件持久数据目录：喂给子进程做 `${*_PLUGIN_DATA}`（首次引用时创建） */
+  pluginDataDir: string;
+  /** `userConfig` 的已存值：子进程经 `*_PLUGIN_OPTION_<KEY>` 读到 */
+  config: Record<string, string | number | boolean>;
   event: PluginHookEvent;
   /** 工具名正则（只对带 matcher 的事件有意义）；缺省即匹配全部 */
   matcher?: string;
@@ -86,8 +91,12 @@ export type PluginHookLoad = {
 export const loadPluginHooks = (input: {
   pluginId: string;
   pluginRoot: string;
+  pluginDataDir: string;
+  config: Record<string, string | number | boolean>;
   source: string;
   value: unknown;
+  /** 会话工作目录：解析 `${*_PROJECT_DIR}` 用；装配期还不知道时缺省 */
+  projectDir?: string;
 }): PluginHookLoad => {
   const bindings: PluginHookBinding[] = [];
   const diagnostics: PluginDiagnosticView[] = [];
@@ -164,12 +173,26 @@ export const loadPluginHooks = (input: {
             ),
           );
         }
+        // shell 形式的 command 上禁止 `${user_config.*}`：值会被 shell 再解析
+        const command = resolvePluginVariables(entry.data.command.trim(), {
+          pluginRoot: input.pluginRoot,
+          pluginDataDir: input.pluginDataDir,
+          config: input.config,
+          allowUserConfig: false,
+          ...(input.projectDir ? { projectDir: input.projectDir } : {}),
+        });
+        for (const message of command.diagnostics) {
+          diagnostics.push(diagnostic("warning", "hooks", `${input.source}：${message}`));
+        }
+
         bindings.push({
           pluginId: input.pluginId,
           pluginRoot: input.pluginRoot,
+          pluginDataDir: input.pluginDataDir,
+          config: input.config,
           event,
           ...(matcher ? { matcher } : {}),
-          command: entry.data.command.trim(),
+          command: command.text,
           timeoutMs: Math.round((entry.data.timeout ?? PLUGIN_HOOK_DEFAULT_TIMEOUT_SECONDS) * 1000),
           isAsync: wantsAsync && PLUGIN_HOOK_ASYNC_EVENTS.includes(event),
         });

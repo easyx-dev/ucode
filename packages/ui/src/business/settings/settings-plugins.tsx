@@ -31,6 +31,7 @@ export function SettingsPlugins() {
   const [installing, setInstalling] = useState(false);
   const {
     plugins,
+    progress,
     marketplaces,
     install,
     setEnabled,
@@ -86,9 +87,12 @@ export function SettingsPlugins() {
     }
   };
 
-  /** `directory` 类型的配置项走系统目录选择器；`file` 类型仍是文本框（浏览器拿不到可靠的文件路径） */
-  const pickDirectory = async (apply: (path: string) => void): Promise<void> => {
-    const picked = await openDirectoryPickerDialog();
+  /** `directory` / `file` 类型的配置项走系统选择器（同一弹层，选文件时点文件即确认） */
+  const pickPath = async (
+    select: "directory" | "file",
+    apply: (path: string) => void,
+  ): Promise<void> => {
+    const picked = await openDirectoryPickerDialog({ select });
     if (picked) apply(picked);
   };
 
@@ -165,6 +169,9 @@ export function SettingsPlugins() {
             {installing ? t("安装中…") : t("安装")}
           </Button>
         </div>
+        {installing || progress ? (
+          <p className="text-xs text-foreground-subtle">{progress ?? t("安装中…")}</p>
+        ) : null}
       </div>
 
       {plugins && plugins.plugins.length === 0 ? (
@@ -331,21 +338,36 @@ export function SettingsPlugins() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input
-                        value={String(draft[field.key] ?? "")}
-                        type={field.type === "number" ? "number" : "text"}
-                        aria-label={field.title}
-                        placeholder={field.sensitive ? t("已设置（留空表示不改）") : t("未设置")}
-                        onChange={(event) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            [field.key]:
-                              field.type === "number" && event.target.value !== ""
-                                ? Number(event.target.value)
-                                : event.target.value,
-                          }))
-                        }
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={String(draft[field.key] ?? "")}
+                          type={field.type === "number" ? "number" : "text"}
+                          aria-label={field.title}
+                          placeholder={field.sensitive ? t("已设置（留空表示不改）") : t("未设置")}
+                          onChange={(event) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [field.key]:
+                                field.type === "number" && event.target.value !== ""
+                                  ? Number(event.target.value)
+                                  : event.target.value,
+                            }))
+                          }
+                        />
+                        {field.type === "directory" || field.type === "file" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              void pickPath(field.type === "file" ? "file" : "directory", (path) =>
+                                setDraft((prev) => ({ ...prev, [field.key]: path })),
+                              )
+                            }
+                          >
+                            {field.type === "file" ? t("选择文件") : t("选择目录")}
+                          </Button>
+                        ) : null}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -443,13 +465,25 @@ export function SettingsPlugins() {
                   <span className="font-mono">{entry.name}</span>
                   {entry.description ? ` · ${entry.description}` : ""}
                 </span>
-                <span className="shrink-0">
-                  v{entry.version}
-                  {entry.installedId === null
-                    ? ""
-                    : entry.updateAvailable
-                      ? ` · ${t("已安装，可更新")}`
-                      : ` · ${t("已安装")}`}
+                <span className="flex shrink-0 items-center gap-2">
+                  <span>
+                    v{entry.version}
+                    {entry.installedId === null
+                      ? ""
+                      : entry.updateAvailable
+                        ? ` · ${t("已安装，可更新")}`
+                        : ` · ${t("已安装")}`}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={entry.source === null || installing}
+                    onClick={() =>
+                      void install({ source: entry.source as PluginCreateRequest["source"] })
+                    }
+                  >
+                    {entry.installedId === null ? t("安装") : t("重装")}
+                  </Button>
                 </span>
               </div>
             ))

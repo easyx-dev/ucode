@@ -444,6 +444,7 @@ export default {
   助理: "Assistant",
   助理区: "Assistant",
   选择目录: "Choose directory",
+  选择文件: "Choose file",
   返回上级: "Go up",
   新建文件夹: "New folder",
   选择此目录: "Choose this directory",
@@ -776,6 +777,7 @@ export default {
   "预览 {{path}}": "Preview {{path}}",
 
   安装: "Install",
+  重装: "Reinstall",
   "安装中…": "Installing…",
   查看插件: "View plugins",
   已安装: "Installed",

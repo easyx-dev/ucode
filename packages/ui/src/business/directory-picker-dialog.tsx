@@ -36,9 +36,19 @@ type DirectoryPickerDialogProps = {
   onSelect: (path: string) => void;
   /** 取消 / Esc / 点遮罩：不选目录收起 */
   onCancel: () => void;
+  /**
+   * 选目录（缺省）还是选文件。选文件时点文件即确认，底部的「选择此目录」与「新建文件夹」隐藏
+   * ——插件配置里的文件路径必须落在某个文件上，让用户再点一次确认只是多一步。
+   */
+  select?: "directory" | "file";
 };
 
-export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDialogProps) {
+export function DirectoryPickerDialog({
+  onSelect,
+  onCancel,
+  select = "directory",
+}: DirectoryPickerDialogProps) {
+  const pickingFile = select === "file";
   const { t } = useTranslation();
   const client = useClient();
   const [listing, setListing] = useState<FsListResponse | null>(null);
@@ -251,7 +261,11 @@ export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDia
                 key={entry.path}
                 type="button"
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50"
-                onClick={() => void navigateTo(entry.path)}
+                onClick={() => {
+                  // 选文件模式：目录继续下钻，文件即确认
+                  if (pickingFile && entry.type !== "directory") onSelect(entry.path);
+                  else void navigateTo(entry.path);
+                }}
               >
                 <Folder className="size-icon-sm shrink-0 text-foreground-subtle" />
                 <span className="truncate">{entry.name}</span>
@@ -264,22 +278,30 @@ export function DirectoryPickerDialog({ onSelect, onCancel }: DirectoryPickerDia
           <Button variant="outline" onClick={onCancel}>
             {t("取消")}
           </Button>
-          <Button
-            disabled={!listing}
-            onClick={() => {
-              if (listing) onSelect(listing.path);
-            }}
-          >
-            {t("选择此目录")}
-          </Button>
+          {pickingFile ? null : (
+            <Button
+              disabled={!listing}
+              onClick={() => {
+                if (listing) onSelect(listing.path);
+              }}
+            >
+              {t("选择此目录")}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-/** 打开目录选择弹层；返回选中的绝对路径，取消返回 null */
-export const openDirectoryPickerDialog = (): Promise<string | null> =>
+/** 打开选择弹层；返回选中的绝对路径，取消返回 null */
+export const openDirectoryPickerDialog = (
+  input: { select?: "directory" | "file" } = {},
+): Promise<string | null> =>
   openDialog<string>((close) => (
-    <DirectoryPickerDialog onSelect={(path) => close(path)} onCancel={() => close()} />
+    <DirectoryPickerDialog
+      onSelect={(path) => close(path)}
+      onCancel={() => close()}
+      {...(input.select ? { select: input.select } : {})}
+    />
   )).then((path) => path ?? null);

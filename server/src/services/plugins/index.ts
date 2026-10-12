@@ -30,6 +30,7 @@ import {
   type PluginManifest,
   parsePluginManifest,
 } from "../../harness/plugins/manifest";
+import type { PluginMcpServer } from "../../harness/plugins/mcp";
 import { buildPluginRegistry } from "../../harness/plugins/registry";
 import { toDataDirName } from "../../harness/plugins/sanitize";
 import { hashDirectory } from "../../harness/plugins/source-hash";
@@ -83,6 +84,8 @@ export type PluginService = {
   binDirs(): string[];
   /** 可信来源插件的命令式 hook；第三方市场的不挂载 */
   hooks(): PluginHookBinding[];
+  /** 启用插件声明的 MCP 服务器：任何来源都生效，能否挂上由会话能力决定 */
+  mcpServers(): PluginMcpServer[];
   /**
    * 重算已装插件的「来源是否已变」：本地目录来源按内容哈希比对，写回 `updateAvailable` 与检查时间。
    * 只在显式动作（刷新市场 / 重拉）里跑——列表接口不做这类扫描。返回结果变化的插件数。
@@ -166,7 +169,11 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
 
   const registry = (): PluginRegistry => {
     const current = state.get();
-    if (!cache || cache.revision !== current.revision) cache = buildPluginRegistry(current);
+    if (!cache || cache.revision !== current.revision) {
+      cache = buildPluginRegistry(current, (id) =>
+        resolve(pluginsDir, PLUGIN_DATA_DIRNAME, toDataDirName(id)),
+      );
+    }
     return cache;
   };
 
@@ -232,6 +239,11 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
     return [...new Set(paths)];
   };
 
+  /** 安装 / 重拉的阶段提示：界面靠它显示一行进度，完成由随后的 `plugins_changed` 表示 */
+  const announceProgress = (message: string): void => {
+    events.emitControl({ type: "plugin_progress", message });
+  };
+
   const viewOf = (id: string): PluginView => {
     const descriptor = registry().plugins.find((item) => item.id === id);
     if (!descriptor) {
@@ -278,6 +290,10 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       }
       return bindings;
     },
+    mcpServers: () =>
+      registry()
+        .plugins.filter((item) => item.enabled)
+        .flatMap((item) => item.mcpServers),
     binDirs: () =>
       trustedAssets((item) =>
         item.components
@@ -336,7 +352,11 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       }
 
       const stagingRoot = stagingRootFor(marketplace);
-      const staged = await stagePluginSource({ source: input.source, stagingRoot });
+      const staged = await stagePluginSource({
+        source: input.source,
+        stagingRoot,
+        onProgress: (message) => announceProgress(message),
+      });
       const manifest = readManifestForInstall(staged.path);
       const name = manifest?.name ?? basename(staged.path);
       if (!PLUGIN_NAME_PATTERN.test(name)) {
@@ -423,7 +443,11 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
     async refresh(input) {
       const record = state.requirePlugin(input.id);
       const stagingRoot = stagingRootFor(record.marketplace);
-      const staged = await stagePluginSource({ source: record.source, stagingRoot });
+      const staged = await stagePluginSource({
+        source: record.source,
+        stagingRoot,
+        onProgress: (message) => announceProgress(message),
+      });
       const manifest = readManifestForInstall(staged.path);
       const name = manifest?.name ?? record.name;
       const version = manifest?.version?.trim() || record.version;

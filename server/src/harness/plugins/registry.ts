@@ -18,6 +18,7 @@ import { isDirectory } from "./components";
 import { describeError, diagnostic } from "./diagnostic";
 import { loadPluginHooks, type PluginHookBinding } from "./hooks";
 import { loadPluginManifest } from "./manifest";
+import { loadPluginMcp, type PluginMcpServer } from "./mcp";
 import {
   type InstalledPluginRecord,
   isLocalMarketplace,
@@ -71,6 +72,7 @@ const describePlugin = (
   record: InstalledPluginRecord,
   marketplaces: readonly PluginMarketplaceRecord[],
   takenAgentSlugs: Set<string>,
+  pluginDataDirOf: (pluginId: string) => string,
 ): PluginDescriptor => {
   const source = pluginSourceOf(record, marketplaces);
   const base = {
@@ -97,6 +99,7 @@ const describePlugin = (
       config: {},
       agents: [],
       hooks: [],
+      mcpServers: [],
       blocked: [],
       diagnostics: [diagnostic("error", "manifest", `安装目录不存在：${record.path}`)],
     };
@@ -116,9 +119,21 @@ const describePlugin = (
       : loadPluginHooks({
           pluginId: record.id,
           pluginRoot: record.path,
+          pluginDataDir: pluginDataDirOf(record.id),
+          config: record.config ?? {},
           source: hooksSource.source,
           value: hooksSource.value,
         });
+  const mcpFile = load.components.find((entry) => entry.group === "mcp")?.path ?? null;
+  const mcpLoad = loadPluginMcp({
+    pluginId: record.id,
+    pluginName: load.name,
+    pluginRoot: record.path,
+    pluginDataDir: pluginDataDirOf(record.id),
+    config: record.config ?? {},
+    file: mcpFile,
+    inline: load.manifest?.mcpServers,
+  });
   const agentLoad = loadPluginAgents({
     pluginName: load.name,
     files: load.components
@@ -139,22 +154,28 @@ const describePlugin = (
     config: record.config ?? {},
     agents: agentLoad.agents,
     hooks: hooksLoad.bindings,
+    mcpServers: mcpLoad.servers,
     blocked: blockedGroups(load.components, source),
     diagnostics: [
       ...load.diagnostics,
       ...agentLoad.diagnostics,
       ...hooksSource.diagnostics,
       ...hooksLoad.diagnostics,
+      ...mcpLoad.diagnostics,
     ],
   };
 };
 
 /** 构建注册表；登记表里的重复 id 只保留第一条，其余出诊断 */
-export const buildPluginRegistry = (state: {
-  revision: number;
-  marketplaces: PluginMarketplaceRecord[];
-  installed: InstalledPluginRecord[];
-}): PluginRegistry => {
+export const buildPluginRegistry = (
+  state: {
+    revision: number;
+    marketplaces: PluginMarketplaceRecord[];
+    installed: InstalledPluginRecord[];
+  },
+  /** 插件数据目录（`${*_PLUGIN_DATA}`）：由调用方按 `$APP_HOME/plugins/data` 给出 */
+  pluginDataDirOf: (pluginId: string) => string = () => "",
+): PluginRegistry => {
   const diagnostics: PluginDiagnosticView[] = [];
   const seen = new Set<string>();
   // 角色 slug 的占用集合跨插件共享：同名插件 token 撞车时靠它加哈希后缀
@@ -182,7 +203,7 @@ export const buildPluginRegistry = (state: {
         ),
       );
     }
-    plugins.push(describePlugin(record, state.marketplaces, takenAgentSlugs));
+    plugins.push(describePlugin(record, state.marketplaces, takenAgentSlugs, pluginDataDirOf));
   }
 
   return { revision: state.revision, plugins, diagnostics };

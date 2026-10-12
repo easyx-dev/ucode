@@ -18,12 +18,20 @@ import {
 import { AppError } from "../../platform/response";
 import { isRecord } from "../../utils/object";
 import { describeError, diagnostic } from "./diagnostic";
+import type { PluginSourceSpec } from "./state";
 
-/** 市场清单里的一个条目：只保留本轮用得到的字段 */
+/** 市场清单里的一个条目的来源：相对路径（相对市场根）或显式来源 */
+export type MarketplaceEntrySource =
+  | { kind: "relative"; path: string }
+  | { kind: "explicit"; source: PluginSourceSpec };
+
+/** 市场清单里的一个条目：名称 / 说明 / 版本 + 可安装的来源 */
 export type MarketplaceCatalogEntry = {
   name: string;
   description: string;
   version: string;
+  /** 来源解析不出来（格式不认识、url 市场里的相对路径）时为 undefined：能看不能一键装 */
+  source?: MarketplaceEntrySource;
 };
 
 export type MarketplaceCatalog = {
@@ -42,7 +50,66 @@ const entrySchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   version: z.string().optional(),
+  source: z.unknown().optional(),
 });
+
+/** 条目的 `source`：字符串按相对路径（`./x` / `x`），对象按显式来源解析 */
+const parseEntrySource = (raw: unknown): MarketplaceEntrySource | undefined => {
+  if (typeof raw === "string") {
+    const path = raw.trim();
+    if (!path) return undefined;
+    // 带协议的字符串不是相对路径（Claude 的市场里也有 `github:owner/repo` 这类简写）
+    if (/^[a-z]+:/i.test(path) && !path.startsWith("./") && !path.startsWith("../")) {
+      return undefined;
+    }
+    return { kind: "relative", path };
+  }
+  if (!isRecord(raw)) return undefined;
+
+  const kind = typeof raw.source === "string" ? raw.source : "";
+  const text = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+  switch (kind) {
+    case "directory":
+      return text(raw.path)
+        ? { kind: "explicit", source: { source: "directory", path: text(raw.path) as string } }
+        : undefined;
+    case "url":
+      return text(raw.url)
+        ? { kind: "explicit", source: { source: "url", url: text(raw.url) as string } }
+        : undefined;
+    case "npm":
+      return text(raw.package)
+        ? { kind: "explicit", source: { source: "npm", package: text(raw.package) as string } }
+        : undefined;
+    case "github":
+      return text(raw.repo)
+        ? {
+            kind: "explicit",
+            source: {
+              source: "github",
+              repo: text(raw.repo) as string,
+              ...(text(raw.path) ? { path: text(raw.path) as string } : {}),
+              ...(text(raw.ref) ? { ref: text(raw.ref) as string } : {}),
+            },
+          }
+        : undefined;
+    case "git":
+      return text(raw.url)
+        ? {
+            kind: "explicit",
+            source: {
+              source: "git",
+              url: text(raw.url) as string,
+              ...(text(raw.path) ? { path: text(raw.path) as string } : {}),
+              ...(text(raw.ref) ? { ref: text(raw.ref) as string } : {}),
+            },
+          }
+        : undefined;
+    default:
+      return undefined;
+  }
+};
 
 /**
  * 解析市场清单内容：url 市场喂响应正文，本地 / git 市场喂文件内容。
@@ -77,10 +144,12 @@ export const parseMarketplaceCatalog = (
       diagnostics.push(diagnostic("error", "manifest", `第 ${index + 1} 个条目缺少 name，已跳过`));
       return;
     }
+    const source = parseEntrySource(entry.data.source);
     entries.push({
       name: entry.data.name,
       description: entry.data.description?.trim() || "",
       version: entry.data.version?.trim() || "0.0.0",
+      ...(source ? { source } : {}),
     });
   });
 

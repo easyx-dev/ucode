@@ -80,6 +80,8 @@ export type StagePluginSourceInput = {
   stagingRoot: string;
   fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
   run?: SourceRunner;
+  /** 阶段提示：拉包 / 解包可能几十秒，调用方把它转成进度帧给界面 */
+  onProgress?: (message: string) => void;
 };
 
 const makeStagingDir = (stagingRoot: string, prefix: string): string => {
@@ -124,6 +126,7 @@ const stageFromUrl = async (
   source: Extract<PluginSourceSpec, { source: "url" }>,
   input: StagePluginSourceInput,
 ): Promise<StagedSource> => {
+  input.onProgress?.("下载插件包…");
   const fetchImpl = input.fetch ?? publicFetch;
   const response = await fetchImpl({
     url: source.url,
@@ -144,6 +147,7 @@ const stageFromUrl = async (
     throw new SourceError("插件包既不是 zip 也不是 tgz，无法解包");
   }
 
+  input.onProgress?.("解包…");
   const dir = makeStagingDir(input.stagingRoot, "url");
   await unpackArchive({ data: response.body, format, targetDir: dir });
   return {
@@ -161,6 +165,7 @@ const stageFromNpm = async (
   input: StagePluginSourceInput,
 ): Promise<StagedSource> => {
   const run = input.run ?? defaultSourceRunner;
+  input.onProgress?.(`npm 安装 ${source.package}…`);
   const dir = makeStagingDir(input.stagingRoot, "npm");
   await run(
     "npm",
@@ -184,6 +189,7 @@ const stageFromGit = async (
 ): Promise<StagedSource> => {
   const run = input.run ?? defaultSourceRunner;
   const url = source.source === "git" ? source.url : `https://github.com/${source.repo}.git`;
+  input.onProgress?.(`克隆 ${url}…`);
   const dir = makeStagingDir(input.stagingRoot, "git");
   const args = ["clone", "--depth", "1"];
   if (source.ref) args.push("--branch", source.ref);

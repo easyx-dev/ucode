@@ -28,6 +28,7 @@ import type { SubagentHooks } from "../features/subagents";
 import type { PiRuntime } from "../pi/runtime";
 import type { PluginHookBinding } from "../plugins/hooks";
 import { createPluginHooksExtension } from "../plugins/hooks-runner";
+import type { PluginMcpServer } from "../plugins/mcp";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -133,6 +134,8 @@ export type SessionAssemblyInput = {
   pluginBinDirs?: string[];
   /** 可信来源插件的命令式 hook 绑定；第三方市场的不在此列（来源门控） */
   pluginHooks?: PluginHookBinding[];
+  /** 启用插件声明的 MCP 服务器；与用户级 mcp.json 合并（同名用户优先），只给默认工具集会话 */
+  pluginMcpServers?: readonly PluginMcpServer[];
 };
 
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
@@ -192,7 +195,9 @@ const createSessionLoader = async (
   // 只读模式（plan / ask）与白名单角色（explore、自定义只读角色）都不挂：MCP 会激活 codemode，
   // 而 MCP 工具名是动态的，只读判定兜不住它（见 harness/setup/mcp）
   const withExtensions = usesDefaultToolSet(capability) && !isReadOnlyCapability(capability);
-  const mcp = withExtensions ? mcpExtension(input.harnessDir ?? env.harnessDir) : undefined;
+  const mcp = withExtensions
+    ? mcpExtension(input.harnessDir ?? env.harnessDir, input.pluginMcpServers ?? [])
+    : undefined;
   // tool_search 只注册、默认不激活：默认集会话出现 deferred MCP 服务器时由 MCP 扩展自动激活
   const discoveryExtension = withExtensions ? [createToolSearchExtension()] : [];
   const loader = new DefaultResourceLoader({

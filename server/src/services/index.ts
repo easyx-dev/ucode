@@ -174,6 +174,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
       extensionPaths: () => plugins.extensionPaths(),
       binDirs: () => plugins.binDirs(),
       hooks: () => plugins.hooks(),
+      mcpServers: () => plugins.mcpServers(),
     },
   );
   // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话

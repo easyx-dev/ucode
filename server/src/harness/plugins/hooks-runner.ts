@@ -12,6 +12,7 @@ import { execa } from "execa";
 
 import { logger } from "../../platform/logger";
 import { matchesToolName, type PluginHookBinding, type PluginHookEvent } from "./hooks";
+import { ensurePluginDataDir } from "./variables";
 
 /** 喂给 hook 子进程的载荷：字段名沿用 Claude，插件作者不用改脚本 */
 export type PluginHookPayload = {
@@ -48,14 +49,24 @@ export const hookEnv = (
   base: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv => {
   const root = binding.pluginRoot;
+  ensurePluginDataDir(binding.pluginDataDir);
   const values: Record<string, string> = {
     [`${ENV_PREFIX}_PLUGIN_ROOT`]: root,
     CLAUDE_PLUGIN_ROOT: root,
     ZCODE_PLUGIN_ROOT: root,
+    [`${ENV_PREFIX}_PLUGIN_DATA`]: binding.pluginDataDir,
+    CLAUDE_PLUGIN_DATA: binding.pluginDataDir,
+    ZCODE_PLUGIN_DATA: binding.pluginDataDir,
     [`${ENV_PREFIX}_PROJECT_DIR`]: cwd,
     CLAUDE_PROJECT_DIR: cwd,
     ZCODE_PROJECT_DIR: cwd,
   };
+  // userConfig 的值走 `*_PLUGIN_OPTION_<KEY>`（键名转大写、非字母数字换 `_`）
+  for (const [key, value] of Object.entries(binding.config)) {
+    const normalized = key.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+    values[`${ENV_PREFIX}_PLUGIN_OPTION_${normalized}`] = String(value);
+    values[`CLAUDE_PLUGIN_OPTION_${normalized}`] = String(value);
+  }
   return { ...base, ...values };
 };
 

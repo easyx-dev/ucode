@@ -108,9 +108,12 @@ my-plugin/
 | `${<品牌大写>_PROJECT_DIR}` | 会话 cwd | `${CLAUDE_PROJECT_DIR}` |
 | `${user_config.KEY}` | `userConfig` 的已存值 | — |
 
-变量名前缀由 `brand.slug` 派生（`server/src` 里不得出现硬编码品牌名字面量）。解析字段：
-hooks 的 `command` / `args`、MCP 的 `command` / `args` / `env` / `url` / `headers`、
-skill / command / agent 的 Markdown 正文（仅非敏感值）、`extensions` 的模块路径。
+变量名前缀由 `brand.slug` 派生（`server/src` 里不得出现硬编码品牌名字面量）。**已实现**的解析字段：
+hooks 的 `command`（`harness/plugins/hooks.ts` 解析绑定命令）与 MCP 的 `command` / `args` / `env` / `url` / `headers`
+（`harness/plugins/mcp.ts`）；`PLUGIN_DATA` 同时按需建目录。
+**未实现**：skill / command / agent 的 Markdown 正文与 `extensions` 的模块路径——正文原样交给 pi、
+我们不改写磁盘文件，`extensions` 路径不经替换。带 `userConfig` 的插件会收到一条 info 级诊断说明这点
+（`components.ts` 的 `warnUserConfigInResources`），要值的插件改用 `*_PLUGIN_OPTION_<KEY>` 环境变量。
 shell 形式的 hook `command` 与 MCP `headersHelper` **拒绝** `${user_config.*}`（值会被 shell 再解析）——
 这是 Claude 也踩过的一条，照抄。
 
@@ -712,4 +715,12 @@ agents / bin），逐条验证「识别正确 + 诊断正确 + 其它组件不�
 
 ## 十七、复盘
 
-> 待落地后补。
+落实过程中改口径 / 补实现的几处，供后续参考：
+
+| 项 | 计划写的 | 实际做法与理由 |
+| --- | --- | --- |
+| 安装进度 | 「把子进程输出转成进度帧」 | 只发**阶段**帧（下载 / 解包 / npm 安装 / 克隆）：逐行喂帧会把事件流刷爆，npm 的输出也不是稳定的机器可读格式；原始输出按调试级进日志 |
+| `${user_config.*}` | 在 Markdown 正文里也替换 | 只替换 hook 命令与 MCP 配置（都是我们装配时经手的字符串）；正文原样交给 pi，改盘上的文件代价与风险都不划算，改为出诊断 |
+| 插件 MCP | 合并进 `loadConfig` | 已实现（`loadPluginMcp` + `mergePluginMcpServers`），插件条目 `scope: "extension"`、排用户条目之后，同名以用户配置优先 |
+| 市场条目一键安装 | — | 计划外补的：条目 `source` 在刷新时解析成绝对来源（相对路径按市场根），`marketplace/info` 返回，前端复用 `plugins/create` |
+| `file` 类型配置项 | — | 计划外补的：与目录选择共用一个弹层（`select: "file"`），选文件时点文件即确认 |

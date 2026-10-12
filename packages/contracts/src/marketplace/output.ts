@@ -1,4 +1,5 @@
 /** marketplace 域的响应模型：市场来源与刷新状态、市场内插件条目 */
+import type { PluginSourceInput } from "../plugins/input";
 import type { PluginDiagnosticView } from "../plugins/output";
 
 export type MarketplaceView = {
@@ -44,6 +45,11 @@ export type MarketplacePluginView = {
   installedId: string | null;
   /** 已安装且可更新；未安装恒为 false */
   updateAvailable: boolean;
+  /**
+   * 可直接安装的来源（相对路径在刷新时已按市场根解析）；解析不出来时为 null，
+   * 界面上的「安装」按钮据此禁用。
+   */
+  source: PluginSourceInput | null;
 };
 
 export type MarketplacePluginsResponse = {

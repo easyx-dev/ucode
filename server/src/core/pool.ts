@@ -165,6 +165,7 @@ export class SessionPool {
       extensionPaths: () => [],
       binDirs: () => [],
       hooks: () => [],
+      mcpServers: () => [],
     },
   ) {
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
@@ -699,6 +700,7 @@ export class SessionPool {
       pluginExtensionPaths: this.plugin.extensionPaths(),
       pluginBinDirs: this.plugin.binDirs(),
       pluginHooks: this.plugin.hooks(),
+      pluginMcpServers: this.plugin.mcpServers(),
       websearch: this.websearch,
       permission: {
         listGrants: () => this.permissions.allow.list(interactionSessionId),

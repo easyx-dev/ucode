@@ -86,6 +86,11 @@ export type ServerControlEvent =
    * 插件登记表变更（安装 / 启停 / 卸载 / 重拉）：客户端据此刷新插件列表与市场区块；
    * 内存会话按 revision 在空闲后重装。
    */
-  | { type: "plugins_changed"; revision: number; plugins: PluginsListResponse };
+  | { type: "plugins_changed"; revision: number; plugins: PluginsListResponse }
+  /**
+   * 安装 / 重拉的阶段提示：拉包与解包可能几十秒，期间给一行文字让界面有反馈。
+   * 完成由随后的 `plugins_changed` 表示，本帧不承载结果。
+   */
+  | { type: "plugin_progress"; message: string };
 
 export type ServerEvent = ServerControlEvent | ServerEventPayload;

@@ -85,6 +85,20 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **插件变量与插件 MCP 真正落地**：`${<SLUG>_PLUGIN_ROOT}` / `${<SLUG>_PLUGIN_DATA}` / `${<SLUG>_PROJECT_DIR}` /
+  `${user_config.KEY}` 在 hook 命令与 MCP 配置里解析（`harness/plugins/variables.ts`，兼容 `CLAUDE_*` / `ZCODE_*` 别名），
+  插件数据目录首次引用即创建，`userConfig` 的值同时以 `<SLUG>_PLUGIN_OPTION_<KEY>` 进子进程环境；
+  shell 形式的 hook `command` 与 MCP `headersHelper` 里拒绝 `${user_config.*}`（值会被 shell 再解析）。
+  插件 `.mcp.json`（或清单 `mcpServers` 内联）现在真的合并进会话 MCP 配置：服务器名 `plugin_<token>_<server>`、
+  标 `scope: "extension"`、排用户条目之后（同名以用户配置优先）。Markdown 正文里的 `${user_config.*}`
+  本轮不替换，改为出 info 级诊断说明。
+
+- **市场条目一键安装与安装进度**：市场条目的 `source` 在刷新时解析成我们的来源模型（相对路径按
+  市场根落成绝对路径；url 市场没有根，这类条目「能看不能装」），界面每个条目给出「安装 / 重装」按钮，
+  复用同一条安装链（`plugins/create`）。安装 / 重拉的阶段提示走新增的 `plugin_progress` 控制帧
+  （下载 / 解包 / npm 安装 / 克隆），界面在安装区显示一行进度，完成由 `plugins_changed` 收尾；
+  `userConfig` 的 `file` 类型补上文件选择（与目录选择器同一个弹层，选文件时点文件即确认）。
+
 - **市场内插件列表与界面收尾**：新增 `POST /api/v1/marketplace/info`（读上一次刷新出的条目缓存，
   不触发网络），列出市场内插件的名称 / 说明 / 版本与「已安装 / 可更新」标记；设置页在市场行上加了
   「查看插件」，`userConfig` 的 `directory` 类型接上系统目录选择器，安装按钮在请求期间显示「安装中…」，

@@ -26,6 +26,18 @@ const makeMarket = (manifest: unknown): string => {
   return dir;
 };
 
+/** 造一个带各类来源条目的市场目录 */
+const makeMarketWithSources = (): string =>
+  makeMarket({
+    name: "with-sources",
+    plugins: [
+      { name: "rel", source: "./plugins/rel" },
+      { name: "gh", source: { source: "github", repo: "owner/repo" } },
+      { name: "npm-pkg", source: { source: "npm", package: "@scope/pkg" } },
+      { name: "weird", source: "github:owner/repo" },
+    ],
+  });
+
 const setup = (over: { run?: SourceRunner; pluginsDir?: string } = {}) => {
   const state = new PluginStateStore(join(makeDir(), "plugins.json"));
   state.load();
@@ -281,5 +293,59 @@ describe("市场内插件列表", () => {
 
     assert.deepEqual(service.info({ name: "empty-market" }).plugins, []);
     assert.throws(() => service.info({ name: "nope" }), /市场不存在/);
+  });
+});
+
+describe("市场条目的一键安装来源", () => {
+  it("本地 / git 市场的相对路径解析成绝对路径，url 市场解析不出来", async () => {
+    const { service } = setup();
+    const dir = makeMarketWithSources();
+    service.create({ name: "my-market", source: { source: "directory", path: dir } });
+    await service.refresh({ name: "my-market" });
+
+    const byName = new Map(service.info({ name: "my-market" }).plugins.map((p) => [p.name, p]));
+    assert.deepEqual(byName.get("rel")?.source, {
+      source: "directory",
+      path: join(dir, "plugins/rel"),
+    });
+    assert.deepEqual(byName.get("gh")?.source, { source: "github", repo: "owner/repo" });
+    assert.deepEqual(byName.get("npm-pkg")?.source, { source: "npm", package: "@scope/pkg" });
+    assert.equal(byName.get("weird")?.source, null, "带协议的字符串简写不猜");
+  });
+
+  it("url 市场里没有可解析的根：相对路径条目能看不能装", async () => {
+    const withFetch = setup();
+    const market = createMarketplaceService({
+      state: withFetch.state,
+      events: { emitControl: () => undefined } as unknown as SessionEventBus,
+      pluginsDir: withFetch.pluginsDir,
+      run: async () => ({ stdout: "" }),
+      fetch: async (input) => ({
+        url: new URL(input.url),
+        status: 200,
+        body: new TextEncoder().encode(
+          JSON.stringify({
+            plugins: [
+              { name: "rel", source: "./plugins/rel" },
+              { name: "gh", source: { source: "github", repo: "o/r" } },
+            ],
+          }),
+        ),
+        truncated: false,
+        contentType: "application/json",
+        etag: null,
+        lastModified: null,
+      }),
+    });
+
+    market.create({
+      name: "remote",
+      source: { source: "url", url: "https://example.com/marketplace.json" },
+    });
+    await market.refresh({ name: "remote" });
+
+    const byName = new Map(market.info({ name: "remote" }).plugins.map((p) => [p.name, p]));
+    assert.equal(byName.get("rel")?.source, null);
+    assert.deepEqual(byName.get("gh")?.source, { source: "github", repo: "o/r" });
   });
 });

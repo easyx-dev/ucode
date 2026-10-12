@@ -8,6 +8,7 @@ import type { PluginComponentGroup, PluginDiagnosticView, PluginSource } from "@
 
 import type { PluginHookBinding } from "./hooks";
 import type { PluginUserConfigField } from "./manifest";
+import type { PluginMcpServer } from "./mcp";
 
 /** 清单解析出的一个组件：路径已归一化，且校验过落在插件根内 */
 export type PluginComponentEntry = {
@@ -50,6 +51,8 @@ export type PluginContributions = {
   binDirs: () => string[];
   /** 可信来源的命令式 hook 绑定；第三方市场的不挂载 */
   hooks: () => PluginHookBinding[];
+  /** 插件声明的 MCP 服务器；MCP 不在执行类组件的来源门控名单里（见 plans/plugins.md 第五章） */
+  mcpServers: () => PluginMcpServer[];
 };
 
 /**
@@ -104,6 +107,8 @@ export type PluginDescriptor = {
   agents: PluginAgentFile[];
   /** 插件声明的命令式 hook（已按事件映射好；来源门控决定挂不挂） */
   hooks: PluginHookBinding[];
+  /** 插件声明的 MCP 服务器（名字已加插件前缀、变量已解析） */
+  mcpServers: PluginMcpServer[];
   /** 因来源为第三方市场而不注入运行时的执行类组件分组 */
   blocked: PluginComponentGroup[];
   diagnostics: PluginDiagnosticView[];

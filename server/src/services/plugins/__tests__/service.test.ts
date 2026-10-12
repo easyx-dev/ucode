@@ -342,6 +342,42 @@ describe("执行类组件的来源门控", () => {
     assert.deepEqual(blocked?.blocked, ["extensions", "bin"], "第三方市场被标为不注入");
   });
 
+  it("MCP 不在执行类门控里：第三方市场的 .mcp.json 照常进会话配置", async () => {
+    const { service, state } = setup();
+    const root = makePluginWithExecutables("market-mcp");
+    mkdirSync(join(root, "bin"), { recursive: true });
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          internal: {
+            type: "stdio",
+            command: "node",
+            args: ["server.js"],
+            env: { TOKEN: "${user_config.token}" },
+          },
+        },
+      }),
+      "utf8",
+    );
+    await createInMarket(service, state, root, "third-party", false);
+
+    const servers = service.mcpServers();
+    assert.equal(servers.length, 1);
+    assert.equal(servers[0]?.name, "plugin_market-mcp_internal");
+    assert.deepEqual(servers[0]?.config, {
+      type: "stdio",
+      command: "node",
+      args: ["server.js"],
+      env: { TOKEN: "" },
+    });
+    assert.deepEqual(
+      service.registry().plugins.find((item) => item.name === "market-mcp")?.blocked,
+      ["extensions", "bin"],
+      "只门控执行类组件，MCP 不在此列",
+    );
+  });
+
   it("插件停用后它的扩展与 bin 也不再注入", async () => {
     const { service } = setup();
     const root = makePluginWithExecutables("local-plugin");
@@ -656,5 +692,44 @@ describe("按来源的版本判定", () => {
 
     assert.equal(await service.checkUpdates(), 1, "200：内容变了");
     assert.equal(service.list().plugins[0]?.updateAvailable, true);
+  });
+});
+
+describe("安装进度帧", () => {
+  it("网络来源安装时发出阶段提示，完成由 plugins_changed 表示", async () => {
+    const repo = makeDir("plugin-repo-");
+    makePluginTree(repo, "git-progress");
+    const git = (...args: string[]): void => {
+      execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+
+    const { service, frames } = setup({ run: defaultSourceRunner });
+    await service.create({ source: { source: "git", url: repo }, scope: "user", enabled: true });
+
+    const messages = frames
+      .filter((frame) => frame.type === "plugin_progress")
+      .map((frame) => (frame.type === "plugin_progress" ? frame.message : ""));
+    assert.ok(messages.length > 0, "至少有一条阶段提示");
+    assert.match(messages.join("\n"), /克隆 .*…/);
+    assert.equal(frames.at(-1)?.type, "plugins_changed", "完成由 plugins_changed 收尾");
+  });
+
+  it("本地目录来源不发进度（没有可等待的阶段）", async () => {
+    const { service, frames } = setup();
+    await service.create({
+      source: { source: "directory", path: makePlugin("no-progress") },
+      scope: "user",
+      enabled: true,
+    });
+
+    assert.deepEqual(
+      frames.filter((frame) => frame.type === "plugin_progress"),
+      [],
+    );
   });
 });

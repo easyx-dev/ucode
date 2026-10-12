@@ -62,6 +62,14 @@ export type MarketplaceServiceDeps = {
   pluginsDir?: string;
 };
 
+/** 状态里缓存的条目：来源已解析成 PluginSourceSpec（解析不出来则缺省） */
+type ResolvedCatalogEntry = {
+  name: string;
+  description: string;
+  version: string;
+  source?: PluginSourceSpec;
+};
+
 /** 默认的进程调用：与来源拉取同一套（execa） */
 const defaultSourceRunner: SourceRunner = async (file, args, options) => {
   const { execa } = await import("execa");
@@ -133,6 +141,37 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     });
   };
 
+  /**
+   * 解析条目来源：相对路径按市场根解析成绝对路径（目录 / git 克隆副本都能对）；
+   * url 市场里的相对路径没有可解析的根，直接放弃（能看不能一键装）。
+   */
+  const resolveEntrySources = (
+    entries: readonly MarketplaceCatalogEntry[],
+    root: string | null,
+  ): ResolvedCatalogEntry[] =>
+    entries.map((entry) => {
+      if (!entry.source) {
+        return { name: entry.name, description: entry.description, version: entry.version };
+      }
+      if (entry.source.kind === "explicit") {
+        return {
+          name: entry.name,
+          description: entry.description,
+          version: entry.version,
+          source: entry.source.source,
+        };
+      }
+      // 相对路径：本地 / git 市场按市场根落成绝对路径；url 市场没有根，只能「能看不能装」
+      if (!root)
+        return { name: entry.name, description: entry.description, version: entry.version };
+      return {
+        name: entry.name,
+        description: entry.description,
+        version: entry.version,
+        source: { source: "directory", path: resolve(root, entry.source.path) },
+      };
+    });
+
   /** 刷新结果写回：成功时清掉上一次的 `lastError` */
   const recordRefresh = (
     name: string,
@@ -143,7 +182,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       etag?: string | null;
       lastModified?: string | null;
       integrity?: string;
-      catalog?: MarketplaceCatalogEntry[];
+      catalog?: ResolvedCatalogEntry[];
     },
   ): void => {
     commit((current) => ({
@@ -214,7 +253,8 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     recordRefresh(record.name, {
       refreshedOk: true,
       pluginCount: catalog.entries.length,
-      catalog: catalog.entries,
+      // url 市场没有本地根：相对路径条目解析不了，留着「能看不能装」
+      catalog: resolveEntrySources(catalog.entries, null),
       etag: response.etag,
       lastModified: response.lastModified,
       integrity: createHash("sha256").update(response.body).digest("hex"),
@@ -250,7 +290,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     recordRefresh(record.name, {
       refreshedOk: true,
       pluginCount: catalog.entries.length,
-      catalog: catalog.entries,
+      catalog: resolveEntrySources(catalog.entries, target),
       integrity: hashDirectory(target)?.hash,
     });
   };
@@ -275,6 +315,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
             version: entry.version,
             installedId: installed?.id ?? null,
             updateAvailable: installed?.updateAvailable === true,
+            source: entry.source ?? null,
           };
         }),
         diagnostics: [],
@@ -344,7 +385,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           recordRefresh(record.name, {
             refreshedOk: true,
             pluginCount: catalog.entries.length,
-            catalog: catalog.entries,
+            catalog: resolveEntrySources(catalog.entries, marketDir),
             integrity: hashDirectory(marketDir)?.hash,
           });
         } else if (source.source === "url") {
