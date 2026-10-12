@@ -88,7 +88,7 @@ export function SessionSidebarMenu({
           className="flex h-10 w-full items-center gap-3 rounded-lg px-2 text-left text-sm outline-none transition-colors hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
         >
           <item.icon className="size-icon-base shrink-0 text-foreground-subtle" />
-          <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
           {item.shortcut ? (
             <span className="shrink-0 text-xs text-foreground-subtle">{item.shortcut}</span>
           ) : null}
