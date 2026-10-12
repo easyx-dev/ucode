@@ -42,8 +42,6 @@ const blockedGroups = (
  * 文件读不出来只记诊断——一个坏 hook 不该让整包不可用。
  */
 const readHooksSource = (input: {
-  pluginId: string;
-  pluginRoot: string;
   file: string | null;
   inline: unknown;
 }): { value: unknown; source: string; diagnostics: PluginDiagnosticView[] } => {
@@ -54,7 +52,7 @@ const readHooksSource = (input: {
   try {
     return {
       value: JSON.parse(readFileSync(input.file, "utf8")) as unknown,
-      source: "hooks/hooks.json",
+      source: input.file,
       diagnostics: [],
     };
   } catch (error) {
@@ -108,8 +106,6 @@ const describePlugin = (
   const load = loadPluginManifest(record.path);
   const hooksFile = load.components.find((entry) => entry.group === "hooks")?.path ?? null;
   const hooksSource = readHooksSource({
-    pluginId: record.id,
-    pluginRoot: record.path,
     file: hooksFile,
     inline: load.manifest?.hooks,
   });

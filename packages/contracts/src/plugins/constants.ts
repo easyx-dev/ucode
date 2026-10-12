@@ -34,3 +34,12 @@ export const PLUGIN_EXECUTABLE_GROUPS: readonly PluginComponentGroup[] = [
   "extensions",
   "bin",
 ];
+
+/**
+ * 插件启用开关的层，**数组顺序即优先级**（前者胜）：
+ * 本地覆盖 `<cwd>/.<slug>/plugins.local.json` → 项目覆盖 `<cwd>/.<slug>/plugins.json` → 用户登记表。
+ * 覆盖只翻已登记插件的开关，永远不能把新代码带进这台机器。
+ */
+export const PLUGIN_SWITCH_LAYERS = ["local", "project", "user"] as const;
+
+export type PluginSwitchLayer = (typeof PLUGIN_SWITCH_LAYERS)[number];

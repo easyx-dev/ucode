@@ -41,18 +41,21 @@ export type PluginCommandAssets = {
 /**
  * 装配期注入的插件贡献：资源目录与子角色。
  * `core` / `harness/setup` 只消费这个形状，不认识插件宿主的内部结构。
+ *
+ * 每个入口都带**会话工作目录**：生效开关按 `<cwd>/.<slug>/plugins.json` 覆盖，
+ * 同一个插件在 A 仓库开着、在 B 仓库关着是常态。
  */
 export type PluginContributions = {
-  commandAssets: () => PluginCommandAssets;
-  agents: () => PluginAgentFile[];
+  commandAssets: (cwd?: string) => PluginCommandAssets;
+  agents: (cwd?: string) => PluginAgentFile[];
   /** 可信来源（`official` / `local`）的 pi 扩展文件路径；第三方市场的不注入 */
-  extensionPaths: () => string[];
+  extensionPaths: (cwd?: string) => string[];
   /** 可信来源的 `bin/` 目录；并入会话 bash 的 PATH，第三方市场的不注入 */
-  binDirs: () => string[];
+  binDirs: (cwd?: string) => string[];
   /** 可信来源的命令式 hook 绑定；第三方市场的不挂载 */
-  hooks: () => PluginHookBinding[];
+  hooks: (cwd?: string) => PluginHookBinding[];
   /** 插件声明的 MCP 服务器；MCP 不在执行类组件的来源门控名单里（见 plans/plugins.md 第五章） */
-  mcpServers: () => PluginMcpServer[];
+  mcpServers: (cwd?: string) => PluginMcpServer[];
 };
 
 /**

@@ -19,7 +19,7 @@ export const createPluginsRoute = (services: Services) => {
   const router = new Hono();
 
   router.post("/list", jsonBody(pluginListInputSchema), (c) => {
-    const response: PluginsListResponse = services.plugins.list();
+    const response: PluginsListResponse = services.plugins.list(c.req.valid("json"));
     return c.json(ok(response));
   });
 

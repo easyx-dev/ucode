@@ -8,10 +8,12 @@ import type {
   PluginUpdateRequest,
 } from "@ucode/contracts";
 
+import { useEffect } from "react";
+
 import { useClient } from "../provider";
 import { useStore } from "./use-store";
 
-export function usePlugins(): {
+export function usePlugins(cwd: string | null = null): {
   plugins: PluginsListResponse | null;
   /** 安装 / 重拉的阶段提示（来自 plugin_progress 帧），完成后自动清空 */
   progress: string | null;
@@ -29,6 +31,11 @@ export function usePlugins(): {
 } {
   const client = useClient();
   const state = useStore(client.plugins);
+
+  // 工作目录变化（切会话 / 切仓库）要按新 cwd 重取一次：生效开关可能被项目覆盖翻掉
+  useEffect(() => {
+    void client.plugins.load(cwd);
+  }, [client, cwd]);
 
   return {
     plugins: state.plugins,

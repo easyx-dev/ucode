@@ -155,6 +155,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const marketplaces = createMarketplaceService({
     ...pluginDeps,
     onCatalogRefreshed: () => plugins.checkUpdates(),
+    pluginList: () => plugins.list(),
   });
   const pool = new SessionPool(
     runtime,
@@ -169,12 +170,12 @@ export const createServices = async (registration: ServiceRegistration): Promise
     goals,
     usage,
     {
-      commandAssets: () => plugins.commandAssets(),
-      agents: () => plugins.agentProfiles(),
-      extensionPaths: () => plugins.extensionPaths(),
-      binDirs: () => plugins.binDirs(),
-      hooks: () => plugins.hooks(),
-      mcpServers: () => plugins.mcpServers(),
+      commandAssets: (cwd) => plugins.commandAssets(cwd),
+      agents: (cwd) => plugins.agentProfiles(cwd),
+      extensionPaths: (cwd) => plugins.extensionPaths(cwd),
+      binDirs: (cwd) => plugins.binDirs(cwd),
+      hooks: (cwd) => plugins.hooks(cwd),
+      mcpServers: (cwd) => plugins.mcpServers(cwd),
     },
   );
   // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话

@@ -1203,7 +1203,9 @@
 
 **请求参数**
 
-无参数（body 传 `{}`）
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `cwd` | string（长度≥1） | 否 | — | 当前工作目录。给了就按它读项目级覆盖（`<cwd>/.<slug>/plugins.json` 与 `plugins.local.json`）， 每条插件的 `enabled` / `enabledBy` 是**该仓库里的生效值**；不给只算用户级。 |
 
 **响应类型**：`PluginsListResponse`
 
@@ -1212,6 +1214,7 @@
 | `plugins` | [PluginView](#pluginview)[] | 是 | — |
 | `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
 | `revision` | number | 是 | 注册表代次：变更入口推进它，会话按它决定是否重建 |
+| `overrides` | [PluginOverridesView](#pluginoverridesview) \| null | 是 | 项目级覆盖的来源与诊断；请求没带 `cwd` 时为 null |
 
 ### POST /api/v1/plugins/create
 
@@ -1223,8 +1226,7 @@
 | --- | --- | --- | --- | --- |
 | `source` | object（source = "directory" \| "url" \| "npm" \| "github" \| "git"） | 是 | — | — |
 | `marketplace` | string（格式 `^[a-z0-9][a-z0-9._-]{0,63}$`） | 否 | — | 归属市场；缺省表示直接登记本地目录（信任档位 local） |
-| `scope` | "user" \| "project" | 否 | `user` | 项目级插件默认不启用，由状态文件或本次入参决定 |
-| `enabled` | boolean | 否 | `true` | — |
+| `enabled` | boolean | 否 | `true` | 登记即启用。安装副本只有用户级一处（`$APP_HOME/plugins`）， 「这个仓库里开不开」由 `<cwd>/.<slug>/plugins.json` 的覆盖决定，不在安装入参里。 |
 
 **source（source = "directory"）**
 
@@ -1361,7 +1363,7 @@
 | --- | --- | --- | --- |
 | `marketplace` | [MarketplaceView](#marketplaceview) | 是 | — |
 | `plugins` | [MarketplacePluginView](#marketplacepluginview)[] | 是 | — |
-| `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | 清单里被跳过的条目原因（来源不被支持、字段非法等） |
+| `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | 清单里被跳过的条目原因（缺 name、字段非法等）；刷新时随清单缓存在状态里 |
 
 ### POST /api/v1/marketplace/create
 
@@ -2035,7 +2037,8 @@
 | `description` | string | 是 | — |
 | `version` | string | 是 | — |
 | `source` | "official" \| "local" \| "market" | 是 | 信任档位：执行类组件是否注入按它判定 |
-| `enabled` | boolean | 是 | — |
+| `enabled` | boolean | 是 | 生效的启用状态：项目 / 本地覆盖优先于用户登记表里的值 |
+| `enabledBy` | "user" \| "local" \| "project" | 是 | `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 |
 | `path` | string | 是 | 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） |
 | `installedAt` | string | 是 | 安装时间（ISO 8601） |
 | `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
@@ -2047,6 +2050,14 @@
 | `latestVersion` | string | 否 | 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 |
 | `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
 | `diagnostics` | [PluginDiagnosticView](#plugindiagnosticview)[] | 是 | — |
+
+### PluginOverridesView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `projectPath` | string | 是 | `<cwd>/.<slug>/plugins.json`：提交进仓库的那份 |
+| `localPath` | string | 是 | `<cwd>/.<slug>/plugins.local.json`：个人覆盖（建议 gitignore） |
+| `diagnostics` | string[] | 是 | — |
 
 ### MarketplaceView
 
@@ -2127,7 +2138,7 @@
 | `label` | string | 是 | 展示名 |
 | `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
 | `kind` | "primary" \| "subagent" | 是 | — |
-| `source` | "project" \| "builtin" \| "global" \| "plugin" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" | 是 | — |
 | `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
 
 ### PromptCommandView
@@ -2137,7 +2148,7 @@
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
-| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -2145,7 +2156,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
-| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
 
 ### ModelUsage
 
@@ -2225,6 +2236,7 @@
 | `plugins` | [PluginView](#pluginview)[] | 是 | — |
 | `statePath` | string | 是 | 状态文件绝对路径，供设置页展示与排查 |
 | `revision` | number | 是 | 注册表代次：变更入口推进它，会话按它决定是否重建 |
+| `overrides` | [PluginOverridesView](#pluginoverridesview) \| null | 是 | 项目级覆盖的来源与诊断；请求没带 `cwd` 时为 null |
 
 ### CatalogModel
 
@@ -2364,7 +2376,7 @@
 | `event` | "invoke" \| "hit" | 是 | 使用方式 |
 | `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
-| `source` | "project" \| "builtin" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 

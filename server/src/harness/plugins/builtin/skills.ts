@@ -156,7 +156,7 @@ description: 审计第三方插件（清单、钩子、bin、MCP、扩展的信�
 export const BUILTIN_SKILLS: readonly BuiltinSkill[] = [
   {
     id: "plugin-create",
-    description: "引导创建一个能被 ${brand.name}、Claude Code 与 ZCode 同时识别的插件包",
+    description: `引导创建一个能被 ${brand.name}、Claude Code 与 ZCode 同时识别的插件包`,
     version: "0.1.0",
     files: { "SKILL.md": PLUGIN_CREATE_SKILL },
     requiredFiles: ["SKILL.md"],

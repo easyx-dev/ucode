@@ -1,6 +1,7 @@
 /** 注册表到契约视图的映射：组件计数与「未注入运行时」的分组供设置页直接渲染 */
 import type { PluginComponentCounts, PluginView } from "@ucode/contracts";
 
+import type { PluginSwitch } from "./state";
 import type { PluginDescriptor, PluginRegistry } from "./types";
 
 const countOf = (descriptor: PluginDescriptor, group: keyof PluginComponentCounts): number =>
@@ -16,14 +17,15 @@ export const toPluginComponentCounts = (descriptor: PluginDescriptor): PluginCom
   extensions: countOf(descriptor, "extensions"),
 });
 
-export const toPluginView = (descriptor: PluginDescriptor): PluginView => ({
+export const toPluginView = (descriptor: PluginDescriptor, toggle: PluginSwitch): PluginView => ({
   id: descriptor.id,
   name: descriptor.name,
   displayName: descriptor.displayName,
   description: descriptor.description,
   version: descriptor.version,
   source: descriptor.source,
-  enabled: descriptor.enabled,
+  enabled: toggle.enabled,
+  enabledBy: toggle.enabledBy,
   path: descriptor.root,
   installedAt: descriptor.installedAt,
   components: toPluginComponentCounts(descriptor),
@@ -41,6 +43,3 @@ export const toPluginView = (descriptor: PluginDescriptor): PluginView => ({
   ...(descriptor.checkedAt ? { checkedAt: descriptor.checkedAt } : {}),
   diagnostics: descriptor.diagnostics,
 });
-
-export const toPluginViews = (registry: PluginRegistry): PluginView[] =>
-  registry.plugins.map(toPluginView);

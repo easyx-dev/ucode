@@ -175,10 +175,3 @@ export const materializeBuiltinAssets = (input: {
 
   return { skillsDir, written, diagnostics };
 };
-
-/** 内置技能目录：装配层注入 loader 用（与物化结果同址） */
-export const builtinSkillsDir = (appHome: string, appDirname: string): string =>
-  join(appHome, appDirname, BUILTIN_DIRNAME, SKILLS_DIRNAME);
-
-/** 技能真身的相对路径（诊断与文档生成用） */
-export const builtinSkillFile = (id: string): string => join(id, SKILL_FILENAME);

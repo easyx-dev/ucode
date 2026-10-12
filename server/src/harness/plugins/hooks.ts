@@ -27,13 +27,6 @@ export type PluginHookEvent = (typeof PLUGIN_HOOK_EVENTS)[number];
 /** 通道支持的事件：只有通知类事件能 `async: true`（决策类必须同步等结论） */
 export const PLUGIN_HOOK_ASYNC_EVENTS: readonly PluginHookEvent[] = ["SessionStart", "Stop"];
 
-/** 带工具 matcher 的事件 */
-export const PLUGIN_HOOK_TOOL_EVENTS: readonly PluginHookEvent[] = [
-  "PreToolUse",
-  "PostToolUse",
-  "PostToolUseFailure",
-];
-
 /** 默认超时：与 Claude 一致 */
 export const PLUGIN_HOOK_DEFAULT_TIMEOUT_SECONDS = 60;
 

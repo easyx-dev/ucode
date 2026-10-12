@@ -16,6 +16,7 @@ import { PLUGIN_FETCH_TIMEOUT_MS, PLUGIN_PACKAGE_MAX_BYTES } from "../../constan
 import { hashDirectory } from "../../harness/plugins/source-hash";
 import type { InstalledPluginRecord } from "../../harness/plugins/state";
 import type { PublicFetchResult, publicFetch } from "../../platform/net";
+import { resolveExistingPath } from "../../platform/paths";
 import type { SourceRunner } from "./sources";
 
 export type SourceUpdate = {
@@ -37,7 +38,8 @@ export type CheckSourceUpdateInput = {
 /** 目录来源：内容哈希比对 */
 const checkDirectory = (record: InstalledPluginRecord): SourceUpdate | null => {
   if (record.source.source !== "directory") return null;
-  const hash = hashDirectory(record.source.path)?.hash;
+  // 登记时存的是用户原样输入的路径（可能带 `~`）：按进程 cwd 直接读会读不到，永远判不出更新
+  const hash = hashDirectory(resolveExistingPath(record.source.path) ?? record.source.path)?.hash;
   if (!hash) return null;
   return {
     updateAvailable: record.integrity !== undefined && record.integrity !== hash,

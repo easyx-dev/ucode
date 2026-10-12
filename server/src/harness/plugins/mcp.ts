@@ -8,7 +8,6 @@
  * - **来源**：MCP 不属于执行类组件的来源门控名单（第三方市场也生效），由调用方按会话能力决定挂不挂。
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import type { PluginDiagnosticView } from "@ucode/contracts";
 
@@ -135,12 +134,12 @@ export const loadPluginMcp = (input: {
       );
     }
   } else if (typeof input.inline === "string") {
-    // 清单写成路径时按路径读
-    return loadPluginMcp({
-      ...input,
-      file: join(input.pluginRoot, input.inline),
-      inline: undefined,
-    });
+    // 清单写成路径时**不自己拼路径**：组件解析已经做过「必须在根内、以 ./ 开头」的校验，
+    // 这里再拼一次等于旁路那条规则（能读到插件根外的任意 JSON）。取不到 file 就是不可用。
+    if (input.inline.trim()) {
+      diagnostics.push(diagnostic("error", "mcp", `${source}：路径写法没有通过组件校验，已跳过`));
+    }
+    return { servers: [], diagnostics };
   } else {
     table = serversOf(input.inline);
   }

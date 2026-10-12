@@ -62,6 +62,7 @@ import type {
   PluginCreateRequest,
   PluginDeleteRequest,
   PluginDeleteResponse,
+  PluginListRequest,
   PluginRefreshRequest,
   PluginsListResponse,
   PluginUpdateRequest,
@@ -285,7 +286,8 @@ export const createApis = (options: ApisOptions = {}) => {
       remove: (name: string) => transport.post<McpDeleteResponse>("mcp/delete", { name }),
     },
     plugins: {
-      list: () => transport.post<PluginsListResponse>("plugins/list"),
+      list: (body: PluginListRequest = {}) =>
+        transport.post<PluginsListResponse>("plugins/list", body),
       create: (body: PluginCreateRequest) =>
         transport.post<PluginWriteResponse>("plugins/create", body),
       update: (body: PluginUpdateRequest) =>

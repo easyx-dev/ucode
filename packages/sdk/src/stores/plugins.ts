@@ -28,8 +28,8 @@ export type PluginsState = {
 export type PluginsStore = {
   getState: Store<PluginsState>["getState"];
   subscribe: Store<PluginsState>["subscribe"];
-  /** 重取插件与市场两份列表 */
-  load: () => Promise<void>;
+  /** 重取插件与市场两份列表；`cwd` 决定插件开关算哪一层（项目覆盖） */
+  load: (cwd?: string | null) => Promise<void>;
   /** 市场内插件列表：命中缓存直接给，否则取一次（失败返回 null 并把错误留在 state） */
   catalog: (name: string) => Promise<MarketplacePluginsResponse | null>;
   /** 安装 / 启停 / 重拉：成功返回回执，失败把错误留在 state 里 */
@@ -51,14 +51,24 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
     error: null,
   });
 
-  const load = async (): Promise<void> => {
+  /** 记住最近一次的 cwd：`plugins_changed` 帧不带 cwd，收到后要按它重取才有项目覆盖 */
+  let lastCwd: string | null = null;
+
+  const load = async (cwd?: string | null): Promise<void> => {
+    if (cwd !== undefined) lastCwd = cwd;
     try {
       const [plugins, marketplaces] = await Promise.all([
-        deps.apis.plugins.list(),
+        deps.apis.plugins.list(lastCwd ? { cwd: lastCwd } : {}),
         deps.apis.marketplace.list(),
       ]);
       // 列表重取意味着市场可能变了，市场内插件缓存一并作废
-      store.setState(() => ({ plugins, marketplaces, catalogs: {}, progress: null, error: null }));
+      store.setState(() => ({
+        plugins,
+        marketplaces,
+        catalogs: {},
+        progress: null,
+        error: null,
+      }));
     } catch (error) {
       store.setState((prev) => ({ ...prev, error: asApiError(error) }));
     }
@@ -82,6 +92,8 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
       .list()
       .then((marketplaces) => store.setState((prev) => ({ ...prev, marketplaces, error: null })))
       .catch((error: unknown) => store.setState((prev) => ({ ...prev, error: asApiError(error) })));
+    // 帧是全局快照（只有用户级开关）：有 cwd 时再取一次，把项目级覆盖叠回来
+    if (lastCwd) void load(lastCwd);
   });
 
   // 重连补快照：断流期间可能错过 plugins_changed
@@ -96,14 +108,17 @@ export const createPluginsStore = (deps: { apis: Apis; events: EventStream }): P
 
   void load();
 
-  /** 写操作共用：成功即把错误清掉，失败把错误留下并返回 null */
+  /**
+   * 写操作共用：成功即把错误清掉，失败把错误留下并返回 null。
+   * 失败时同样清 `progress`——安装失败不会再有 `plugins_changed`，进度行会一直挂着上一句提示。
+   */
   const run = async <T>(action: () => Promise<T>): Promise<T | null> => {
     try {
       const result = await action();
       store.setState((prev) => ({ ...prev, error: null }));
       return result;
     } catch (error) {
-      store.setState((prev) => ({ ...prev, error: asApiError(error) }));
+      store.setState((prev) => ({ ...prev, error: asApiError(error), progress: null }));
       return null;
     }
   };

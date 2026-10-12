@@ -445,6 +445,9 @@ export default {
   助理区: "Assistant",
   选择目录: "Choose directory",
   选择文件: "Choose file",
+  由本仓库的覆盖文件决定: "Set by this repository's override file",
+  "本仓库的覆盖文件：{{project}}（个人覆盖：{{local}}）":
+    "Override files for this repository: {{project}} (personal: {{local}})",
   返回上级: "Go up",
   新建文件夹: "New folder",
   选择此目录: "Choose this directory",

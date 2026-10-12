@@ -66,8 +66,23 @@ export const PLUGIN_MARKETPLACES_DIRNAME = "marketplaces";
 /** 插件持久数据目录名（位于插件根下）：`data/<sanitized-plugin-id>`，即 `${*_PLUGIN_DATA}` */
 export const PLUGIN_DATA_DIRNAME = "data";
 
+/**
+ * 旧版本副本的处理：换版本 / 同版本重拉时旧副本先改名成 `<前缀><版本>-<时间戳>`，
+ * 并在里面写 `<标记文件>`（内容是 ISO 时间），14 天后由清扫删掉。
+ * 不立即删是因为可能有会话正握着旧路径跑（`${*_PLUGIN_ROOT}` 指向版本目录）。
+ */
+export const PLUGIN_ORPHAN_DIRNAME_PREFIX = ".orphaned-";
+export const PLUGIN_ORPHAN_MARKER_FILENAME = ".orphaned_at";
+
 /** 插件状态文件名（位于 app 目录下）：登记表 + 用户配置 + 注册表代次 */
 export const PLUGIN_STATE_FILENAME = "plugins.json";
+
+/**
+ * 项目级启停覆盖的文件名，位于 `<cwd>/.<slug>/`：
+ * `plugins.json` 提交进仓库给团队共用，`plugins.local.json` 是个人覆盖（建议 gitignore）。
+ */
+export const PLUGIN_PROJECT_OVERRIDES_FILENAME = "plugins.json";
+export const PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME = "plugins.local.json";
 
 /** 市场清单文件名（位于市场目录 / 直链末尾） */
 export const PLUGIN_MARKETPLACE_FILENAME = "marketplace.json";

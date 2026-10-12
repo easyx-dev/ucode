@@ -55,6 +55,6 @@ export type MarketplacePluginView = {
 export type MarketplacePluginsResponse = {
   marketplace: MarketplaceView;
   plugins: MarketplacePluginView[];
-  /** 清单里被跳过的条目原因（来源不被支持、字段非法等） */
+  /** 清单里被跳过的条目原因（缺 name、字段非法等）；刷新时随清单缓存在状态里 */
   diagnostics: PluginDiagnosticView[];
 };

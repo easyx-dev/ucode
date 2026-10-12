@@ -554,7 +554,7 @@ export const PROMPT_MAX_CONTEXTS = 32;
 /**
  * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：
  * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 插件 → 内置。
- * 提示词命令只会有 `project` / `global` / `builtin` 三种。
+ * 提示词命令与技能还可能来自插件（`plugin`）与内置资产。
  */
 export const COMMAND_ASSET_SOURCES = [
   "project",

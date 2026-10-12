@@ -5,7 +5,7 @@
  * 断言 `defaultTools` / 白名单两条路在 pi 侧的实际落点——这也兜住「工具名与 pi 注册名脱节后静默失效」。
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -28,6 +28,7 @@ import { MemoryService } from "../../features/memory";
 import { rememberFact } from "../../features/memory/store";
 import { toProviderConfigInput } from "../../pi/provider-config";
 import type { PiRuntime } from "../../pi/runtime";
+import type { PluginHookBinding } from "../../plugins/hooks";
 import {
   type AgentProfile,
   type AgentRegistry,
@@ -104,6 +105,8 @@ const optionsOf = async (
   agentRegistry?: AgentRegistry,
   /** 会话行；用于验证覆盖值与模式推荐值的优先级 */
   record?: SessionRecord,
+  /** 插件 hook 绑定；验 SessionStart 在只读会话里也触发 */
+  pluginHooks?: PluginHookBinding[],
 ): Promise<CreateAgentSessionOptions> => {
   const modelRuntime = await ModelRuntime.create({
     authPath: join(root, "auth.json"),
@@ -146,6 +149,7 @@ const optionsOf = async (
       : {}),
     ...(memory ? { memory } : {}),
     ...(agentRegistry ? { agentRegistry } : {}),
+    ...(pluginHooks ? { pluginHooks } : {}),
     promptSource,
   });
 };
@@ -259,6 +263,34 @@ describe("buildSessionOptions 的 session_start", () => {
     const session = await sessionOf("build");
     await assert.doesNotReject(() => session.bindExtensions({}));
     session.dispose();
+  });
+
+  // 插件 SessionStart hook 也挂在 `session_start` 上：只读 / plan / ask 会话同样要触发，
+  // 否则插件作者拿不到任何诊断（pool 对所有会话都调 bindExtensions）
+  it("plan 会话也能触发插件 SessionStart hook", async () => {
+    const marker = join(root, `hook-ran-${Date.now()}`);
+    const session = await sessionOf("plan", "custom", undefined, undefined, undefined, undefined, [
+      {
+        pluginId: "demo@local",
+        pluginRoot: root,
+        pluginDataDir: join(root, "plugin-data"),
+        config: {},
+        event: "SessionStart",
+        command: `printf ran >> ${marker}`,
+        timeoutMs: 10_000,
+        isAsync: true,
+      },
+    ]);
+    await session.bindExtensions({});
+
+    // SessionStart 是通知类事件（async），落到文件需要一点点时间：轮询而不是固定等
+    let seen = "";
+    for (let attempt = 0; attempt < 40 && seen === ""; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      seen = existsSync(marker) ? readFileSync(marker, "utf8") : "";
+    }
+    session.dispose();
+    assert.equal(seen, "ran", "只读会话也应跑插件的 SessionStart hook");
   });
 });
 

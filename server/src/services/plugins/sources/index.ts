@@ -7,7 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { execa } from "execa";
 
@@ -21,7 +21,7 @@ import { hashDirectory } from "../../../harness/plugins/source-hash";
 import type { PluginSourceSpec } from "../../../harness/plugins/state";
 import { logger } from "../../../platform/logger";
 import { type PublicFetchResult, publicFetch } from "../../../platform/net";
-import { resolveExistingPath } from "../../../platform/paths";
+import { isInsidePath, resolveExistingPath } from "../../../platform/paths";
 import { detectArchiveFormat, unpackArchive } from "./unpack";
 
 /** 来源不可用：网络失败、非 2xx、包结构不对、进程调用失败，都归这一类 */
@@ -196,7 +196,12 @@ const stageFromGit = async (
   args.push(url, dir);
   await run("git", args, { timeout: PLUGIN_GIT_TIMEOUT_MS });
 
-  const root = source.path ? join(dir, source.path) : dir;
+  // `path` 由来源方给出（市场条目的 source 也是它），必须落在克隆目录内：否则会把用户任意目录
+  // 当插件根搬进缓存（安装是 rename，等于把原目录移走）
+  const root = source.path ? resolve(dir, source.path) : dir;
+  if (!isInsidePath(dir, root)) {
+    throw new SourceError(`仓内路径越出仓库：${source.path ?? ""}`);
+  }
   if (!existsSync(root)) throw new SourceError(`仓内路径不存在：${source.path ?? ""}`);
 
   // 记下克隆到的 commit：检查更新时用 `git ls-remote` 的同一个值比对

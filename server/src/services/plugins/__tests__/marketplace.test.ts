@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import type { ServerControlEvent } from "@ucode/contracts";
+import type { PluginsListResponse, ServerControlEvent } from "@ucode/contracts";
 
 import type { SessionEventBus } from "../../../core/event-bus";
 import { createMarketplaceService } from "../marketplace";
@@ -38,7 +38,9 @@ const makeMarketWithSources = (): string =>
     ],
   });
 
-const setup = (over: { run?: SourceRunner; pluginsDir?: string } = {}) => {
+const setup = (
+  over: { run?: SourceRunner; pluginsDir?: string; pluginList?: () => PluginsListResponse } = {},
+) => {
   const state = new PluginStateStore(join(makeDir(), "plugins.json"));
   state.load();
   const frames: ServerControlEvent[] = [];
@@ -54,6 +56,7 @@ const setup = (over: { run?: SourceRunner; pluginsDir?: string } = {}) => {
       state,
       events,
       pluginsDir,
+      ...(over.pluginList ? { pluginList: over.pluginList } : {}),
       // 默认不给网络与进程：测试要么注入替身，要么走失败分支
       run:
         over.run ??
@@ -160,7 +163,6 @@ describe("市场移除", () => {
           source: { source: "directory", path: dir },
           marketplace: "my-market",
           path: dir,
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
         },
@@ -267,7 +269,6 @@ describe("市场内插件列表", () => {
           source: { source: "directory", path: dir },
           marketplace: "my-market",
           path: dir,
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
           updateAvailable: true,
@@ -347,5 +348,60 @@ describe("市场条目的一键安装来源", () => {
     const byName = new Map(market.info({ name: "remote" }).plugins.map((p) => [p.name, p]));
     assert.equal(byName.get("rel")?.source, null);
     assert.deepEqual(byName.get("gh")?.source, { source: "github", repo: "o/r" });
+  });
+});
+
+describe("变更帧", () => {
+  it("市场增删发的 plugins_changed 带真实插件列表：空列表会把界面上的插件卡片清空", async () => {
+    const snapshot: PluginsListResponse = {
+      plugins: [],
+      statePath: "/tmp/plugins.json",
+      revision: 7,
+      overrides: null,
+    };
+    const { frames, service } = setup({ pluginList: () => snapshot });
+
+    await service.create({
+      name: "demo-market",
+      source: { source: "directory", path: makeMarket({ name: "demo-market", plugins: [] }) },
+    });
+
+    const frame = frames.at(-1);
+    assert.equal(frame?.type, "plugins_changed");
+    assert.deepEqual(
+      frame?.type === "plugins_changed" ? frame.plugins : null,
+      snapshot,
+      "帧里的插件列表来自插件服务，而不是凑出来的空壳",
+    );
+  });
+
+  it("没注入列表提供者时退回空壳（只用于测试与早期装配）", async () => {
+    const { frames, service } = setup();
+    await service.create({
+      name: "demo-market",
+      source: { source: "directory", path: makeMarket({ name: "demo-market", plugins: [] }) },
+    });
+    const frame = frames.at(-1);
+    assert.equal(frame?.type === "plugins_changed" ? frame.plugins.plugins.length : -1, 0);
+  });
+});
+
+describe("条目级诊断", () => {
+  it("刷新时跳过的条目原因随缓存带出 info，界面能看到而不是恒空", async () => {
+    const dir = makeMarket({
+      name: "broken-market",
+      plugins: [{ description: "缺 name" }, { name: "ok", version: "1.0.0" }],
+    });
+    const { service } = setup();
+    await service.create({ name: "broken-market", source: { source: "directory", path: dir } });
+    await service.refresh({ name: "broken-market" });
+
+    const info = service.info({ name: "broken-market" });
+    assert.deepEqual(
+      info.plugins.map((item) => item.name),
+      ["ok"],
+    );
+    assert.equal(info.diagnostics.length, 1);
+    assert.match(info.diagnostics[0]?.message ?? "", /第 1 个条目缺少 name/);
   });
 });

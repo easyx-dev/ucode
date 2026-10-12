@@ -56,14 +56,22 @@ export const pluginSourceSchema = z.discriminatedUnion("source", [
   }),
 ]);
 
-export const pluginListInputSchema = z.object({});
+export const pluginListInputSchema = z.object({
+  /**
+   * 当前工作目录。给了就按它读项目级覆盖（`<cwd>/.<slug>/plugins.json` 与 `plugins.local.json`），
+   * 每条插件的 `enabled` / `enabledBy` 是**该仓库里的生效值**；不给只算用户级。
+   */
+  cwd: z.string().min(1).optional(),
+});
 
 export const pluginCreateInputSchema = z.object({
   source: pluginSourceSchema,
   /** 归属市场；缺省表示直接登记本地目录（信任档位 local） */
   marketplace: marketplaceNameSchema.optional(),
-  /** 项目级插件默认不启用，由状态文件或本次入参决定 */
-  scope: z.enum(["user", "project"]).default("user"),
+  /**
+   * 登记即启用。安装副本只有用户级一处（`$APP_HOME/plugins`），
+   * 「这个仓库里开不开」由 `<cwd>/.<slug>/plugins.json` 的覆盖决定，不在安装入参里。
+   */
   enabled: z.boolean().default(true),
 });
 

@@ -1,21 +1,33 @@
 /** services/plugins/state：plugins.json 的建立、限权、代次推进与纯逻辑 */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import {
+  PLUGIN_PROJECT_OVERRIDES_FILENAME,
+  PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME,
+  PROJECT_CONFIG_DIRNAME,
+} from "../../../constants/dirs";
+import {
   DEFAULT_PLUGIN_MARKETPLACES,
   emptyPluginState,
   LOCAL_MARKETPLACE_NAME,
+  loadProjectPluginOverrides,
   parsePluginId,
   pluginSourceOf,
+  pluginSwitchOf,
   toPluginId,
-  withProjectOverrides,
 } from "../../../harness/plugins/state";
 import { PluginStateStore } from "..";
 
 const created: string[] = [];
+
+const makeDir = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "plugin-cwd-"));
+  created.push(dir);
+  return dir;
+};
 
 const makeStatePath = (): string => {
   const dir = mkdtempSync(join(tmpdir(), "plugin-state-"));
@@ -68,7 +80,6 @@ describe("PluginStateStore", () => {
           version: "0.0.0",
           source: { source: "directory", path: "/tmp/my-plugin" },
           path: "/tmp/my-plugin",
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
         },
@@ -136,54 +147,55 @@ describe("纯逻辑", () => {
     assert.equal(pluginSourceOf({ ...base, marketplace: "third-party" }, marketplaces), "market");
   });
 
-  it("项目级覆盖只改启用状态，且项目级默认不启用", () => {
-    const state = emptyPluginState();
-    const next = withProjectOverrides(
-      {
-        ...state,
-        installed: [
-          {
-            id: "user-plugin@local",
-            name: "user-plugin",
-            version: "0.0.0",
-            source: { source: "directory", path: "/p" },
-            path: "/p",
-            scope: "user",
-            enabled: true,
-            installedAt: "2026-01-01T00:00:00.000Z",
-          },
-          {
-            id: "proj-plugin@local",
-            name: "proj-plugin",
-            version: "0.0.0",
-            source: { source: "directory", path: "/q" },
-            path: "/q",
-            scope: "project",
-            enabled: true,
-            installedAt: "2026-01-01T00:00:00.000Z",
-          },
-          {
-            id: "proj-on@local",
-            name: "proj-on",
-            version: "0.0.0",
-            source: { source: "directory", path: "/r" },
-            path: "/r",
-            scope: "project",
-            enabled: false,
-            installedAt: "2026-01-01T00:00:00.000Z",
-          },
-        ],
-      },
-      { enabled: ["proj-on@local"] },
+  it("覆盖按 local > project > user 生效，只翻已登记插件的开关", () => {
+    const cwd = makeDir();
+    const dir = join(cwd, PROJECT_CONFIG_DIRNAME);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, PLUGIN_PROJECT_OVERRIDES_FILENAME),
+      JSON.stringify({ enabledPlugins: { "a@local": false, "b@local": true } }),
+      "utf8",
+    );
+    writeFileSync(
+      join(dir, PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME),
+      JSON.stringify({ enabledPlugins: { "a@local": true } }),
+      "utf8",
     );
 
-    assert.deepEqual(
-      next.installed.map((item) => [item.id, item.enabled]),
-      [
-        ["user-plugin@local", true],
-        ["proj-plugin@local", false],
-        ["proj-on@local", true],
-      ],
+    const overrides = loadProjectPluginOverrides(cwd);
+    assert.deepEqual(overrides.diagnostics, []);
+    assert.equal(pluginSwitchOf({ id: "a@local", enabled: false }, overrides).enabled, true);
+    assert.equal(pluginSwitchOf({ id: "a@local", enabled: false }, overrides).enabledBy, "local");
+    assert.equal(pluginSwitchOf({ id: "b@local", enabled: false }, overrides).enabled, true);
+    assert.equal(pluginSwitchOf({ id: "b@local", enabled: false }, overrides).enabledBy, "project");
+    // 覆盖里没提到的 id 保持登记表里的值；项目文件不能凭空启用一个没装的插件
+    assert.deepEqual(pluginSwitchOf({ id: "c@local", enabled: true }, overrides), {
+      enabled: true,
+      enabledBy: "user",
+    });
+    const bogus = pluginSwitchOf({ id: "never-installed@local", enabled: false }, overrides);
+    assert.equal(bogus.enabledBy, "user");
+  });
+
+  it("没有覆盖文件时一律按用户级；坏 JSON 只记诊断", () => {
+    const cwd = makeDir();
+    const bare = loadProjectPluginOverrides(cwd);
+    assert.deepEqual(bare.diagnostics, []);
+    assert.equal(pluginSwitchOf({ id: "a@local", enabled: true }, bare).enabledBy, "user");
+
+    mkdirSync(join(cwd, PROJECT_CONFIG_DIRNAME), { recursive: true });
+    writeFileSync(
+      join(cwd, PROJECT_CONFIG_DIRNAME, PLUGIN_PROJECT_OVERRIDES_FILENAME),
+      "{oops",
+      "utf8",
+    );
+    const broken = loadProjectPluginOverrides(cwd);
+    assert.equal(broken.diagnostics.length, 1);
+    assert.match(broken.diagnostics[0] ?? "", /读不出来/);
+    assert.equal(
+      pluginSwitchOf({ id: "a@local", enabled: true }, broken).enabled,
+      true,
+      "坏文件按不存在处理",
     );
   });
 });

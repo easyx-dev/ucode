@@ -15,6 +15,7 @@ import { Input } from "../../base/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
 import { Spinner } from "../../base/spinner";
 import { usePlugins } from "../../hooks/use-plugins";
+import { useWorkbench } from "../../provider/workbench";
 import { openDirectoryPickerDialog } from "../directory-picker-dialog";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
@@ -29,6 +30,8 @@ export function SettingsPlugins() {
   );
   const [purge, setPurge] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  // 生效开关按当前会话的工作目录算：切会话即换一套项目覆盖
+  const cwd = useWorkbench()?.cwd ?? null;
   const {
     plugins,
     progress,
@@ -42,7 +45,7 @@ export function SettingsPlugins() {
     removeMarketplace,
     refreshMarketplace,
     catalog,
-  } = usePlugins();
+  } = usePlugins(cwd);
   const [openCatalog, setOpenCatalog] = useState<string | null>(null);
   const [catalogEntries, setCatalogEntries] = useState<MarketplacePluginsResponse["plugins"]>([]);
   const [sourceKind, setSourceKind] = useState<SourceKind>("directory");
@@ -225,6 +228,11 @@ export function SettingsPlugins() {
                   {plugin.enabled ? null : (
                     <span className="shrink-0 text-xs text-foreground-subtle">{t("已停用")}</span>
                   )}
+                  {plugin.enabledBy === "user" ? null : (
+                    <span className="shrink-0 text-xs text-foreground-subtle">
+                      {t("由本仓库的覆盖文件决定")}
+                    </span>
+                  )}
                 </div>
                 <p className="truncate font-mono text-xs text-foreground-subtle">{plugin.id}</p>
                 {plugin.description ? (
@@ -240,6 +248,8 @@ export function SettingsPlugins() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  // 生效值来自仓库里的覆盖文件时，改登记表不会有效果：按钮置灰，改文件才生效
+                  disabled={plugin.enabledBy !== "user"}
                   onClick={() => void setEnabled(plugin.id, !plugin.enabled)}
                 >
                   {plugin.enabled ? t("停用") : t("启用")}
@@ -478,9 +488,18 @@ export function SettingsPlugins() {
                     variant="outline"
                     size="sm"
                     disabled={entry.source === null || installing}
-                    onClick={() =>
-                      void install({ source: entry.source as PluginCreateRequest["source"] })
-                    }
+                    onClick={() => {
+                      // 已登记的走重拉：再发一次 create 会被服务端按「插件已登记」拒掉
+                      if (entry.installedId !== null) {
+                        void refresh(entry.installedId);
+                        return;
+                      }
+                      // 必须带上所属市场，否则服务端按本地登记（local 档），执行类组件的来源门控会被绕开
+                      void install({
+                        source: entry.source as PluginCreateRequest["source"],
+                        marketplace: openCatalog,
+                      });
+                    }}
                   >
                     {entry.installedId === null ? t("安装") : t("重装")}
                   </Button>
@@ -517,6 +536,21 @@ export function SettingsPlugins() {
       <p className="text-xs break-all text-foreground-subtle">
         {t("状态文件：{{path}}", { path: plugins?.statePath ?? "" })}
       </p>
+      {plugins?.overrides ? (
+        <div className="space-y-1 text-xs break-all text-foreground-subtle">
+          <p>
+            {t("本仓库的覆盖文件：{{project}}（个人覆盖：{{local}}）", {
+              project: plugins.overrides.projectPath,
+              local: plugins.overrides.localPath,
+            })}
+          </p>
+          {plugins.overrides.diagnostics.map((message) => (
+            <p key={message} className="text-destructive">
+              {message}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { zipSync } from "fflate";
 import { PLUGIN_MANIFEST_DIRNAME } from "../../../../constants/dirs";
@@ -204,6 +204,30 @@ describe("stagePluginSource", () => {
       }),
       (error: unknown) => error instanceof SourceError && /仓内路径不存在/.test(error.message),
     );
+  });
+
+  it("git 来源：仓内 path 越出克隆目录时拒绝（否则会把用户任意目录当插件根搬走）", async () => {
+    const repo = makeDir("plugin-repo-");
+    makePackage(repo);
+    const outsider = makeDir("plugin-outsider-");
+    writeFileSync(join(outsider, "keep.txt"), "用户的文件", "utf8");
+    const git = (...args: string[]): void => {
+      execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    };
+    git("init", "-q");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+
+    await assert.rejects(
+      stagePluginSource({
+        source: { source: "git", url: repo, path: join("..", basename(outsider)) },
+        stagingRoot: makeDir(),
+      }),
+      (error: unknown) => error instanceof SourceError && /越出仓库/.test(error.message),
+    );
+    assert.equal(existsSync(join(outsider, "keep.txt")), true, "越界的目录必须原地不动");
   });
 
   it("git 来源：克隆失败原样抛出（不吞掉进程错误）", async () => {

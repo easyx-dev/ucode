@@ -1,5 +1,10 @@
 /** plugins 域的响应模型：已登记插件的视图、组件摘要与诊断 */
-import type { PluginComponentGroup, PluginDiagnosticLevel, PluginSource } from "./constants";
+import type {
+  PluginComponentGroup,
+  PluginDiagnosticLevel,
+  PluginSource,
+  PluginSwitchLayer,
+} from "./constants";
 
 /**
  * 一条诊断：坏清单、越界组件路径、未注入的执行类组件都走它。
@@ -59,7 +64,10 @@ export type PluginView = {
   version: string;
   /** 信任档位：执行类组件是否注入按它判定 */
   source: PluginSource;
+  /** 生效的启用状态：项目 / 本地覆盖优先于用户登记表里的值 */
   enabled: boolean;
+  /** `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 */
+  enabledBy: PluginSwitchLayer;
   /** 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） */
   path: string;
   /** 安装时间（ISO 8601） */
@@ -86,12 +94,23 @@ export type PluginView = {
   diagnostics: PluginDiagnosticView[];
 };
 
+/** 项目级覆盖的来源与读盘诊断（请求带 cwd 时才有） */
+export type PluginOverridesView = {
+  /** `<cwd>/.<slug>/plugins.json`：提交进仓库的那份 */
+  projectPath: string;
+  /** `<cwd>/.<slug>/plugins.local.json`：个人覆盖（建议 gitignore） */
+  localPath: string;
+  diagnostics: string[];
+};
+
 export type PluginsListResponse = {
   plugins: PluginView[];
   /** 状态文件绝对路径，供设置页展示与排查 */
   statePath: string;
   /** 注册表代次：变更入口推进它，会话按它决定是否重建 */
   revision: number;
+  /** 项目级覆盖的来源与诊断；请求没带 `cwd` 时为 null */
+  overrides: PluginOverridesView | null;
 };
 
 /** 安装 / 启停 / 重拉的统一回执：变更后的插件视图与新的代次 */

@@ -1,14 +1,16 @@
 /**
  * 市场服务：市场来源的登记、移除与刷新。
  *
- * 本轮只实现**本地目录市场**的清单读取：登记时校验目录存在，刷新时读 `marketplace.json` 并记条目数；
- * url / github / git 来源在公共网络底座落地前一律按「来源尚未支持」处理——内置市场（如
- * `claude-plugins-official`）失败只落 `lastError`，用户显式刷新则把失败报出去。
+ * 四种来源（本地目录 / url 直链 / git / github）都能刷新；清单缓存与克隆副本落在
+ * `marketplaces/<市场>`，条目来源在刷新时解析成绝对路径，供「一键安装」直接复用。
+ * 内置市场（如 `claude-plugins-official`）刷新失败只落 `lastError`，用户显式刷新则把失败报出去。
  */
 
 import { createHash } from "node:crypto";
 import { mkdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+
+import type { PluginDiagnosticView, PluginsListResponse } from "@ucode/contracts";
 import {
   ERROR_CODES,
   type MarketplaceCreateInput,
@@ -36,6 +38,7 @@ import {
   readMarketplaceCatalog,
 } from "../../harness/plugins/marketplace";
 import { hashDirectory } from "../../harness/plugins/source-hash";
+
 import type {
   PluginMarketplaceRecord,
   PluginSourceSpec,
@@ -54,6 +57,8 @@ export type MarketplaceServiceDeps = {
   onRegistryChange?: (revision: number) => void;
   /** 清单刷新成功后顺带重算已装插件的「来源是否已变」（由插件服务提供） */
   onCatalogRefreshed?: () => Promise<number>;
+  /** 变更帧要带真实插件列表；市场增删会改来源档位，客户端不能只刷新市场区块 */
+  pluginList?: () => PluginsListResponse;
   /** 出网取流（url 市场）；测试可替换 */
   fetch?: (input: Parameters<typeof publicFetch>[0]) => Promise<PublicFetchResult>;
   /** 进程调用（git 市场）；测试可替换 */
@@ -133,10 +138,11 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
     events.emitControl({
       type: "plugins_changed",
       revision: next.revision,
-      plugins: {
+      plugins: deps.pluginList?.() ?? {
         plugins: [],
         statePath: state.path,
         revision: next.revision,
+        overrides: null,
       },
     });
   };
@@ -183,6 +189,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       lastModified?: string | null;
       integrity?: string;
       catalog?: ResolvedCatalogEntry[];
+      diagnostics?: PluginDiagnosticView[];
     },
   ): void => {
     commit((current) => ({
@@ -200,6 +207,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
           ...(patch.lastModified ? { lastModified: patch.lastModified } : {}),
           ...(patch.integrity === undefined ? {} : { integrity: patch.integrity }),
           ...(patch.catalog === undefined ? {} : { catalog: patch.catalog }),
+          ...(patch.diagnostics === undefined ? {} : { catalogDiagnostics: patch.diagnostics }),
         };
       }),
     }));
@@ -255,6 +263,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       pluginCount: catalog.entries.length,
       // url 市场没有本地根：相对路径条目解析不了，留着「能看不能装」
       catalog: resolveEntrySources(catalog.entries, null),
+      diagnostics: catalog.diagnostics,
       etag: response.etag,
       lastModified: response.lastModified,
       integrity: createHash("sha256").update(response.body).digest("hex"),
@@ -291,6 +300,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
       refreshedOk: true,
       pluginCount: catalog.entries.length,
       catalog: resolveEntrySources(catalog.entries, target),
+      diagnostics: catalog.diagnostics,
       integrity: hashDirectory(target)?.hash,
     });
   };
@@ -318,7 +328,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
             source: entry.source ?? null,
           };
         }),
-        diagnostics: [],
+        diagnostics: record.catalogDiagnostics ?? [],
       };
     },
 
@@ -386,6 +396,7 @@ export const createMarketplaceService = (deps: MarketplaceServiceDeps): Marketpl
             refreshedOk: true,
             pluginCount: catalog.entries.length,
             catalog: resolveEntrySources(catalog.entries, marketDir),
+            diagnostics: catalog.diagnostics,
             integrity: hashDirectory(marketDir)?.hash,
           });
         } else if (source.source === "url") {

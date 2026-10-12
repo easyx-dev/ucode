@@ -11,6 +11,7 @@ import {
   type InstalledPluginRecord,
   LOCAL_MARKETPLACE_NAME,
   type PluginMarketplaceRecord,
+  pluginSwitchOf,
   toPluginId,
 } from "../state";
 import { toPluginComponentCounts, toPluginView } from "../view";
@@ -62,7 +63,6 @@ const installed = (input: {
   source: { source: "directory", path: input.path },
   ...(input.marketplace ? { marketplace: input.marketplace } : {}),
   path: input.path,
-  scope: "user",
   enabled: true,
   installedAt: "2026-01-01T00:00:00.000Z",
 });
@@ -218,8 +218,9 @@ describe("视图映射", () => {
       extensions: 1,
     });
 
-    const view = toPluginView(descriptor);
+    const view = toPluginView(descriptor, pluginSwitchOf(descriptor, null));
     assert.equal(view.id, "my-plugin@third-party");
+    assert.equal(view.enabledBy, "user", "没有覆盖文件时开关来自用户登记表");
     assert.equal(view.displayName, "my-plugin");
     assert.equal(view.version, "1.0.0");
     assert.equal(view.path, path);

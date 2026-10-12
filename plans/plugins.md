@@ -36,7 +36,9 @@
   - **资源型**：skills / commands / agents / hooks / MCP / bin / userConfig；
   - **代码型**：`extensions/` 下的 pi TS 扩展、`hooks` 的模块式 handler（见 4.2）。
 - **生命周期**：发现 → 清单校验 → 装载 → 装配注入 → 启停 → 卸载 → 相关会话按注册表 revision 重建（4.4）。
-- **作用域**：用户级 `$APP_HOME/plugins/`；项目级 `<cwd>/.<slug>/plugins/`，**默认不启用**。
+- **作用域**：安装副本只有**用户级**一处（`$APP_HOME/plugins/`，登记表 `$APP_HOME/app/plugins.json`）；
+  项目级只放**启停覆盖**（`<cwd>/.<slug>/plugins.json` 提交、`plugins.local.json` 个人），
+  覆盖只翻已登记插件的开关，**不能引入新代码**——理由见「十七、复盘」的作用域一节。
 - **发现只认登记表**：唯一的装载依据是 `plugins.json` 的 `marketplaces` / `installed` 记录，
   **不扫插件根目录**。放进 `$APP_HOME/plugins/` 但不登记 = 不加载、也不参与来源门控。
   这是「来源即信任」（第五章）能成立的前提——否则「把目录拷进去」就等价于授予可信来源。
@@ -216,7 +218,8 @@ MCP 服务器名          plugin_my-plugin_review
 | PermissionRequest | —（不实现，出诊断） | pi 无独立权限事件 |
 | PostToolUse | `tool_result` | 可替换结果内容 |
 | PostToolUseFailure | `tool_result`（`isError`） | 可注释错误 |
-| Stop | `agent_end` / `agent_settled` | 仅通知 / 清理 |
+| Stop | `agent_settled` | 仅通知 / 清理。只挂它：`agent_end` 是底层循环（含重试）结束发的，两个都挂一轮会跑多遍 |
+| — | — | `SessionStart` 挂在 `session_start` 上，而它是 `bindExtensions` 触发的：**所有会话都要绑扩展**（漏绑会让 plan / ask 与只读角色会话静默不跑 SessionStart） |
 
 载体两种：
 
@@ -310,7 +313,7 @@ MCP 服务器名          plugin_my-plugin_review
 - **总开关**：一个开关停掉全部执行类组件（资源型照常加载）。
 - **权限**：插件规则只收紧（与 `deny` 取并集）；涉及命令执行的组件与 `bash` 同权限档，只读模式不给；
   边界以 [`modes-and-permissions.md`](../docs/modes-and-permissions.md) 为准。
-- **隔离**：项目级插件默认不启用（`<cwd>/.<slug>/plugins/` 里的东西不带 `enabled` 就不加载）。
+- **隔离**：项目级只有开关覆盖，且只对已登记的 id 生效；覆盖里出现没装过的 id 一律忽略（不出安装、不出下载）。
 - **状态与密钥**：`plugins.json` 0600；`userConfig` 非敏感值明文存该文件，`sensitive` 走系统凭据库
   （同 Claude / ZCode），取不到凭据库时拒绝保存而不是回落明文。
 - **Windows**：`bin/` 与路径处理的平台语义在实施时明确。
@@ -416,7 +419,16 @@ $APP_HOME/app/plugins.json                              # 状态（0600）
 }
 ```
 
-项目级 `<cwd>/.<slug>/plugins.json` 只承载启用覆盖 `{ "enabled": [...] }`，**默认不启用**。
+项目级只承载启用覆盖，键是插件 id、值是布尔：
+
+```json
+{ "enabledPlugins": { "hello@my-market": true, "other@local": false } }
+```
+
+`<cwd>/.<slug>/plugins.json`（提交进仓库，团队共用）与 `<cwd>/.<slug>/plugins.local.json`（个人覆盖，
+建议 gitignore）两份，**local 压过 project、project 压过登记表**；逐 id 取值，没提到的 id 用登记表里的值。
+插件视图带 `enabledBy`（`user` / `project` / `local`），界面据此说明「这个值是谁定的」并把开关置灰。
+读盘坏掉只记一条诊断，按「文件不存在」处理。
 
 `installed[].path`：`directory` 源指向源目录（不复制，改源码即生效），其余来源指向 cache 里的
 版本副本目录（见上面的目录树）。两种都只是缓存字段，真身份是 `id`。
@@ -479,8 +491,10 @@ $APP_HOME/app/plugins.json                              # 状态（0600）
 
 ### 6.7 旧版本清理
 
-换版本时给旧目录写 `.orphaned_at` 标记，后台清扫在 14 天后删除（会话可能还在用旧版本）。
-只在还有已装插件时清扫（与 Claude 同）。`${*_PLUGIN_DATA}` 不随版本清理。
+换版本 / 同版本重拉时把旧目录改名成 `cache/<市场>/<插件>/.orphaned-<版本>-<时间戳>`，
+在里面写 `.orphaned_at` 标记，**14 天**后由清扫删除（会话可能还握着 `${*_PLUGIN_ROOT}` 指着的旧路径）。
+清扫的触发点是服务启动、安装、重拉与「勾了清理缓存的卸载」，且**只在还有已装插件时**跑（与 Claude 同）；
+判过期以标记文件的 mtime 为准，读不到退回目录 mtime。`${*_PLUGIN_DATA}` 不随版本清理。
 
 ### 6.8 接口
 
@@ -656,7 +670,7 @@ packages/contracts/src/marketplace/ input.ts  output.ts
 | PLG-08 | MCP 变量替换与命名 | 服务器名 `plugin_<plugin>_<server>`，与用户 `mcp.json` 同名时用户优先 |
 | PLG-09 | bin PATH | 注入 spawn env，追加在 `$PATH` 之后 |
 | PLG-10 | userConfig | 表单值落 `plugins.json`；`sensitive` 不落明文；`${user_config.*}` 在 shell 字段被拒 |
-| PLG-11 | 状态读写 | `plugins.json` 增删改、项目级启用覆盖、`revision` 推进 |
+| PLG-11 | 状态读写 | `plugins.json` 增删改、项目级启停覆盖（`enabledPlugins` + local > project > user）、`revision` 推进 |
 | PLG-12 | 会话重建 | revision 变化后相关会话被重建；有待答交互的会话只标脏不回收 |
 | PLG-13 | 内置资产 | 物化幂等、升级覆盖、名冲突与 frontmatter 校验、`manifest.json` 写入、云端不可达回落 |
 | PLG-14 | 市场解析 | 三档识别、相对路径条目在 url 市场被拒、来源形式逐类解析、未实现来源报错 |
@@ -724,3 +738,6 @@ agents / bin），逐条验证「识别正确 + 诊断正确 + 其它组件不�
 | 插件 MCP | 合并进 `loadConfig` | 已实现（`loadPluginMcp` + `mergePluginMcpServers`），插件条目 `scope: "extension"`、排用户条目之后，同名以用户配置优先 |
 | 市场条目一键安装 | — | 计划外补的：条目 `source` 在刷新时解析成绝对来源（相对路径按市场根），`marketplace/info` 返回，前端复用 `plugins/create` |
 | `file` 类型配置项 | — | 计划外补的：与目录选择共用一个弹层（`select: "file"`），选文件时点文件即确认 |
+| 旧版本清理 | §6.7 的 `.orphaned_at` + 14 天清扫 | 照 Claude Code 的口径落地：旧副本改名成 `.orphaned-<版本>-<时间戳>` + 标记文件、14 天保留、只在有已装插件时清扫（它的原文也点明了清扫依赖同根下的账本）。触发点放在 commit 之后：首次安装时 commit 前登记表还是空的 |
+| `SessionStart` 的会话范围 | 计划只写了 `SessionStart → session_start`，没提会话模式 | 原先只在 `mode === "build" && usesDefaultToolSet` 时调 `bindExtensions`（那是为 MCP 加的），于是只读 / plan / ask 会话静默不跑插件 SessionStart。现在**所有会话都绑扩展**；挂的扩展本来就少（没有 MCP、没有 tool_search），代价可以忽略 |
+| 项目级作用域 | 项目级安装根 `<cwd>/.<slug>/plugins/` + 启用覆盖 | 只做**启用覆盖**，装副本留在用户级。查了九家：Claude Code（`enabledPlugins`，6 档优先级，且明说「不扫项目 `.claude/plugins/`」）、Codex（`[plugins."name@market"] enabled`，未信任整层跳过）、VS Code agent plugins（同一键形）都是「用户级装 + 项目级开关」；ZCode 更直接——**项目级 hooks 整段不执行**（`config_project_hooks_ignored`），团队共享请走插件。只有 Obsidian（vault 即部署单元）与 opencode / Amp（文件即加载、无开关）把本体放进工作区。另外安装根在项目内会让 §6.7 的清扫失去前提（Claude Code 的清扫依赖同根下的 `installed_plugins.json`）。故：**项目文件永远不能把新代码带进这台机器** |

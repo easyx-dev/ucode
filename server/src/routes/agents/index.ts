@@ -74,10 +74,12 @@ export const createAgentsRoute = (services: Services) => {
 
   router.post("/list", jsonBody(agentsListInputSchema), (c) => {
     const input = c.req.valid("json");
+    // 同 commands：插件子角色也按该 cwd 的生效开关取，否则列表里会有会话里并不存在的角色
+    const cwd = resolveCwd(services, input);
     const registry = loadAgentRegistry({
-      cwd: resolveCwd(services, input),
+      cwd,
       appHome: env.homeDir,
-      pluginAgents: services.plugins.agentProfiles(),
+      pluginAgents: services.plugins.agentProfiles(cwd),
     });
     return c.json(
       ok({

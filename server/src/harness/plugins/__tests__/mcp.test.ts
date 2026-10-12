@@ -102,7 +102,7 @@ describe("loadPluginMcp", () => {
     assert.match(messagesOf(result), /以文件为准/);
   });
 
-  it("清单里写成路径时按插件根解析", () => {
+  it("清单里写成路径时不自行解析（组件层已校验过，这里再拼一次会旁路那条规则）", () => {
     const nested = join(dir, "nested.json");
     writeFileSync(nested, JSON.stringify({ mcpServers: { x: { type: "stdio", command: "c" } } }));
 
@@ -112,16 +112,11 @@ describe("loadPluginMcp", () => {
       file: null,
       inline: "nested.json",
     });
-    assert.equal(result.servers[0]?.name, "plugin_my-plugin_x");
+    assert.deepEqual(result.servers, []);
+    assert.match(messagesOf(result), /路径写法没有通过组件校验/);
   });
 
   it("坏形状与非法服务器名出诊断、不产出条目", () => {
-    // 清单里写成字符串即当路径：解析不问存在性，读不到时由文件分支报错
-    const missing = loadPluginMcp({ ...base, file: null, inline: "not-there.json" });
-    assert.equal(missing.servers.length, 0);
-    assert.equal(missing.diagnostics.length, 1);
-    assert.match(messagesOf(missing), /读不出来/);
-
     const notPath = loadPluginMcp({ ...base, file: null, inline: 42 });
     assert.deepEqual(notPath.servers, []);
     assert.match(messagesOf(notPath), /不是 mcpServers 对象形状/);

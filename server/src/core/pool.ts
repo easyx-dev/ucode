@@ -666,7 +666,7 @@ export class SessionPool {
     const registry = loadAgentRegistry({
       cwd,
       appHome: env.homeDir,
-      pluginAgents: this.plugin.agents(),
+      pluginAgents: this.plugin.agents(cwd),
     });
     if (registry.errors.length > 0) {
       logger.warn({ errors: registry.errors }, "跳过了无法解析的自定义子角色");
@@ -696,11 +696,11 @@ export class SessionPool {
       ...(isSubagent ? {} : { subagents: this.subagentHooks(record, cwd, registry) }),
       ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
       agentRegistry: registry,
-      pluginAssets: this.plugin.commandAssets(),
-      pluginExtensionPaths: this.plugin.extensionPaths(),
-      pluginBinDirs: this.plugin.binDirs(),
-      pluginHooks: this.plugin.hooks(),
-      pluginMcpServers: this.plugin.mcpServers(),
+      pluginAssets: this.plugin.commandAssets(cwd),
+      pluginExtensionPaths: this.plugin.extensionPaths(cwd),
+      pluginBinDirs: this.plugin.binDirs(cwd),
+      pluginHooks: this.plugin.hooks(cwd),
+      pluginMcpServers: this.plugin.mcpServers(cwd),
       websearch: this.websearch,
       permission: {
         listGrants: () => this.permissions.allow.list(interactionSessionId),
@@ -746,9 +746,11 @@ export class SessionPool {
     // 会话已创建、但还没入池：这之后的任何失败都要先 dispose，否则会话（及其可能拉起的
     // MCP 子进程）会脱离池被泄漏
     try {
-      // MCP 扩展在 `session_start` 时才连接 mcp.json 的服务器，必须显式触发；
-      // 只有继承默认工具集、够得着扩展工具的会话才挂了它（见 session-config）
-      if (mode === "build" && usesDefaultToolSet(capability)) await session.bindExtensions({});
+      // `bindExtensions` 是 `session_start` 的唯一触发点：MCP 扩展靠它连 mcp.json，
+      // 插件的 SessionStart hook 也靠它。**所有会话都要调**——plan / ask 模式与只读角色
+      // 会话里挂的扩展少（没有 MCP、没有 tool_search），但插件 hook 与权限扩展都在，
+      // 漏调会让插件作者拿不到任何诊断（见 plans/plugins.md 4.2）。
+      await session.bindExtensions({});
 
       const unsubscribe = session.subscribe((event) => {
         // 每步耗时归因：只看 turn_start / message_start / 首个内容帧 / message_end / turn_end

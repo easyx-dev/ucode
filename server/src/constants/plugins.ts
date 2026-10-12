@@ -81,3 +81,6 @@ export const PLUGIN_GIT_TIMEOUT_MS = 120_000;
 
 /** 目录内容哈希跳过的目录：版本库与依赖不参与「插件内容变没变」的判断 */
 export const PLUGIN_HASH_SKIP_DIRNAMES = [".git", "node_modules"] as const;
+
+/** 旧版本副本的保留期：14 天（与 Claude Code 同）——够覆盖「会话还握着旧路径」的窗口 */
+export const PLUGIN_ORPHAN_TTL_DAYS = 14;

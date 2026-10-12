@@ -275,10 +275,10 @@ export const createPluginHooksExtension =
 
     const stop = of(input.bindings, "Stop");
     if (stop.length > 0) {
-      const notify = async (): Promise<void> => {
+      // 只挂 `agent_settled`：它在一轮跑完后发一次；`agent_end` 是底层循环结束（含重试）时发的，
+      // 两个都挂会让 Stop 命令在一轮里跑两遍以上（写盘、发通知、跑 formatter 这类不是幂等的）
+      pi.on("agent_settled", async () => {
         await runBindings(stop, payloadOf("Stop", {}));
-      };
-      pi.on("agent_end", notify);
-      pi.on("agent_settled", notify);
+      });
     }
   };

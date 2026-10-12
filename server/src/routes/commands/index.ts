@@ -32,11 +32,13 @@ export const createCommandsRoute = (services: Services) => {
 
   router.post("/list", jsonBody(commandsListInputSchema), async (c) => {
     const input = c.req.valid("json");
+    // 生效开关按 cwd 算：插件资产必须和会话装配用同一个目录，否则菜单里会出现该仓库已关掉的技能
+    const cwd = resolveCwd(services, input);
     const assets: CommandsListResponse = await loadCommandAssets({
-      cwd: resolveCwd(services, input),
+      cwd,
       appHome: env.homeDir,
       harnessDir: env.harnessDir,
-      plugin: services.plugins.commandAssets(),
+      plugin: services.plugins.commandAssets(cwd),
     });
     return c.json(ok(assets));
   });

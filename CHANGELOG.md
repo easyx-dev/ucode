@@ -85,6 +85,33 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   物化幂等（内容不变不写盘）、缺必需文件时拒绝写入并保留上一版；内置技能与内置命令的优先级**恒为最低**。
   随包提供 `plugin-create`（引导创建三端兼容的插件包）与 `plugin-review`（审计第三方插件的信任面）两个技能。
 
+- **插件旧版本清理与 SessionStart 的会话范围**：换版本 / 同版本重拉时旧副本改名成
+  `cache/<市场>/<插件>/.orphaned-<版本>-<时间戳>` 并写 `.orphaned_at`，保留 14 天后由清扫删除
+  （正在跑的会话可能还握着旧路径）；清扫在服务启动、安装、重拉与「勾了清理缓存的卸载」时跑，
+  且只在还有已装插件时扫；答案以标记文件 mtime 为准，读不到退回目录 mtime。
+  另外 `bindExtensions` 现在**对所有会话**都调（原先只在默认工具集的 build 会话里调）——
+  它是 `session_start` 的唯一触发点，漏调会让 plan / ask 与只读角色会话静默不跑插件的 SessionStart hook。
+
+- **项目级插件作用域：只做「开关」，不做「安装根」**：安装副本一律留在 `$APP_HOME/plugins/`，
+  项目级只放 `<cwd>/.<slug>/plugins.json`（提交进仓库）与 `plugins.local.json`（个人覆盖）两份启停覆盖，
+  形如 `{ "enabledPlugins": { "id": true } }`，**local > project > 用户登记表**，逐 id 取值；
+  只对已登记的插件生效，没装过的 id 忽略——项目文件永远不能把新代码带进这台机器。
+  插件视图新增 `enabledBy`（`user` / `project` / `local`），设置页据此标明这个值是谁定的、开关置灰并指出改哪个文件；
+  装配期六个贡献入口（技能/命令目录、角色、扩展路径、bin、hook、MCP）按会话 cwd 取生效开关，
+  覆盖文件按 `mtime:size` 缓存（一次装配不重复读盘）。安装入参里的 `scope` 随之删除。
+  依据（九家对比）见 `plans/plugins.md` 第十七章：主流是「用户级装 + 项目级开关」，ZCode 直接把项目级 hooks 整段关掉。
+
+- **内置 `/review` 审查插件提交后修的问题**：界面「一键安装」漏传 `marketplace`，市场插件被按本地登记（`local`
+  档）落地、执行类组件的来源门控被绕开——现在带上所属市场，已登记的条目改走重拉；
+  `git` / `github` 来源的仓内 `path` 校验落在克隆目录内（越界会把用户任意目录搬进缓存）；
+  市场增删发的 `plugins_changed` 带真实插件列表（空壳会把界面上的插件卡片清空）；
+  清单把 `mcpServers` 写成路径时不再自行拼路径（旁路组件层「必须在根内」的校验）；
+  包拉取失败落成 400 的 `plugin_source_invalid`（原先被兜成 500 内部错误），并删掉随之失效的
+  `assertDirectorySource`；`purge` 按来源种类判定，`directory` 来源的内容即便落在插件根里也不删；
+  `Stop` 钩子只挂 `agent_settled`（两个都挂时一轮跑两遍）；目录来源的哈希按展开后的路径算
+  （`~/x` 写法原先永远判不出更新）；市场条目级诊断随清单缓存带出；装失败时清掉进度行；
+  另清理几处死代码与陈旧文件头、注释。
+
 - **插件变量与插件 MCP 真正落地**：`${<SLUG>_PLUGIN_ROOT}` / `${<SLUG>_PLUGIN_DATA}` / `${<SLUG>_PROJECT_DIR}` /
   `${user_config.KEY}` 在 hook 命令与 MCP 配置里解析（`harness/plugins/variables.ts`，兼容 `CLAUDE_*` / `ZCODE_*` 别名），
   插件数据目录首次引用即创建，`userConfig` 的值同时以 `<SLUG>_PLUGIN_OPTION_<KEY>` 进子进程环境；

@@ -1,14 +1,28 @@
 /** services/plugins：安装 / 启停 / 卸载 / 重拉，以及装配期资产目录与变更广播 */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import type { ServerControlEvent } from "@ucode/contracts";
 
-import { PLUGIN_MANIFEST_DIRNAME } from "../../../constants/dirs";
+import {
+  PLUGIN_MANIFEST_DIRNAME,
+  PLUGIN_PROJECT_OVERRIDES_FILENAME,
+  PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME,
+  PROJECT_CONFIG_DIRNAME,
+} from "../../../constants/dirs";
 import type { SessionEventBus } from "../../../core/event-bus";
 import { createPluginService } from "..";
 import { defaultSourceRunner, type SourceRunner } from "../sources";
@@ -77,7 +91,6 @@ describe("安装与登记", () => {
 
     const result = await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
     assert.equal(result.plugin.id, "my-plugin@local");
@@ -100,7 +113,8 @@ describe("安装与登记", () => {
   });
 
   it("网络来源：git 装进版本化缓存目录，暂存目录不留盘", async () => {
-    const { service, pluginsDir } = setup();
+    // 这条要真的跑 git（本地仓库），所以显式用真实 runner，而不是 setup 里那个「不连网」的替身
+    const { service, pluginsDir } = setup({ run: defaultSourceRunner });
     const repo = makeDir("plugin-repo-");
     makePluginTree(join(repo, "pkg"), "git-demo");
     const git = (...args: string[]): void => {
@@ -114,7 +128,6 @@ describe("安装与登记", () => {
 
     const created = await service.create({
       source: { source: "git", url: repo, path: "pkg" },
-      scope: "user",
       enabled: true,
     });
 
@@ -139,7 +152,6 @@ describe("安装与登记", () => {
     await assert.rejects(
       service.create({
         source: { source: "directory", path: broken },
-        scope: "user",
         enabled: true,
       }),
       (error: unknown) =>
@@ -149,13 +161,11 @@ describe("安装与登记", () => {
     const root = makePlugin("dup");
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
     await assert.rejects(
       service.create({
         source: { source: "directory", path: root },
-        scope: "user",
         enabled: true,
       }),
       /插件已登记/,
@@ -164,7 +174,6 @@ describe("安装与登记", () => {
       service.create({
         source: { source: "directory", path: root },
         marketplace: "nope",
-        scope: "user",
         enabled: true,
       }),
       (error: unknown) =>
@@ -191,7 +200,6 @@ describe("安装与登记", () => {
     const result = await service.create({
       source: { source: "directory", path: root },
       marketplace: "my-official",
-      scope: "user",
       enabled: true,
     });
     assert.equal(result.plugin.id, "official-plugin@my-official");
@@ -205,7 +213,6 @@ describe("启停 / 卸载 / 重拉", () => {
     const root = makePlugin("my-plugin", "1.0.0");
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
 
@@ -233,7 +240,6 @@ describe("启停 / 卸载 / 重拉", () => {
     const source = makePlugin("src-plugin");
     await service.create({
       source: { source: "directory", path: source },
-      scope: "user",
       enabled: true,
     });
 
@@ -255,7 +261,6 @@ describe("装配期资产目录", () => {
     const root = makePlugin("my-plugin");
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
 
@@ -266,6 +271,220 @@ describe("装配期资产目录", () => {
 
     service.update({ id: "my-plugin@local", enabled: false });
     assert.deepEqual(service.commandAssets(), { skills: [], prompts: [] });
+  });
+});
+
+describe("项目级启停覆盖", () => {
+  const writeOverrides = (cwd: string, files: Record<string, unknown>): void => {
+    const dir = join(cwd, PROJECT_CONFIG_DIRNAME);
+    mkdirSync(dir, { recursive: true });
+    for (const [name, content] of Object.entries(files)) {
+      writeFileSync(
+        join(dir, name),
+        typeof content === "string" ? content : JSON.stringify(content),
+        "utf8",
+      );
+    }
+  };
+
+  const setupWithPlugin = async () => {
+    const context = setup();
+    const root = makePlugin("local-plugin");
+    await context.service.create({ source: { source: "directory", path: root }, enabled: true });
+    return { ...context, root };
+  };
+
+  it("项目里关掉它：生效值、enabledBy 与四个执行类入口一起跟着走", async () => {
+    const { service, root } = await setupWithPlugin();
+    const cwd = makeDir();
+    writeOverrides(cwd, {
+      [PLUGIN_PROJECT_OVERRIDES_FILENAME]: { enabledPlugins: { "local-plugin@local": false } },
+    });
+
+    const list = service.list({ cwd });
+    assert.equal(list.plugins[0]?.enabled, false);
+    assert.equal(list.plugins[0]?.enabledBy, "project");
+    assert.equal(
+      list.overrides?.projectPath,
+      join(cwd, PROJECT_CONFIG_DIRNAME, PLUGIN_PROJECT_OVERRIDES_FILENAME),
+    );
+    assert.deepEqual(list.overrides?.diagnostics, []);
+
+    assert.deepEqual(service.commandAssets(cwd).skills, [], "停用后不进装配");
+    assert.deepEqual(service.hooks(cwd), []);
+    assert.deepEqual(service.extensionPaths(cwd), []);
+    assert.deepEqual(service.binDirs(cwd), []);
+
+    // 同一份登记表，在别的目录（或没给 cwd）里仍然按用户级开关生效
+    assert.equal(service.list().plugins[0]?.enabled, true);
+    assert.equal(service.list().plugins[0]?.enabledBy, "user");
+    assert.deepEqual(
+      service.commandAssets().skills,
+      [join(realpathSync(root), "skills")],
+      "别的目录里仍按用户级开关生效",
+    );
+  });
+
+  it("本地覆盖压过项目覆盖，并且只认已登记的 id", async () => {
+    const { service } = await setupWithPlugin();
+    const cwd = makeDir();
+    writeOverrides(cwd, {
+      [PLUGIN_PROJECT_OVERRIDES_FILENAME]: { enabledPlugins: { "local-plugin@local": false } },
+      [PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME]: {
+        enabledPlugins: { "local-plugin@local": true, "没装过的@local": true },
+      },
+    });
+
+    const list = service.list({ cwd });
+    assert.equal(list.plugins[0]?.enabled, true);
+    assert.equal(list.plugins[0]?.enabledBy, "local");
+    assert.equal(list.plugins.length, 1, "覆盖里多出来的 id 不会凭空造出插件");
+  });
+
+  it("坏覆盖文件只出诊断，不动开关", async () => {
+    const { service } = await setupWithPlugin();
+    const cwd = makeDir();
+    writeOverrides(cwd, { [PLUGIN_PROJECT_OVERRIDES_FILENAME]: "{oops" });
+
+    const list = service.list({ cwd });
+    assert.equal(list.plugins[0]?.enabled, true);
+    assert.equal(list.overrides?.diagnostics.length, 1);
+  });
+});
+
+describe("旧版本副本的清理", () => {
+  /** 造一个多版本共存的缓存现场，返回缓存根 */
+  const makeCache = (pluginsDir: string): string => resolve(pluginsDir, "cache", "local", "demo");
+
+  it("旧副本改名成孤儿并留标记，不删", async () => {
+    const { service, pluginsDir } = setup({ run: defaultSourceRunner });
+    const repo = makeDir("plugin-repo-");
+    makePluginTree(join(repo, "pkg"), "demo", "1.0.0");
+    const git = (...args: string[]): void => {
+      execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+
+    await service.create({ source: { source: "git", url: repo, path: "pkg" }, enabled: true });
+    const first = join(pluginsDir, "cache", "local", "demo", "1.0.0");
+    assert.equal(existsSync(first), true, "第一次装在版本目录里");
+
+    // 同版本重拉：旧副本应改名成孤儿，新副本落到原路径
+    await service.refresh({ id: "demo@local" });
+    assert.equal(existsSync(first), true);
+    const orphans = readdirSync(makeCache(pluginsDir)).filter((name) =>
+      name.startsWith(".orphaned-"),
+    );
+    assert.equal(readdirSync(makeCache(pluginsDir)).includes("1.0.0"), true, "新副本落在版本目录");
+    assert.equal(orphans.length, 1, "旧副本改名成了孤儿目录");
+    const orphan = join(makeCache(pluginsDir), orphans[0] as string);
+    assert.equal(existsSync(join(orphan, ".orphaned_at")), true, "孤儿目录带标记文件");
+  });
+
+  it("清扫按保留期删孤儿；没有已装插件时不扫", async () => {
+    const pluginsDir = makeDir("plugin-root-");
+    // 孤儿与被替换的版本目录同级：`cache/<市场>/<插件>/<前缀><版本>-<时间戳>`
+    const cache = resolve(pluginsDir, "cache", "local", "demo");
+    mkdirSync(cache, { recursive: true });
+    const stale = join(cache, ".orphaned-1.0.0-2020-01-01T00-00-00-000Z");
+    const fresh = join(cache, ".orphaned-1.0.0-2099-01-01T00-00-00-000Z");
+    for (const dir of [stale, fresh]) mkdirSync(dir, { recursive: true });
+    // 过期与否以标记文件的 mtime 为准
+    const old = new Date("2020-01-01T00:00:00.000Z");
+    for (const [dir, at] of [
+      [stale, old],
+      [fresh, new Date()],
+    ] as const) {
+      const marker = join(dir, ".orphaned_at");
+      writeFileSync(marker, at.toISOString(), "utf8");
+      utimesSync(marker, at, at);
+    }
+
+    // 一个插件都没装：启动时那次清扫直接跳过，现场留着
+    const { service } = setup({ pluginsDir, run: defaultSourceRunner });
+    assert.equal(existsSync(stale), true, "没有已装插件时不扫");
+
+    // 装上之后清扫生效：过期删、没过期留
+    await service.create({
+      source: { source: "directory", path: makePlugin("demo") },
+      enabled: true,
+    });
+    assert.equal(existsSync(stale), false, "过期孤儿被清掉");
+    assert.equal(existsSync(fresh), true, "没过期的留着给在跑的会话");
+  });
+});
+
+describe("卸载清理的边界", () => {
+  it("directory 来源即便落在插件根里也不删（市场条目用相对路径时正是这种布局）", async () => {
+    const pluginsDir = makeDir("plugin-root-");
+    const inside = join(pluginsDir, "marketplaces", "demo-market", "plugins", "from-market");
+    mkdirSync(inside, { recursive: true });
+    makePluginTree(inside, "from-market");
+
+    const { service } = setup({ pluginsDir });
+    await service.create({
+      source: { source: "directory", path: inside },
+      enabled: true,
+    });
+
+    service.delete({ id: "from-market@local", purge: true });
+    assert.equal(existsSync(inside), true, "目录来源的内容是别人的目录，purge 不能删");
+  });
+});
+
+describe("来源失败的错误码", () => {
+  it("拉取失败落成 400 的来源错误，而不是 500 内部错误", async () => {
+    const { service } = setup({
+      run: async () => {
+        throw new Error("git clone 失败：repository not found");
+      },
+    });
+
+    await assert.rejects(
+      service.create({
+        source: { source: "github", repo: "owner/nope" },
+        enabled: true,
+      }),
+      (error: unknown) => {
+        const failure = error as { code?: string; status?: number; message?: string };
+        return (
+          failure.code === "plugin_source_invalid" &&
+          failure.status === 400 &&
+          /repository not found/.test(failure.message ?? "")
+        );
+        // 注入的 runner 抛出的原文要透出来，用户才知道是网络还是地址错
+      },
+    );
+  });
+
+  it("重拉走同一个错误映射", async () => {
+    const { service, state } = setup({
+      run: async () => {
+        throw new Error("npm 装不上");
+      },
+    });
+    const root = makePlugin("local-plugin");
+    await service.create({
+      source: { source: "directory", path: root },
+      enabled: true,
+    });
+
+    // 直接把来源改成 npm（模拟来源换成会失败的类型），重拉应落来源错误
+    state.set({
+      ...state.get(),
+      installed: state.get().installed.map((record) => ({
+        ...record,
+        source: { source: "npm", package: "no-such-pkg" },
+      })),
+    });
+    await assert.rejects(
+      service.refresh({ id: "local-plugin@local" }),
+      (error: unknown) => (error as { code?: string }).code === "plugin_source_invalid",
+    );
   });
 });
 
@@ -308,7 +527,6 @@ describe("执行类组件的来源门控", () => {
     await service.create({
       source: { source: "directory", path: root },
       marketplace,
-      scope: "user",
       enabled: true,
     });
   };
@@ -318,7 +536,6 @@ describe("执行类组件的来源门控", () => {
     const local = makePluginWithExecutables("local-plugin");
     await service.create({
       source: { source: "directory", path: local },
-      scope: "user",
       enabled: true,
     });
 
@@ -383,7 +600,6 @@ describe("执行类组件的来源门控", () => {
     const root = makePluginWithExecutables("local-plugin");
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
     assert.equal(service.extensionPaths().length, 1);
@@ -413,7 +629,6 @@ describe("插件子角色", () => {
 
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
     assert.deepEqual(
@@ -452,7 +667,6 @@ describe("hooks 的来源门控与解析", () => {
     const local = makePluginWithHooks("local-hooks", bindHooks);
     await service.create({
       source: { source: "directory", path: local },
-      scope: "user",
       enabled: true,
     });
 
@@ -484,7 +698,6 @@ describe("hooks 的来源门控与解析", () => {
     await service.create({
       source: { source: "directory", path: thirdParty },
       marketplace: "third-party",
-      scope: "user",
       enabled: true,
     });
 
@@ -500,7 +713,6 @@ describe("hooks 的来源门控与解析", () => {
     const root = makePluginWithHooks("local-hooks", bindHooks);
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
     assert.equal(service.hooks().length, 1);
@@ -516,7 +728,6 @@ describe("来源已变检测", () => {
     const root = makePlugin("my-plugin");
     await service.create({
       source: { source: "directory", path: root },
-      scope: "user",
       enabled: true,
     });
 
@@ -557,7 +768,6 @@ describe("来源已变检测", () => {
           source: { source: "npm", package: "some-plugin" },
           path: "/tmp/remote",
           integrity: "sha256:old",
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
         },
@@ -585,7 +795,6 @@ describe("按来源的版本判定", () => {
           id: "p@local",
           name: "p",
           version: "1.0.0",
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
           ...record,
@@ -610,7 +819,6 @@ describe("按来源的版本判定", () => {
     const { service, state } = setup({ run: defaultSourceRunner });
     const created = await service.create({
       source: { source: "git", url: repo, path: "." },
-      scope: "user",
       enabled: true,
     });
     const record = state.get().installed[0];
@@ -656,7 +864,6 @@ describe("按来源的版本判定", () => {
           version: "1.0.0",
           source: { source: "url", url: "https://example.com/pkg.zip" },
           path: "/tmp/u",
-          scope: "user",
           enabled: true,
           installedAt: "2026-01-01T00:00:00.000Z",
           etag: 'W/"v1"',
@@ -709,7 +916,7 @@ describe("安装进度帧", () => {
     git("commit", "-qm", "init");
 
     const { service, frames } = setup({ run: defaultSourceRunner });
-    await service.create({ source: { source: "git", url: repo }, scope: "user", enabled: true });
+    await service.create({ source: { source: "git", url: repo }, enabled: true });
 
     const messages = frames
       .filter((frame) => frame.type === "plugin_progress")
@@ -723,7 +930,6 @@ describe("安装进度帧", () => {
     const { service, frames } = setup();
     await service.create({
       source: { source: "directory", path: makePlugin("no-progress") },
-      scope: "user",
       enabled: true,
     });
 

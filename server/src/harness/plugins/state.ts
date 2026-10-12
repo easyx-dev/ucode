@@ -1,11 +1,27 @@
 /**
- * 插件状态的纯逻辑：状态文件 schema、默认市场、来源分档与项目级覆盖。
+ * 插件状态的纯逻辑：状态文件 schema、默认市场、来源分档，以及项目级启停覆盖的读取与判定。
  *
- * 结构与判定都在这里，文件读写留给 `services/plugins/state.ts`——
- * 依赖方向只能是 services 取用 harness，反过来会破坏分层。
+ * 登记表的文件读写留给 `services/plugins/state.ts`——依赖方向只能是 services 取用 harness，
+ * 反过来会破坏分层。覆盖文件是「读一份小 JSON + 算生效值」，放在这里是因为它没有状态：
+ * 每次装配按会话 cwd 现读，改完文件新建会话即生效。
  */
-import { type PluginSource, pluginSourceSchema } from "@ucode/contracts";
+import { existsSync, readFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
+
+import {
+  PLUGIN_COMPONENT_GROUPS,
+  type PluginSource,
+  type PluginSwitchLayer,
+  pluginSourceSchema,
+} from "@ucode/contracts";
 import { z } from "zod";
+
+import {
+  PLUGIN_PROJECT_OVERRIDES_FILENAME,
+  PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME,
+  PROJECT_CONFIG_DIRNAME,
+} from "../../constants/dirs";
+import { describeError } from "./diagnostic";
 
 /** 安装来源：与安装入参同形，状态文件按它原样落盘；市场只用到其中四种，npm 会在市场解析阶段被拒 */
 export type PluginSourceSpec = z.infer<typeof pluginSourceSchema>;
@@ -50,6 +66,16 @@ const marketplaceRecordSchema = z.object({
   lastModified: z.string().optional(),
   /** 内容摘要：url 市场记响应哈希，git 市场记克隆副本的内容哈希 */
   integrity: z.string().optional(),
+  /** 上一次刷新的条目级诊断（跳过了第几个条目之类）：列表接口原样带给界面 */
+  catalogDiagnostics: z
+    .array(
+      z.object({
+        level: z.enum(["error", "warning", "info"]),
+        component: z.enum(PLUGIN_COMPONENT_GROUPS),
+        message: z.string(),
+      }),
+    )
+    .optional(),
   /** 上一次成功刷新出的条目：市场内插件列表直接读它，不再扫盘 / 打网络 */
   catalog: z
     .array(
@@ -74,7 +100,7 @@ const installedPluginRecordSchema = z.object({
   marketplace: z.string().optional(),
   /** 安装目录绝对路径：复制型来源指向 cache 副本，`directory` 源指向源目录 */
   path: z.string().min(1),
-  scope: z.enum(["user", "project"]).default("user"),
+  /** 用户级登记表里的开关；某个仓库里的生效值由覆盖文件决定（`pluginSwitchOf`） */
   enabled: z.boolean().default(true),
   /** 内容摘要：本地目录来源记目录内容哈希，url / npm 记下载摘要 */
   integrity: z.string().optional(),
@@ -100,15 +126,18 @@ export const pluginStateSchema = z.object({
   installed: z.array(installedPluginRecordSchema).default([]),
 });
 
-/** 项目级 `<cwd>/.<slug>/plugins.json` 只承载启用覆盖，默认不启用 */
+/**
+ * 项目级覆盖文件（`<cwd>/.<slug>/plugins.json` 与 `plugins.local.json`）：只承载启停覆盖。
+ * 键是插件 id，值是「在这个仓库里开不开」；**只对已登记的 id 生效**，查不到的 id 一律忽略——
+ * 项目文件永远不能把新代码带进这台机器（见 `plans/plugins.md` 第一章）。
+ */
 export const projectPluginOverridesSchema = z.object({
-  enabled: z.array(z.string().min(1)).default([]),
+  enabledPlugins: z.record(z.string(), z.boolean()).default({}),
 });
 
 export type PluginMarketplaceRecord = z.infer<typeof marketplaceRecordSchema>;
 export type InstalledPluginRecord = z.infer<typeof installedPluginRecordSchema>;
 export type PluginState = z.infer<typeof pluginStateSchema>;
-export type ProjectPluginOverrides = z.infer<typeof projectPluginOverridesSchema>;
 
 /** 初始状态：两个内置市场随包写入，插件列表为空 */
 export const emptyPluginState = (): PluginState => ({
@@ -141,26 +170,77 @@ export const pluginSourceOf = (
   return marketplace?.builtin ? "official" : "market";
 };
 
-/** 内置市场：刷新失败静默（只落 `lastError`），不当错误弹给用户 */
-export const isBuiltinMarketplace = (
-  name: string,
-  marketplaces: readonly PluginMarketplaceRecord[],
-): boolean => marketplaces.find((item) => item.name === name)?.builtin === true;
+/** 一个插件在某个工作目录里的生效开关 */
+export type PluginSwitch = {
+  enabled: boolean;
+  /** 值由哪一层决定：`user` 是登记表本身，其余是覆盖文件 */
+  enabledBy: PluginSwitchLayer;
+};
+
+export type LoadedProjectOverrides = {
+  /** 合并后的值（local 覆盖 project） */
+  values: Map<string, boolean>;
+  /** 每个 id 的值来自哪一层 */
+  layers: Map<string, PluginSwitchLayer>;
+  projectPath: string;
+  localPath: string;
+  /** 读不出来 / 形状不对的说明；界面按它提示，不阻断任何东西 */
+  diagnostics: string[];
+};
+
+const emptyOverrides = (projectPath: string, localPath: string): LoadedProjectOverrides => ({
+  values: new Map(),
+  layers: new Map(),
+  projectPath,
+  localPath,
+  diagnostics: [],
+});
 
 /**
- * 并入项目级启用覆盖：只按 id 覆盖 `enabled`，且项目级插件**默认不启用**——
- * 不在覆盖名单里的项目级插件保持关闭，用户级插件的开关不受影响。
+ * 读一个工作目录的两层覆盖文件。**缺文件是常态**（大多数仓库都没有），不记诊断；
+ * 坏 JSON 记一条并忽略整份文件——与其它配置同一口径：坏了就跳过并报告，不拖垮会话。
  */
-export const withProjectOverrides = (
-  state: PluginState,
-  overrides: ProjectPluginOverrides,
-): PluginState => {
-  const enabled = new Set(overrides.enabled);
-  return {
-    ...state,
-    installed: state.installed.map((record) => {
-      if (record.scope !== "project") return record;
-      return { ...record, enabled: enabled.has(record.id) };
-    }),
-  };
+export const loadProjectPluginOverrides = (cwd: string): LoadedProjectOverrides => {
+  const dir = resolve(cwd, PROJECT_CONFIG_DIRNAME);
+  const projectPath = resolve(dir, PLUGIN_PROJECT_OVERRIDES_FILENAME);
+  const localPath = resolve(dir, PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME);
+  const loaded = emptyOverrides(projectPath, localPath);
+
+  // 先 project 后 local：后写的覆盖先写的，于是 local 优先
+  const files: { path: string; layer: PluginSwitchLayer }[] = [
+    { path: projectPath, layer: "project" },
+    { path: localPath, layer: "local" },
+  ];
+  for (const file of files) {
+    if (!existsSync(file.path)) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(file.path, "utf8")) as unknown;
+    } catch (error) {
+      loaded.diagnostics.push(`${relative(cwd, file.path)}：读不出来（${describeError(error)}）`);
+      continue;
+    }
+    const result = projectPluginOverridesSchema.safeParse(parsed);
+    if (!result.success) {
+      loaded.diagnostics.push(
+        `${relative(cwd, file.path)}：enabledPlugins 必须是 id 到布尔值的映射`,
+      );
+      continue;
+    }
+    for (const [id, enabled] of Object.entries(result.data.enabledPlugins)) {
+      loaded.values.set(id, enabled);
+      loaded.layers.set(id, file.layer);
+    }
+  }
+  return loaded;
+};
+
+/** 算出生效开关：覆盖文件里有就按它，没有就用登记表里的值 */
+export const pluginSwitchOf = (
+  record: { id: string; enabled: boolean },
+  overrides: LoadedProjectOverrides | null,
+): PluginSwitch => {
+  const layer = overrides?.layers.get(record.id);
+  if (!layer) return { enabled: record.enabled, enabledBy: "user" };
+  return { enabled: overrides?.values.get(record.id) === true, enabledBy: layer };
 };
