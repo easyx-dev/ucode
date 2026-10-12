@@ -96,10 +96,24 @@ export const isFirstTurn = (messages: readonly SessionMessage[]): boolean =>
       (message.role === "user" || message.role === "custom") && textOf(message).trim().length > 0,
   );
 
-const buildTitleMessage = (exchange: TitleExchange): string =>
-  exchange.assistantText
+/**
+ * 指令与待概括的交流拼进同一条 user 消息：部分代理 / 模型会无视 system（或 developer）角色，
+ * 把交流当成普通提问直接作答，标题就成了回答的第一行。内联后对任何模型都有效。
+ */
+export const buildTitleMessage = (exchange: TitleExchange): string => {
+  const material = exchange.assistantText
     ? `第一条用户消息：\n${exchange.userText}\n\n助手的回复：\n${exchange.assistantText}`
     : `第一条用户消息：\n${exchange.userText}`;
+  return [
+    TITLE_SYSTEM_PROMPT,
+    "",
+    "=====待概括的交流（开始）=====",
+    material,
+    "=====待概括的交流（结束）=====",
+    "",
+    "现在只输出这次会话的标题本身。",
+  ].join("\n");
+};
 
 /** 包裹的引号与收尾标点会交替出现（如 `"…".`），反复剥到稳定为止 */
 const stripWrapping = (text: string): string => {
@@ -125,7 +139,10 @@ export const parseSessionTitle = (text: string): string | null => {
   if (!firstLine) return null;
 
   const cleaned = stripWrapping(firstLine.replace(/^(?:标题|会话标题|title)\s*[:：]\s*/i, ""));
-  return cleaned.length > 0 ? clip(cleaned, TITLE_MAX_LENGTH) : null;
+  if (cleaned.length === 0) return null;
+  // 首行明显超长说明模型没有在起标题（多半是在回答问题）：按失败处理，而不是截断充数
+  if ([...cleaned].length > TITLE_MAX_LENGTH * 2) return null;
+  return clip(cleaned, TITLE_MAX_LENGTH);
 };
 
 export type GenerateTitleInput = {
@@ -139,7 +156,7 @@ export const generateSessionTitle = async (input: GenerateTitleInput): Promise<s
   const answer: AssistantMessage = await input.runtime.completeSimple(
     input.model,
     {
-      systemPrompt: TITLE_SYSTEM_PROMPT,
+      // 不依赖 systemPrompt：指令已内联进 user 消息（见 buildTitleMessage）
       messages: [
         { role: "user", content: buildTitleMessage(input.exchange), timestamp: Date.now() },
       ],

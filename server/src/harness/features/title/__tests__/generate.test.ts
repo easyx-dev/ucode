@@ -9,6 +9,7 @@ import {
   TITLE_MAX_USER_TURNS,
 } from "../../../../constants/title";
 import {
+  buildTitleMessage,
   firstExchange,
   firstPromptExchange,
   generateSessionTitle,
@@ -113,9 +114,47 @@ describe("parseSessionTitle", () => {
     assert.equal(parseSessionTitle("   \n  "), null);
     assert.equal(parseSessionTitle("「」"), null);
   });
+
+  it("首行明显超长（模型在回答问题而不是起标题）按失败处理，不截断充数", () => {
+    const answer = `"工作台"听起来像是 VS Code（Workbench）里的 Git Diff 视图。${"如果是的话，".repeat(10)}`;
+    assert.equal(parseSessionTitle(answer), null);
+  });
+});
+
+describe("buildTitleMessage", () => {
+  it("把指令与待概括的交流拼进同一条消息", () => {
+    const message = buildTitleMessage({ userText: "登录超时了" });
+    assert.ok(message.includes("会话列表起标题"));
+    assert.ok(message.includes("第一条用户消息：\n登录超时了"));
+    assert.equal(message.includes("助手的回复"), false);
+  });
+
+  it("有助手回复时一并带上", () => {
+    const message = buildTitleMessage({ userText: "登录超时了", assistantText: "先看下入口" });
+    assert.ok(message.includes("助手的回复：\n先看下入口"));
+  });
 });
 
 describe("generateSessionTitle", () => {
+  it("不依赖 systemPrompt：指令内联在 user 消息里", async () => {
+    let captured: { systemPrompt?: string; messages: { content: string }[] } | undefined;
+    const runtime = {
+      completeSimple: async (_model: unknown, context: typeof captured) => {
+        captured = context;
+        return { role: "assistant", content: [{ type: "text", text: "修复登录超时" }] };
+      },
+    } as unknown as ModelRuntime;
+
+    await generateSessionTitle({
+      runtime,
+      model: {} as never,
+      exchange: { userText: "登录超时了" },
+    });
+
+    assert.equal(captured?.systemPrompt, undefined);
+    assert.ok(captured?.messages[0]?.content.includes("会话列表起标题"));
+  });
+
   /** 只关心请求参数与「从哪个块取正文」，用一个捕获参数的替身就能覆盖 */
   const withRuntime = async (
     answer: unknown,
