@@ -49,7 +49,13 @@
 
 ### 新增
 
-### 新增
+- **侧栏项目拖拽排序**：新增 `POST /api/v1/projects/reorder`（`paths` 是侧栏从上到下的项目目录，
+  没提到的行接在后面），`project` 表加 `sort_order` 列（schema v10），项目列表的次序从此就是侧栏的次序
+  （排过的在前，没排过的按登记时间降序接在最后）；`projects_changed` 照旧广播整份列表——
+  输入区的项目选择器也按这份列表渲染，排序随之从「最近用过」变成拖拽次序。
+  界面用 `@dnd-kit/{core,sortable,modifiers,utilities}`（新依赖）：组头就是拖拽把手，鼠标移动超过 4px、
+  触屏长按 250ms 才进拖拽（单击仍是展开 / 收起，触屏按下仍能滚侧栏），落下时先在 SDK store 里本地落位，
+  再由服务端回的列表覆盖。
 
 - **步级耗时统计（先重构再聚合）**：`UsageService` 按职责拆成 `parse.ts`（条目与步级解析）/
   `context.ts`（上下文占用的运行期状态）/ `aggregate.ts`（纯派生），`stats/summary` 新增 `steps`：
@@ -247,6 +253,10 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 - **设计系统新增 `text-2xl` 档**：`--text-2xl`（基准的 12/7，14px 基准下 24px）只用于全屏面板的页标题，
   同步更新 `DESIGN.md` 字号表与 `scripts/verify/checks/design.ts` 的白名单（放开 `text-2xl`，仍禁 `text-3xl` 以上）。
+
+- **侧栏项目行的悬停底色与双击改名**：项目组头去掉悬停底色（反馈交给悬停露出的入口与拖拽光标），
+  展开时图标改用 `FolderOpen`（收起仍是 `Folder`）；会话行去掉双击标题改名——重命名走对话区头部的双击
+  或 `/rename`，侧栏不再重复一个只在悬停时才知道存在的入口。
 
 - **触屏上不再显示滚动条**：`@media (pointer: coarse)` 下把 `scrollbar-width` / `::-webkit-scrollbar` 收成 0，
   并隐藏 Radix `ScrollArea` 的自绘条（它不受 `::-webkit-scrollbar` 影响）——滚动能力不受影响，

@@ -26,6 +26,9 @@ export type ProjectSummary = {
   updatedAt: string;
 };
 
+/**
+ * 项目列表。`projects` 的次序就是侧栏里的次序：用户拖拽排出来的，没排过的按登记时间降序接在后面。
+ */
 export type ProjectListResponse = ListResult & {
   projects: ProjectSummary[];
 };

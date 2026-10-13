@@ -16,3 +16,14 @@ export const projectUpdateInputSchema = z.object({
 
 export type ProjectUpdateRequest = z.input<typeof projectUpdateInputSchema>;
 export type ProjectUpdateInput = z.infer<typeof projectUpdateInputSchema>;
+
+/**
+ * 重排项目：`paths` 是侧栏里从上到下的项目目录，服务端按数组次序记下来。
+ * 只给界面上看得见的那些，没提到的行接在后面——客户端拿不到不可见的行，不该擅自给它们排位。
+ */
+export const projectReorderInputSchema = z.object({
+  paths: z.array(z.string().min(1)).min(1),
+});
+
+export type ProjectReorderRequest = z.input<typeof projectReorderInputSchema>;
+export type ProjectReorderInput = z.infer<typeof projectReorderInputSchema>;

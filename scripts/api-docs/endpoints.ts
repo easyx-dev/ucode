@@ -294,6 +294,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     output: "ProjectSummary",
     summary: "重命名项目（name 传 null 即清空，界面回落目录末段）",
   },
+  {
+    domain: "projects",
+    action: "reorder",
+    method: "POST",
+    input: "projectReorderInputSchema",
+    requestType: "ProjectReorderInput",
+    output: "ProjectListResponse",
+    summary: "重排项目（paths 是侧栏从上到下的目录次序）",
+  },
 
   {
     domain: "messages",

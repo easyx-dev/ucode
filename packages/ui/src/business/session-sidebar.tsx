@@ -31,8 +31,8 @@ type SessionSidebarProps = {
   onCreateInDirectory: (path: string) => void;
   /** 请求重命名某个项目（对话框由 App 承载） */
   onRenameProject: (path: string) => void;
-  /** 请求重命名某个会话（对话框由 App 承载，便于 `/rename` 命令复用） */
-  onRenameRequest: (session: SessionSummary) => void;
+  /** 项目拖拽后的新次序（从上到下）；写回服务端后各端一致 */
+  onReorderProjects: (paths: string[]) => void;
   onArchive: (sessionId: string) => void;
   /** 置顶 / 取消置顶 */
   onTogglePin: (session: SessionSummary) => void;
@@ -56,7 +56,7 @@ export function SessionSidebar({
   onCreateAssistant,
   onCreateInDirectory,
   onRenameProject,
-  onRenameRequest,
+  onReorderProjects,
   onArchive,
   onTogglePin,
   onOpenSearch,
@@ -101,7 +101,7 @@ export function SessionSidebar({
         onCreate={onCreateInDirectory}
         onCreateAssistant={onCreateAssistant}
         onRenameProject={onRenameProject}
-        onRename={onRenameRequest}
+        onReorderProjects={onReorderProjects}
         onArchive={(session) => {
           void confirmArchiveSession(session, t).then((confirmed) => {
             if (confirmed) onArchive(session.id);

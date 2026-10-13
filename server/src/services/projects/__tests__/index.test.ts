@@ -159,6 +159,46 @@ describe("ProjectService.remember", () => {
   });
 });
 
+describe("ProjectService.reorder", () => {
+  it("按入参次序重排，没提到的接在后面", () => {
+    const seen: ProjectSummary[][] = [];
+    const env = makeService((projects) => seen.push(projects));
+    try {
+      for (const path of ["/work/a", "/work/b", "/work/c"]) env.service.remember(path, {});
+
+      const reordered = env.service.reorder(["/work/c", "/work/a"]);
+      assert.deepEqual(
+        reordered.map((project) => project.path),
+        ["/work/c", "/work/a", "/work/b"],
+      );
+      // 广播的也是新次序（各端手上的那份要跟着换）
+      assert.deepEqual(
+        seen.at(-1)?.map((project) => project.path),
+        ["/work/c", "/work/a", "/work/b"],
+      );
+    } finally {
+      env.close();
+    }
+  });
+
+  it("没登记过的目录补一行，助理工作区与重复项丢掉", () => {
+    const env = makeService();
+    try {
+      const reordered = env.service.reorder([`${WORKSPACES}/s1`, "/work/new", "/work/new", ""]);
+      assert.deepEqual(
+        reordered.map((project) => project.path),
+        ["/work/new"],
+      );
+      assert.deepEqual(
+        env.repository.list().map((record) => record.path),
+        ["/work/new"],
+      );
+    } finally {
+      env.close();
+    }
+  });
+});
+
 describe("ProjectService.reconcile", () => {
   it("只留还有会话引用的行，待保留路径按同一口径归一", () => {
     const env = makeService();

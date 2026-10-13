@@ -1,8 +1,8 @@
-/** 会话分组单测：项目组按组内最早创建时间排序，助理区平铺 */
+/** 会话分组单测：项目区按项目行的次序排（没有项目行的目录按创建时间），助理区平铺 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { groupSessions, isWorkspaceSession } from "../session-groups";
-import type { SessionSummary } from "../types";
+import type { ProjectSummary, SessionSummary } from "../types";
 
 const base: SessionSummary = {
   id: "",
@@ -32,20 +32,54 @@ const session = (over: Partial<SessionSummary> & Pick<SessionSummary, "id" | "cw
   ...over,
 });
 
+/** 项目行在分组里只用 path（次序）与 name（组名），其余字段与分组无关 */
+const project = (path: string): ProjectSummary => ({
+  id: `id:${path}`,
+  path,
+  name: null,
+  model: null,
+  thinkingLevel: null,
+  mode: null,
+  permissionMode: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+});
+
 describe("groupSessions", () => {
-  it("项目组按组内最早会话的创建时间降序，新项目排最前", () => {
+  it("项目区按项目行的次序排，与组内会话的时间无关", () => {
     const sections = groupSessions(
       [
-        // 入参已按 updatedAt 降序：旧项目 A 刚被用过，新项目 B 更早创建
+        // 入参已按 updatedAt 降序：项目 A 刚被用过，且它的会话创建得更早
         session({ id: "a1", cwd: "/work/a", createdAt: "2026-01-01T00:00:00.000Z" }),
         session({ id: "b1", cwd: "/work/b", createdAt: "2026-02-01T00:00:00.000Z" }),
       ],
       "/home/assistant",
+      // 用户把 B 拖到了 A 前面
+      [project("/work/b"), project("/work/a")],
     );
 
     assert.deepEqual(
       sections[0]?.groups.map((group) => group.name),
       ["b", "a"],
+    );
+  });
+
+  it("没有项目行的目录排在已登记的后面，彼此按组内最早会话的创建时间降序", () => {
+    const sections = groupSessions(
+      [
+        // 入参已按 updatedAt 降序：新建会话的是 D，最早建会话的是 C
+        session({ id: "d1", cwd: "/work/d", createdAt: "2026-03-01T00:00:00.000Z" }),
+        session({ id: "c1", cwd: "/work/c", createdAt: "2026-01-01T00:00:00.000Z" }),
+        session({ id: "a1", cwd: "/work/a", createdAt: "2026-02-01T00:00:00.000Z" }),
+      ],
+      "/home/assistant",
+      // C 与 D 还没登记过（早于项目表的会话），不占次序，都落在 A 之后
+      [project("/work/a")],
+    );
+
+    assert.deepEqual(
+      sections[0]?.groups.map((group) => group.name),
+      ["a", "d", "c"],
     );
   });
 

@@ -1,5 +1,5 @@
 /**
- * 项目仓储：按会话工作目录（cwd）归口的偏好——侧栏展示用的名称，以及「最近一次在该项目里选择的」
+ * 项目仓储：按会话工作目录（cwd）归口的偏好——侧栏展示用的名称与次序，以及「最近一次在该项目里选择的」
  * 模型 / 思考档位 / 模式 / 权限档位。
  *
  * 项目是应用自己的概念（会话文件里没有对应表示），行随会话创建登记、不提供删除；
@@ -25,6 +25,8 @@ export type ProjectRecord = {
   /** 归一化后的绝对路径；项目的自然键 */
   path: string;
   name: string | null;
+  /** 侧栏里的次序；为空表示还没被拖过，排在排过的之后 */
+  sortOrder: number | null;
   /** 以下四项存的是文本，读到非法枚举值时由上层按「未设置」处理 */
   model: string | null;
   thinkingLevel: string | null;
@@ -39,6 +41,7 @@ const PROJECT_COLUMNS = [
   "id",
   "path",
   "name",
+  "sort_order",
   "model",
   "thinking_level",
   "mode",
@@ -47,13 +50,17 @@ const PROJECT_COLUMNS = [
   "updated_at",
 ].join(", ");
 
-/** 列表排序：最近写过的项目在前；顺序只影响接口输出，客户端一律按路径取用 */
-const PROJECT_ORDER = "ORDER BY updated_at DESC";
+/**
+ * 列表顺序就是侧栏的项目顺序（客户端的项目区按它排）：被拖过的在前、按 `sort_order` 升序，
+ * 没拖过的按登记时间降序排在其后——新项目落在末尾，不会插进用户排好的那段里。
+ */
+const PROJECT_ORDER = "ORDER BY sort_order IS NULL, sort_order ASC, created_at DESC";
 
 const rowSchema = z.object({
   id: z.string(),
   path: z.string(),
   name: z.string().nullable(),
+  sort_order: z.number().nullable(),
   model: z.string().nullable(),
   thinking_level: z.string().nullable(),
   mode: z.string().nullable(),
@@ -68,6 +75,7 @@ const rowToRecord = (row: ProjectRow): ProjectRecord => ({
   id: row.id,
   path: row.path,
   name: row.name,
+  sortOrder: row.sort_order,
   model: row.model,
   thinkingLevel: row.thinking_level,
   mode: row.mode,
@@ -104,6 +112,27 @@ export class ProjectRepository {
       removed.push(record.path);
     }
     return removed;
+  }
+
+  /**
+   * 按给定顺序重排：`paths` 里的按入参次写入 0..n-1，没提到的行接在后面（保持它们当前的相对次序）。
+   * 没提到的是界面上看不见的项目（会话全部归档了），挪到列表中间反而会让下次拖拽对不上。
+   */
+  reorder(paths: readonly string[]): void {
+    const mentioned = new Set(paths);
+    const rest = this.list()
+      .map((record) => record.path)
+      .filter((path) => !mentioned.has(path));
+
+    this.db.exec("BEGIN");
+    try {
+      const statement = this.db.prepare("UPDATE project SET sort_order = ? WHERE path = ?");
+      for (const [index, path] of [...paths, ...rest].entries()) statement.run(index, path);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   /**

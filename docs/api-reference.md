@@ -43,6 +43,7 @@
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
 | POST | `/api/v1/projects/list` | 项目列表（按 cwd 归口的展示名与最近的会话参数） |
 | POST | `/api/v1/projects/update` | 重命名项目（name 传 null 即清空，界面回落目录末段） |
+| POST | `/api/v1/projects/reorder` | 重排项目（paths 是侧栏从上到下的目录次序） |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
 | POST | `/api/v1/messages/services` | 会话的后台服务清单（响应前重探一次，供活动面板用） |
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
@@ -751,6 +752,23 @@
 | `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
+
+### POST /api/v1/projects/reorder
+
+重排项目（paths 是侧栏从上到下的目录次序）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `paths` | string（长度≥1）[]（≥1 项） | 是 | — | — |
+
+**响应类型**：`ProjectListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | number | 是 | — |
+| `projects` | [ProjectSummary](#projectsummary)[] | 是 | — |
 
 ## 消息（`messages`）
 

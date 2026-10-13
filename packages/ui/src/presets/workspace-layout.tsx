@@ -672,8 +672,10 @@ export function WorkspaceLayout({
     onCreate: startNewSession,
     onCreateAssistant: startAssistantSession,
     onCreateInDirectory: startInDirectory,
-    onRenameRequest: requestRename,
     onRenameProject: requestRenameProject,
+    onReorderProjects: (paths: string[]) => {
+      void projects.reorder(paths);
+    },
     onArchive: (id: string) => {
       void sessions.archive(id);
       composer.clear(composerKeyOf(id));

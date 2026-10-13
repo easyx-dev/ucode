@@ -25,7 +25,7 @@ export type SessionSection = {
  */
 export const isWorkspaceSession = (cwd: string, root: string): boolean => isUnderPath(cwd, root);
 
-/** 组内最早的创建时间：项目分组的排序键（组内是 `updatedAt` 降序，不能拿首项当最早） */
+/** 组内最早的创建时间：没有项目行的目录之间的排序键（组内是 `updatedAt` 降序，不能拿首项当最早） */
 const groupCreatedAt = (sessions: readonly SessionSummary[]): string =>
   sessions.reduce(
     (earliest, session) => (session.createdAt < earliest ? session.createdAt : earliest),
@@ -34,14 +34,15 @@ const groupCreatedAt = (sessions: readonly SessionSummary[]): string =>
 
 /**
  * 分区：cwd 落在助理根之下的进「助理区」（平铺），其余按 cwd 精确归组进「项目区」。
- * 组内保持入参顺序（列表已按 `updatedAt` 降序）；项目区各组按**组内最早会话的创建时间**降序——
- * 新项目排最前，之后在哪个项目里发消息都不会把分组顺序顶得来回跳。
+ * 组内保持入参顺序（列表已按 `updatedAt` 降序）；项目区各组按 `projects` 的次序排——
+ * 那份次序就是用户在侧栏拖出来的（见 `projects/reorder`）。目录还没有对应项目行时（早于项目表的会话），
+ * 按组内最早会话的创建时间降序接在后面，新目录在前。
  * 空分区不输出。
  */
 export const groupSessions = (
   sessions: SessionSummary[],
   workspacesDir: string | null,
-  /** 项目行：提供组名（未命名时回落目录末段）；还没登记过的目录不必传 */
+  /** 项目行：提供组名（未命名时回落目录末段）与各组次序；还没登记过的目录不必传 */
   projects: readonly ProjectSummary[] = [],
 ): SessionSection[] => {
   const assistant: SessionSummary[] = [];
@@ -59,13 +60,24 @@ export const groupSessions = (
 
   const sections: SessionSection[] = [];
 
+  /** 项目行里的位次；没有对应行时排在所有已登记的项目之后 */
+  const rankOf = (path: string): number => {
+    const index = projects.findIndex((project) => project.path === path);
+    return index < 0 ? projects.length : index;
+  };
+
   const projectGroups = [...byDir.entries()]
     .map(([path, items]) => ({
       name: projectLabel(path, projectOf(projects, path)),
       path,
       sessions: items,
     }))
-    .sort((a, b) => groupCreatedAt(b.sessions).localeCompare(groupCreatedAt(a.sessions)));
+    .sort((a, b) => {
+      const delta = rankOf(a.path) - rankOf(b.path);
+      return delta !== 0
+        ? delta
+        : groupCreatedAt(b.sessions).localeCompare(groupCreatedAt(a.sessions));
+    });
   if (projectGroups.length > 0) sections.push({ kind: "projects", groups: projectGroups });
 
   if (assistant.length > 0) {

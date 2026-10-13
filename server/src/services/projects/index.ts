@@ -1,9 +1,10 @@
 /**
- * 项目偏好：按会话工作目录（cwd）归口的一组设置——侧栏展示用的名称，以及「最近一次在该项目里选择的」
+ * 项目偏好：按会话工作目录（cwd）归口的一组设置——侧栏展示用的名称与次序，以及「最近一次在该项目里选择的」
  * 模型 / 思考档位 / 模式 / 权限档位。
  *
  * 两个方向：新建会话时把项目记住的值补进初始设置（`seedFor`），用户显式选过参数后写回项目（`remember`）。
  * 写回只由用户动作触发——子智能体与分叉继承来的值不算「用户选择」，都不经过这里。
+ * 侧栏的次序是另一种写入：拖拽落下时由 `reorder` 整份写回（它不改会话默认值）。
  * 模型与模式的可用性只在读取时校验：记住的那个模型被删、模式角色被移除后按「未设置」回落，
  * 不能让项目里的陈旧值把 `sessions/create` 打成 400。
  */
@@ -72,6 +73,25 @@ export class ProjectService {
   }
 
   /**
+   * 重排项目：`paths` 是界面上从上到下的项目目录（只给可见的那些，其余行接在后面）。
+   * 目录不在项目口径里（助理工作区、空路径）或重复出现时丢掉；目录还没登记过时补一行——
+   * 侧栏里看得见的目录可能来自早于项目表的会话，不补就无处存次序。
+   */
+  reorder(paths: readonly string[]): ProjectSummary[] {
+    const normalized: string[] = [];
+    for (const path of paths) {
+      const projectPath = this.toProjectPath(path);
+      if (!projectPath || normalized.includes(projectPath)) continue;
+      this.repository.ensure(projectPath);
+      normalized.push(projectPath);
+    }
+    if (normalized.length === 0) return this.list();
+
+    this.repository.reorder(normalized);
+    return this.notify();
+  }
+
+  /**
    * 登记项目并写回用户这次显式选择的参数（会话创建与更新都走它）。
    * 没有显式参数时只登记一行；`cwd` 不是项目目录（未绑定目录的会话、助理工作区）时什么也不做。
    */
@@ -133,8 +153,11 @@ export class ProjectService {
     return isWorkspaceCwd(normalized, this.workspacesDir) ? null : normalized;
   }
 
-  private notify(): void {
-    this.options.onChange?.(this.list());
+  /** 广播整份列表：写入后各端手上的必须换成新的，顺带把新区次回给调用方 */
+  private notify(): ProjectSummary[] {
+    const projects = this.list();
+    this.options.onChange?.(projects);
+    return projects;
   }
 
   /** 行里当前仍然可用的默认值：模型不可用、模式角色不存在、枚举非法的一律不出现 */

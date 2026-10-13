@@ -8,6 +8,8 @@ export type ProjectsController = {
   projects: ProjectSummary[];
   /** 重命名（`name` 传 null 即清空，界面回落目录末段） */
   rename: (body: ProjectUpdateRequest) => Promise<ProjectSummary | null>;
+  /** 重排（`paths` 是侧栏里从上到下的目录次序） */
+  reorder: (paths: string[]) => Promise<void>;
 };
 
 export function useProjects(): ProjectsController {
@@ -17,5 +19,6 @@ export function useProjects(): ProjectsController {
   return {
     projects: state.data?.projects ?? [],
     rename: client.projects.rename,
+    reorder: client.projects.reorder,
   };
 }

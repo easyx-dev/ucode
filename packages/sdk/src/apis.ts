@@ -70,6 +70,7 @@ import type {
   PluginUpdateRequest,
   PluginWriteResponse,
   ProjectListResponse,
+  ProjectReorderRequest,
   ProjectSummary,
   ProjectUpdateRequest,
   PromptAdmittedResponse,
@@ -217,11 +218,14 @@ export const createApis = (options: ApisOptions = {}) => {
         transport.post<StatsSummaryResponse>("stats/summary", body),
     },
     projects: {
-      /** 项目列表：按 cwd 归口的展示名与最近一次选择的会话参数 */
+      /** 项目列表：按 cwd 归口的展示名与最近一次选择的会话参数；次序就是侧栏里的次序 */
       list: () => transport.post<ProjectListResponse>("projects/list", {}),
       /** 重命名项目；`name` 传 null 即清空 */
       update: (body: ProjectUpdateRequest) =>
         transport.post<ProjectSummary>("projects/update", body),
+      /** 重排项目：`paths` 是侧栏里从上到下的目录次序 */
+      reorder: (body: ProjectReorderRequest) =>
+        transport.post<ProjectListResponse>("projects/reorder", body),
     },
     goals: {
       /** 设定 / 替换当前会话目标；由服务端起第一轮 */

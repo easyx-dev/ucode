@@ -9,7 +9,7 @@ import { groupSessions, type SessionGroup } from "../lib/session-groups";
 import type { ProjectSummary, SessionSummary } from "../lib/types";
 import { SessionListItem } from "./session-list-item";
 import { SessionPagedRows } from "./session-paged-rows";
-import { SessionProjectGroup } from "./session-project-group";
+import { projectGroupsOf, SessionProjectGroups } from "./session-project-groups";
 import { SessionSection } from "./session-section";
 
 const COLLAPSED_KEY = `${brand.slug}-collapsed-session-groups`;
@@ -24,11 +24,8 @@ const readCollapsed = (): Set<string> => {
   }
 };
 
-/** 顶层分类的折叠键；与项目组的键（完整路径）共用一份存储，用前缀避免撞名 */
+/** 顶层分类的折叠键；与项目组的折叠键（完整路径）共用一份存储，用前缀避免撞名 */
 const sectionKey = (kind: "projects" | "assistant"): string => `section:${kind}`;
-
-/** 折叠状态的存储键：项目目录用完整路径，避免不同目录末段重名时互相串 */
-const groupKey = (path: string | null): string => path ?? "";
 
 type SessionListProps = {
   sessions: SessionSummary[];
@@ -47,7 +44,8 @@ type SessionListProps = {
   onOpenWorkspace: () => void;
   /** 重命名项目（项目区组头的铅笔） */
   onRenameProject: (path: string) => void;
-  onRename: (session: SessionSummary) => void;
+  /** 项目拖拽后的新次序（从上到下） */
+  onReorderProjects: (paths: string[]) => void;
   onArchive: (session: SessionSummary) => void;
   onTogglePin: (session: SessionSummary) => void;
 };
@@ -63,7 +61,7 @@ export function SessionList({
   onCreateAssistant,
   onOpenWorkspace,
   onRenameProject,
-  onRename,
+  onReorderProjects,
   onArchive,
   onTogglePin,
 }: SessionListProps) {
@@ -97,11 +95,10 @@ export function SessionList({
         onSelect={onSelect}
         unread={session.id !== activeId && isSessionUnread(session)}
         onTogglePin={() => onTogglePin(session)}
-        onRename={() => onRename(session)}
         onArchive={() => onArchive(session)}
       />
     ),
-    [activeId, onArchive, onRename, onSelect, onTogglePin],
+    [activeId, onArchive, onSelect, onTogglePin],
   );
 
   // 项目 / 助理始终各渲染一个分类（即使下面没有会话），顺序固定
@@ -148,23 +145,16 @@ export function SessionList({
                   section.groups.length === 0 ? (
                     placeholder(t("暂无项目"))
                   ) : (
-                    section.groups.map((group) => {
-                      const gKey = groupKey(group.path);
-                      return (
-                        <SessionProjectGroup
-                          key={gKey}
-                          name={group.name}
-                          path={group.path}
-                          sessions={group.sessions}
-                          activeId={activeId}
-                          collapsed={collapsed.has(gKey)}
-                          onCollapsedChange={(next) => toggle(gKey, next)}
-                          onCreate={() => group.path && onCreate(group.path)}
-                          onRename={() => group.path && onRenameProject(group.path)}
-                          renderItem={renderItem}
-                        />
-                      );
-                    })
+                    <SessionProjectGroups
+                      groups={projectGroupsOf(section.groups)}
+                      activeId={activeId}
+                      isCollapsed={(path) => collapsed.has(path)}
+                      onCollapsedChange={(path, next) => toggle(path, next)}
+                      onCreate={onCreate}
+                      onRename={onRenameProject}
+                      onReorder={onReorderProjects}
+                      renderItem={renderItem}
+                    />
                   )
                 ) : (
                   <div className="space-y-0.5">

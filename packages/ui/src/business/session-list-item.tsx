@@ -1,6 +1,6 @@
 /**
  * 会话列表的一行：未读点 / 置顶标记、标题与相对时间；
- * 悬停时右侧露出置顶与归档入口，双击标题可重命名。
+ * 悬停时右侧露出置顶与归档入口。
  */
 import type { SessionStatus, SessionSummary } from "@ucode/contracts";
 import { cn } from "cn";
@@ -48,8 +48,6 @@ type SessionListItemProps = {
   unread?: boolean;
   /** 置顶开关入口 */
   onTogglePin?: () => void;
-  /** 双击标题重命名入口 */
-  onRename?: () => void;
   onArchive?: () => void;
 };
 
@@ -59,7 +57,6 @@ export function SessionListItem({
   onSelect,
   unread,
   onTogglePin,
-  onRename,
   onArchive,
 }: SessionListItemProps) {
   const { t } = useTranslation();
@@ -88,7 +85,6 @@ export function SessionListItem({
         title={statusLabel ? `${title} · ${statusLabel}` : title}
         className="flex h-full min-w-0 flex-1 items-center rounded-lg pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         onClick={() => onSelect(session.id)}
-        onDoubleClick={onRename}
       >
         {/* 固定槽位：有没有指示器都占同样宽度，标题才能稳定对齐；置顶针与未读点可并存；
             图标左对齐，与项目行的文件夹图标同一列 */}

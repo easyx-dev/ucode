@@ -111,6 +111,45 @@ describe("ProjectRepository", () => {
     }
   });
 
+  it("reorder 按入参写次序，没提到的接在后面", () => {
+    const env = makeRepo();
+    try {
+      for (const path of ["/work/a", "/work/b", "/work/c"]) env.repo.ensure(path);
+
+      env.repo.reorder(["/work/c", "/work/a"]);
+
+      assert.deepEqual(
+        env.repo.list().map((record) => record.path),
+        ["/work/c", "/work/a", "/work/b"],
+      );
+      assert.equal(env.repo.find("/work/c")?.sortOrder, 0);
+      assert.equal(env.repo.find("/work/a")?.sortOrder, 1);
+      assert.equal(env.repo.find("/work/b")?.sortOrder, 2);
+    } finally {
+      env.close();
+    }
+  });
+
+  it("后登记的行接在排过的后面，不改已有次序", () => {
+    const env = makeRepo();
+    try {
+      env.repo.ensure("/work/a");
+      env.repo.ensure("/work/b");
+      env.repo.reorder(["/work/b", "/work/a"]);
+
+      // 新项目不带次序（sort_order 为空），不应插进用户排好的那段里
+      env.repo.ensure("/work/new");
+
+      assert.deepEqual(
+        env.repo.list().map((record) => record.path),
+        ["/work/b", "/work/a", "/work/new"],
+      );
+      assert.equal(env.repo.find("/work/new")?.sortOrder, null);
+    } finally {
+      env.close();
+    }
+  });
+
   it("deleteOrphans 只删没有被会话引用的行", () => {
     const env = makeRepo();
     try {
