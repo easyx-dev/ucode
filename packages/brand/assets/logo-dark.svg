@@ -1,3 +1,2 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M12 5.6 13.5 9.9 17.8 11.4 13.5 12.9 12 17.2 10.5 12.9 6.2 11.4 10.5 9.9Z" fill="#fafafa" />
-</svg>
+<!-- U 标：设计框 208×232、笔画 28（外描边 12 让切口带圆角）、四处收口沿用参考图的 18:26 斜切；改形状只需改下面的 path -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path fill="#fafafa" stroke="#fafafa" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" d="M12 12 H40 V218 L58 244 H174 L192 218 V12 H220 V218 L202 244 H30 L12 218 Z"/></svg>
