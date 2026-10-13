@@ -1170,13 +1170,13 @@ export class SessionPool {
   }
 
   /**
-   * 配置变更后的会话回收：空闲实例立即丢弃（下次访问按新配置重装），
-   * 正在生成 / 压缩的实例只标脏 —— 不打断这一轮，等它落定后回收。
+   * 配置变更后的会话回收：空闲实例立即丢弃（下次访问按新配置重装），不能立刻丢的（见 `isProtected`）
+   * 只标脏 —— 改配置的频率不低，把等审批 / 等计划确认的会话打回会直接清掉用户正看着的东西。
    */
   recycleForConfigChange(): void {
     this.generation += 1;
     const plan = planRecycle(
-      [...this.entries.keys()].map((id) => ({ id, active: this.isActive(id) })),
+      [...this.entries.keys()].map((id) => ({ id, active: this.isProtected(id) })),
     );
     for (const sessionId of plan.markStale) {
       const entry = this.entries.get(sessionId);

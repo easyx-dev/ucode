@@ -5,8 +5,8 @@
  *   routes → services → core → harness → pi
  *   platform 是基建，不许反向依赖上层。
  *
- * 这里只约束「可检查、且现在事实成立」的四条；跨层但合规的例外（如 core 取用 harness 的能力）
- * 不在此列。规则收窄为目录前缀 + `import type` 判定，避免误报。
+ * 这里只约束「可检查、且现在事实成立」的几条；跨层但合规的例外（如 core 取用 harness 的能力、
+ * 装配期按值构造插件扩展）不在此列。规则收窄为目录前缀 + `import type` 判定，避免误报。
  */
 import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
@@ -50,9 +50,30 @@ const RULES: Rule[] = [
   {
     from: (file) => isUnder(file, "server/src/harness/pi"),
     to: (target) =>
-      isUnder(target, "server/src/harness/setup") || isUnder(target, "server/src/harness/features"),
+      isUnder(target, "server/src/harness/setup") ||
+      isUnder(target, "server/src/harness/features") ||
+      isUnder(target, "server/src/harness/plugins"),
     typeOnly: false,
-    reason: "pi 适配层只能依赖 contracts 与 harness 的共用原语，不得反向依赖装配或运行期能力",
+    reason:
+      "pi 适配层只能依赖 contracts 与 harness 的共用原语，不得反向依赖装配、运行期能力与插件宿主",
+  },
+  {
+    from: (file) => isUnder(file, "server/src/harness/features"),
+    to: (target) => isUnder(target, "server/src/harness/plugins"),
+    typeOnly: false,
+    reason: "插件宿主是接缝层：运行期要用的插件数据由调用方注入，不自己去宿主里取",
+  },
+  {
+    from: (file) => isUnder(file, "server/src/core") && !isTest(file),
+    to: (target) => isUnder(target, "server/src/harness/plugins"),
+    typeOnly: true,
+    reason: "core 取插件宿主的类型只许 import type（贡献数据由调用方注入）",
+  },
+  {
+    from: (file) => isUnder(file, "server/src/platform"),
+    to: (target) => isUnder(target, "server/src/harness/plugins"),
+    typeOnly: false,
+    reason: "插件宿主是接缝层，基建不得依赖它",
   },
   {
     from: (file) => isUnder(file, "server/src/harness/utils"),

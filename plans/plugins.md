@@ -545,7 +545,7 @@ cache（`$APP_HOME/plugins/cache/<slug>-plugins-official/<name>/<version>/`，�
 
 | 技能 | 用途 | 真身 | 物化 |
 | --- | --- | --- | --- |
-| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/plugins/builtin/skills/plugin-create/{SKILL.md,references/…}` | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
+| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/plugins/builtin/skills/plugin-create/{SKILL.md,references/…}`（**实际用 TS 常量，见复盘**） | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
 | `plugin-review` | 审计第三方插件（审查清单见第五章） | 同上的 `plugin-review/` | 同上的物化 |
 
 调用方式 `/skill:plugin-create`、`/skill:plugin-review`，来源标 `official`；`plugin-review` 的描述要写明
@@ -750,3 +750,5 @@ agents / bin），逐条验证「识别正确 + 诊断正确 + 其它组件不�
 | 旧版本清理 | §6.7 的 `.orphaned_at` + 14 天清扫 | 照 Claude Code 的口径落地：旧副本改名成 `.orphaned-<版本>-<时间戳>` + 标记文件、14 天保留、只在有已装插件时清扫（它的原文也点明了清扫依赖同根下的账本）。触发点放在 commit 之后：首次安装时 commit 前登记表还是空的 |
 | `SessionStart` 的会话范围 | 计划只写了 `SessionStart → session_start`，没提会话模式 | 原先只在 `mode === "build" && usesDefaultToolSet` 时调 `bindExtensions`（那是为 MCP 加的），于是只读 / plan / ask 会话静默不跑插件 SessionStart。现在**所有会话都绑扩展**；挂的扩展本来就少（没有 MCP、没有 tool_search），代价可以忽略 |
 | 项目级作用域 | 项目级安装根 `<cwd>/.<slug>/plugins/` + 启用覆盖 | 只做**启用覆盖**，装副本留在用户级。查了九家：Claude Code（`enabledPlugins`，6 档优先级，且明说「不扫项目 `.claude/plugins/`」）、Codex（`[plugins."name@market"] enabled`，未信任整层跳过）、VS Code agent plugins（同一键形）都是「用户级装 + 项目级开关」；ZCode 更直接——**项目级 hooks 整段不执行**（`config_project_hooks_ignored`），团队共享请走插件。只有 Obsidian（vault 即部署单元）与 opencode / Amp（文件即加载、无开关）把本体放进工作区。另外安装根在项目内会让 §6.7 的清扫失去前提（Claude Code 的清扫依赖同根下的 `installed_plugins.json`）。故：**项目文件永远不能把新代码带进这台机器** |
+| `harness/plugins` 的 layers 校验 | §10.1 第 4 条：`harness/{pi,setup,features}`、`core`、`platform` 都不得依赖宿主 | 按代码事实收窄：`pi` / `features` / `platform` 整条禁止，`core` 只许 `import type`（`pool.ts` 取 `PluginContributions` 现在就是这个形状）；`harness/setup` **不在约束内**——装配期要按值构造插件 hooks 扩展（`session-config.ts`）并合并内置命令（`assets/index.ts`），那句「`harness/setup` 只许类型依赖」与代码不符，已按代码改 `AGENTS.md` |
+| 内置技能的 `.md` 真身 | §7.1 与落位表写的是 `builtin/skills/plugin-create/SKILL.md` 等文件真身 | **仍用 TS 常量**（`builtin/skills.ts`）。改成 `.md` 真身要同时解决三件事：esbuild 的 text loader、开发 / 测试链路（tsx）对 `.md` 的加载、以及正文里品牌派生值（产品名 / 清单目录名 / 环境变量前缀，`brand` 校验不允许落成字面量）的模板替换。收益只是「编辑时有 Markdown 高亮」，不值得为它引进一条代码生成流水线；原先「等生成脚本落地再改」的注释已改成现状说明，空的 `builtin/skills/` 目录已删 |

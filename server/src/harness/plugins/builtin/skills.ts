@@ -1,11 +1,11 @@
 /**
  * 内置技能的真身：随包发布、物化到 `$APP_HOME/app/builtin/skills/<id>/`。
  *
- * 正文写成 TS 常量而不是 `.md` 文件：`.md` 需要 esbuild 的 text loader 加运行期（tsx）支持，
- * 目前两条链路都要动；等 `docs/plugin-authoring.md` 的生成脚本落地时再改成文件真身。
- *
- * 正文里的产品名、清单目录名与环境变量前缀**一律从品牌派生**：换品牌时这两个技能要跟着变，
- * 不能出现硬编码字面量（`scripts/verify` 的 brand 校验会拦下）。
+ * 正文写成 TS 常量而不是 `.md` 文件，是构建链的取舍而不是图省事：正文里有从品牌派生的产品名、
+ * 清单目录名与环境变量前缀（换品牌必须跟着变，不能落成字面量），改成 `.md` 真身要额外解决
+ * 三件事——esbuild 的 text loader、开发与测试链路（tsx）对 `.md` 的加载、以及模板占位替换。
+ * 现在只有 `docs/plugin-authoring.md` 一个生成物还指着这里（`scripts/plugin-docs`），
+ * 单独为它引进这套流水线不划算。真要改时按上述三件事一起做（见 `plans/plugins.md` 复盘）。
  */
 import { brand } from "@ucode/brand/values";
 

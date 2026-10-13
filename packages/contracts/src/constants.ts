@@ -94,10 +94,11 @@ export const PERMISSION_DECISION_CUSTOM_TYPE = "ucode.permission-decision";
 
 /**
  * 每步耗时记录：每次模型往返结束后，服务端往会话文件追加的 pi `custom` 条目。
- * `data` 为 `{turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs,
- * streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens,
- * outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments}`——
- * 把「一次往返」拆成响应头 / 首字节 / 解码 / 工具四段，外加等用户的时间，供事后算账。
+ * `data` 为 `{turn, userTurn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs,
+ * ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens,
+ * outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, provider, model,
+ * stopReason, attachments}`——把「一次往返」拆成响应头 / 首字节 / 解码 / 工具四段，外加等用户的时间，
+ * 供事后算账；`turn` 是本次装配内的往返序号，`userTurn` 才是按用户输入分组的依据。
  * 它只作服务端观测：既不进模型上下文，也不下发给客户端
  * （见 `core/serialize` 的 customType 白名单）。
  */
@@ -572,8 +573,11 @@ export const AGENT_KINDS = ["primary", "subagent"] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
-/** 角色来源：内置 / 项目 `.ucode` / 全局 `$APP_HOME` / 插件（自定义 subagent 与 primary 共用） */
-export const AGENT_SOURCES = ["builtin", "project", "global", "plugin"] as const;
+/**
+ * 角色来源。与 `COMMAND_ASSET_SOURCES` 同口径：数组顺序把更具体的来源放前（`plugin` 先于 `builtin`），
+ * 目前没有任何消费方——实际的同名消解靠注册表与 slug 前缀，不靠这个数组。
+ */
+export const AGENT_SOURCES = ["project", "global", "plugin", "builtin"] as const;
 
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 

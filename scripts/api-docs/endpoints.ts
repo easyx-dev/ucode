@@ -516,7 +516,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: "pluginCreateInputSchema",
     requestType: "PluginCreateInput",
     output: "PluginWriteResponse",
-    summary: "按来源安装并登记插件（本轮只支持本地目录来源）",
+    summary: "按来源（本地目录 / url / npm / github / git）安装并登记插件",
   },
   {
     domain: "plugins",
@@ -589,7 +589,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     input: "marketplaceRefreshInputSchema",
     requestType: "MarketplaceRefreshInput",
     output: "MarketplaceWriteResponse",
-    summary: "刷新市场清单（本轮只支持本地目录市场）",
+    summary: "刷新市场清单（本地目录 / url / github / git）",
   },
 
   {

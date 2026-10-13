@@ -209,6 +209,8 @@
   `{ type: "error", sessionId?, code, message, params? }`、
   `{ type: "config_changed", config: ConfigSnapshot }`（配置已变更，客户端据此重取 models / health）、
   `{ type: "mcp_changed", mcp: McpListResponse }`、
+  `{ type: "plugins_changed", revision: number, plugins: PluginsListResponse }`（插件登记表已变更，
+  客户端据此重取列表；代次推进会让相关会话按新装配重装）、
   `{ type: "projects_changed", projects: ProjectListResponse }`（项目改名或写回最近的会话参数）
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲
@@ -318,6 +320,36 @@
   `allow_session` 等价于按 `scope` 追加一条会话级 allow 规则，同样只存进程内存，服务重启回到规则默认。
 - **多客户端**：请求经事件流广播到所有已连接客户端，**任一客户端可作答、首个响应结算生效**（其余端收到
   `interaction_resolved` 后收起对话框）。
+
+## 插件与市场（plugins / marketplace）
+
+插件是**资源与受信任代码的打包单位**：技能 / 命令 / 角色 / 钩子 / MCP / bin / 扩展打成可启停、
+可分发、可升级的单元，包格式兼容 Claude Code 与 ZCode。使用与安全边界见 [插件](./plugins.md)，
+这里只记接口口径。
+
+- **身份**：`id` 为 `<name>@<marketplace>`；直接登记本地目录时市场名用保留值 `local`。
+  插件名与市场名同一套字符集（小写字母或数字开头，只含小写字母、数字与 `. _ -`）。
+- **来源**：`pluginCreate` 收 `directory` / `url` / `npm` / `github` / `git` 五种（Claude 的
+  `command` 一类不在 schema 内，校验阶段就拒，不会走到运行期再静默失败）；市场只收
+  `directory` / `url` / `github` / `git`——市场本体是清单文件而不是包，所以没有 `npm`。
+- `plugins/list`：可带 `cwd`。给了就按它读项目级覆盖（`<cwd>/.<slug>/plugins.json` 与
+  `plugins.local.json`），每条插件的 `enabled` / `enabledBy` 是**该仓库里的生效值**；不给只算用户级。
+  项目文件只能开关**已登记**的插件，不能装新插件（那是把新代码带进这台机器）。
+- `plugins/create`：登记即启用（`enabled` 默认 true）。安装副本一律落用户级
+  （`$APP_HOME/plugins/cache/<市场>/<插件>/<版本>`，`directory` 来源不复制），仓库维度只由上面的覆盖决定。
+- `plugins/update`：启停（`enabled`）与写 `userConfig` 的值（标量，类型由插件清单声明）。
+- `plugins/delete`：默认只移除登记；`purge: true` 一并清掉插件根内的缓存与插件数据目录，
+  但 `directory` 来源的内容永远不删——那是用户自己的目录。
+- `plugins/refresh`：按来源重读清单。换版本 / 同版本重拉时旧副本改名成 `.orphaned-<版本>-<时间戳>`
+  保留 14 天（正在跑的会话可能还握着旧路径），到期在下次安装 / 重拉 / 卸载时清掉。
+- **来源门控**：执行类组件（`hooks` / `extensions` / `bin`）只对随包（`official`）与本地登记（`local`）
+  注入运行时，来自第三方市场（`market`）的**只解析出诊断、不注入**。它的后果是「组件不生效 +
+  诊断里说明」而不是拒绝请求，因此没有信任 / 授权类错误码。MCP 不在这条门控里（它另起进程，
+  不在你的会话里跑代码）。
+- `marketplace/{list,info,create,delete,refresh}`：`info` 读上一次刷新出的条目缓存，不触发网络；
+  删除只移除登记，已有缓存与已装插件不受影响。
+- **代次与重装**：登记表变化推进 revision 并广播 `plugins_changed`。正在进行的会话按新装配重装，
+  正在生成、等待审批 / 回答 / 计划确认的会话先让这一轮走完（只标脏，落定后回收）。
 
 ## 鉴权
 

@@ -212,7 +212,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 | --- | --- | --- |
 | `routes/` | 协议适配：Hono 路由、zod 校验、封套、SSE | 只做 HTTP 适配，不写业务判断 |
 | `services/` | 业务与胶水：用例编排、进程生命周期、跨组件连线 | 被 routes 调用；`lifecycle.ts` / `config.ts` 是两个进程级入口 |
-| `harness/plugins/` | 插件宿主：清单、组件解析、注册表与来源门控 | 接缝层，不被 `harness/{pi,setup,features}`、`core`、`platform` 反向依赖 |
+| `harness/plugins/` | 插件宿主：清单、组件解析、注册表与来源门控 | 接缝层，不被 `harness/{pi,features}`、`core`、`platform` 反向依赖（装配期的按值依赖是例外，见下） |
 | `core/` | 内核·会话运行态 | 持有 `AgentSession` 或进程内运行态（池、占位、挂起请求、事件流） |
 | `harness/` | 基于 pi 的能力 | 直接构造 / 转换 / 驱动 pi 的对象与数据结构 |
 | `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
@@ -247,8 +247,10 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   - `plugins/`：插件宿主（`manifest` 清单发现与解析 / `components` 组件解析与路径校验 /
     `agent-file` 插件角色解析 / `hooks` + `hooks-runner` hook 解析与执行 / `marketplace` 市场清单读取 /
     `sanitize` 命名 / `registry` 注册表与来源门控 / `state` 状态结构与判定 / `view` 视图映射）。
-    它是接缝层：`core`、`platform` 与 `harness/pi` 不得依赖它；`harness/setup` 只许**类型**依赖
-    （数据由调用方注入：`PluginContributions`），`harness/plugins → core` 也只许 `import type`。
+    它是接缝层：`harness/pi`、`harness/features` 与 `platform` 不得依赖它；`core` 取它只许
+    `import type`（贡献数据由调用方注入：`PluginContributions`），`harness/plugins → core` 也只许
+    `import type`。装配期（`harness/setup`）是刻意的例外：它要按值构造插件的 hooks 扩展
+    （`session-config.ts`）并合并内置命令（`assets/index.ts`）。以上由 layers 校验兜底。
     插件的文件读写与安装流程在 `services/plugins/`；
   - `utils/`：harness 内的公共方法（`text.ts` 取消息文本、`boundary.ts` 不可信内容的边界包裹与中和，
     后者的标签名单在 `packages/contracts`）。按下一段关于 `utils` 的定义，它只服务于 harness，
