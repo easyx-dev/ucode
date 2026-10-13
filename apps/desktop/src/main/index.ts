@@ -7,6 +7,7 @@
  */
 import { resolve } from "node:path";
 
+import { brand } from "@ucode/brand/values";
 import { app, BrowserWindow, ipcMain, session } from "electron";
 
 import { isFrameless } from "../shared/chrome.ts";
@@ -21,6 +22,12 @@ import { registerWindowControlsIpc, watchWindowState } from "./window-controls.t
  */
 const rendererDevUrl = process.env.DESKTOP_RENDERER_URL;
 const rendererDist = resolve(import.meta.dirname, "../dist");
+
+/**
+ * Windows 靠 AppUserModelID 把 toast 归到应用名下，没设会被系统静默丢弃（通知等于发不出去）；
+ * macOS 与 Linux 没有这个概念，调用是空操作。
+ */
+app.setAppUserModelId(`${brand.slug}.desktop`);
 
 /**
  * 开发形态的令牌注入：渲染层由 Vite（`:5174`）提供、`/api/*` 经 Vite 代理转给服务，

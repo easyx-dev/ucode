@@ -708,7 +708,11 @@ export default {
     "The browser hasn't granted notification permission yet — use “Allow notifications” to grant it.",
   "浏览器已拒绝通知，需要在浏览器的网站设置里允许后才能送达。":
     "Notifications are blocked; allow them in the browser's site settings.",
+  "系统没有让通知通过，请检查系统的通知设置（macOS 上未签名的应用会被拦下）。":
+    "The system didn't deliver the notification — check the system notification settings (unsigned apps are blocked on macOS).",
   "当前环境不支持系统通知。": "This environment doesn't support system notifications.",
+
+  // Session transcript（会话原始记录导出）
 
   // Desktop shell（桌面端启动时的连接态）
   未连接到本机服务: "Not connected to the local service",

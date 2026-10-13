@@ -3,13 +3,15 @@
  *
  * 触发点每次发通知前现读 localStorage，故不需要跨组件广播；这里只为设置页提供受控值与授权状态。
  */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   type NoticePermissionState,
   noticePermissionState,
+  readDesktopDelivered,
   readNoticeEnabled,
   requestNoticePermission,
+  subscribeDesktopDelivered,
   writeNoticeEnabled,
 } from "../lib/notice";
 
@@ -17,16 +19,24 @@ export function useNoticeEnabled(): {
   noticeEnabled: boolean;
   /** 通知能不能送达：未授权时设置页要给出授权入口或排障提示 */
   noticePermission: NoticePermissionState;
+  /** 桌面端最近一次通知被系统拦下（web 端恒为 false） */
+  noticeBlocked: boolean;
   /** 在用户手势里申请授权 */
   requestPermission: () => Promise<void>;
   setNoticeEnabled: (next: boolean) => void;
 } {
   const [noticeEnabled, setEnabled] = useState(readNoticeEnabled);
   const [noticePermission, setPermission] = useState<NoticePermissionState>(noticePermissionState);
+  // 桌面端查不到授权状态，只能看最近一次投递的结果
+  const noticeBlocked = useSyncExternalStore(
+    subscribeDesktopDelivered,
+    () => readDesktopDelivered() === false,
+  );
 
   return {
     noticeEnabled,
     noticePermission,
+    noticeBlocked,
     requestPermission: async () => {
       setPermission((await requestNoticePermission()) ? "granted" : noticePermissionState());
     },

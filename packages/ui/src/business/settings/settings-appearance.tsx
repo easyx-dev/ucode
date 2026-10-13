@@ -84,7 +84,7 @@ export function SettingsAppearance() {
     { value: "cozy", label: t("宽松") },
   ] as const satisfies ReadonlyArray<SegmentedOption<DensityId>>;
 
-  const { noticeEnabled, noticePermission, requestPermission, setNoticeEnabled } =
+  const { noticeEnabled, noticePermission, noticeBlocked, requestPermission, setNoticeEnabled } =
     useNoticeEnabled();
   const noticeOptions = [
     { value: "on", label: t("开启") },
@@ -93,7 +93,14 @@ export function SettingsAppearance() {
 
   // 开关开着却送不出去时要说清缺哪一步：浏览器授权只能在用户手势里申请，这里就是那个入口
   const noticeDescription = (): string => {
-    if (!noticeEnabled || noticePermission === "granted") {
+    if (!noticeEnabled) {
+      return t("会话等待你的输入、完成或出错时发送系统通知；页面在前台时不打扰。");
+    }
+    // 桌面端问不到授权状态，只能按最近一次投递结果提示
+    if (noticeBlocked) {
+      return t("系统没有让通知通过，请检查系统的通知设置（macOS 上未签名的应用会被拦下）。");
+    }
+    if (noticePermission === "granted") {
       return t("会话等待你的输入、完成或出错时发送系统通知；页面在前台时不打扰。");
     }
     if (noticePermission === "default") {
