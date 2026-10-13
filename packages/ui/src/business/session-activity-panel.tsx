@@ -82,7 +82,7 @@ export function SessionActivityPanel({
         <button
           type="button"
           aria-label={t("关闭")}
-          className="shrink-0 rounded text-foreground-subtle hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="shrink-0 rounded-xs text-foreground-subtle hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
           onClick={onClose}
         >
           <X className="size-icon-sm" />

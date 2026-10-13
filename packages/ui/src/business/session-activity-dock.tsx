@@ -4,7 +4,7 @@
  * 位置与展开都由**右侧留白**（内容列两侧的空白）决定：
  *
  * - 留白够放下面板（≈ 面板宽 + 两侧边距）时，面板整屏落在内容列右侧、不压正文，**默认就展开**；
- * - 留白不够（窄窗口、开着工作台）时只出一个胶囊，**默认收起**，点开才在内容列上浮出。
+ * - 留白不够（窄窗口、开着工作台）时只出一条摘要条，**默认收起**，点开才在内容列上浮出。
  *
  * 用户手动收起 / 展开过就按用户的选择（`open` 非 null），不再随窗口宽度翻来覆去。
  * 层级取 `z-10`：低于所有 Portal 弹层；面板高度按对话区实测高度收口，不会顶到内容区头部。
@@ -25,7 +25,7 @@ const SIDE_SPACE_REM = 22;
 /** 面板高度的下限：对话区很矮时也留出能看几行的位置 */
 const MIN_PANEL_HEIGHT = 160;
 
-/** 面板之外还要让出的高度：顶部间距 + 胶囊一行 + 两者之间的空隙 */
+/** 面板之外还要让出的高度：顶部间距 + 摘要条一行 + 两者之间的空隙 */
 const DOCK_RESERVED_HEIGHT = 64;
 
 type SessionActivityDockProps = {
@@ -104,7 +104,7 @@ export function SessionActivityDock({
             <button
               type="button"
               aria-expanded={expanded}
-              className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-popover px-2.5 py-1 text-xs text-foreground ring-1 ring-border-strong hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+              className="pointer-events-auto flex items-center gap-1.5 rounded-xs bg-popover px-2.5 py-1 text-xs text-foreground ring-1 ring-border-strong hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
               onClick={() => onOpenChange(!expanded)}
             >
               <Activity aria-hidden className="size-icon-sm shrink-0 text-foreground-subtle" />

@@ -31,7 +31,7 @@ export function SubagentEntry({ description, status, label, onOpen }: SubagentEn
   return (
     <button
       type="button"
-      className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-foreground-subtle hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="flex shrink-0 items-center gap-1 rounded-xs bg-muted px-1.5 py-0.5 text-xs text-foreground-subtle hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
       title={description ? `${t("子智能体")} · ${description}` : t("子智能体")}
       onClick={onOpen}
     >

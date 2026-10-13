@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { fileIconOf } from "../lib/file-icons";
 
 const TOKEN_CLASS =
-  "inline-flex max-w-48 items-baseline gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 align-baseline font-mono text-xs text-foreground [&_svg]:size-icon-xs [&_svg]:shrink-0 [&_svg]:self-center";
+  "inline-flex max-w-48 items-baseline gap-1 rounded-xs border border-border bg-background px-1.5 py-0.5 align-baseline font-mono text-xs text-foreground [&_svg]:size-icon-xs [&_svg]:shrink-0 [&_svg]:self-center";
 
 export type AttachmentTokenProps = {
   /** 附件类别：图片显示序号，其余显示文件名 */

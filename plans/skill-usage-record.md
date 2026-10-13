@@ -230,7 +230,7 @@ export const matchSkillInvoke = (
 ### 10. `packages/ui/src/business/tool-call.tsx`
 
 `ToolCall`（:177）在 `InputLabel` 的渲染点（:206，组件定义在 :114）之后插技能标记：`entry.skill` 存在时渲染一个
-`rounded bg-muted px-1 text-[11px]` 的 chip，文案 `t("技能 {{name}}", { name })`，`title` 同文案。
+`rounded-xs bg-muted px-1 text-xs` 的 chip，文案 `t("技能 {{name}}", { name })`，`title` 同文案。
 行高仍是 32px，不新增可点区域（路径按钮的预览行为不变）。
 
 ### 11. `packages/i18n/src/locales/ui/en.ts`

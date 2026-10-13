@@ -58,7 +58,7 @@
   @apply border-l-2 pl-3 text-foreground-subtle;
 }
 .md-content code {
-  @apply rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs;
+  @apply rounded-xs bg-muted px-1.5 py-0.5 font-mono text-xs;
 }
 .md-content pre {
   @apply overflow-x-auto rounded-lg bg-muted p-3 text-xs;

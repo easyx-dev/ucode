@@ -173,16 +173,22 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 ## 圆角
 
-基准 `--radius`（0.75rem），四档派生：`rounded-sm`(0.6×) / `rounded-md`(0.8×) / `rounded-lg`(1×) / `rounded-xl`(1.4×)，另有 `rounded-full`。
+基准 `--radius`（0.625rem），五档派生：`rounded-xs`(0.4×) / `rounded-sm`(0.6×) / `rounded-md`(0.8×) / `rounded-lg`(1×) / `rounded-xl`(1.4×)，另有 `rounded-full`。
 
 取档只看**容器嵌套层级**，不看组件重要性：
 
-- 第一个圆角容器一律 `rounded-xl`；嵌套时逐级降为 `lg → md → sm`（`sm` 为下限）。
+- 第一个圆角容器一律 `rounded-xl`；嵌套时逐级降为 `lg → md → sm → xs`（`xs` 为下限）。
 - 例外：贴窗口边缘的面板（对话区、工作台）用 `rounded-md`——它们的圆角要与无标题栏窗口自身的圆角相称，
-  取 `xl`（16.8px）会在窗口角上露出错位的月牙。
-- 控件（按钮、输入框、选择器）默认 `rounded-lg`；落在 `rounded-lg` 父容器里降为 `md`，落在 `rounded-md` / `sm` 里降为 `sm`。
+  取 `xl`（14px）会在窗口角上露出错位的月牙。
+- 控件（按钮、输入框、选择器）默认 `rounded-lg`；落在 `rounded-lg` 父容器里降为 `md`，落在 `rounded-md` / `sm` 里降为 `sm`；段控件这类「控件里还嵌一层选中项」的结构，最内层直接取 `xs`。
+- `xs`（基准的 0.4×）只给行内的微元素：徽标与同类 chip（技能 / 命令 chip、附件 token、子智能体入口、活动摘要条、
+  空态建议 chip）、行内图标按钮（复制 / 分叉 / 编辑 / 展开收起 / 关闭）、段控件的选中项、Markdown 行内代码、
+  用户气泡的右下角。面板与控件本体不用它——面板边上出现 4px 的圆角会读成直角。
+- 用户消息气泡：`rounded-lg`，右下角单独收一档到 `rounded-br-xs`，读起来像说话的一角。
 - 布局容器、分隔条、包装层不算一层。
-- `rounded-full` 只用于刻意的胶囊与圆形；禁任意值与 `rounded-2xl` 及以上。
+- `rounded-full` 只留给真正的圆形与刻意做胶囊的浮起控件：状态点、进度条、滑块、开关、滚动条，「回到底部」这类浮起的胶囊按钮；
+  徽标与 chip 用 `xs`，不做胶囊。禁任意值与 `rounded-2xl` 及以上；裸 `rounded`（编译成固定 `0.25rem`）
+  与 CSS 里显式写的 `border-radius` 字面值同样禁——两者都不跟 `--radius` 走，由 `pnpm check` 的 design 校验兜底。
 
 ## 层级
 

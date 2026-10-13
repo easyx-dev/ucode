@@ -16,7 +16,7 @@ export function ForkAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
+      className="shrink-0 rounded-xs p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
       title={t("从此分叉")}
       onClick={onClick}
     >

@@ -43,7 +43,7 @@
    * 随密度走，且单独成变量——需要精确纵向定位的地方（桌面端窗口控件的中线）直接引用它。
    */
   --shell-inset: var(--base-unit);
-  --radius: 0.75rem;
+  --radius: 0.625rem;
   --leading-base: 1.5;
   /*
    * 全局字距：绝对值（px），不随字号缩放。
@@ -317,7 +317,8 @@
   /* 窗口控件的点：固定 14px，不随密度与字号走——它仿的是系统标题栏按钮（见 DESIGN.md「间距与尺寸」） */
   --spacing-window-control: 0.875rem;
 
-  /* 圆角：基准 --radius 派生四档，不随字号与密度变化 */
+  /* 圆角：基准 --radius 派生五档，不随字号与密度变化 */
+  --radius-xs: calc(var(--radius) * 0.4);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

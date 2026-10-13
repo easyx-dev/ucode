@@ -28,7 +28,7 @@ export function CopyAction({ className, text }: { className?: string; text: stri
     <button
       type="button"
       className={cn(
-        "shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground",
+        "shrink-0 rounded-xs p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground",
         className,
       )}
       title={copied ? t("已复制") : t("复制")}

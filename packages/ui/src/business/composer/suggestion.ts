@@ -43,7 +43,7 @@ export const createSuggestionRenderer = (onActiveChange?: (active: boolean) => v
       }
       const row = document.createElement("button");
       row.type = "button";
-      row.className = `flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm ${
+      row.className = `flex w-full items-center gap-2 rounded-xs px-2 py-1 text-left text-sm ${
         index === selected ? "bg-muted text-foreground" : "text-foreground-subtle"
       }`;
       const name = document.createElement("span");

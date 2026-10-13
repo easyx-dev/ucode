@@ -1,7 +1,7 @@
 /**
  * 会话活动面板的视图模型：把子智能体、目标与后台服务三块运行态拼成展示形状。
  *
- * 纯派生，不碰 store 与 DOM；悬浮胶囊与面板共用同一份结果，口径只在一处。
+ * 纯派生，不碰 store 与 DOM；悬浮摘要条与面板共用同一份结果，口径只在一处。
  */
 import type { BackgroundService, GoalPauseCause, GoalStatus, GoalView } from "@ucode/contracts";
 
@@ -53,7 +53,7 @@ export type SessionActivityView = {
   goalActive: boolean;
   /** 目标段的展示数据；没有在推进的目标时为空 */
   goal: ActivityGoal | null;
-  /** 悬浮胶囊是否出现：三块里任一有内容 */
+  /** 悬浮摘要条是否出现：三块里任一有内容 */
   visible: boolean;
 };
 

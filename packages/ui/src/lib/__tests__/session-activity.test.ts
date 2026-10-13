@@ -1,4 +1,4 @@
-/** 活动面板视图模型单测：分组、最近一步派生与「胶囊是否出现」 */
+/** 活动面板视图模型单测：分组、最近一步派生与「摘要条是否出现」 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 

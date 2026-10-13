@@ -209,7 +209,7 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
           <InputLabel input={input} />
           {entry.skill ? (
             <span
-              className="truncate rounded bg-muted px-1 text-xs text-foreground-subtle"
+              className="truncate rounded-xs bg-muted px-1 text-xs text-foreground-subtle"
               title={t("技能 {{name}}", { name: entry.skill.name })}
             >
               {t("技能 {{name}}", { name: entry.skill.name })}

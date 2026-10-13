@@ -23,7 +23,7 @@ import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
 
-const CHIP_CLASS = "rounded bg-muted px-1 py-0.5 text-foreground";
+const CHIP_CLASS = "rounded-xs bg-muted px-1 py-0.5 text-foreground";
 
 /** 可编辑区的类：高度上限、内边距与占位提示的呈现；高度对输入区与消息编辑态一视同仁（同一个编辑器、同一种手感）
  *

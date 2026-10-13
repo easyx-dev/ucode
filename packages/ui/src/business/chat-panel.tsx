@@ -348,7 +348,7 @@ export function ChatPanel({
       ) : null}
 
       {hero ? null : (
-        // 活动面板与悬浮胶囊挂在对话区右下角：包一层 relative 容器，与消息列表同级（子会话不挂）
+        // 活动面板与悬浮摘要条挂在对话区右下角：包一层 relative 容器，与消息列表同级（子会话不挂）
         <div className="relative flex min-h-0 flex-1 flex-col">
           <MessageList
             items={chat.items}

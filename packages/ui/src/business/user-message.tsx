@@ -30,7 +30,7 @@ import { ForkAction } from "./message-footer";
 
 /** chip 共用一套外观：句子外的技能 / 命令与句子里的引用都长这样 */
 const CHIP_CLASS =
-  "inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-foreground-subtle";
+  "inline-flex items-center gap-1 rounded-xs bg-muted px-2 py-0.5 text-xs text-foreground-subtle";
 
 /** 折叠阈值：超过这个高度的正文收起，留出恰好能看出「还有下文」的一段 */
 const BODY_MAX_HEIGHT = "max-h-80";
@@ -233,7 +233,7 @@ export function UserMessage({
         <div
           className={cn(
             // 反色面（与浮层同一对 token）：浅色近黑底白字、深色近白底深字；右下收一档，读起来像说话的一角
-            "max-w-full rounded-lg rounded-br-sm bg-foreground text-background",
+            "max-w-full rounded-lg rounded-br-xs bg-foreground text-background",
             highlight && "ring-2 ring-ring/50",
           )}
         >
@@ -279,7 +279,7 @@ export function UserMessage({
       {overflowing ? (
         <button
           type="button"
-          className="rounded text-xs text-foreground-subtle hover:text-foreground"
+          className="rounded-xs text-xs text-foreground-subtle hover:text-foreground"
           onClick={() => setExpanded((prev) => !prev)}
         >
           {expanded ? t("收起") : t("展开")}
@@ -302,7 +302,7 @@ function EditAction({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="shrink-0 rounded p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
+      className="shrink-0 rounded-xs p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
       title={t("编辑并重新发送")}
       onClick={onClick}
     >
