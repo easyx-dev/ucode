@@ -21,8 +21,8 @@ import { projectLabel } from "../../lib/project";
 import type { ProjectSummary } from "../../lib/types";
 import { openDirectoryPickerDialog } from "../directory-picker-dialog";
 
-/** 可点的项目 / 分支 chip：无边框、悬停才给底色 */
-export const PROJECT_CHIP_CLASS =
+/** 项目 chip（弹层触发钮）：无边框、悬停才给底色 */
+const PROJECT_CHIP_CLASS =
   "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground [&_svg]:size-icon-sm";
 
 /**

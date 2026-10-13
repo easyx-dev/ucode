@@ -277,7 +277,8 @@ export function Composer({
       >
         {/* biome-ignore lint/a11y/noStaticElementInteractions: 整条容器都作粘贴 / 拖拽落点，真正的交互在内部编辑器 */}
         <div
-          className="rounded-xl bg-muted/50"
+          // 灰底只在草稿态铺：它是首行项目 / 分支条的底，已有会话没这一行，白卡直接落在面板上
+          className={cn(sessionId === null && "rounded-xl bg-muted/50")}
           onPaste={(event) => {
             // 编辑器内的粘贴会先被它拦截（defaultPrevented），这里兜住其余区域的粘贴
             if (event.defaultPrevented) return;
@@ -298,13 +299,14 @@ export function Composer({
             handleFiles(files);
           }}
         >
-          <ProjectRow
-            draft={sessionId === null}
-            cwdPath={cwdPath}
-            projectName={projectName}
-            projectPath={projectPath}
-            onSelectProject={onSelectProject}
-          />
+          {sessionId === null ? (
+            <ProjectRow
+              cwdPath={cwdPath}
+              projectName={projectName}
+              projectPath={projectPath}
+              onSelectProject={onSelectProject}
+            />
+          ) : null}
 
           <div
             className={cn(
