@@ -1,5 +1,6 @@
 /** 对话区头部：会话标题、运行态与运行时操作 */
 import { cn } from "cn";
+import type { TFunction } from "i18next";
 import {
   ChevronLeft,
   Gauge,
@@ -15,14 +16,34 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
 import { Button } from "../base/button";
-import { Spinner } from "../base/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../base/tooltip";
 import { sessionTitle } from "../lib/session";
+import { type SessionTone, sessionToneOf } from "../lib/session-tone";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
 import { contextPercentLabel } from "../lib/usage";
 import { CopyTranscriptAction } from "./copy-transcript-action";
 
 /**
+ * 状态底色：淡色一层铺满头部并呼吸。只用语义 token，透明度取白名单档位；
+ * 呼吸是纯 opacity 动画，减弱动效偏好下由 `base.css` 一律关掉。
+ */
+const TONE_CLASS: Record<SessionTone, string> = {
+  busy: "bg-primary/10",
+  form: "bg-warning/10",
+  permission: "bg-destructive/10",
+};
+
+/** 状态的无障碍文案：底色只对看得见的人有效，读屏与色盲用户靠这一行 */
+const toneLabelOf = (t: TFunction, tone: SessionTone): string => {
+  switch (tone) {
+    case "busy":
+      return t("生成中");
+    case "form":
+      return t("等待你的输入");
+    case "permission":
+      return t("等待权限审批");
+  }
+};
 
 type ChatHeaderProps = {
   session: SessionSummary | null;
@@ -62,6 +83,9 @@ type ChatHeaderProps = {
   workbenchOpen?: boolean;
   /** 双击标题就地改名；子会话等不可改名的场景不传 */
   onRenameSession?: () => void;
+  /** 本端是否正在接流：服务端状态还没跟上时用它点亮「生成中」底色 */
+  streaming?: boolean;
+  /** 取本会话的原始记录（JSONL 文本）用于复制；不传则不显示这个入口 */
   onLoadTranscript?: () => Promise<string>;
 };
 
@@ -119,15 +143,17 @@ export function ChatHeader({
   onToggleWorkbench,
   workbenchOpen,
   onRenameSession,
+  streaming = false,
   onLoadTranscript,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
+  const tone = sessionToneOf(session?.status ?? "idle", streaming);
 
   return (
     <header
       data-slot="chat-header"
       className={cn(
-        "flex items-center gap-2 border-b border-border px-4 py-2.5",
+        "relative isolate flex items-center gap-2 border-b border-border px-4 py-2.5",
         // 无标题栏窗口里这行就是标题条：整行可拖（里面的按钮由 `.window-drag button` 排除）
         titleBarInset > 0 && "window-drag",
       )}
@@ -138,6 +164,17 @@ export function ChatHeader({
           : undefined
       }
     >
+      {/* 状态底色铺在内容之下：头部自身背景透明，负 z 层不会盖住任何东西 */}
+      {tone ? (
+        <div
+          aria-hidden
+          data-slot="chat-header-tone"
+          className={cn(
+            "pointer-events-none absolute inset-0 -z-10 animate-pulse",
+            TONE_CLASS[tone],
+          )}
+        />
+      ) : null}
       {windowControls}
       {onToggleSidebar ? (
         <Button
@@ -188,12 +225,7 @@ export function ChatHeader({
           {t("分叉自「{{name}}」", { name: forkedFromName || session.forkedFromId })}
         </Button>
       ) : null}
-      {session?.running ? (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-foreground-subtle">
-          <Spinner className="size-icon-xs" />
-          {t("生成中")}
-        </span>
-      ) : null}
+      {tone ? <span className="sr-only">{toneLabelOf(t, tone)}</span> : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {onOpenUsage && (context || (usage && usage.totalTokens > 0)) ? (
@@ -225,6 +257,7 @@ export function ChatHeader({
             </Button>
           </>
         ) : null}
+
         {onLoadTranscript ? <CopyTranscriptAction load={onLoadTranscript} /> : null}
 
         <Tooltip>

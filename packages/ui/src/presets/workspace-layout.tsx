@@ -70,6 +70,7 @@ import type {
   ThinkingPreference,
 } from "../lib/types";
 import { changeDoc, changesDoc, commitDoc, fileDoc } from "../lib/workbench-docs";
+import { readWorkbenchOpen, writeWorkbenchOpen } from "../lib/workbench-prefs";
 import { useClient } from "../provider";
 import { type ChangeTarget, WorkbenchProvider, type WorkbenchView } from "../provider/workbench";
 
@@ -104,14 +105,8 @@ export type WorkspaceLayoutProps = {
 /** 侧栏收起状态的持久化键 */
 const SIDEBAR_COLLAPSED_KEY = `${brand.slug}-sidebar-collapsed`;
 
-/** 工作台展开状态的持久化键 */
-const WORKBENCH_OPEN_KEY = `${brand.slug}-workbench-open`;
-
 /** 读出上次的侧栏收起状态；读不到时默认展开 */
 const readSidebarCollapsed = (): boolean => readStorage(SIDEBAR_COLLAPSED_KEY) === "1";
-
-/** 读出上次的工作台展开状态；读不到时默认收起 */
-const readWorkbenchOpen = (): boolean => readStorage(WORKBENCH_OPEN_KEY) === "1";
 
 export function WorkspaceLayout({
   titleBarInset = 0,
@@ -139,10 +134,19 @@ export function WorkspaceLayout({
   // 唯一通知触发点：web 与桌面端都在这里判定，点开通知即切到那条会话
   useSessionNotices({ onSelectSession: setActiveId });
   /**
+   * 当前工作目录：已有会话用它自己的工作目录；草稿态还没有会话，用草稿里选中的目录——
+   * 「在某个项目里新建」时工作台与命令面板的文件检索都该落在那个项目上，而不是助理工作区。
+   */
+  const draftCwd = activeId ? null : (composer.drafts[NEW_SESSION_KEY]?.cwd ?? null);
+  // 编辑器区的文档标签：工作目录变化即整体清空（见 use-workbench-docs）
+  const workbenchCwd = activeSession?.cwd ?? draftCwd ?? workspacesDir;
+  // 工作台显隐按项目记忆：助理工作区与草稿态没有项目，回落全局键
+  const workbenchProjectId = projectOf(projects.projects, workbenchCwd)?.id ?? null;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
-  const [workbenchOpen, setWorkbenchOpen] = useState(readWorkbenchOpen);
+  const [workbenchOpen, setWorkbenchOpen] = useState(() => readWorkbenchOpen(workbenchProjectId));
   // 侧栏视图与是否展开：都不落盘——面板收起后再打开回到默认视图（代码管理，最常看）
   const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("changes");
   const [workbenchSidebarVisible, setWorkbenchSidebarVisible] = useState(true);
@@ -188,6 +192,7 @@ export function WorkspaceLayout({
   }, [isDesktop, sidebarCollapsed, titleBarInset]);
 
   const configured = models.data?.configured ?? false;
+
   /**
    * 取当前会话的原始记录（JSONL 文本）供复制。内容可能几 MB，所以只在点按钮时取。
    * 失败要说清原因（记录过大、文件读不到），否则「复制出来是空的」看不出是失败。
@@ -252,11 +257,19 @@ export function WorkspaceLayout({
     });
   }, []);
 
-  /** 展开 / 收起工作台并落盘；移动端抽屉由 workbenchSheetOpen 单独管 */
-  const applyWorkbenchOpen = useCallback((open: boolean) => {
-    setWorkbenchOpen(open);
-    writeStorage(WORKBENCH_OPEN_KEY, open ? "1" : "0");
-  }, []);
+  /** 展开 / 收起工作台并落盘（按当前项目）；移动端抽屉由 workbenchSheetOpen 单独管 */
+  const applyWorkbenchOpen = useCallback(
+    (open: boolean) => {
+      setWorkbenchOpen(open);
+      writeWorkbenchOpen(workbenchProjectId, open);
+    },
+    [workbenchProjectId],
+  );
+
+  // 换项目就换一份记忆：初始化只跑一次，不重读会把上一个项目的显隐带过去
+  useEffect(() => {
+    setWorkbenchOpen(readWorkbenchOpen(workbenchProjectId));
+  }, [workbenchProjectId]);
 
   /** 展开工作台；窄屏下同时唤出抽屉 */
   const showWorkbench = useCallback(() => {

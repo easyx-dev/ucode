@@ -337,6 +337,7 @@ export function ChatPanel({
         usage={usage}
         context={context}
         onOpenUsage={onOpenUsage}
+        streaming={chat.streaming}
         onLoadTranscript={onLoadTranscript}
       />
 

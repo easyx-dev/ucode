@@ -699,6 +699,7 @@ export default {
   "会话等待你的输入、完成或出错时发送系统通知；页面在前台时不打扰。":
     "Send a system notification when a session waits for input, finishes or fails; stays quiet while this page is in the foreground.",
   等待权限审批: "Waiting for permission",
+  等待你的输入: "Waiting for your input",
   等待你的回答: "Waiting for your answer",
   等待计划确认: "Waiting for plan review",
   会话已完成: "Session finished",
@@ -730,7 +731,9 @@ export default {
   工具耗时占比: "Tool time share",
   已扣掉等用户的时间: "Excludes time spent waiting on you",
   失败步数: "Failed steps",
+  上游报错或本轮被中断: "Upstream error or interrupted turn",
   按模型: "By model",
+  按思考档位: "By thinking level",
   每日平均步耗时: "Daily average step time",
   "最慢 {{value}}": "Slowest {{value}}",
   "{{date}} · 平均每步 {{value}} · {{steps}} 步": "{{date}} · {{value}} per step · {{steps}} steps",

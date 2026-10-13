@@ -61,6 +61,7 @@ export type {
   SessionCreateRequest,
   SessionListResponse,
   SessionMode,
+  SessionStatus,
   SessionSummary,
   SessionUsageEntry,
   SessionUsageKind,

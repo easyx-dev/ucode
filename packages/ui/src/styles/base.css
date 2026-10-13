@@ -57,6 +57,23 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: var(--foreground-subtle);
   }
+  /*
+   * 触屏上不要滚动条：它只占宽度而且不好拖，滚动能力本身不受影响。
+   * 用 `pointer: coarse` 而不是窄屏判断——窄窗口在桌面上仍该看得见滚动条。
+   * Radix 的 ScrollArea 是自绘条，不受 `::-webkit-scrollbar` 影响，得单独收掉。
+   */
+  @media (pointer: coarse) {
+    * {
+      scrollbar-width: none;
+    }
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    [data-slot="scroll-area-scrollbar"] {
+      display: none;
+    }
+  }
 }
 
 /*
