@@ -37,6 +37,7 @@
 | POST | `/api/v1/sessions/create` | 新建会话（首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | 会话详情 + 用量 + 当前目标 |
 | POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 / 置顶 |
+| POST | `/api/v1/sessions/transcript` | 会话原始记录（JSONL 文本），供导出 / 复制使用 |
 | POST | `/api/v1/sessions/archive` | 归档会话（软删：从列表隐藏，文件保留） |
 | POST | `/api/v1/sessions/read` | 标记会话已读（写上次打开时间） |
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
@@ -66,7 +67,7 @@
 | POST | `/api/v1/mcp/upsert` | 按 name 覆盖写入 MCP 服务器 |
 | POST | `/api/v1/mcp/delete` | 按 name 删除 MCP 服务器 |
 | POST | `/api/v1/plugins/list` | 列出已登记的插件、组件摘要与诊断 |
-| POST | `/api/v1/plugins/create` | 按来源安装并登记插件（本轮只支持本地目录来源） |
+| POST | `/api/v1/plugins/create` | 按来源（本地目录 / url / npm / github / git）安装并登记插件 |
 | POST | `/api/v1/plugins/update` | 启停插件或写入 userConfig 的值 |
 | POST | `/api/v1/plugins/delete` | 移除插件登记（purge 时一并清理缓存与插件数据） |
 | POST | `/api/v1/plugins/refresh` | 按来源重读插件清单并推进代次 |
@@ -74,7 +75,7 @@
 | POST | `/api/v1/marketplace/info` | 市场内插件列表（读上一次刷新的缓存，不触发网络） |
 | POST | `/api/v1/marketplace/create` | 登记市场来源 |
 | POST | `/api/v1/marketplace/delete` | 移除市场登记（下挂插件只失去来源，内容不删） |
-| POST | `/api/v1/marketplace/refresh` | 刷新市场清单（本轮只支持本地目录市场） |
+| POST | `/api/v1/marketplace/refresh` | 刷新市场清单（本地目录 / url / github / git） |
 | POST | `/api/v1/agents/list` | 列出可选的 primary / subagent 角色 |
 | POST | `/api/v1/attachments` | 上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库） |
 | GET | `/api/v1/attachments/:id` | 按 id 返回附件原始字节（非 JSON，不走封套） |
@@ -602,6 +603,23 @@
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
+
+### POST /api/v1/sessions/transcript
+
+会话原始记录（JSONL 文本），供导出 / 复制使用
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
+
+**响应类型**：`SessionTranscriptResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | string | 是 | — |
+| `content` | string | 是 | 会话文件的原始文本（UTF-8） |
 
 ### POST /api/v1/sessions/archive
 
@@ -1237,7 +1255,7 @@
 
 ### POST /api/v1/plugins/create
 
-按来源安装并登记插件（本轮只支持本地目录来源）
+按来源（本地目录 / url / npm / github / git）安装并登记插件
 
 **请求参数**
 
@@ -1452,7 +1470,7 @@
 
 ### POST /api/v1/marketplace/refresh
 
-刷新市场清单（本轮只支持本地目录市场）
+刷新市场清单（本地目录 / url / github / git）
 
 **请求参数**
 
@@ -1671,6 +1689,7 @@
 | `streak` | [UsageStreak](#usagestreak) | 是 | 活跃度与连续天数（全量历史） |
 | `peak` | [UsagePeakDay](#usagepeakday) \| null | 是 | 区间内的峰值日；区间内没有用量时为 null |
 | `longestSessionMs` | number | 是 | 区间内「单会话最长聊天时长」（毫秒）：会话内相邻调用间隔不超过 30 分钟算同一段， 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。 |
+| `steps` | [StatsStepSummary](#statsstepsummary) | 是 | 区间内的步级耗时画像；区间内没有任何步记录时各指标为空 |
 
 ## 事件流
 
@@ -2239,6 +2258,15 @@
 | `date` | string | 是 | — |
 | `totalTokens` | number | 是 | — |
 
+### StatsStepSummary
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | [StepUsageTotals](#stepusagetotals) | 是 | — |
+| `byModel` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按 `provider/model` 分桶，按步数降序 |
+| `byThinking` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按思考档位分桶；取不到档位的步归 `unknown` |
+| `daily` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按服务端本地日期分桶（`YYYY-MM-DD`，只出有步的日） |
+
 ### ConfigSnapshot
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -2481,6 +2509,31 @@
 | `options` | string[] | 否 | `select` 的候选值 |
 | `multiple` | boolean | 否 | 允许多选（`select`） |
 | `sensitive` | boolean | 否 | 敏感值：不回显（服务端只回传是否已设置） |
+
+### StepUsageTotals
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `steps` | number | 是 | 记录到耗时数据的步数 |
+| `turns` | number | 是 | 有步的用户轮数（按 `userTurn` 去重） |
+| `stepsPerTurn` | number \| null | 是 | 平均每轮步数；没有步时为空 |
+| `avgStepMs` | number \| null | 是 | 单步总耗时：均值与两个分位（毫秒） |
+| `p50StepMs` | number \| null | 是 | — |
+| `p90StepMs` | number \| null | 是 | — |
+| `avgFirstEventMs` | number \| null | 是 | 请求发出 → 响应头（含上传与排队）的均值 |
+| `avgTtftMs` | number \| null | 是 | 响应头 → 首个内容帧的均值（真正开始吐字前的静默） |
+| `ttftShare` | number \| null | 是 | 累计首帧延迟（含排队）占总耗时的比例；分母为 0 时为空 |
+| `toolShare` | number \| null | 是 | 纯工具耗时（已扣掉等用户）占总耗时的比例；分母为 0 时为空 |
+| `toolCalls` | number | 是 | 步里的工具调用合计 |
+| `failedSteps` | number | 是 | 以失败 / 中断收尾的步数（`stopReason` 为 `error` / `aborted`） |
+| `cacheHitRate` | number \| null | 是 | 缓存命中率：命中读 /（未命中输入 + 命中读）；分母为 0 时为空 |
+
+### StepUsageBucket
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `key` | string | 是 | — |
+| `totals` | [StepUsageTotals](#stepusagetotals) | 是 | — |
 
 ### QuestionOption
 
