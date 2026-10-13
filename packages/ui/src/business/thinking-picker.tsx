@@ -5,13 +5,21 @@ import { useTranslation } from "react-i18next";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../base/dropdown-menu";
 import { thinkingPreferenceLabel } from "../lib/thinking";
 import { THINKING_PREFERENCES, type ThinkingLevel, type ThinkingPreference } from "../lib/types";
-import { PICKER_TRIGGER_CLASS, type PickerOption, PickerOptions } from "./picker-options";
+import {
+  PICKER_TRIGGER_CLASS,
+  PICKER_TRIGGER_LABEL_CLASS,
+  type PickerOption,
+  PickerOptions,
+  usePickerCloseFocus,
+} from "./picker-options";
 
 type ThinkingPickerProps = {
   value: ThinkingPreference;
   /** 实际生效的档位；`value` 为 `auto` 时显示成「自动 · 极高」。未知（还没有会话）时只显示「自动」 */
   resolved?: ThinkingLevel;
   disabled?: boolean;
+  /** 弹层关掉后把焦点交给谁（输入区传编辑器）；点在别处时不会调它 */
+  onRefocus?: () => void;
   /** 受控打开（`/thinking` 命令从外部唤起）；不传则内部自管 */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -25,10 +33,12 @@ export function ThinkingPicker({
   open,
   onOpenChange,
   onSelect,
+  onRefocus,
 }: ThinkingPickerProps) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
+  const closeFocus = usePickerCloseFocus(onRefocus);
 
   return (
     <DropdownMenu
@@ -44,11 +54,13 @@ export function ThinkingPicker({
         disabled={disabled}
       >
         <Brain />
-        {thinkingPreferenceLabel(value, resolved, t)}
+        <span className={PICKER_TRIGGER_LABEL_CLASS}>
+          {thinkingPreferenceLabel(value, resolved, t)}
+        </span>
         <ChevronDown />
       </DropdownMenuTrigger>
       {/* 档位只有单字标签，比模式 / 权限那两栏窄：宽度跟着内容收，不留空半栏 */}
-      <DropdownMenuContent side="top" align="start" className="w-40">
+      <DropdownMenuContent side="top" align="start" className="w-40" {...closeFocus}>
         <PickerOptions
           options={THINKING_PREFERENCES.map(
             (preference): PickerOption => ({

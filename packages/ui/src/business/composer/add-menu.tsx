@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "../../base/dropdown-menu";
 import { useCommands } from "../../hooks/use-commands";
-import { PICKER_TRIGGER_CLASS } from "../picker-options";
+import { PICKER_TRIGGER_CLASS, usePickerCloseFocus } from "../picker-options";
 
 type AddMenuProps = {
   sessionId: string | null;
@@ -25,13 +25,16 @@ type AddMenuProps = {
   onFiles: (files: File[]) => void;
   /** 插入命令 / 技能节点；正文开头已有一条时返回 false */
   onInsertCommand: (command: { kind: "prompt" | "skill"; name: string }) => boolean;
+  /** 弹层关掉后把焦点交给谁（输入区传编辑器）；点在别处时不会调它 */
+  onRefocus?: () => void;
 };
 
-export function AddMenu({ sessionId, cwdPath, onFiles, onInsertCommand }: AddMenuProps) {
+export function AddMenu({ sessionId, cwdPath, onFiles, onInsertCommand, onRefocus }: AddMenuProps) {
   const { t } = useTranslation();
   const commands = useCommands(sessionId, cwdPath);
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
+  const closeFocus = usePickerCloseFocus(onRefocus);
 
   const handlePick = (event: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(event.target.files ?? []);
@@ -53,7 +56,7 @@ export function AddMenu({ sessionId, cwdPath, onFiles, onInsertCommand }: AddMen
         <DropdownMenuTrigger className={PICKER_TRIGGER_CLASS} title={t("添加")}>
           <Plus />
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-80">
+        <DropdownMenuContent side="top" align="start" className="w-80" {...closeFocus}>
           <DropdownMenuLabel>{t("添加")}</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
             <Paperclip />

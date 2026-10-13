@@ -1,4 +1,4 @@
-/** 输入区：白卡容器，顶部上下文行 + Tiptap 编辑器 + 底部工具栏（模型 / 模式 / 思考 / 发送） */
+/** 输入区：白卡容器，顶部上下文行 + Tiptap 编辑器 + 底部工具栏（添加 · 模式 · 权限 · 模型 · 思考 · 发送） */
 
 import { brand } from "@ucode/brand";
 import { cn } from "cn";
@@ -128,12 +128,12 @@ export function Composer({
    */
   const syncedRef = useRef(JSON.stringify(initialDoc ?? EMPTY_DOC));
 
-  // 选择器关掉后把焦点还给输入区：它是从命令唤起的，用户的下一步多半是接着打字
-  const wasPickerOpen = useRef(false);
-  useEffect(() => {
-    if (wasPickerOpen.current && openPicker === null) editorHandle.current?.focus();
-    wasPickerOpen.current = openPicker !== null;
-  }, [openPicker]);
+  /**
+   * 工具栏的五个弹层关掉后都把焦点交回输入区（各选择器用 `usePickerCloseFocus` 在真正关闭的那一刻调它）：
+   * 点选、`Esc`、`/` 命令拉起三条路径同一种结果；点在别处（消息、别的按钮）时它们不调，
+   * 那种情况下焦点归用户点的那个东西。
+   */
+  const focusEditor = useCallback(() => editorHandle.current?.focus(), []);
 
   /** 把编辑器切到给定文档：重挂载并记下已同步内容 */
   const resetEditor = useCallback(
@@ -206,13 +206,13 @@ export function Composer({
       if (builtin) {
         resetEditor(EMPTY_DOC);
         handleBuiltin(builtin);
-        editorHandle.current?.focus();
+        focusEditor();
         return;
       }
     }
     onSend(payload, doc);
-    editorHandle.current?.focus();
-  }, [handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
+    focusEditor();
+  }, [focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -220,6 +220,20 @@ export function Composer({
     },
     [addFiles],
   );
+
+  // 「+」菜单的附件走系统文件对话框：对话框关掉后浏览器不会把焦点还给输入区，这里补一次
+  const handleMenuFiles = useCallback(
+    (files: File[]) => {
+      handleFiles(files);
+      focusEditor();
+    },
+    [focusEditor, handleFiles],
+  );
+
+  const handleStop = useCallback(() => {
+    onStop();
+    focusEditor();
+  }, [focusEditor, onStop]);
 
   const fill = (text: string): void => {
     const doc = textToDoc(text);
@@ -342,34 +356,30 @@ export function Composer({
               onFiles={handleFiles}
             />
 
-            {/* 左侧一组在窄容器下横向滚动，右侧（思考 + 发送）始终可见；
-                整行不换行，否则大字号 + 紧凑密度下中文标签会拆成两行 */}
-            <div className="flex items-center gap-1 px-2 pb-2">
-              <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
+            {/*
+              左：添加 · 模式 · 权限；右：模型 · 思考 · 发送。
+              整行不换行也不横向滚动：容器窄于阈值时四个选择器只留图标（`@container` 供
+              PICKER_TRIGGER_LABEL_CLASS 的容器查询用），模型名按剩余宽度截断。
+              五个弹层关掉后都把焦点交回输入区（`onRefocus`），见 `focusEditor`。
+            */}
+            <div className="@container flex items-center gap-1 px-2 pb-2">
+              <div className="flex min-w-0 items-center gap-1 whitespace-nowrap">
                 <AddMenu
                   sessionId={sessionId}
                   cwdPath={cwdPath}
-                  onFiles={handleFiles}
+                  onFiles={handleMenuFiles}
                   onInsertCommand={(command) =>
                     editorHandle.current?.insertCommand(command) ?? false
                   }
+                  onRefocus={focusEditor}
                 />
-
-                {providers.length > 0 ? (
-                  <ModelPicker
-                    providers={providers}
-                    value={model}
-                    open={openPicker === "model"}
-                    onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
-                    onSelect={onSelectModel}
-                  />
-                ) : null}
 
                 <ModePicker
                   value={mode}
                   open={openPicker === "mode"}
                   onOpenChange={(next) => setOpenPicker(next ? "mode" : null)}
                   onSelect={onSelectMode}
+                  onRefocus={focusEditor}
                 />
 
                 <PermissionPicker
@@ -377,20 +387,33 @@ export function Composer({
                   open={openPicker === "permission"}
                   onOpenChange={(next) => setOpenPicker(next ? "permission" : null)}
                   onSelect={onSelectPermissionMode}
+                  onRefocus={focusEditor}
                 />
               </div>
 
-              <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
+              <div className="ml-auto flex min-w-0 items-center gap-1 whitespace-nowrap">
+                {providers.length > 0 ? (
+                  <ModelPicker
+                    providers={providers}
+                    value={model}
+                    open={openPicker === "model"}
+                    onOpenChange={(next) => setOpenPicker(next ? "model" : null)}
+                    onSelect={onSelectModel}
+                    onRefocus={focusEditor}
+                  />
+                ) : null}
+
                 <ThinkingPicker
                   value={thinkingLevel}
                   resolved={resolvedThinkingLevel}
                   open={openPicker === "thinking"}
                   onOpenChange={(next) => setOpenPicker(next ? "thinking" : null)}
                   onSelect={onSelectThinkingLevel}
+                  onRefocus={focusEditor}
                 />
 
                 {streaming ? (
-                  <Button size="icon" variant="outline" onClick={onStop} title={t("停止生成")}>
+                  <Button size="icon" variant="outline" onClick={handleStop} title={t("停止生成")}>
                     <Square className="size-icon-sm" />
                   </Button>
                 ) : (

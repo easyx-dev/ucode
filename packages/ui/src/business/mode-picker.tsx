@@ -12,11 +12,19 @@ import { useTranslation } from "react-i18next";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../base/dropdown-menu";
 import { modeDescription, modeLabel } from "../lib/mode";
 import { SESSION_MODES } from "../lib/types";
-import { PICKER_TRIGGER_CLASS, type PickerOption, PickerOptions } from "./picker-options";
+import {
+  PICKER_TRIGGER_CLASS,
+  PICKER_TRIGGER_LABEL_CLASS,
+  type PickerOption,
+  PickerOptions,
+  usePickerCloseFocus,
+} from "./picker-options";
 
 type ModePickerProps = {
   value: string;
   disabled?: boolean;
+  /** 弹层关掉后把焦点交给谁（输入区传编辑器）；点在别处时不会调它 */
+  onRefocus?: () => void;
   /** 受控打开（`/mode` 命令从外部唤起）；不传则内部自管 */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -30,10 +38,18 @@ const ICONS: Record<string, LucideIcon> = {
   ask: MessageSquare,
 };
 
-export function ModePicker({ value, disabled, open, onOpenChange, onSelect }: ModePickerProps) {
+export function ModePicker({
+  value,
+  disabled,
+  open,
+  onOpenChange,
+  onSelect,
+  onRefocus,
+}: ModePickerProps) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
+  const closeFocus = usePickerCloseFocus(onRefocus);
 
   return (
     <DropdownMenu
@@ -45,10 +61,10 @@ export function ModePicker({ value, disabled, open, onOpenChange, onSelect }: Mo
     >
       <DropdownMenuTrigger className={PICKER_TRIGGER_CLASS} title={t("模式")} disabled={disabled}>
         <Compass />
-        {modeLabel(value, t)}
+        <span className={PICKER_TRIGGER_LABEL_CLASS}>{modeLabel(value, t)}</span>
         <ChevronDown />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-72">
+      <DropdownMenuContent side="top" align="start" className="w-72" {...closeFocus}>
         <PickerOptions
           options={SESSION_MODES.map(
             (mode): PickerOption => ({

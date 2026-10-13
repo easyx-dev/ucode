@@ -2,18 +2,25 @@
 
 import { cn } from "cn";
 import type { TFunction } from "i18next";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Cpu, Search } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../base/badge";
 import type { CatalogModel, CatalogProvider } from "../lib/types";
+import {
+  PICKER_TRIGGER_CLASS,
+  PICKER_TRIGGER_LABEL_CLASS,
+  usePickerCloseFocus,
+} from "./picker-options";
 
 type ModelPickerProps = {
   providers: CatalogProvider[];
   /** 当前生效的 "provider/model" */
   value: string;
   disabled?: boolean;
+  /** 弹层关掉后把焦点交给谁（输入区传编辑器）；点在别处时不会调它 */
+  onRefocus?: () => void;
   /** 受控打开（`/models` 命令从外部唤起）；不传则内部自管 */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -36,12 +43,14 @@ export function ModelPicker({
   open,
   onOpenChange,
   onSelect,
+  onRefocus,
 }: ModelPickerProps) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const [query, setQuery] = useState("");
   const isControlled = open !== undefined;
   const visible = open ?? internalOpen;
+  const closeFocus = usePickerCloseFocus(onRefocus);
 
   const setOpen = (next: boolean): void => {
     if (!isControlled) setInternalOpen(next);
@@ -69,17 +78,12 @@ export function ModelPicker({
   return (
     <Popover.Root open={visible} onOpenChange={setOpen}>
       <Popover.Trigger asChild disabled={disabled}>
-        <button
-          type="button"
-          className={cn(
-            "flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-subtle",
-            "outline-none transition-colors hover:bg-state-hover hover:text-foreground",
-            "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-          )}
-          title={t("切换模型")}
-        >
-          <span className="max-w-48 truncate">{value || t("选择模型")}</span>
-          <ChevronDown className="size-icon-sm shrink-0" />
+        <button type="button" className={PICKER_TRIGGER_CLASS} title={t("切换模型")}>
+          <Cpu />
+          <span className={cn(PICKER_TRIGGER_LABEL_CLASS, "max-w-48 truncate")}>
+            {value || t("选择模型")}
+          </span>
+          <ChevronDown />
         </button>
       </Popover.Trigger>
 
@@ -88,6 +92,7 @@ export function ModelPicker({
           side="top"
           align="start"
           sideOffset={6}
+          {...closeFocus}
           className={cn(
             "z-50 w-80 rounded-xl bg-popover shadow-popover ring-1 ring-border-strong outline-none",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",

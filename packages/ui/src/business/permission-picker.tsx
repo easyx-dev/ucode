@@ -6,11 +6,19 @@ import { useTranslation } from "react-i18next";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../base/dropdown-menu";
 import { permissionModeDescription, permissionModeLabel } from "../lib/permission";
 import { PERMISSION_MODES, type PermissionMode } from "../lib/types";
-import { PICKER_TRIGGER_CLASS, type PickerOption, PickerOptions } from "./picker-options";
+import {
+  PICKER_TRIGGER_CLASS,
+  PICKER_TRIGGER_LABEL_CLASS,
+  type PickerOption,
+  PickerOptions,
+  usePickerCloseFocus,
+} from "./picker-options";
 
 type PermissionPickerProps = {
   value: PermissionMode;
   disabled?: boolean;
+  /** 弹层关掉后把焦点交给谁（输入区传编辑器）；点在别处时不会调它 */
+  onRefocus?: () => void;
   /** 受控打开（`/permission` 命令从外部唤起）；不传则内部自管 */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -30,10 +38,12 @@ export function PermissionPicker({
   open,
   onOpenChange,
   onSelect,
+  onRefocus,
 }: PermissionPickerProps) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
+  const closeFocus = usePickerCloseFocus(onRefocus);
   const Icon = ICONS[value] ?? Shield;
   // 最放行档用 warning 色标记，提醒它已跳过越界审批（见 DESIGN.md 的权限标记）
   const isFull = value === "full";
@@ -55,10 +65,10 @@ export function PermissionPicker({
         disabled={disabled}
       >
         <Icon />
-        {permissionModeLabel(value, t)}
+        <span className={PICKER_TRIGGER_LABEL_CLASS}>{permissionModeLabel(value, t)}</span>
         <ChevronDown />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-72">
+      <DropdownMenuContent side="top" align="start" className="w-72" {...closeFocus}>
         <PickerOptions
           options={PERMISSION_MODES.map(
             (mode): PickerOption => ({
