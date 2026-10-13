@@ -242,6 +242,11 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **品牌显示名统一为 `UCode`**：`@ucode/brand` 的 `name` / `title` 由 `ucode` 改为 `UCode`，侧栏标题、
+  输入区占位、浏览器标签页标题、CLI 帮助与启动日志、模型身份提示词与内置技能描述随之更新；
+  `slug` 仍是 `ucode`——主题 / 语言 / 外观 / 会话 token 存储键、`~/.ucode` 数据目录与项目级 `.ucode`
+  目录都由它派生，均不变，无迁移。
+
 - **设置页重排布局与样式**：全屏面板换成「页头（标题 + 说明 + 页面动作 + 保存区）+ 内容列 + 左侧分组导航」，
   分组卡与行的说明文字提到 `text-sm`；布尔项统一改用新增的基础组件 `Switch`（`base/switch.tsx`，
   `radix-ui` 的 Switch 薄封装），保存入口从导航底部上移到页头右侧（窄屏仍在顶部条）。
@@ -816,7 +821,7 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 - 新增「显示思考过程」开关（外观设置，只存 localStorage，不进服务端 `config.json`）。
 - `packages/ui` 新增 `@tanstack/react-virtual` 依赖与 `test` 脚本（`chat-rows` / `tool-view` 共 26 个用例）
   及 `tsx` / `@types/node` 开发依赖。约定校验的 i18n 硬编码中文扫描不再检查 `__tests__` 目录。
-- 新增项目级提示词目录 `.ucode/prompts`（软链到 `.agents/commands`）：ucode 在本仓库里以项目级提示词读到
+- 新增项目级提示词目录 `.ucode/prompts`（软链到 `.agents/commands`）：UCode 在本仓库里以项目级提示词读到
   同一批命令（`/review`、`/todo`），做法与 `.opencode/commands` 一致。
 - 会话上下文占用：`SessionInfoResponse` 与 `session_updated` 事件增加 `contextUsage`（当前上下文的 token 数与
   模型窗口；压缩后未出新回答、模型窗口不可知、会话未落盘时为空）。池内会话直接读 pi 的内存投影，
@@ -826,7 +831,7 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   server + CLI 打成单文件 `dist/ucode.js`）；`pnpm build` 同时构建 web（`apps/web/dist`）与 server 产物，
   `pnpm start` 改为 `NODE_ENV=production node dist/ucode.js`（不再经 tsx 直接跑源码）。CLI 提供
   `--port` / `--host` / `--open` / `--restart` / `--status` / `--version`，经 `pnpm start -- …` 透传；
-  `node dist/ucode.js` 不被 watch，改代码不会打断运行中的会话，方便「用 ucode 开发 ucode」时手动重启。
+  `node dist/ucode.js` 不被 watch，改代码不会打断运行中的会话，方便「用 UCode 开发 UCode」时手动重启。
   根 `package.json` 增加运行时 `dependencies`（镜像 server 的第三方依赖，供产物从仓库根解析 external），
   新增 `scripts/verify` 的 `manifest` 校验兜底依赖镜像。
 - `$APP_HOME/app/service.json` 增加 `pid` 字段：启动写入 `process.pid`、优雅退出清空，

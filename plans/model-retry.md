@@ -19,7 +19,7 @@
   不可重试黑名单在 `:4-22`（quota / billing / subscription limit）；
 - 事件齐备：`auto_retry_start`（`attempt` / `maxAttempts` / `delayMs` / `errorMessage`）与
   `auto_retry_end`（`success` / `attempt` / `finalError`）；
-- ucode 把这两个事件**丢弃**了（`server/src/core/events.ts:184-185` 的 default 分支），
+- UCode 把这两个事件**丢弃**了（`server/src/core/events.ts:184-185` 的 default 分支），
   且 `applyOverrides`（`harness/setup/session-config.ts:263-274`）只覆盖 `defaultTools` 与 `compaction`，
   没碰 `retry`；
 - 失败耗尽也是静默的：模型失败不会让 `prompt()` reject（pi 把它变成 `stopReason: "error"` 的 assistant

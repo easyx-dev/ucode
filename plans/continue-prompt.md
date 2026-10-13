@@ -8,7 +8,7 @@
 ---
 
 ```text
-继续 ucode 的 agent 能力建设，本次做【{{阶段}}】。
+继续 UCode 的 agent 能力建设，本次做【{{阶段}}】。
 
 先读这两份，再动手：
 - plans/agent-tools-and-modes.md —— 这项工作的单一事实源，看「使用方式（跨会话）」「进度」

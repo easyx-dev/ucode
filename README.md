@@ -1,4 +1,4 @@
-# ucode
+# UCode
 
 把 [pi](https://pi.dev) 编码 agent（`@earendil-works/pi-coding-agent`）封装成 HTTP 服务，并配一个 Vite + React + shadcn/ui 的对话界面。
 
@@ -39,7 +39,7 @@ pnpm start:desktop      # 生产：构建后由 Electron 直接加载产物（�
 
 生产启动是「先构建、再跑产物」：`pnpm build` 把 web 构到 `apps/web/dist`，再由 esbuild 把
 server 打成单文件 `dist/ucode.js`，`pnpm start` 即 `NODE_ENV=production node dist/ucode.js`。
-主要用途之一是**用 ucode 开发 ucode**：`node dist/ucode.js` 不被 watch，编辑源码不会重启它，
+主要用途之一是**用 UCode 开发 UCode**：`node dist/ucode.js` 不被 watch，编辑源码不会重启它，
 只在你显式重启时才生效——避开开发环境存盘即重启打断会话的问题。
 
 ```bash

@@ -56,7 +56,7 @@ my-plugin/
 ├── agents/*.md
 ├── hooks/hooks.json
 ├── hooks/*.js                   # 模块式 handler（代码型）
-├── extensions/*.ts              # pi TS 扩展（ucode 专属，可选）
+├── extensions/*.ts              # pi TS 扩展（UCode 专属，可选）
 ├── bin/<executable>
 └── .mcp.json
 ```
@@ -121,7 +121,7 @@ shell 形式的 hook `command` 与 MCP `headersHelper` **拒绝** `${user_config
 
 ### 3.5 兼容边界与降级清单
 
-| 项 | ucode 处理 |
+| 项 | UCode 处理 |
 | --- | --- |
 | 清单三档位置 / 无清单的标准布局 | 都支持；多清单并存取第一个，其余诊断 |
 | `settings` / `channels` / `lspServers` / `outputStyles` / `workflows` / `experimental` | 注册但不执行，诊断 |
@@ -151,13 +151,13 @@ shell 形式的 hook `command` 与 MCP `headersHelper` **拒绝** `${user_config
 
 `agents/*.md` 的 frontmatter 走 Claude 语义：
 
-| Claude 字段 | ucode 处理 |
+| Claude 字段 | UCode 处理 |
 | --- | --- |
 | `name` | 显示名与 slug 来源（加插件前缀） |
 | `description` | 直接映射 |
 | `model` | 别名 `sonnet` / `opus` / `haiku` / `inherit` 忽略并回落会话默认；其余交给 `resolveModelRef` |
 | `tools` | 经工具名映射表收敛为白名单；未知项诊断丢弃 |
-| `disallowedTools` | 收敛为 `excludeTools`（需给 ucode 角色能力补该字段） |
+| `disallowedTools` | 收敛为 `excludeTools`（需给 UCode 角色能力补该字段） |
 | 其余（`effort` / `maxTurns` / `memory` / `background` / `isolation` / `color` / `mode`） | 诊断忽略 |
 
 工具名映射（Claude → pi）：
@@ -168,7 +168,7 @@ WebFetch→webfetch  WebSearch→websearch  Task→subagent
 ```
 
 `mode: <slug>` 的 agent **不再解释为主模式**（第十一章）：出诊断、按普通子角色落位。
-插件 agent 一律是子角色，slug 用 `<pluginToken>-<agentToken>`，需满足 ucode 的 slug 规则与长度上限。
+插件 agent 一律是子角色，slug 用 `<pluginToken>-<agentToken>`，需满足 UCode 的 slug 规则与长度上限。
 
 ### 3.8 命名空间与命名规则
 
@@ -181,7 +181,7 @@ MCP 服务器名          plugin_my-plugin_review
 - sanitize：小写；非 `[a-z0-9-]` 替换为 `-`；折叠连续 `-`；去首尾 `-`；数字开头补前缀。
 - token = `<pluginToken>-<componentToken>`；跨插件冲突追加 `-<6位hash>`；
   **与两个内置技能名（`plugin-create` / `plugin-review`）冲突时同样加 hash**。
-- 插件 agent 的 slug 需满足 ucode 规则（小写字母开头、`[a-z0-9-]`、长度上限）。
+- 插件 agent 的 slug 需满足 UCode 规则（小写字母开头、`[a-z0-9-]`、长度上限）。
 - 技能与提示词命令是两套索引（`CommandsListResponse` 的 `prompts` / `skills`），同名不冲突，
   但 `/` 菜单里会相邻出现，描述文案要写清适用场景。
 
@@ -545,7 +545,7 @@ cache（`$APP_HOME/plugins/cache/<slug>-plugins-official/<name>/<version>/`，�
 
 | 技能 | 用途 | 真身 | 物化 |
 | --- | --- | --- | --- |
-| `plugin-create` | 引导创建一个 ucode / Claude / ZCode 都能认的插件包 | `server/src/harness/plugins/builtin/skills/plugin-create/{SKILL.md,references/…}`（**实际用 TS 常量，见复盘**） | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
+| `plugin-create` | 引导创建一个 UCode / Claude / ZCode 都能认的插件包 | `server/src/harness/plugins/builtin/skills/plugin-create/{SKILL.md,references/…}`（**实际用 TS 常量，见复盘**） | `$APP_HOME/app/builtin/skills/plugin-create/SKILL.md` |
 | `plugin-review` | 审计第三方插件（审查清单见第五章） | 同上的 `plugin-review/` | 同上的物化 |
 
 调用方式 `/skill:plugin-create`、`/skill:plugin-review`，来源标 `official`；`plugin-review` 的描述要写明

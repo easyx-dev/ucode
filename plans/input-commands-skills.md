@@ -59,14 +59,14 @@
    会话装配禁用 pi 默认目录，只认这些目录。
 9. **不新增 web 以外的运行时依赖**：图片归一化复用 pi 已导出的 `resizeImage`（内置 Photon wasm）。
 10. **技能默认允许模型自动调用**：技能清单由 **pi 自动注入**系统提示词（`AgentSession` 从
-    `resourceLoader.getSkills()` 取值，`disable-model-invocation` 自动排除），**ucode 不手动 `formatSkillsForPrompt`**；
+    `resourceLoader.getSkills()` 取值，`disable-model-invocation` 自动排除），**UCode 不手动 `formatSkillsForPrompt`**；
     同时保留 `/skill:name` 显式调用，对齐 Claude Code / Cursor 的「自动 + 显式」双通道。
 11. **附件增强**（对齐 Cursor / Copilot / opencode）：`@` 支持文件与文件夹、可带行/选区范围；
     粘贴大段文本可一键转成附件；命令带 `argument-hint` 前端提示；附件以可删 chip 呈现。
 12. **非图片附件只留口子**：本期不引入任何文档解析依赖。附件库、`MessageBlock` 预留的 `file` 变体、
     消息里的附件引用标记、以及保留的自研工具名 `read_attachment` 共同构成集成点；
     PDF/Word/Excel → 文本的解析作为后续插件 / MCP 接入（参考 opencode 的 `opencode-parser` 做法）。
-13. **项目资源直接生效，不过 project trust**（ucode 用自己的信任模型；本期无审批）。
+13. **项目资源直接生效，不过 project trust**（UCode 用自己的信任模型；本期无审批）。
 14. **同名优先级**由我们显式排出后交给 pi（pi 是 first-wins），见 §三。
 15. **SDK 往前提**：对外 OpenAPI + `@ucode/client` 纳入 P3（见 §十四）。
 16. **自定义 primary agent 允许覆盖内置 `build` / `plan` / `ask`**（见 §八）。

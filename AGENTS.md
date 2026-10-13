@@ -185,7 +185,7 @@ agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里�
   `.env` / `.env.prod` 为本地文件）；`APP_HOME` 支持 `~` 与相对路径（相对环境文件所在目录）。
 - **CLI 生命周期**：`server/src/cli.ts` 提供 `--port` / `--host` / `--open` / `--restart` /
   `--status` / `--version`。`node dist/ucode.js` 不被 watch，编辑源码不会重启它——这正是
-  「用 ucode 开发 ucode」时避免打断会话的关键；改完显式 `pnpm build && pnpm start -- --restart`
+  「用 UCode 开发 UCode」时避免打断会话的关键；改完显式 `pnpm build && pnpm start -- --restart`
   即可停旧起新。见 README「生产启动与自迭代」。
 - **`APP_HOST` / `APP_PORT` 是默认值**：`APP_HOST` 取值顺序为 显式（`--host` 或启动前已有环境变量）
   > `service.json`（设置里改过的值）> `.env(.prod)`，故「局域网访问」开关重启后生效；`APP_PORT` 无设置入口，

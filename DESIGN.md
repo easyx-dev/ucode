@@ -1,6 +1,6 @@
 # 设计系统
 
-ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./packages/ui/src/styles/tokens.css)，
+UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./packages/ui/src/styles/tokens.css)，
 基础组件在 `packages/ui/src/base/`，业务组件的视觉取值见 [`docs/design-surfaces.md`](./docs/design-surfaces.md)。
 各端在 tailwind 入口 `@import "@ucode/ui/theme.css"` 并用 `@source` 扫描包内 className。
 

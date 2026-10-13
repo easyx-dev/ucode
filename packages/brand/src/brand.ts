@@ -11,9 +11,9 @@
  */
 export const brand = {
   /** 产品名：侧栏标题与输入区占位文案里的提问对象 */
-  name: "ucode",
+  name: "UCode",
   /** 浏览器标签页标题 */
-  title: "ucode · AI 对话",
+  title: "UCode · AI 对话",
   /** 标识串：用于主题存储键等命名空间，只允许小写字母、数字与连字符 */
   slug: "ucode",
 } as const;
