@@ -1,5 +1,6 @@
 /** 会话侧栏：品牌头、顶部功能菜单、项目 / 助理分类列表与底部身份区 */
 import { brand } from "@ucode/brand";
+import { cn } from "cn";
 import { Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "../base/avatar";
@@ -12,6 +13,8 @@ import { SessionSidebarMenu } from "./session-sidebar-menu";
 
 type SessionSidebarProps = {
   sessions: SessionSummary[];
+  /** 是否显示顶部品牌区（logo + 品牌名）；桌面端外壳传 false */
+  showBrand: boolean;
   /** 项目行；侧栏组名与重命名入口用 */
   projects: ProjectSummary[];
   /** 助理根目录（health.workspace）；用于区分助理区 */
@@ -42,6 +45,7 @@ type SessionSidebarProps = {
 
 export function SessionSidebar({
   sessions,
+  showBrand,
   projects,
   workspacesDir,
   activeId,
@@ -66,11 +70,19 @@ export function SessionSidebar({
   const localUserName = t("本地用户");
 
   return (
-    <aside className="flex h-full w-full flex-col bg-background text-foreground">
-      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-        <BrandLogo className="size-icon-lg" />
-        <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
-      </div>
+    // 品牌区去掉时留一点上边距：顶部那条是拖拽区与自绘控件的地盘，不留就把菜单贴上去了
+    <aside
+      className={cn(
+        "flex h-full w-full flex-col bg-background text-foreground",
+        !showBrand && "pt-2",
+      )}
+    >
+      {showBrand ? (
+        <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+          <BrandLogo className="size-icon-lg" />
+          <span className="text-sm font-semibold tracking-tight">{brand.name}</span>
+        </div>
+      ) : null}
 
       <SessionSidebarMenu
         canCreate={configured}

@@ -86,6 +86,10 @@ export type WorkspaceLayoutProps = {
   windowControls?: ReactNode;
   /** 当前选中的会话；null 表示草稿态（新建） */
   sessionId: string | null;
+   * 侧栏顶部是否显示品牌区（logo + 品牌名）。桌面端外壳传 false：窗口顶部已经是自绘控件与拖拽条，
+   * 不需要再露一次品牌；web 端保持默认显示。
+   */
+  showBrand?: boolean;
   onSelectSession: (sessionId: string | null) => void;
   /** 设置界面当前的分区；null 表示未打开 */
   settingsSection: SettingsSectionId | null;
@@ -110,6 +114,7 @@ export function WorkspaceLayout({
   titleBarInset = 0,
   windowControlsWidth = 0,
   windowControls,
+  showBrand = true,
   sessionId: activeId,
   onSelectSession: setActiveId,
   settingsSection,
@@ -632,6 +637,7 @@ export function WorkspaceLayout({
 
   const sidebarProps = {
     sessions: sessionsView,
+    showBrand,
     projects: projects.projects,
     workspacesDir,
     activeId,

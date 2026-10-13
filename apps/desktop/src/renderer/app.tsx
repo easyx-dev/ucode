@@ -29,6 +29,8 @@ export function DesktopApp() {
 
   return (
     <WorkspaceLayout
+      // 桌面端的侧栏顶部是自绘窗口控件与拖拽条的地盘，不再露品牌区（见 `WorkspaceLayoutProps.showBrand`）
+      showBrand={false}
       titleBarInset={titleBarInset()}
       windowControlsWidth={windowControlsWidth()}
       windowControls={<WindowControls />}
