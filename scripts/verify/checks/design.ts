@@ -14,6 +14,15 @@ import { listFiles } from "../files.ts";
 
 type Rule = { test: RegExp; message: string };
 
+/**
+ * 裸 `rounded`：编译成固定 `0.25rem`、不跟 token（当前正好等于 `rounded-xs`）。
+ * 前置字符包含 `:`，带变体的写法（`sm:rounded`）才拦得住；类名与 `@apply` 都拦。
+ */
+const BARE_ROUNDED: Rule = {
+  test: /(?:^|[\s"'`:])rounded(?![\w-])/,
+  message: "裸 rounded 编译成固定 0.25rem、不跟 token：用 rounded-xs",
+};
+
 const RULES: Rule[] = [
   // 字号：只用六档 + 图表三档，禁任意值与超出体系的档位
   {
@@ -60,8 +69,9 @@ const RULES: Rule[] = [
     message: "阴影只用 shadow-raised / shadow-popover / shadow-dialog / shadow-edge",
   },
 
-  // 圆角：只用四档 + full
-  { test: /\brounded-(?:2xl|3xl|4xl)\b/, message: "圆角只有 sm/md/lg/xl/full 五档" },
+  // 圆角：只用五档 + full
+  { test: /\brounded-(?:2xl|3xl|4xl)\b/, message: "圆角只有 xs/sm/md/lg/xl/full 六档" },
+  BARE_ROUNDED,
   { test: /rounded-\[(?!inherit)/, message: "圆角禁任意值：按最近圆角父容器取档" },
 
   // 动效
@@ -112,20 +122,42 @@ const RULES: Rule[] = [
   },
 ];
 
+/*
+ * CSS 侧的额外规则：类名档位那批（RULES）在 `@apply` 里同样适用，所以样式文件跑 RULES + 这一组；
+ * 这里只放 `@apply` 表达不了的——显式写属性时同样只能取 token。
+ */
+const CSS_RULES: Rule[] = [
+  {
+    /*
+     * 例外：`var(--radius…)`（含基准 `var(--radius)`）、`9999px`（真胶囊与真圆形，如滚动条拇指）、
+     * `inherit`（与类名侧的 `rounded-[inherit]` 对齐）、`0` / `0px`；
+     * 值前的空白与行尾都写进前瞻里——`\s*` 会退回零个字符，值换行书写时只看得到冒号，不排除就会误报。
+     */
+    test: /border-radius:(?!\s*(?:var\(--radius[-\w]*|9999px|inherit\b|0(?:px|rem|em|%)?(?![\d.]))|$)/,
+    message: "CSS 里的圆角写 var(--radius-*)（本来就写 var 基准也可以）；真胶囊与真圆形写 9999px",
+  },
+];
+
+const DIRS = ["apps/web/src", "apps/desktop/src/renderer", "packages/ui/src"];
+
+const filesMatching = (root: string, ext: RegExp): string[] =>
+  DIRS.flatMap((dir) => listFiles(root, dir, (path) => ext.test(path)));
+
 export const run = (root: string): string[] => {
   const problems: string[] = [];
-  const files = ["apps/web/src", "apps/desktop/src/renderer", "packages/ui/src"].flatMap((dir) =>
-    listFiles(root, dir, (path) => /\.tsx?$/.test(path)),
-  );
-
-  for (const file of files) {
-    const lines = readFileSync(join(root, file), "utf8").split("\n");
-    for (const [index, line] of lines.entries()) {
-      for (const rule of RULES) {
-        if (rule.test.test(line)) problems.push(`${file}:${index + 1}：${rule.message}`);
+  const scan = (files: string[], rules: Rule[]): void => {
+    for (const file of files) {
+      const lines = readFileSync(join(root, file), "utf8").split("\n");
+      for (const [index, line] of lines.entries()) {
+        for (const rule of rules) {
+          if (rule.test.test(line)) problems.push(`${file}:${index + 1}：${rule.message}`);
+        }
       }
     }
-  }
+  };
+
+  scan(filesMatching(root, /\.tsx?$/), RULES);
+  scan(filesMatching(root, /\.css$/), [...RULES, ...CSS_RULES]);
 
   return problems;
 };
