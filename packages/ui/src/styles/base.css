@@ -14,6 +14,14 @@
     /* 全局字距：基准变量，局部用 tracking-* 覆盖 */
     letter-spacing: var(--tracking-base);
   }
+  /*
+   * 图标线宽：lucide 默认 2，在本项目的字号档（图标 12–20px）下偏粗，统一收到 `--icon-stroke-width`（1.5）。
+   * 线宽的默认值写在 svg 的 `stroke-width` 呈现属性上，CSS 声明一律覆盖呈现属性，
+   * 因此这条会压掉组件传的 `strokeWidth`——需要更粗的少数地方用内联样式写回。
+   */
+  svg.lucide {
+    stroke-width: var(--icon-stroke-width);
+  }
   /* Tailwind v4 起按钮默认 cursor: default；可点击控件统一回正手型（禁用态除外） */
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {

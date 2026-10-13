@@ -305,6 +305,8 @@
   --spacing-icon-sm: var(--font-size-base);
   --spacing-icon-base: calc(var(--font-size-base) * 8 / 7);
   --spacing-icon-lg: calc(var(--font-size-base) * 10 / 7);
+  /* 图标线宽：lucide 默认 2 在这套字号档下偏粗，统一收到 1.5（例外见 DESIGN.md） */
+  --icon-stroke-width: 1.5;
   /* 窗口控件的点：固定 14px，不随密度与字号走——它仿的是系统标题栏按钮（见 DESIGN.md「间距与尺寸」） */
   --spacing-window-control: 0.875rem;
 

@@ -57,10 +57,14 @@ function ControlDot({
         window.desktop.windowControl(event.altKey ? (altAction ?? action) : action)
       }
     >
-      {/* 符号平时不显示：悬停这一组时才露出来，静止时就是一排纯色点（macOS 的做法） */}
+      {/*
+        符号平时不显示：悬停这一组时才露出来，静止时就是一排纯色点（macOS 的做法）。
+        线宽用内联样式而不是 `strokeWidth`：全局图标线宽是 1.5（见共享基础层），
+        这颗符号只有 8px，再细就看不清了，内联样式优先级高于那条全局规则。
+      */}
       <Icon
         className="size-2 text-window-control-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-60"
-        strokeWidth={3}
+        style={{ strokeWidth: 3 }}
       />
     </button>
   );
