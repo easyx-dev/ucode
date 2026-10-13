@@ -73,7 +73,7 @@ export function SessionSidebar({
     // 品牌区去掉时留一点上边距：顶部那条是拖拽区与自绘控件的地盘，不留就把菜单贴上去了
     <aside
       className={cn(
-        "flex h-full w-full flex-col bg-background text-foreground",
+        "flex h-full w-full flex-col bg-glass text-foreground backdrop-blur-sm",
         !showBrand && "pt-2",
       )}
     >

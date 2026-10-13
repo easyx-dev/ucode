@@ -690,7 +690,8 @@ export function WorkspaceLayout({
     <TooltipProvider>
       <WorkbenchProvider value={workbenchApi}>
         {/* 四周留白见 DESIGN.md「间距与尺寸」：外壳容器统一留，内容卡不再自己留 margin */}
-        <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground md:p-shell-inset">
+        {/* 外壳是最底层，用玻璃面 + 模糊：窗口透明或加了背景图之后它会透出后面那层 */}
+        <div className="flex h-dvh w-full overflow-hidden bg-glass text-foreground backdrop-blur-sm md:p-shell-inset">
           {/* 桌面端三栏分栏；窄屏只有对话区，侧栏与工作台走下方抽屉 */}
           <ResizablePanelGroup
             id={`${PANEL_IDS.sidebar}-group`}

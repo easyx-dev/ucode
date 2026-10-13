@@ -32,7 +32,7 @@ function SheetContent({
         data-slot="sheet-content"
         // 只留入场动画：退场若用 `data-closed:animate-out`，Radix Presence 会在动画结束前一直挂着节点
         className={cn(
-          "fixed inset-y-0 z-50 flex h-full w-full flex-col bg-background shadow-dialog outline-none",
+          "fixed inset-y-0 z-50 flex h-full w-full flex-col bg-glass shadow-dialog outline-none supports-backdrop-filter:backdrop-blur-sm",
           "data-open:animate-in",
           side === "left"
             ? "left-0 border-r border-border data-open:slide-in-from-left"

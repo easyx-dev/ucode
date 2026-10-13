@@ -92,9 +92,23 @@ const createWindow = (): void => {
     minWidth: 960,
     minHeight: 600,
     show: false,
-    // 自绘的窗口控件与标题条要在失焦时也一次点得动：macOS 默认会吃掉未聚焦窗口的第一次点击
+    /*
+      自绘的窗口控件与标题条要在失焦时也一次点得动：macOS 默认会吃掉未聚焦窗口的第一次点击。
+      同时把窗口做成透明的：界面的外壳与侧栏是玻璃层（`--glass` + `backdrop-blur`），
+      要透出桌面与系统材质，得先有「能透的窗口」——否则玻璃后面永远是自己那层不透明的底色。
+      `backgroundColor` 必须显式留空，否则首帧会先刷一层白再被材质盖掉（一闪）。
+      非 macOS 不设：transparent 在那里要配合无边框窗口，而本壳只在 macOS 走自绘标题条。
+    */
     ...(isFrameless(process.platform)
-      ? { titleBarStyle: "hiddenInset" as const, acceptFirstMouse: true }
+      ? {
+          titleBarStyle: "hiddenInset" as const,
+          acceptFirstMouse: true,
+          transparent: true,
+          backgroundColor: "#00000000",
+          /** macOS 的系统材质；`under-window` 是「窗下」那一层，跟随窗口活跃态 */
+          vibrancy: "under-window" as const,
+          visualEffectState: "followWindow" as const,
+        }
       : {}),
     webPreferences: {
       preload: resolve(import.meta.dirname, "preload.cjs"),

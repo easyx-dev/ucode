@@ -129,6 +129,12 @@
   --muted: var(--theme-panel);
   --secondary: var(--theme-solid);
   --secondary-foreground: var(--theme-text);
+  /*
+   * 玻璃面：与外壳同色但掺了透明，配合 `backdrop-blur` 用在最底层与浮层上。
+   * 同一颜色在背后没东西时看不出差别——真正显出来要等窗口透明（桌面端）或背景图（web 端），
+   * 那是另两件事；这里先把「可透的底层」准备好，届时不用再动样式。
+   */
+  --glass: color-mix(in oklab, var(--background) 84%, transparent);
 
   /* 文本层级：主 / 次级 / 最弱 */
   --foreground-subtle: color-mix(
@@ -309,6 +315,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-muted: var(--muted);
+  --color-glass: var(--glass);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-state-hover: var(--state-hover);

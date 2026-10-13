@@ -8,3 +8,13 @@
 @source "../../../../packages/ui/src";
 /* streamdown 输出的 className 在它自己的 dist 里，Tailwind 默认不扫 node_modules */
 @source "../../../../packages/ui/node_modules/streamdown/dist/*.js";
+
+/*
+ * 窗口是透明的（见 `src/main/index.ts`）：页面自己不能再铺一层不透明底色，
+ * 否则玻璃层透出来的是这层底色而不是桌面材质。共享基础层里的 `body { bg-background }`
+ * 要在这里覆盖——非分层样式优先于 `@layer base` 里的规则。
+ */
+html,
+body {
+  background: transparent;
+}
