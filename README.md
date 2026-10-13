@@ -85,6 +85,9 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 - 启动：先起服务，再按场合二选一——开发用 `pnpm dev` + `pnpm dev:desktop`，生产用 `pnpm start` + `pnpm start:desktop`
   （后者先构建桌面端，再由 Electron 加载产物）。`start:desktop` 带 `NODE_ENV=production`，即读 `.env.prod`
   的 `APP_HOME`（`~/.ucode`），故连的是生产实例；`dev:desktop` 读 `.env`，连开发实例。
+- **Electron 二进制**：`electron` 依赖的安装脚本会去 GitHub Releases 拉一份运行时（约 120MB），
+  安装时被跳过、或网络到不了 release 资产时会停在 `Downloading Electron binary...`。补装：
+  `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node apps/desktop/node_modules/electron/install.js`。
 - 调试：开发形态自动独立开一窗 DevTools（`⌘⌥I` 或 `F12` 随时收回 / 再唤出），生产形态不开。
 
 > 尚未做：安装包（内置服务运行时）、服务发现与自动拉起、按 `compatRange` 的版本兼容决策；留待打包阶段。
