@@ -44,6 +44,7 @@ import { compactionNoticeMessage } from "../lib/compaction";
 import { textToDoc } from "../lib/composer-document";
 import { type ComposerDraft, composerKeyOf, NEW_SESSION_KEY } from "../lib/composer-draft";
 import { textPayload } from "../lib/composer-payload";
+import { errorText } from "../lib/error";
 import type { GoalCommand } from "../lib/goal-command";
 import {
   CHAT_MIN_WIDTH,
@@ -69,6 +70,7 @@ import type {
   ThinkingPreference,
 } from "../lib/types";
 import { changeDoc, changesDoc, commitDoc, fileDoc } from "../lib/workbench-docs";
+import { useClient } from "../provider";
 import { type ChangeTarget, WorkbenchProvider, type WorkbenchView } from "../provider/workbench";
 
 export type WorkspaceLayoutProps = {
@@ -86,6 +88,7 @@ export type WorkspaceLayoutProps = {
   windowControls?: ReactNode;
   /** 当前选中的会话；null 表示草稿态（新建） */
   sessionId: string | null;
+  /**
    * 侧栏顶部是否显示品牌区（logo + 品牌名）。桌面端外壳传 false：窗口顶部已经是自绘控件与拖拽条，
    * 不需要再露一次品牌；web 端保持默认显示。
    */
@@ -129,11 +132,13 @@ export function WorkspaceLayout({
   const workspacesDir = useStatus()?.workspace ?? null;
   const composer = useComposerDrafts();
   // 会话归档 / id 失效时把选中项清回空态
+  const client = useClient();
   const activeSession = useActiveSession(activeId, () => setActiveId(null));
   const interactions = useInteractions(activeId);
   const goal = useGoal(activeId);
   // 唯一通知触发点：web 与桌面端都在这里判定，点开通知即切到那条会话
   useSessionNotices({ onSelectSession: setActiveId });
+  /**
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
@@ -184,12 +189,19 @@ export function WorkspaceLayout({
 
   const configured = models.data?.configured ?? false;
   /**
-   * 当前工作目录：已有会话用它自己的工作目录；草稿态还没有会话，用草稿里选中的目录——
-   * 「在某个项目里新建」时工作台与命令面板的文件检索都该落在那个项目上，而不是助理工作区。
+   * 取当前会话的原始记录（JSONL 文本）供复制。内容可能几 MB，所以只在点按钮时取。
+   * 失败要说清原因（记录过大、文件读不到），否则「复制出来是空的」看不出是失败。
    */
-  const draftCwd = activeId ? null : (composer.drafts[NEW_SESSION_KEY]?.cwd ?? null);
-  // 编辑器区的文档标签：工作目录变化即整体清空（见 use-workbench-docs）
-  const workbenchCwd = activeSession?.cwd ?? draftCwd ?? workspacesDir;
+  const loadTranscript = useCallback(async (): Promise<string> => {
+    if (!activeId) return "";
+    try {
+      const result = await client.apis.sessions.transcript(activeId);
+      return result.content;
+    } catch (error) {
+      toast.error(errorText(t, error));
+      throw error;
+    }
+  }, [activeId, client, t]);
   const docs = useWorkbenchDocs(workbenchCwd);
   /** 展开工作台时的默认宽度按窗口夹取：窄窗口下 640 会把对话区压破（记忆值优先） */
   const workbenchPanelSpec = useMemo(
@@ -741,6 +753,7 @@ export function WorkspaceLayout({
                   onToggleWorkbench={toggleWorkbench}
                   workbenchOpen={isDesktop ? workbenchOpen : workbenchSheetOpen}
                   onRenameSession={activeSession ? () => requestRename(activeSession) : undefined}
+                  onLoadTranscript={activeId ? loadTranscript : undefined}
                   onFork={forkFrom}
                   onEdit={editMessage}
                   forkedFromName={forkSourceName}

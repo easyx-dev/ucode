@@ -713,6 +713,9 @@ export default {
   "当前环境不支持系统通知。": "This environment doesn't support system notifications.",
 
   // Session transcript（会话原始记录导出）
+  复制会话记录: "Copy session log",
+  "复制中…": "Copying…",
+
   // Usage steps（步级耗时）
   步级耗时: "Per-step timings",
   "{{steps}} 步 · {{turns}} 轮": "{{steps}} steps across {{turns}} turns",

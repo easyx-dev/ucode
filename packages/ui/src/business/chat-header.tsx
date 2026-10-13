@@ -20,6 +20,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../base/tooltip";
 import { sessionTitle } from "../lib/session";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../lib/types";
 import { contextPercentLabel } from "../lib/usage";
+import { CopyTranscriptAction } from "./copy-transcript-action";
+
+/**
 
 type ChatHeaderProps = {
   session: SessionSummary | null;
@@ -59,6 +62,7 @@ type ChatHeaderProps = {
   workbenchOpen?: boolean;
   /** 双击标题就地改名；子会话等不可改名的场景不传 */
   onRenameSession?: () => void;
+  onLoadTranscript?: () => Promise<string>;
 };
 
 /**
@@ -115,6 +119,7 @@ export function ChatHeader({
   onToggleWorkbench,
   workbenchOpen,
   onRenameSession,
+  onLoadTranscript,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
@@ -220,6 +225,7 @@ export function ChatHeader({
             </Button>
           </>
         ) : null}
+        {onLoadTranscript ? <CopyTranscriptAction load={onLoadTranscript} /> : null}
 
         <Tooltip>
           <TooltipTrigger asChild>

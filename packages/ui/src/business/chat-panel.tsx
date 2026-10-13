@@ -88,6 +88,8 @@ type ChatPanelProps = {
   workbenchOpen?: boolean;
   /** 双击标题就地改名（新名称弹层由上层管） */
   onRenameSession?: () => void;
+  /** 取本会话的原始记录（JSONL 文本）用于复制；不传则不显示这个入口 */
+  onLoadTranscript?: () => Promise<string>;
   /** 从某条消息分叉出新会话 */
   onFork: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话、非生成中可用） */
@@ -143,6 +145,7 @@ export function ChatPanel({
   onToggleWorkbench,
   workbenchOpen,
   onRenameSession,
+  onLoadTranscript,
   onFork,
   onEdit,
   forkedFromName,
@@ -334,6 +337,7 @@ export function ChatPanel({
         usage={usage}
         context={context}
         onOpenUsage={onOpenUsage}
+        onLoadTranscript={onLoadTranscript}
       />
 
       {chat.error ? (

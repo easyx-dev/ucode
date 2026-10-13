@@ -80,3 +80,12 @@ export type SessionArchiveResponse = SessionScoped & {
 };
 
 /**
+ * 会话原始记录（JSONL 文本）：给「复制 JSONL 内容」这类导出用。
+ *
+ * 不放文件路径：服务端可能不在客户端这台机器上，路径在那边也没有意义，还多泄露一层目录结构。
+ * 草稿会话（还没落盘）返回空串；超过服务端上限时回 `payload_too_large`。
+ */
+export type SessionTranscriptResponse = SessionScoped & {
+  /** 会话文件的原始文本（UTF-8） */
+  content: string;
+};
