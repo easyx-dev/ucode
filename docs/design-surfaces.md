@@ -161,6 +161,8 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 | 外层容器 | `rounded-xl bg-muted/50`，承载首行项目 / 分支条与内层白卡，也是粘贴 / 拖拽的落点 |
 | 项目 / 分支条 | 首行 `px-2 py-2`（与列表行同高）；项目 chip 草稿态可下拉（`rounded-md px-1.5 py-0.5 text-xs` + `hover:bg-state-hover`），已有会话同形但只读；分支 chip 只在确实是 git 仓库且取得到分支名时出现 |
 | 输入卡 | 内层 `rounded-lg bg-popover` + `ring-1 ring-border-strong`，聚焦只把 ring 换成 `ring-ring`（颜色变、粗细不变）；编辑区 `px-3 py-3`、`min-h-16`、`max-h-55`（消息「编辑重发」复用同一个编辑器） |
+| 编辑区结构 | 段落、文本、硬换行、有序 / 无序列表（可 `Tab` 缩进嵌套）与三个原子 mention；**列表标记要显式恢复**——Tailwind 预检把 `list-style` 清掉了，编辑区类里写了 `[&_ul]:list-disc [&_ol]:list-decimal` 与 `pl-5`（与消息区 `.md-content` 同一口径）|
+| 编辑区按键 | `Enter` 发送、`Shift+Enter` 换行；**在列表项里 `Enter` 是续行**（空项回车退出列表），此时不发送——列表里按发送键或退出列表后再回车才发出 |
 | 工具栏 | 左 `+`（附件 / 技能）· 模型 · 模式 · 权限；右 思考 · 发送 / 停止。均为无边框的 `text-xs` 轻量按钮，图标 `size-icon-sm` |
 | 工具栏降级 | 左侧一组在窄容器（大字号 + 紧凑密度 + 三栏同开）下横向滚动，**不换行**（`whitespace-nowrap` + 子项 `shrink-0` + `overflow-x-auto`）；右侧的思考与发送固定可见 |
 | 建议行 | 只在空态出现，排在输入卡**下方**（`rounded-full` + `border` + `text-xs`，带 `size-icon-sm` 图标），点击填入输入框而不是发送 |

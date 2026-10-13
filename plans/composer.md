@@ -66,7 +66,9 @@
 
 ### 3.1 文档模型
 
-Tiptap 文档只含段落、文本、硬换行与两个原子 mention 节点：
+Tiptap 文档只含段落、文本、硬换行、有序 / 无序列表与两个原子 mention 节点
+（列表是后续追加的：`@tiptap/extension-{bullet,ordered}-list` + `list-item`，序列化与回填见
+`lib/composer-document.ts`；当时「不要列表」的结论只针对排版能力，行级结构后来被单独加回来了）：
 
 | 触发 | 节点 | attrs | 序列化到正文 | 说明 |
 | --- | --- | --- | --- | --- |

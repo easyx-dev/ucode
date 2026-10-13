@@ -1,17 +1,21 @@
 /**
- * 编辑器的 Tiptap 配置：结构节点 + 三个 mention + 历史，以及 editorProps。
+ * 编辑器的 Tiptap 配置：结构节点（段落 / 硬换行 / 有序与无序列表）+ 三个 mention + 历史，以及 editorProps。
  *
  * 单独一个模块是为了让 `editor.tsx` 只留「装配」：这里全是声明式配置，没有组件状态。
  * 回调一律经 ref 读取（`ComposerCallbacks`）——Tiptap 实例只在挂载时创建一次，直接传函数会拿到旧闭包。
  */
 import { Extension, type Extensions } from "@tiptap/core";
+import BulletList from "@tiptap/extension-bullet-list";
 import Document from "@tiptap/extension-document";
 import HardBreak from "@tiptap/extension-hard-break";
+import ListItem from "@tiptap/extension-list-item";
 import Mention from "@tiptap/extension-mention";
+import OrderedList from "@tiptap/extension-ordered-list";
 import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import Text from "@tiptap/extension-text";
 import { history, redo, undo } from "@tiptap/pm/history";
+import type { EditorState } from "@tiptap/pm/state";
 import type { EditorProps } from "@tiptap/pm/view";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import type { RefObject } from "react";
@@ -21,9 +25,12 @@ import { filesOf } from "./use-composer-attachments";
 
 const CHIP_CLASS = "rounded bg-muted px-1 py-0.5 text-foreground";
 
-/** 可编辑区的类：高度上限、内边距与占位提示的呈现；高度对输入区与消息编辑态一视同仁（同一个编辑器、同一种手感） */
+/** 可编辑区的类：高度上限、内边距与占位提示的呈现；高度对输入区与消息编辑态一视同仁（同一个编辑器、同一种手感）
+ *
+ * 列表标记要显式恢复：Tailwind 的预检把 `list-style` 清掉了，不加就只剩缩进没有圆点 / 编号
+ * （与消息区 `.md-content` 的写法保持一致）。 */
 const CONTENT_CLASS =
-  "max-h-55 min-h-16 overflow-y-auto px-3 py-3 text-sm outline-none [&_.is-editor-empty]:before:pointer-events-none [&_.is-editor-empty]:before:float-left [&_.is-editor-empty]:before:h-0 [&_.is-editor-empty]:before:text-foreground-subtle [&_.is-editor-empty]:before:content-[attr(data-placeholder)]";
+  "max-h-55 min-h-16 overflow-y-auto px-3 py-3 text-sm outline-none [&_.is-editor-empty]:before:pointer-events-none [&_.is-editor-empty]:before:float-left [&_.is-editor-empty]:before:h-0 [&_.is-editor-empty]:before:text-foreground-subtle [&_.is-editor-empty]:before:content-[attr(data-placeholder)] [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5";
 
 /** 编辑器要用的回调与开关：全部经 ref 取最新实现 */
 export type ComposerCallbacks = {
@@ -200,12 +207,25 @@ export const createComposerExtensions = (
   Paragraph,
   Text,
   HardBreak,
+  // 列表：输入规则（`- ` / `1. `）与 Enter 续行、Tab 缩进都由这三个扩展提供
+  BulletList,
+  OrderedList,
+  ListItem,
   History,
   createContextMention(callbacks, flags.context),
   createCommandMention(callbacks, flags.command),
   AttachmentMention,
   Placeholder.configure({ placeholder: flags.placeholder }),
 ];
+
+/** 光标是否在列表项里：在列表里 Enter 归列表用（续行 / 退出列表），不该把消息发出去 */
+const isInsideListItem = (state: EditorState): boolean => {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === "listItem") return true;
+  }
+  return false;
+};
 
 /** 编辑器的 DOM 行为：粘贴 / 拖拽入库、Esc、Enter 发送 */
 export const createEditorProps = (callbacks: ComposerCallbacks): EditorProps => ({
@@ -242,6 +262,8 @@ export const createEditorProps = (callbacks: ComposerCallbacks): EditorProps => 
       return true;
     }
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      // 列表里 Enter 是续行 / 退出列表（空项回车即退出），交给列表扩展；退出后再按一次才发送
+      if (isInsideListItem(_view.state)) return false;
       event.preventDefault();
       callbacks.onSend.current();
       return true;

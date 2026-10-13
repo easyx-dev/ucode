@@ -2,7 +2,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { attachmentOrdinalInDoc, type ComposerNode, docToPayload } from "../composer-document";
+import {
+  attachmentOrdinalInDoc,
+  type ComposerNode,
+  docToPayload,
+  textToDoc,
+} from "../composer-document";
 
 const docOf = (children: ComposerNode[]): ComposerNode => ({
   type: "doc",
@@ -113,5 +118,118 @@ describe("attachmentOrdinalInDoc 的序号", () => {
     assert.equal(attachmentOrdinalInDoc(doc, "nope", "image"), 0);
     assert.equal(attachmentOrdinalInDoc(doc, "i1", "file"), 0);
     assert.equal(attachmentOrdinalInDoc(null, "i1", "image"), 0);
+  });
+});
+
+const listItem = (...children: ComposerNode[]): ComposerNode => ({
+  type: "listItem",
+  content: children,
+});
+
+const bulletList = (...items: ComposerNode[]): ComposerNode => ({
+  type: "bulletList",
+  content: items,
+});
+
+const orderedList = (...items: ComposerNode[]): ComposerNode => ({
+  type: "orderedList",
+  content: items,
+});
+
+const paragraphOf = (...children: ComposerNode[]): ComposerNode => ({
+  type: "paragraph",
+  content: children,
+});
+
+const listDoc = (...blocks: ComposerNode[]): ComposerNode => ({ type: "doc", content: blocks });
+
+describe("docToPayload 的列表", () => {
+  it("无序列表还原成 `- ` 行", () => {
+    const payload = docToPayload(
+      listDoc(
+        bulletList(listItem(paragraphOf(text("第一条"))), listItem(paragraphOf(text("第二条")))),
+      ),
+    );
+    assert.equal(payload.text, "- 第一条\n- 第二条");
+  });
+
+  it("有序列表按位置编号", () => {
+    const payload = docToPayload(
+      listDoc(orderedList(listItem(paragraphOf(text("甲"))), listItem(paragraphOf(text("乙"))))),
+    );
+    assert.equal(payload.text, "1. 甲\n2. 乙");
+  });
+
+  it("嵌套列表缩进两空格", () => {
+    const payload = docToPayload(
+      listDoc(
+        orderedList(
+          listItem(paragraphOf(text("父")), bulletList(listItem(paragraphOf(text("子"))))),
+        ),
+      ),
+    );
+    assert.equal(payload.text, "1. 父\n  - 子");
+  });
+
+  it("列表项里的引用与附件照样收进载荷", () => {
+    const payload = docToPayload(
+      listDoc(
+        bulletList(
+          listItem(paragraphOf(mention("/repo/a.ts"), text(" "), attachment("f1", "file"))),
+        ),
+      ),
+    );
+    assert.equal(payload.text, "- @/repo/a.ts 附件 1.pdf");
+    assert.deepEqual(payload.contexts, [{ path: "/repo/a.ts" }]);
+    assert.deepEqual(payload.attachments, [{ id: "f1" }]);
+  });
+
+  it("列表与段落混排时顺序不变", () => {
+    const payload = docToPayload(
+      listDoc(
+        paragraphOf(text("开头")),
+        bulletList(listItem(paragraphOf(text("项")))),
+        paragraphOf(text("结尾")),
+      ),
+    );
+    assert.equal(payload.text, "开头\n- 项\n结尾");
+  });
+});
+
+describe("textToDoc 还原列表", () => {
+  it("`- ` 行收成一个无序列表，非列表行仍是段落", () => {
+    const doc = textToDoc("说明\n- 一\n- 二");
+    assert.equal(doc.content?.[0]?.type, "paragraph");
+    assert.equal(doc.content?.[1]?.type, "bulletList");
+    assert.equal(doc.content?.[1]?.content?.length, 2);
+    assert.equal(docToPayload(doc).text, "说明\n- 一\n- 二");
+  });
+
+  it("有序与嵌套缩进都能还原（发送出去仍是同一份文本）", () => {
+    const source = "1. 父\n  - 子\n2. 兄弟";
+    const doc = textToDoc(source);
+    assert.equal(doc.content?.[0]?.type, "orderedList");
+    assert.equal(doc.content?.[0]?.content?.[0]?.content?.[1]?.type, "bulletList");
+    assert.equal(docToPayload(doc).text, source);
+  });
+
+  it("同一层换列表种类时另起一个列表", () => {
+    const doc = textToDoc("- 一\n1. 二");
+    assert.equal(doc.content?.length, 2);
+    assert.equal(doc.content?.[1]?.type, "orderedList");
+  });
+});
+
+describe("attachmentOrdinalInDoc 的列表", () => {
+  it("列表项里的附件按文档顺序占号", () => {
+    const doc = listDoc(
+      paragraphOf(attachment("i1", "image")),
+      bulletList(
+        listItem(paragraphOf(text("项"), attachment("i2", "image"))),
+        listItem(paragraphOf(text("项二"), attachment("i3", "image"))),
+      ),
+    );
+    assert.equal(attachmentOrdinalInDoc(doc, "i2", "image"), 2);
+    assert.equal(attachmentOrdinalInDoc(doc, "i3", "image"), 3);
   });
 });
