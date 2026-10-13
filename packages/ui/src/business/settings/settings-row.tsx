@@ -1,5 +1,4 @@
 /** 设置行：标题 + 说明 + 右侧控件；若干行用 SettingsGroup 组成一张分组卡 */
-
 import { cn } from "cn";
 import type { ReactNode } from "react";
 
@@ -13,7 +12,7 @@ export function SettingsGroup({
   return (
     <div
       className={cn(
-        "divide-y divide-border overflow-hidden rounded-xl ring-1 ring-border-strong",
+        "divide-y divide-border overflow-hidden rounded-xl bg-popover ring-1 ring-border-strong",
         className,
       )}
     >
@@ -38,15 +37,15 @@ export function SettingsRow({ title, description, control, dense, className }: S
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-6 bg-popover",
-        dense ? "px-3 py-2" : "px-4 py-3",
+        "flex items-start justify-between gap-6",
+        dense ? "px-3 py-2" : "px-4 py-4",
         className,
       )}
     >
       <div className="min-w-0 space-y-1">
         <div className="text-sm font-medium">{title}</div>
         {description ? (
-          <p className="text-xs leading-relaxed text-foreground-subtle">{description}</p>
+          <p className="text-sm leading-relaxed text-foreground-subtle">{description}</p>
         ) : null}
       </div>
       <div className="shrink-0">{control}</div>

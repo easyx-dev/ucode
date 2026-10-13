@@ -1,6 +1,8 @@
-/** 模型设置：左侧供应商列表 + 右侧该供应商详情，两栏各自滚动 */
+/** 模型设置：一张卡里左右两栏——左边供应商列表，右边当前供应商的详情 */
+
+import { cn } from "cn";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
 import { Spinner } from "../../base/spinner";
@@ -9,11 +11,15 @@ import type { DraftProvider } from "../../lib/config-draft";
 import { ProviderAddDialog } from "./provider-add-dialog";
 import { ProviderDetail } from "./provider-detail";
 import { ProviderList } from "./provider-list";
-import { SettingsPageHeader } from "./settings-page";
+import { SETTINGS_CONTENT_COLUMN, SettingsPageHeader } from "./settings-page";
 
 type SettingsModelsProps = {
   /** 页头标题：与导航项共用同一份元数据 */
   title: string;
+  /** 页头说明：配置何时生效与 apiKey 的语义 */
+  description: string;
+  /** 页头右侧的保存区 */
+  trailing: ReactNode;
   draft: ConfigDraft;
   /** 正在测试连通性的 provider key */
   testingKey: string | null;
@@ -33,7 +39,7 @@ function DraftPlaceholder({ loading }: { loading: boolean }) {
     );
   }
   return (
-    <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
+    <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
       {t("还没有接入供应商，点右上角「添加供应商」。")}
     </p>
   );
@@ -77,8 +83,14 @@ function AddProviderButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function SettingsModels({ title, draft, testingKey, onTest }: SettingsModelsProps) {
-  const { t } = useTranslation();
+export function SettingsModels({
+  title,
+  description,
+  trailing,
+  draft,
+  testingKey,
+  onTest,
+}: SettingsModelsProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // 选中的条目被删除时回落到第一条，无需 effect 纠正
@@ -99,22 +111,33 @@ export function SettingsModels({ title, draft, testingKey, onTest }: SettingsMod
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SettingsPageHeader
         title={title}
+        description={description}
         action={<AddProviderButton onClick={() => setAdding(true)} />}
+        trailing={trailing}
       />
 
-      <p className="shrink-0 border-b border-border px-6 py-2 text-xs text-foreground-subtle md:px-8">
-        {t("保存后新配置从下一轮开始生效；apiKey 留空表示沿用已保存的 key。")}
-      </p>
+      {/* 顶部留白给两栏卡的 ring 留余量：贴住上边界时描边会被裁掉 */}
+      <div className="min-h-0 min-w-0 flex-1 px-6 pt-4 pb-6 md:px-8">
+        <div
+          className={cn(
+            SETTINGS_CONTENT_COLUMN,
+            "flex h-full min-h-0 flex-col overflow-hidden rounded-xl bg-popover ring-1 ring-border-strong md:flex-row",
+          )}
+        >
+          <ProviderList
+            providers={draft.providers}
+            selectedKey={selected?.key ?? null}
+            onSelect={setSelectedKey}
+          />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
-        <ProviderList
-          providers={draft.providers}
-          selectedKey={selected?.key ?? null}
-          onSelect={setSelectedKey}
-        />
-
-        <div className="min-w-0 flex-1 overflow-y-auto p-4 md:p-8">
-          <ProviderPane provider={selected} draft={draft} testingKey={testingKey} onTest={onTest} />
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
+            <ProviderPane
+              provider={selected}
+              draft={draft}
+              testingKey={testingKey}
+              onTest={onTest}
+            />
+          </div>
         </div>
       </div>
 

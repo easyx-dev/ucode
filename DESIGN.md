@@ -52,7 +52,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | 等宽字体 `--font-mono-stack` | **不可配**：系统等宽栈 + 中文回退 | 代码、路径、diff、终端、工具名 |
 
 - 字号与密度**刻意不联动**：允许「字大 + 紧凑」这种组合，观感取舍交给用户；大字号配紧凑密度时界面会更挤，这是选择的结果而不是缺陷。
-- 派生链：字号 → 五档字号 + 图标四档 + 行高；密度 → `--base-unit = 0.25rem × density` → 间距基准、控件高度、高度层的 offset/blur。
+- 派生链：字号 → 六档字号 + 图标四档 + 行高；密度 → `--base-unit = 0.25rem × density` → 间距基准、控件高度、高度层的 offset/blur。
   **栏宽不在这条链上**：它由 `lib/panel-layout.ts` 的像素常量（侧栏 288 / 工作台 640 / 树列 275）给定，
   密度变化不重算，也不缩写用户拖出来的宽度。
 - 应用只有一个出口：`lib/appearance.ts` 的 `applyAppearance` 把参数写到 `<html>` 的行内样式与 `data-theme`；
@@ -131,17 +131,18 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 - 字体：`--font-ui` = 设置给出的界面字体 + **固定的中文回退**；`--font-mono` = 系统等宽栈 + 同一份中文回退。
   等宽栈必须带中文回退：Windows 的 Consolas 不含中文字形，不带会落到宋体（JetBrains Mono、Geist Mono 同样没有汉字）。
-- 五档字号，全部由基准派生（14px 基准下给出括号里的值）：
+- 六档字号，全部由基准派生（14px 基准下给出括号里的值）：
 
 | 档 | 用途 | 基准 14px 时 |
 | --- | --- | --- |
 | `text-xs` | 次级说明、时间、徽标、行内代码、密集列表 | 12px |
 | `text-sm` | 正文、控件、列表行（默认档） | 14px |
-| `text-base` | 页面与对话框标题、用量等大数字 | 16px |
+| `text-base` | 对话框标题、用量等大数字 | 16px |
 | `text-lg` | Markdown 一级标题 | 18px |
 | `text-xl` | 空态问候语 | 20px |
+| `text-2xl` | 全屏面板的页标题（设置） | 24px |
 
-- 图表字号**另算**，不占上面五档，只用于轴、刻度、图例与热力图标签：`text-chart-axis`（基准的 5/7）、`text-chart-label`（6/7）、`text-chart-value`（基准）。
+- 图表字号**另算**，不占上面的字号档位，只用于轴、刻度、图例与热力图标签：`text-chart-axis`（基准的 5/7）、`text-chart-label`（6/7）、`text-chart-value`（基准）。
 - 行高：密集 UI 用 `leading-tight`，默认由各字号自带（约 1.5em），长文正文用 `leading-prose`（1.75）。行高用 `em` 表达，字号变化时比例不变。
 - 字重只用 `normal` / `medium` / `semibold`；不用 `bold`、不用斜体、不用全大写做标题。
 - 字距全局 `0.4px`（`--tracking-base`，绝对值、不随字号缩放）：中英混排下汉字之间不至于拥挤，改一处即全局生效。

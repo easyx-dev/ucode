@@ -1,4 +1,5 @@
-/** provider 的连接信息字段：id、名称、baseUrl、api 类型与 apiKey */
+/** provider 的连接信息字段：名称、id、baseUrl、api 类型与 apiKey */
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "../../base/input";
 import { Label } from "../../base/label";
@@ -13,12 +14,25 @@ type ProviderFieldsProps = {
 
 export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
   const { t } = useTranslation();
+  // 同一页可能同时挂多个供应商表单，字段 id 用前缀区分
+  const fieldId = useId();
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-xs">id</Label>
+        <Label htmlFor={`${fieldId}-name`}>{t("名称")}</Label>
         <Input
+          id={`${fieldId}-name`}
+          value={provider.name}
+          onChange={(event) => onPatch({ name: event.target.value })}
+          placeholder="Local Gateway"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor={`${fieldId}-id`}>id</Label>
+        <Input
+          id={`${fieldId}-id`}
           value={provider.id}
           onChange={(event) => onPatch({ id: event.target.value })}
           placeholder="local"
@@ -26,17 +40,9 @@ export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">{t("名称")}</Label>
+        <Label htmlFor={`${fieldId}-base-url`}>Base URL</Label>
         <Input
-          value={provider.name}
-          onChange={(event) => onPatch({ name: event.target.value })}
-          placeholder="Local Gateway"
-        />
-      </div>
-
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label className="text-xs">baseUrl</Label>
-        <Input
+          id={`${fieldId}-base-url`}
           value={provider.baseUrl}
           onChange={(event) => onPatch({ baseUrl: event.target.value })}
           placeholder="http://localhost:8317/v1"
@@ -44,9 +50,9 @@ export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">api</Label>
+        <Label htmlFor={`${fieldId}-api`}>{t("API 格式")}</Label>
         <Select value={provider.api} onValueChange={(value) => onPatch({ api: value as ApiType })}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger id={`${fieldId}-api`} className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -60,8 +66,9 @@ export function ProviderFields({ provider, onPatch }: ProviderFieldsProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">apiKey</Label>
+        <Label htmlFor={`${fieldId}-api-key`}>API Key</Label>
         <Input
+          id={`${fieldId}-api-key`}
           type="password"
           value={provider.apiKey}
           onChange={(event) => onPatch({ apiKey: event.target.value })}

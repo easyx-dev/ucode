@@ -31,10 +31,12 @@ export function useConfigModels(setProviders: Dispatch<SetStateAction<DraftProvi
     [updateModels],
   );
 
-  /** 追加一条模型；`fields` 用于按提示预填（拉取到的上游模型建议） */
+  /** 追加一条模型；`fields` 用于按提示预填（拉取到的上游模型建议）。返回新模型的草稿 key，供调用方直接打开它的编辑对话框 */
   const addModel = useCallback(
-    (providerKey: string, fields: DraftModelFields = {}) => {
-      updateModels(providerKey, (models) => [...models, { ...createDraftModel(), ...fields }]);
+    (providerKey: string, fields: DraftModelFields = {}): string => {
+      const model = { ...createDraftModel(), ...fields };
+      updateModels(providerKey, (models) => [...models, model]);
+      return model.key;
     },
     [updateModels],
   );

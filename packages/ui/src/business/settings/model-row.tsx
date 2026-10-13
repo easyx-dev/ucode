@@ -1,116 +1,49 @@
-/** 模型设置里的一条模型：基础字段 + 输入类型 + 推理等级映射 */
-import { Trash2 } from "lucide-react";
+/** 模型设置里的一条模型：单行摘要 + 右侧动作，字段编辑在 ModelFormDialog 里 */
+import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Badge } from "../../base/badge";
 import { Button } from "../../base/button";
-import { Input } from "../../base/input";
-import { Label } from "../../base/label";
+import { Switch } from "../../base/switch";
 import type { DraftModel } from "../../lib/config-draft";
-import { ModelThinkingLevels } from "./model-thinking-levels";
 
 type ModelRowProps = {
   model: DraftModel;
-  onChange: (patch: Partial<DraftModel>) => void;
+  onEdit: () => void;
+  onToggleReasoning: (enabled: boolean) => void;
   onRemove: () => void;
 };
 
-export function ModelRow({ model, onChange, onRemove }: ModelRowProps) {
-  const { t } = useTranslation();
+/** 上下文窗口的紧凑写法：128000 → 128K，1000000 → 1M；读不出数就不出徽标 */
+const contextLabel = (raw: string): string | null => {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) return null;
+  if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`;
+  return `${Math.round(value / 1000)}K`;
+};
 
-  const toggleImage = (enabled: boolean) => {
-    // 文本恒在，只有图片可增删
-    onChange({ input: enabled ? ["text", "image"] : ["text"] });
-  };
+export function ModelRow({ model, onEdit, onToggleReasoning, onRemove }: ModelRowProps) {
+  const { t } = useTranslation();
+  const context = contextLabel(model.contextWindow);
 
   return (
-    <div className="space-y-2 rounded-lg p-2 ring-1 ring-border-strong">
-      {/* 12 列网格：3+3+2+2+1+1 之外再插一栏就会挤到第二行，所以这里用 2+2 留出余量 */}
-      <div className="grid items-end gap-2 sm:grid-cols-12">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-xs text-foreground-subtle">{t("模型 id")}</Label>
-          <Input
-            value={model.id}
-            onChange={(event) => onChange({ id: event.target.value })}
-            placeholder="deepseek-v4-flash"
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-xs text-foreground-subtle">{t("显示名")}</Label>
-          <Input value={model.name} onChange={(event) => onChange({ name: event.target.value })} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-xs text-foreground-subtle">{t("上下文窗口")}</Label>
-          <Input
-            value={model.contextWindow}
-            onChange={(event) => onChange({ contextWindow: event.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label
-            className="text-xs text-foreground-subtle"
-            title={t("有效上下文预算：到达即自动压缩；留空按窗口推算")}
-          >
-            {t("上下文预算")}
-          </Label>
-          <Input
-            value={model.contextBudget}
-            placeholder={t("留空自动")}
-            onChange={(event) => onChange({ contextBudget: event.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-xs text-foreground-subtle">{t("最大输出")}</Label>
-          <Input
-            value={model.maxTokens}
-            onChange={(event) => onChange({ maxTokens: event.target.value })}
-          />
-        </div>
-        <label className="flex h-8 items-center gap-1.5 text-xs sm:col-span-1">
-          <input
-            type="checkbox"
-            className="size-icon-sm accent-primary"
-            checked={model.reasoning}
-            onChange={(event) => onChange({ reasoning: event.target.checked })}
-          />
-          {t("思考")}
-        </label>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="sm:col-span-1"
-          onClick={onRemove}
-          title={t("删除模型")}
-        >
+    <div className="flex items-center gap-2 px-4 py-2">
+      <span className="min-w-0 flex-1 truncate font-mono text-xs">
+        {model.id.trim() || t("未命名模型")}
+      </span>
+      {context ? <Badge variant="secondary">{context}</Badge> : null}
+      {model.input.includes("image") ? <Badge variant="secondary">{t("视觉")}</Badge> : null}
+      <div className="flex shrink-0 items-center gap-1">
+        <Button variant="ghost" size="icon-sm" aria-label={t("编辑模型")} onClick={onEdit}>
+          <Pencil className="size-icon-sm" />
+        </Button>
+        <Button variant="ghost" size="icon-sm" aria-label={t("删除模型")} onClick={onRemove}>
           <Trash2 className="size-icon-sm text-destructive" />
         </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <fieldset className="flex items-center gap-3">
-          <legend className="sr-only">{t("输入类型")}</legend>
-          <span aria-hidden className="text-xs text-foreground-subtle">
-            {t("输入类型")}
-          </span>
-          <label className="flex items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              className="size-icon-sm accent-primary"
-              defaultChecked
-              disabled
-            />
-            {t("文本")}
-          </label>
-          <label className="flex items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              className="size-icon-sm accent-primary"
-              checked={model.input.includes("image")}
-              onChange={(event) => toggleImage(event.target.checked)}
-            />
-            {t("图片")}
-          </label>
-        </fieldset>
-
-        {model.reasoning ? <ModelThinkingLevels model={model} onChange={onChange} /> : null}
+        <Switch
+          checked={model.reasoning}
+          onCheckedChange={onToggleReasoning}
+          aria-label={t("思考")}
+        />
       </div>
     </div>
   );

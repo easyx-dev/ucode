@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../base/select";
+import { Switch } from "../../base/switch";
 import { useLocale } from "../../hooks/use-locale";
 import { useNoticeEnabled } from "../../hooks/use-notice-enabled";
 import { useShowThinking } from "../../hooks/use-show-thinking";
@@ -16,7 +17,6 @@ import { SegmentedControl, type SegmentedOption } from "../segmented-control";
 import { SettingsGroup, SettingsRow } from "./settings-row";
 
 type ThemeValue = "light" | "dark" | "system";
-type ThinkingValue = "visible" | "hidden";
 
 /** 界面字体选择器；等宽不走设置（系统栈固定），所以只有这一个旋钮 */
 function UiFontSelect({
@@ -58,10 +58,6 @@ export function SettingsAppearance() {
   ] as const satisfies ReadonlyArray<SegmentedOption<ThemeValue>>;
 
   const { showThinking, setShowThinking } = useShowThinking();
-  const thinkingOptions = [
-    { value: "visible", label: t("显示") },
-    { value: "hidden", label: t("不显示") },
-  ] as const satisfies ReadonlyArray<SegmentedOption<ThinkingValue>>;
 
   // 语言一律用母语名展示，不随界面语言翻译
   const localeOptions = [
@@ -86,10 +82,6 @@ export function SettingsAppearance() {
 
   const { noticeEnabled, noticePermission, noticeBlocked, requestPermission, setNoticeEnabled } =
     useNoticeEnabled();
-  const noticeOptions = [
-    { value: "on", label: t("开启") },
-    { value: "off", label: t("关闭") },
-  ] as const satisfies ReadonlyArray<SegmentedOption<"on" | "off">>;
 
   // 开关开着却送不出去时要说清缺哪一步：浏览器授权只能在用户手势里申请，这里就是那个入口
   const noticeDescription = (): string => {
@@ -183,14 +175,13 @@ export function SettingsAppearance() {
         }
       />
       <SettingsRow
-        title={t("思考过程")}
-        description={t("在消息区展示模型的思考过程；隐藏后只保留回答与工具调用。")}
+        title={t("显示思考过程")}
+        description={t("在消息区展示模型的思考过程；关闭后只保留回答与工具调用。")}
         control={
-          <SegmentedControl
-            label={t("思考过程")}
-            value={showThinking ? "visible" : "hidden"}
-            options={thinkingOptions}
-            onChange={(next) => setShowThinking(next === "visible")}
+          <Switch
+            checked={showThinking}
+            onCheckedChange={setShowThinking}
+            aria-label={t("显示思考过程")}
           />
         }
       />
@@ -204,11 +195,10 @@ export function SettingsAppearance() {
                 {t("允许通知")}
               </Button>
             ) : null}
-            <SegmentedControl
-              label={t("消息通知")}
-              value={noticeEnabled ? "on" : "off"}
-              options={noticeOptions}
-              onChange={(next) => setNoticeEnabled(next === "on")}
+            <Switch
+              checked={noticeEnabled}
+              onCheckedChange={setNoticeEnabled}
+              aria-label={t("消息通知")}
             />
           </div>
         }
@@ -223,11 +213,10 @@ export function SettingsAppearance() {
             <Button variant="outline" size="sm" onClick={preview}>
               {t("试听")}
             </Button>
-            <SegmentedControl
-              label={t("提示音")}
-              value={soundEnabled ? "on" : "off"}
-              options={noticeOptions}
-              onChange={(next) => setSoundEnabled(next === "on")}
+            <Switch
+              checked={soundEnabled}
+              onCheckedChange={setSoundEnabled}
+              aria-label={t("提示音")}
             />
           </div>
         }

@@ -15,12 +15,15 @@ import { listFiles } from "../files.ts";
 type Rule = { test: RegExp; message: string };
 
 const RULES: Rule[] = [
-  // 字号：只用五档 + 图表三档，禁任意值与超大档
+  // 字号：只用六档 + 图表三档，禁任意值与超出体系的档位
   {
     test: /text-\[[^\]]*(?:px|rem|em)[^\]]*\]/,
-    message: "字号禁任意值：用 text-xs/sm/base/lg/xl 或 text-chart-*",
+    message: "字号禁任意值：用 text-xs/sm/base/lg/xl/2xl 或 text-chart-*",
   },
-  { test: /\btext-(?:2xl|3xl|4xl|5xl|6xl)\b/, message: "字号只有五档：text-xs/sm/base/lg/xl" },
+  {
+    test: /\btext-(?:3xl|4xl|5xl|6xl)\b/,
+    message: "字号只有六档：text-xs/sm/base/lg/xl/2xl",
+  },
 
   // 图标：四档，跟随字号（size-6 及以上是按钮与头像的盒子，不在此列）
   {

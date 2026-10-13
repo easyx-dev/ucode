@@ -1,7 +1,8 @@
 /**
  * 设置界面的分类导航：桌面端是左侧固定栏，窄屏收成顶部横向 tab 条。
  *
- * 导航底部的动作区（取消 / 保存并生效）是草稿模式下唯一始终可见的提交入口。
+ * 桌面端的保存入口在页头（见 SettingsPageHeader），这里的保存动作只服务窄屏顶部条；
+ * 导航底部是用户身份区，不放动作。
  */
 import { cn } from "cn";
 import { ArrowLeft, type LucideIcon } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   type SettingsGroupId,
   type SettingsSectionId,
 } from "../../lib/settings-section";
+import { LocalUserRow } from "../local-user-row";
 import { useSettingsSectionMeta } from "./settings-sections";
 
 type SettingsNavProps = {
@@ -45,7 +47,7 @@ function NavItem({
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors",
+        "flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors",
         selected
           ? "bg-state-selected font-medium text-foreground"
           : "text-foreground hover:bg-state-hover",
@@ -81,35 +83,7 @@ function TabItem({
   );
 }
 
-function SaveActions({
-  saving,
-  loading,
-  onClose,
-  onSave,
-}: Omit<SettingsNavProps, "section" | "onSectionChange">) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-3">
-      <Button className="w-full" onClick={onSave} disabled={saving || loading}>
-        {saving ? <Spinner className="size-icon-base" /> : null}
-        {t("保存并生效")}
-      </Button>
-      <Button className="w-full" variant="ghost" onClick={onClose} disabled={saving}>
-        {t("取消")}
-      </Button>
-    </div>
-  );
-}
-
-function DesktopNav({
-  section,
-  onSectionChange,
-  onClose,
-  saving,
-  loading,
-  onSave,
-}: SettingsNavProps) {
+function DesktopNav({ section, onSectionChange, onClose }: SettingsNavProps) {
   const { t } = useTranslation();
   const meta = useSettingsSectionMeta();
   const groupLabels: Record<SettingsGroupId, string> = {
@@ -120,17 +94,17 @@ function DesktopNav({
 
   return (
     <nav className="hidden w-60 min-w-0 shrink-0 flex-col border-r border-border bg-background md:flex">
-      <div className="flex h-14 shrink-0 items-center px-3">
+      <div className="shrink-0 px-2 pt-3 pb-1">
         <Button variant="ghost" size="sm" onClick={onClose}>
           <ArrowLeft className="size-icon-base" />
           {t("返回工作区")}
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-2">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 py-3">
         {SETTINGS_GROUP_IDS.map((group) => (
           <div key={group} className="space-y-1">
-            <h3 className="px-2 text-xs font-medium text-foreground-subtle">
+            <h3 className="px-2 pb-1 text-xs font-medium text-foreground-subtle">
               {groupLabels[group]}
             </h3>
             {SETTINGS_GROUP_SECTIONS[group].map((id) => (
@@ -146,7 +120,7 @@ function DesktopNav({
         ))}
       </div>
 
-      <SaveActions saving={saving} loading={loading} onClose={onClose} onSave={onSave} />
+      <LocalUserRow className="shrink-0 border-t border-border" />
     </nav>
   );
 }

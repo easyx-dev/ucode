@@ -51,6 +51,13 @@ export default {
   默认值: "Defaults",
   "MCP 服务器": "MCP servers",
   保存并生效: "Save and apply",
+  "{{count}} 个": "{{count}}",
+  服务器: "Servers",
+  "还没有配置 MCP 服务器": "No MCP server configured yet",
+  "添加服务器后，它提供的工具会出现在新会话里。":
+    "Once a server is added, its tools show up in new sessions.",
+  "管理插件的启停、配置与来源。":
+    "Manage plugins: enable, configure and inspect where they come from.",
   添加供应商: "Add provider",
   "还没有接入供应商，点右上角「添加供应商」。":
     "No provider yet. Use “Add provider” at the top right.",
@@ -77,7 +84,6 @@ export default {
   项目记忆: "Project memory",
   "开启后，每轮对话结束会在后台回顾并保存项目级长期记忆，同一项目的后续会话自动带上；记忆只保存在本机，并按项目目录隔离。":
     "When on, each conversation is reviewed in the background and durable facts are saved per project; later sessions in the same project load them automatically. Memory is stored locally and isolated by project directory.",
-  开启: "On",
 
   // Appearance
   界面主题: "Theme",
@@ -105,10 +111,9 @@ export default {
   语言: "Language",
   "界面语言，切换后立即生效并记住选择。":
     "Interface language. Changes take effect immediately and are remembered.",
-  显示: "Show",
-  不显示: "Hide",
-  "在消息区展示模型的思考过程；隐藏后只保留回答与工具调用。":
-    "Show the model's reasoning in the message area; hiding keeps only answers and tool calls.",
+  显示思考过程: "Show thinking",
+  "在消息区展示模型的思考过程；关闭后只保留回答与工具调用。":
+    "Show the model's reasoning in the message area; turning it off keeps only answers and tool calls.",
 
   // Provider add dialog
   "搜索供应商，如 deepseek": "Search providers, e.g. deepseek",
@@ -172,12 +177,21 @@ export default {
 
   // Provider fields / model list
   名称: "Name",
+  "API 格式": "API format",
   添加模型: "Add model",
+  编辑模型: "Edit model",
+  模型列表: "Models",
+  未命名模型: "Untitled model",
+  "还没有模型：拉取上游列表，或手动添加一个。":
+    "No model yet: fetch the upstream list or add one by hand.",
+  "字段随草稿一起保存；数字留空表示按默认值处理。":
+    "Fields save with the draft; leave a number empty to use its default.",
+  "该模型支持推理档位；关掉后不再向它传思考档。":
+    "The model supports reasoning levels; turning this off stops sending them.",
 
   // Fetch model list
   拉取模型列表: "Fetch model list",
-  "按当前端点的 /models 拉取，点条目即填入下方模型。":
-    "Fetch from the endpoint's /models; click an entry to fill in a model below.",
+  "拉取中…": "Fetching…",
   "已拉取 {{n}} 个模型 · {{latency}}ms": "Fetched {{n}} models · {{latency}}ms",
   收起: "Collapse",
   "上游返回的条数超过上限，只显示前 {{n}} 条。":
@@ -450,7 +464,10 @@ export default {
   助理区: "Assistant",
   选择目录: "Choose directory",
   选择文件: "Choose file",
-  由本仓库的覆盖文件决定: "Set by this repository's override file",
+  配置: "Configure",
+  启用插件: "Enable plugin",
+  "开关由本仓库的覆盖文件决定，改文件才生效。":
+    "The switch is set by this repository's override file; edit that file to change it.",
   "本仓库的覆盖文件：{{project}}（个人覆盖：{{local}}）":
     "Override files for this repository: {{project}} (personal: {{local}})",
   返回上级: "Go up",
@@ -836,6 +853,15 @@ export default {
 
   安装: "Install",
   重装: "Reinstall",
+  安装插件: "Install plugin",
+  尚未安装插件: "No plugin installed yet",
+  "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起；可从本地目录、压缩包、npm 或 git 仓库安装。":
+    "A plugin bundles skills, commands, agents, hooks and MCP servers; install it from a local folder, an archive, npm, or a git repository.",
+  "本地目录来源不复制内容（改完重拉即可生效），网络来源会复制进插件缓存。":
+    "A local folder source is not copied (edit it and refresh); other sources are copied into the plugin cache.",
+  来源地址: "Source address",
+  留空用默认分支: "Leave empty for the default branch",
+  "还没有登记市场。": "No marketplace registered yet.",
   "刷新中…": "Refreshing…",
   "安装中…": "Installing…",
   查看插件: "View plugins",
@@ -857,7 +883,6 @@ export default {
   未设置: "Not set",
   "已设置（留空表示不改）": "Already set (leave empty to keep)",
   保存配置: "Save config",
-  清理缓存: "Also clear cache",
   卸载并清理缓存: "Uninstall and clear cache",
   "组件（{{count}}）": "Components ({{count}})",
   插件: "Plugins",
@@ -871,7 +896,7 @@ export default {
   卸载: "Uninstall",
   "来源已变更，可重拉": "Source changed; reload to pick it up",
   重拉: "Reload",
-  移除: "Remove",
+  移除市场: "Remove marketplace",
   尚未刷新: "Not refreshed yet",
   "{{count}} 个来源": "{{count}} sources",
   "{{count}} 个插件": "{{count}} plugins",
@@ -879,15 +904,12 @@ export default {
   插件目录: "Plugin folder",
   插件目录的绝对路径: "Absolute path to the plugin folder",
   没有组件: "No components",
-  "还没有安装插件。": "No plugins installed yet.",
   登记市场: "Register marketplace",
   市场名: "Marketplace name",
   "市场名（小写字母、数字与 - . _）": "Marketplace name (lowercase letters, digits, - . _)",
   市场目录: "Marketplace folder",
   "含 marketplace.json 的目录": "Folder containing marketplace.json",
   "状态文件：{{path}}": "State file: {{path}}",
-  "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起。本地目录来源不复制内容（改完重拉即可生效），网络来源会复制进插件缓存；来自第三方市场的钩子、扩展与命令目录不会注入运行时。":
-    "Plugins bundle skills, commands, agents, hooks and MCP servers. Local folders are referenced rather than copied (reload picks up your edits); network sources are copied into the plugin cache. Hooks, extensions and command binaries from third-party marketplaces are never injected.",
   "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对随包与本地登记的插件开放）。":
     "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to bundled and locally registered plugins.",
   "市场是一份插件清单（marketplace.json），可来自本地目录、url 直链或 git 仓库；刷新后点「查看插件」看目录内容。内置的 Claude 官方市场是 git 源。":

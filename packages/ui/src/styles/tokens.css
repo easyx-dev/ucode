@@ -254,7 +254,7 @@
   --font-heading: var(--font-ui);
   --font-mono: var(--font-mono-stack);
 
-  /* 字号：五档，全部由基准派生（14px 基准下为 12 / 14 / 16 / 18 / 20）。
+  /* 字号：六档，全部由基准派生（14px 基准下为 12 / 14 / 16 / 18 / 20 / 24）。
      行高用 em 表达相对比例，这样基准变化时行距比例不变 */
   --text-xs: calc(var(--font-size-base) * 6 / 7);
   --text-xs--line-height: 1.333em;
@@ -266,8 +266,14 @@
   --text-lg--line-height: 1.556em;
   --text-xl: calc(var(--font-size-base) * 10 / 7);
   --text-xl--line-height: 1.4em;
+  /*
+   * 面板页标题：只用于全屏面板（设置）里压住内容卡的那一级标题。
+   * 五档之外再加一档是刻意的——现有最高档 text-xl 是空态问候语，拿它当页标题拉不开与卡片标题的层级。
+   */
+  --text-2xl: calc(var(--font-size-base) * 12 / 7);
+  --text-2xl--line-height: 1.3em;
 
-  /* 图表字号：独立三档，不受五档约束，只用于轴、刻度、图例与热力图标签 */
+  /* 图表字号：独立三档，不受字号档位约束，只用于轴、刻度、图例与热力图标签 */
   --text-chart-axis: calc(var(--font-size-base) * 5 / 7);
   --text-chart-axis--line-height: 1.4em;
   --text-chart-label: calc(var(--font-size-base) * 6 / 7);

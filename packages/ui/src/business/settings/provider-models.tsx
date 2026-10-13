@@ -1,7 +1,9 @@
-/** provider 卡片里的模型列表：拉取入口 + 逐行编辑 + 增删 */
+/** provider 卡片里的模型列表：区块标题承载动作，逐行的字段编辑在对话框里完成 */
 import { Plus } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
+import { useProviderModelFetch } from "../../hooks/use-provider-model-fetch";
 import {
   type DraftModel,
   type DraftModelFields,
@@ -9,44 +11,88 @@ import {
   suggestionToModelFields,
 } from "../../lib/config-draft";
 import type { ProviderModelSuggestion } from "../../lib/types";
+import { ModelFormDialog } from "./model-form-dialog";
 import { ModelRow } from "./model-row";
-import { ProviderModelFetch } from "./provider-model-fetch";
+import { ModelFetchButton, ModelFetchResult } from "./provider-model-fetch";
+import { SettingsSectionHeader } from "./settings-page";
+import { SettingsGroup } from "./settings-row";
 
 type ProviderModelsProps = {
   provider: DraftProvider;
   onPatch: (modelKey: string, patch: Partial<DraftModel>) => void;
-  onAdd: (fields?: DraftModelFields) => void;
+  /** 追加一条模型并返回它的草稿 key：新加的条目直接进编辑对话框 */
+  onAdd: (fields?: DraftModelFields) => string;
   onRemove: (modelKey: string) => void;
 };
 
 export function ProviderModels({ provider, onPatch, onAdd, onRemove }: ProviderModelsProps) {
   const { t } = useTranslation();
+  const { fetching, result, fetch, discard } = useProviderModelFetch();
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  // 选中的条目被删掉时自动落空，无需 effect 纠正
+  const editing = provider.models.find((model) => model.key === editingKey) ?? null;
 
-  /** 草稿里已有同 id 的模型就改它，否则按建议新增一行，用户均可继续编辑 */
+  /** 草稿里已有同 id 的模型就改它，否则按建议新增一条；两种都直接打开对话框让人核对 */
   const applySuggestion = (suggestion: ProviderModelSuggestion): void => {
     const fields = suggestionToModelFields(suggestion);
     const existing = provider.models.find((model) => model.id.trim() === suggestion.id);
-    if (existing) onPatch(existing.key, fields);
-    else onAdd(fields);
+    if (existing) {
+      onPatch(existing.key, fields);
+      setEditingKey(existing.key);
+      return;
+    }
+    setEditingKey(onAdd(fields));
   };
 
   return (
-    <div className="space-y-2">
-      <ProviderModelFetch provider={provider} onSelect={applySuggestion} />
+    <section className="space-y-3">
+      <SettingsSectionHeader
+        title={t("模型列表")}
+        meta={t("{{count}} 个", { count: provider.models.length })}
+        action={
+          <>
+            <ModelFetchButton provider={provider} fetching={fetching} onFetch={fetch} />
+            <Button size="sm" onClick={() => setEditingKey(onAdd())}>
+              <Plus className="size-icon-base" />
+              {t("添加模型")}
+            </Button>
+          </>
+        }
+      />
 
-      {provider.models.map((model) => (
-        <ModelRow
-          key={model.key}
-          model={model}
-          onChange={(patch) => onPatch(model.key, patch)}
-          onRemove={() => onRemove(model.key)}
+      {result ? (
+        <ModelFetchResult result={result} onSelect={applySuggestion} onDiscard={discard} />
+      ) : null}
+
+      {provider.models.length === 0 ? (
+        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
+          {t("还没有模型：拉取上游列表，或手动添加一个。")}
+        </p>
+      ) : (
+        <SettingsGroup>
+          {provider.models.map((model) => (
+            <ModelRow
+              key={model.key}
+              model={model}
+              onEdit={() => setEditingKey(model.key)}
+              onToggleReasoning={(enabled) => onPatch(model.key, { reasoning: enabled })}
+              onRemove={() => onRemove(model.key)}
+            />
+          ))}
+        </SettingsGroup>
+      )}
+
+      {editing ? (
+        <ModelFormDialog
+          // 按模型重挂载：对话框里的局部状态不跟着上一个条目串门
+          key={editing.key}
+          model={editing}
+          onPatch={(patch) => onPatch(editing.key, patch)}
+          onOpenChange={(open) => {
+            if (!open) setEditingKey(null);
+          }}
         />
-      ))}
-
-      <Button variant="outline" size="sm" onClick={() => onAdd()}>
-        <Plus className="size-icon-base" />
-        {t("添加模型")}
-      </Button>
-    </div>
+      ) : null}
+    </section>
   );
 }

@@ -227,7 +227,43 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 
 ## 设置
 
-- 导航分组（基础 / 助理 / 服务）+ 分区页；窄屏退化成抽屉，导航项 `h-10 rounded-lg`，选中 `bg-state-selected`。
-- 分区内容用 `SettingsGroup`（`rounded-xl ring-1 ring-border-strong divide-y divide-border`）+ `SettingsRow`（标题 + 说明 + 右侧控件）。
-- 外观分区的控件选型：配色主题与深浅模式用分段控件；界面字号用滑块（14–22px，右侧显示当前值）；
-  界面密度用分段控件（紧凑 / 默认 / 宽松）；界面字体用下拉（等宽固定为系统栈，不给设置项）。改动即时生效并落本地，没有「保存」按钮。
+全屏面板：左侧分类导航 + 右侧内容页（模型设置是唯一的自排正文页）。面板底色是外壳色，内容一律落在卡上。
+
+**导航**（`business/settings/settings-nav.tsx`）
+
+- 桌面端 `w-60` + `border-r border-border`：顶部「← 返回工作区」，中间是分组（基础设置 / Agent 能力 / 服务）与条目，
+  底部是用户身份行（`business/local-user-row.tsx`，与侧栏页脚共用同一份实现）。
+- 分组标题 `text-xs font-medium text-foreground-subtle`；条目 `h-8 rounded-lg px-2 text-sm`，图标 `size-icon-base`，
+  选中 `bg-state-selected font-medium`。
+- 窄屏（< md）退化成顶部条：返回 + 取消 / 保存 + 分区 pill 横滚；分区 pill 与桌面条目同档（`h-8 rounded-lg`）。
+
+**页头与正文**（`business/settings/settings-page.tsx`）
+
+- 页头固定在滚动区之上、不画分隔线：标题 `text-2xl font-semibold`（见 DESIGN.md「排版」的最后一档），
+  标题行右侧是常驻的保存区（「取消」+「保存并生效」，`hidden md:flex`）；说明行 `text-sm text-foreground-subtle` +
+  右侧页面动作（模型页的「添加供应商」）。
+- 正文独立滚动，内容列 `mx-auto w-full max-w-4xl`，左右 `px-6 md:px-8`，底部 `pb-8`。
+- 一页要分段时用 `SettingsSectionHeader`（`text-sm font-medium` 标题 + 计数 `text-foreground-subtle tabular-nums` +
+  右侧区块动作）；列表为空用 `SettingsEmptyState`（虚线框内居中：图标 + 主文案 + 说明 + 一个动作）。
+
+**卡片与行**（`business/settings/settings-row.tsx`）
+
+- `SettingsGroup`：`rounded-xl bg-popover ring-1 ring-border-strong divide-y divide-border`；
+  `SettingsRow`：`px-4 py-4`，标题与说明同为 `text-sm`（说明用 `text-foreground-subtle`），控件贴右、不填满整行。
+- 控件口径：布尔项用 `Switch`（`base/switch.tsx`）；两三档互斥项用 `SegmentedControl`；长枚举用 `Select`；文本字段用 `Input`。
+
+**模型设置**：正文是一张卡（两栏 `flex`，`rounded-xl bg-popover ring-1 ring-border-strong`），左栏 `w-60` + `border-r`，
+按内置 / 自定义分组（条目 = 图标块 + 名称 + 右侧就绪状态点）；右栏头部是名称 + 来源徽标 + key 状态 + 测试连接 / 删除，
+字段竖排（Label 在上、Input 全宽）。模型列表的区块标题承载「拉取模型列表」与「添加模型」，
+每行是 `id`（`font-mono text-xs`）+ 上下文窗口与视觉徽标 + 编辑 / 删除 / 推理开关；
+逐模型字段（含推理等级映射）在 `ModelFormDialog` 里改，改动直接落草稿，由页头保存统一提交。
+
+**插件**：分「已安装」（本地登记与市场来源）与「内置」（随包官方）两段，每行 = 名称 + 来源徽标 + 版本 +
+组件计数 + 说明，右侧是配置 / 更多（重拉、卸载、卸载并清理缓存）/ 启用开关；`enabledBy !== "user"` 时
+开关置灰并注明由覆盖文件决定。配置表单、组件清单与诊断收在行内展开区。市场单独一段，
+五种安装来源收进 `PluginInstallDialog`。
+
+- 保存语义：打开设置即拉草稿，改动只落在草稿里；「保存并生效」提交后关闭面板，「取消」丢弃草稿回工作区。
+- 外观分区例外：它读写的是设备本地偏好（`localStorage`），改动即时生效并落本地，不进草稿。
+- 外观分区的控件选型：配色主题与深浅模式、界面密度、语言用分段控件；界面字号用滑块（14–22px，右侧显示当前值）；
+  界面字体用下拉（等宽固定为系统栈，不给设置项）。

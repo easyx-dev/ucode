@@ -3,11 +3,11 @@ import { brand } from "@ucode/brand";
 import { cn } from "cn";
 import { Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Avatar, AvatarFallback } from "../base/avatar";
 import { Button } from "../base/button";
 import { confirmArchiveSession } from "../lib/session";
 import type { ProjectSummary, SessionSummary } from "../lib/types";
 import { BrandLogo } from "./brand-logo";
+import { LocalUserRow } from "./local-user-row";
 import { SessionList } from "./session-list";
 import { SessionSidebarMenu } from "./session-sidebar-menu";
 
@@ -66,8 +66,6 @@ export function SessionSidebar({
   onOpenSettings,
 }: SessionSidebarProps) {
   const { t } = useTranslation();
-  /** 用户名的来源（登录态 / 配置项）尚未确定，本轮先固定展示；接入时只改这一处 */
-  const localUserName = t("本地用户");
 
   return (
     // 品牌区去掉时留一点上边距：顶部那条是拖拽区与自绘控件的地盘，不留就把菜单贴上去了
@@ -113,15 +111,14 @@ export function SessionSidebar({
         onOpenWorkspace={onOpenWorkspace}
       />
 
-      <div className="flex items-center gap-2 p-2 shadow-edge">
-        <Avatar className="size-7">
-          <AvatarFallback className="text-xs">{localUserName.slice(0, 1)}</AvatarFallback>
-        </Avatar>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{localUserName}</span>
-        <Button variant="ghost" size="icon-sm" title={t("设置")} onClick={onOpenSettings}>
-          <Settings2 className="size-icon-base" />
-        </Button>
-      </div>
+      <LocalUserRow
+        className="shadow-edge"
+        action={
+          <Button variant="ghost" size="icon-sm" title={t("设置")} onClick={onOpenSettings}>
+            <Settings2 className="size-icon-base" />
+          </Button>
+        }
+      />
     </aside>
   );
 }

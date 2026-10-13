@@ -236,6 +236,18 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **设置页重排布局与样式**：全屏面板换成「页头（标题 + 说明 + 页面动作 + 保存区）+ 内容列 + 左侧分组导航」，
+  分组卡与行的说明文字提到 `text-sm`；布尔项统一改用新增的基础组件 `Switch`（`base/switch.tsx`，
+  `radix-ui` 的 Switch 薄封装），保存入口从导航底部上移到页头右侧（窄屏仍在顶部条）。
+  模型设置改为一张卡里的两栏：左栏按内置 / 自定义分组（图标块 + 就绪状态点），右栏字段竖排、
+  模型列表只出行摘要（id + 上下文窗口与视觉徽标 + 编辑 / 删除 / 推理开关），逐模型字段收进
+  `ModelFormDialog`；插件设置拆成 `settings-plugins` / `plugin-list-item` / `plugin-install-dialog` /
+  `plugin-market-section` 四个文件，分「已安装」与「内置」两段列出，安装五种来源收进对话框。
+  顺带抽出 `business/local-user-row.tsx`（导航页脚与侧栏页脚共用）。
+
+- **设计系统新增 `text-2xl` 档**：`--text-2xl`（基准的 12/7，14px 基准下 24px）只用于全屏面板的页标题，
+  同步更新 `DESIGN.md` 字号表与 `scripts/verify/checks/design.ts` 的白名单（放开 `text-2xl`，仍禁 `text-3xl` 以上）。
+
 - **触屏上不再显示滚动条**：`@media (pointer: coarse)` 下把 `scrollbar-width` / `::-webkit-scrollbar` 收成 0，
   并隐藏 Radix `ScrollArea` 的自绘条（它不受 `::-webkit-scrollbar` 影响）——滚动能力不受影响，
   窄窗口在桌面上仍保留滚动条（按指针而不是按宽度判定）。
