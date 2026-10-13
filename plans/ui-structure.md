@@ -125,5 +125,7 @@ packages/ui/src/
 - **超长文件拆分（剩下的）**：`chat-nodes`(566) / `chat-panel`(446) / `composer`(434) / `command-palette`(383) /
   `message-list`(372) 已过 400 行预警阈值；其中 `chat-nodes` 是单一算法（索引 → 配对 → 聚合 → 特殊行），
   `chat-panel` / `composer` 是「一个组件里写了整套状态机」，可以照预设的办法抽 hook。
-- **公开面收口**：`exports` 仍是 `./base/*`、`./business/*`、`./hooks/*`、`./utils/*` 通配，内部实现可被外壳深链；
-  根 barrel `src/index.ts` 全仓库无人 import（只是 `types` 字段的落点）。
+- **公开面收口（已落地）**：删掉无人使用的根入口 `.`（原 `src/index.ts`，`types` 改指 `src/types.ts`），
+  新增 `pnpm verify` 的 ui-exports 校验（exports 目标存在 / 通配后缀与目录一致 / 外壳引用可解析），
+  边界与备选见 [`plans/ui-exports.md`](./ui-exports.md)。`./business/*` 仍保留通配（文档里的「应用层可自拼
+  业务组件」是刻意保留的能力），但它对外的是**组件**，域内 `.ts` 不在公开面内。

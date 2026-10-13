@@ -242,6 +242,13 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **`@ucode/ui` 公开面收口**：删掉无人使用的根入口（`src/index.ts`，`types` 改指 `src/types.ts`）。
+  公开面即 `exports` 的几条子路径：`./base/*`（原语）、`./business/*`（**业务组件**）、`./hooks/*`、
+  `./utils/*`、`./provider`、`./presets/workspace`、`./theme.css`；域内逻辑与 hook（`business/**/*.ts`）
+  不再算公开面，要复用的能力先上提到 `hooks/*` / `utils/*`。新增 `pnpm verify` 的 ui-exports 校验
+  （exports 目标存在 / 通配后缀与目录一致 / 外壳引用可解析）。边界与备选见
+  [`docs/components.md`](./docs/components.md)「公开面」与 [`plans/ui-exports.md`](./plans/ui-exports.md)。
+
 - **`@ucode/ui` 目录按域重排**：`lib/` 拆掉——跨域通用方法归新的 `utils/`（`path` / `time` / `storage` / `clipboard`
   / 格式化…），包的类型门面提到 `src/types.ts`，外观偏好的事实源（`appearance` / `themes` / `fonts`）随
   `AppearanceProvider` 进 `provider/`，其余全部随使用它的域走；`business/` 一级不再平铺组件，改为

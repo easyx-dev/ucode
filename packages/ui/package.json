@@ -7,7 +7,6 @@
     "**/*.css"
   ],
   "exports": {
-    ".": "./src/index.ts",
     "./base/*": "./src/base/*.tsx",
     "./business/*": "./src/business/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
@@ -16,7 +15,7 @@
     "./presets/workspace": "./src/presets/workspace/workspace-layout.tsx",
     "./theme.css": "./src/styles/theme.css"
   },
-  "types": "./src/index.ts",
+  "types": "./src/types.ts",
   "scripts": {
     "test": "node --import tsx --test \"src/**/__tests__/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"

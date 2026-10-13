@@ -103,7 +103,7 @@
 | [`docs/database.md`](./docs/database.md) | 数据库：迁移、命名、类型映射、SQL 约束、删除语义 |
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
 | [`docs/session-entries.md`](./docs/session-entries.md) | 会话条目（JSONL）：条目类型、payload、进不进模型上下文、界面是否展示 |
-| [`docs/components.md`](./docs/components.md) | 组件：分层、props、状态覆盖、可访问性、组合模式 |
+| [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
 规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、分层依赖方向（layers）、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本），
@@ -311,7 +311,9 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   外观偏好的事实源也在这里）、跨域复用的 React 绑定（`src/hooks/*`，SDK store 订阅在 `src/hooks/store/`）
   与跨域通用方法（`src/utils/*`）。子路径导出：`@ucode/ui/base/*`、`@ucode/ui/business/*`、
   `@ucode/ui/hooks/*`、`@ucode/ui/utils/*`、`@ucode/ui/provider`、`@ucode/ui/presets/workspace`、
-  `@ucode/ui/theme.css`。落位判据与域间依赖方向见 [`docs/components.md`](./docs/components.md)。
+  `@ucode/ui/theme.css`。`./business/*` 对外的是**组件**（`.tsx`），域内逻辑与 hook（`.ts`）是内部实现，
+  要复用就先上提到 `hooks/*` / `utils/*`。落位判据、域间依赖方向与公开面边界见
+  [`docs/components.md`](./docs/components.md)，由 `pnpm verify` 的 ui-exports 项兜底。
   组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
 - `apps/web/`（Vite + React）与 `apps/desktop/`（Electron）都是薄外壳：界面与逻辑在 `@ucode/ui` /
   `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/utils/app-i18n`）、client 装配与导航状态。

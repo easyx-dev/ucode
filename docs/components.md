@@ -117,6 +117,26 @@ packages/ui/src/
 - **组合优先**：应用层拼装 `base/*` 与 `business/*`；`presets/workspace` 只是一套默认组合，任何应用都可拆开自拼
 - 事件回调用 `on<动词>` 命名；纯函数下沉到本域目录或 `utils/`，可单独测试
 
+## 公开面
+
+外壳只能用 `packages/ui/package.json` 的 `exports` 声明过的子路径（`pnpm verify` 的 ui-exports 项兜底）：
+
+| 子路径 | 公开面 |
+| --- | --- |
+| `./base/*` | 原语全集（`.tsx`）——外壳可以拿单个原语拼自己的界面 |
+| `./business/*` | **业务组件**（`.tsx`）：外壳可以拿 `chat/chat-panel`、`session/session-sidebar` 这类组件自拼布局 |
+| `./hooks/*` | 跨域复用的 React 绑定（含 `store/`） |
+| `./utils/*` | 跨域通用方法 |
+| `./provider` · `./presets/workspace` · `./theme.css` | 预置入口与样式 |
+
+**域内的逻辑与 hook（`business/**/*.ts`）是内部实现，不在公开面内**：要复用的能力应该先上提到 `hooks/*`
+（React 绑定）或 `utils/*`（无 React 的通用方法），而不是直接深链某个域的实现；真的只属于某个域、
+又确实要给外壳用，才给它加一条具名 exports（这两条路径记在 [`plans/ui-exports.md`](./plans/ui-exports.md)）。
+按 Node 的子路径模式，通配只能映射到一个具体后缀，所以 `./business/*` 引不到 `.ts`——这是有意的边界，不是缺口。
+
+三条通配的后缀与目录实际内容由 ui-exports 校验看着（`base/` 全 `.tsx`、`hooks/` 与 `utils/` 全 `.ts`；
+`business/` 允许同时有 `.tsx` 与 `.ts`），exports 目标必须存在，外壳的每一条引用都必须能解析到存在的文件。
+
 ## props 约定
 
 - 用 `type XxxProps = { ... }` 声明，字段逐个写注释；类型名与组件同名

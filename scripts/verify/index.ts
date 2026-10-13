@@ -1,6 +1,6 @@
 /**
  * 约定校验入口：migrations / contracts / api-docs / plugin-docs / layers / tokens / design / themes /
- * brand / i18n / session-entries / manifest / tests。
+ * appearance / brand / i18n / session-entries / manifest / tests / ui-exports。
  *
  * 由根 `pnpm check` 调用（`biome check . && pnpm -r typecheck && pnpm -r test && node scripts/verify/index.ts`）。
  * 任一检查不通过即非零退出，输出处会用「文件:行」定位。
@@ -21,6 +21,7 @@ import { run as runSessionEntries } from "./checks/session-entries.ts";
 import { run as runTests } from "./checks/tests.ts";
 import { run as runThemes } from "./checks/themes.ts";
 import { run as runTokens } from "./checks/tokens.ts";
+import { run as runUiExports } from "./checks/ui-exports.ts";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -39,6 +40,7 @@ const CHECKS: Array<{ name: string; run: (root: string) => string[] }> = [
   { name: "session-entries", run: runSessionEntries },
   { name: "manifest", run: runManifest },
   { name: "tests", run: runTests },
+  { name: "ui-exports", run: runUiExports },
 ];
 
 let failures = 0;
