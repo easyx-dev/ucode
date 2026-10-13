@@ -281,6 +281,13 @@
   --text-2xl: calc(var(--font-size-base) * 12 / 7);
   --text-2xl--line-height: 1.3em;
 
+  /*
+   * 文档标题：Markdown 正文（`.md-content`）的 H1 / H2，只比正文各高 1px、H1 再比 H2 高 1px。
+   * 另设一组而不占六档——标题要贴着正文字号走，靠 1px 的级差与字重拉开层次，不与控件字号抢档位。
+   */
+  --text-heading-2: calc(var(--font-size-base) + 1px);
+  --text-heading-1: calc(var(--text-heading-2) + 1px);
+
   /* 图表字号：独立三档，不受字号档位约束，只用于轴、刻度、图例与热力图标签 */
   --text-chart-axis: calc(var(--font-size-base) * 5 / 7);
   --text-chart-axis--line-height: 1.4em;

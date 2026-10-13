@@ -140,12 +140,14 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | --- | --- | --- |
 | `text-xs` | 次级说明、时间、徽标、行内代码、密集列表 | 12px |
 | `text-sm` | 正文、控件、列表行（默认档） | 14px |
-| `text-base` | 对话框标题、用量等大数字 | 16px |
-| `text-lg` | Markdown 一级标题 | 18px |
+| `text-base` | 对话框标题 | 16px |
+| `text-lg` | 用量等大数字 | 18px |
 | `text-xl` | 空态问候语 | 20px |
 | `text-2xl` | 全屏面板的页标题（设置） | 24px |
 
 - 图表字号**另算**，不占上面的字号档位，只用于轴、刻度、图例与热力图标签：`text-chart-axis`（基准的 5/7）、`text-chart-label`（6/7）、`text-chart-value`（基准）。
+- 文档标题（Markdown 正文的 H1 / H2）同样**另算**：`text-heading-2` 比正文大 1px、`text-heading-1` 再比 H2 大 1px，
+  层次靠 1px 的级差与字重（`semibold`）拉开；h3 及以下与正文同档。
 - 行高：密集 UI 用 `leading-tight`，默认由各字号自带（约 1.5em），长文正文用 `leading-prose`（1.75）。行高用 `em` 表达，字号变化时比例不变。
 - 字重只用 `normal` / `medium` / `semibold`；不用 `bold`、不用斜体、不用全大写做标题。
 - 字距全局 `0.4px`（`--tracking-base`，绝对值、不随字号缩放）：中英混排下汉字之间不至于拥挤，改一处即全局生效。

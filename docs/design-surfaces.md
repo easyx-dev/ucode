@@ -202,8 +202,9 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 正文由 `styles/markdown.css` 的 `.md-content` 一层渲染，解析与流式交给 `streamdown`
 （唯一入口 `business/message-response.tsx`，对话正文、md 预览、压缩摘要共用）。
 
-- 字号分两档：正文与表格 `text-sm leading-prose`（表格是读的东西，不降档），代码块 `text-xs`；标题不与正文拉开字号，靠字重。
-- 标题 `mt-5 mb-2`（首个元素不带上边距）；h1 用 `text-lg`、h2 用 `text-base`、h3 及以下 `text-sm`。
+- 字号分两档：正文与表格 `text-sm leading-prose`（表格是读的东西，不降档），代码块 `text-xs`。
+- 标题 `mt-5 mb-2`（首个元素不带上边距），字号贴着正文：h2 比正文大 1px（`text-heading-2`）、h1 再比 h2 大 1px
+  （`text-heading-1`），h3 及以下与正文同档（`text-sm`）；层次主要靠字重。
 - 表格是一张**卡片**：卡片画在 `table` 自身（`rounded-lg border border-border` + `w-max max-w-full overflow-x-auto`），
   三处 `.md-content` 入口（对话正文、md 预览、全屏表格预览）因此长得一样；
   分隔只用横线（表头下一条 `thead tr:last-child th`、行间若干 `tbody tr:not(:last-child) td`），末行不画，交给卡片下边框收尾；

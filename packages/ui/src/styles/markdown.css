@@ -2,7 +2,7 @@
  * markdown 渲染（assistant 输出、md 预览、压缩摘要共用）。
  *
  * 字号分两档：正文与表格按基准字号与长文行高（表格是读的东西，不降档），代码块降一档；
- * 标题不与正文拉开字号，靠字重区分。
+ * 标题也贴正文：H2 比正文大 1px、H1 再比 H2 大 1px（`--text-heading-*`），层次主要靠字重。
  * 中文断行由 `@streamdown/cjk` 处理（`message-response.tsx` 接入），这里不要覆盖 word-break / line-break。
  */
 .md-content {
@@ -24,10 +24,10 @@
   @apply mt-0;
 }
 .md-content h1 {
-  @apply text-lg;
+  @apply text-heading-1;
 }
 .md-content h2 {
-  @apply text-base;
+  @apply text-heading-2;
 }
 .md-content h3,
 .md-content h4,
