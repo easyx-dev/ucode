@@ -8,6 +8,7 @@ import { isSessionUnread } from "../lib/session";
 import { groupSessions, type SessionGroup } from "../lib/session-groups";
 import type { ProjectSummary, SessionSummary } from "../lib/types";
 import { SessionListItem } from "./session-list-item";
+import { SessionPagedRows } from "./session-paged-rows";
 import { SessionProjectGroup } from "./session-project-group";
 import { SessionSection } from "./session-section";
 
@@ -155,6 +156,7 @@ export function SessionList({
                           name={group.name}
                           path={group.path}
                           sessions={group.sessions}
+                          activeId={activeId}
                           collapsed={collapsed.has(gKey)}
                           onCollapsedChange={(next) => toggle(gKey, next)}
                           onCreate={() => group.path && onCreate(group.path)}
@@ -166,9 +168,15 @@ export function SessionList({
                   )
                 ) : (
                   <div className="space-y-0.5">
-                    {assistantSessions.length === 0
-                      ? placeholder(t("暂无会话"))
-                      : assistantSessions.map((session) => renderItem(session))}
+                    {assistantSessions.length === 0 ? (
+                      placeholder(t("暂无会话"))
+                    ) : (
+                      <SessionPagedRows
+                        sessions={assistantSessions}
+                        activeId={activeId}
+                        renderItem={renderItem}
+                      />
+                    )}
                   </div>
                 )}
               </SessionSection>

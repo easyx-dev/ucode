@@ -7,12 +7,15 @@ import { Button } from "../base/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../base/collapsible";
 import { isSessionUnread } from "../lib/session";
 import type { SessionSummary } from "../lib/types";
+import { SessionPagedRows } from "./session-paged-rows";
 
 type SessionProjectGroupProps = {
   name: string;
   /** 项目目录；助理区平铺时为 null */
   path: string | null;
   sessions: SessionSummary[];
+  /** 当前选中会话；组内分页至少要展开到它 */
+  activeId: string | null;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   /** 在组内新建会话（在该目录里开一个会话） */
@@ -31,6 +34,7 @@ export function SessionProjectGroup({
   name,
   path,
   sessions,
+  activeId,
   collapsed,
   onCollapsedChange,
   onCreate,
@@ -82,7 +86,7 @@ export function SessionProjectGroup({
           {sessions.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-foreground-subtle">{t("暂无会话")}</p>
           ) : (
-            sessions.map((session) => renderItem(session))
+            <SessionPagedRows sessions={sessions} activeId={activeId} renderItem={renderItem} />
           )}
         </div>
       </CollapsibleContent>
