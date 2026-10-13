@@ -78,9 +78,9 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `surface` | 对话区 / 工作台的面板底 | `#f8f8f8`（自建底料） | `#161616`（与 `card` 同色） |
 | `card` | 面板里的卡片与浮起面（用量卡、diff 面、浮起按钮、选中的分段） | `white` | `#161616`（自建底料） |
 | `popover` | 弹层、下拉、对话框、输入框 | `white` | `#161616`（自建底料） |
-| `muted` | 次级面板底、悬停与嵌入块（代码块、表格头、用户消息） | `#f2f2f2`（自建底料） | `neutral-700` |
+| `muted` | 次级面板底、悬停与嵌入块（代码块、表格头） | `#f2f2f2`（自建底料） | `neutral-700` |
 | `secondary` | 次级实底（次按钮、次级徽标） | `neutral-200` | `neutral-700` |
-| `foreground` | 主文本 | `neutral-800` | `neutral-200` |
+| `foreground` | 主文本（兼作反色面：用户消息气泡拿它当底、`background` 当字） | `neutral-800` | `neutral-200` |
 | `foreground-subtle` | 次级文本、描述、时间、图标弱化 | 前景 60% | 前景 60% |
 | `foreground-subtlest` | 占位、最弱元数据、禁用邻接文案 | 前景 40% | 前景 30% |
 | `border` | 描边、分隔 | 叠加基准 10% | 同 |

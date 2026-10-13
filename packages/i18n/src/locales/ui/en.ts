@@ -431,6 +431,10 @@ export default {
   "发送后将移除这条消息之后的内容（仍保留在会话记录中）。":
     "Sending will remove everything after this message (kept in the session record).",
 
+  // Message outline
+  用户消息目录: "User messages",
+  "跳到第 {{index}} 条用户消息": "Jump to user message {{index}}",
+
   // Empty states
   "深夜好呀，有什么想让我帮忙的吗": "Still up? What can I help with?",
   "上午好呀，有什么想让我帮忙的吗": "Good morning. What can I help with?",

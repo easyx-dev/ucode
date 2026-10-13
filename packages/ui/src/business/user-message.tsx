@@ -5,6 +5,9 @@
  * 图片开弹层看原图，附件下载），位置就是用户当初放的位置；技能与命令不属于任何句子，排在气泡上方。
  * 时刻与操作（分叉 / 编辑 / 复制）落在气泡下方，常驻占位、悬停才现，出现时不顶动内容。
  *
+ * 气泡走反色面：浅色深底白字、深色浅底深字，让它直接铺在面板底上的 assistant 正文一眼分得开。
+ * 句子成分因此落在反色底上，各自带底色的引用 chip 与附件 token 都留着原来的取法（它们本来就有面）。
+ *
  * 正文超过一段高度就折叠（底部渐隐 + 展开入口）：用户贴整段日志时不该把屏幕占满。
  * 编辑态复用输入区的编辑器（见 `message-edit-form`），改写后重发，旧分支留在会话文件里。
  */
@@ -34,7 +37,7 @@ const BODY_MAX_HEIGHT = "max-h-80";
 
 /**
  * 底部渐隐：给正文自身加一层掩码，内容向下淡出、露出气泡底色。
- * 用掩码而不是渐变覆盖层——覆盖层要与气泡的 `bg-muted/60` 对色，叠两层半透明色必然有色差。
+ * 用掩码而不是渐变覆盖层——覆盖层要与气泡底色对色，叠两层半透明色必然有色差。
  */
 const BODY_FADE = "mask-b-from-85%";
 
@@ -48,6 +51,8 @@ type UserMessageProps = {
   onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
   /** 是否为本会话最后一条用户消息；非最后一条会提示其后内容将被移除 */
   isLastUser?: boolean;
+  /** 从目录条跳过来时闪一下，好认出落点是哪一条（时长由列表管） */
+  highlight?: boolean;
 };
 
 /** 正文里的引用：点开右侧工作台预览；没有工作台（子会话嵌套视图、测试）时退化成原文 */
@@ -108,7 +113,14 @@ function AttachmentTokenLink({ id, name }: { id: string; name?: string | null })
   );
 }
 
-export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMessageProps) {
+export function UserMessage({
+  item,
+  blocks,
+  onFork,
+  onEdit,
+  isLastUser,
+  highlight,
+}: UserMessageProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -218,12 +230,18 @@ export function UserMessage({ item, blocks, onFork, onEdit, isLastUser }: UserMe
       ) : null}
 
       {segments.length > 0 ? (
-        <div className="max-w-full rounded-lg rounded-br-sm border border-border bg-muted/60">
+        <div
+          className={cn(
+            // 反色面（与浮层同一对 token）：浅色近黑底白字、深色近白底深字；右下收一档，读起来像说话的一角
+            "max-w-full rounded-lg rounded-br-sm bg-foreground text-background",
+            highlight && "ring-2 ring-ring/50",
+          )}
+        >
           <div
             ref={bodyRef}
             className={cn(
-              "px-3 py-2 text-sm break-words whitespace-pre-wrap text-foreground",
-              // 限高常驻（展开才去）：底部渐隐靠自身掩码，不会碰到气泡的底色与描边
+              "px-3 py-2 text-sm break-words whitespace-pre-wrap",
+              // 限高常驻（展开才去）：底部渐隐靠自身掩码，不会碰到气泡的底色
               expanded ? undefined : `${BODY_MAX_HEIGHT} overflow-hidden`,
               expanded || !overflowing ? undefined : BODY_FADE,
             )}

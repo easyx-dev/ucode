@@ -6,7 +6,7 @@
  */
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "../base/skeleton";
 import { useShowThinking } from "../hooks/use-show-thinking";
@@ -20,6 +20,7 @@ import {
 } from "../lib/chat-rows";
 import { subagentSessionIdOf } from "../lib/tool-view";
 import type { ChatItem, EditMessagePayload, SubagentStreams } from "../lib/types";
+import { MessageOutline, type OutlineEntry } from "./message-outline";
 import { MessageRow } from "./message-row";
 import { SubagentEntry } from "./subagent-entry";
 
@@ -39,6 +40,9 @@ const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
 
 /** 距底部多少像素内算「贴着底部」；更远就认为用户在回看历史 */
 const SCROLL_END_THRESHOLD = 96;
+
+/** 从目录条跳到某条消息后，目标气泡的定位高亮保持多久（与活动面板的高亮同一档） */
+const HIGHLIGHT_MS = 1600;
 
 type MessageListProps = {
   items: ChatItem[];
@@ -85,6 +89,8 @@ export function MessageList({
   // 它只在 scroll 事件里改写——实测高度让 totalSize 变大并不触发 scroll 事件，用距离直接驱动状态会卡住
   const [following, setFollowing] = useState(true);
   const followingRef = useRef(true);
+  /** 刚跳过去、要闪一下的那一行 key */
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   /** 上一次见过的压缩分隔行：新出现一条时才知道「这次重写带来了压缩」 */
   const lastCompactionKeyRef = useRef<string | null>(null);
   /** 是否已经见过至少一行：hydrate 完成前列表必然为空，那一刻不算「历史」 */
@@ -93,6 +99,17 @@ export function MessageList({
   const rows = useMemo(
     () => buildChatRows(showThinking ? items : withoutThinking(items), working),
     [items, working, showThinking],
+  );
+
+  /** 目录条要的刻度：每条用户消息一格，带上行下标（跳转）与内容块（预览） */
+  const outlineEntries = useMemo<OutlineEntry[]>(
+    () =>
+      rows.flatMap((row, index) =>
+        row.kind === "content" && row.node.item.role === "user"
+          ? [{ key: row.key, index, blocks: row.node.blocks }]
+          : [],
+      ),
+    [rows],
   );
 
   // 虚拟列表的回调必须保持引用稳定，否则每次增量都会作废已测量的行高；行数据经 ref 读最新值
@@ -150,8 +167,9 @@ export function MessageList({
       ...(compacting ? { compacting } : {}),
       ...(onFork ? { onFork } : {}),
       ...(onEdit ? { onEdit } : {}),
+      ...(highlightKey ? { highlightKey } : {}),
     }),
-    [renderToolTrailing, compacting, onFork, onEdit],
+    [renderToolTrailing, compacting, onFork, onEdit, highlightKey],
   );
 
   const setFollowingBoth = useCallback((next: boolean) => {
@@ -168,6 +186,33 @@ export function MessageList({
     virtualizer.scrollToEnd();
   }, [virtualizer]);
 
+  /**
+   * 从目录条跳过去：平滑滚到那条消息的顶部，且关掉贴底跟随——不关的话正在流式追加的内容
+   * 会在下一次渲染里把视口拽回底部，跳了等于没跳。行 key 从 ref 现取，取的就是当前这份投影里的行。
+   *
+   * 落点由虚拟列表的测量给出，没渲染过的行只有估算高度，长会话里可能差一两条消息；
+   * 真实位置由目录条常亮的那一格反映，不去反复纠偏（再调一次拿到的仍是同一批估算）。
+   */
+  const jumpToRow = useCallback(
+    (index: number) => {
+      setFollowingBoth(false);
+      virtualizer.scrollToIndex(index, { align: "start", behavior: "smooth" });
+      setHighlightKey(rowsRef.current[index]?.key ?? null);
+    },
+    [setFollowingBoth, virtualizer],
+  );
+
+  /**
+   * 定位高亮只留一会儿：够看清落点，又不会一直亮着。
+   * 滚动期间先不开始计时——平滑滚动到远处要一会儿，等停下来再算，那 1.6s 才落在看得见的时候。
+   */
+  const scrolling = virtualizer.isScrolling;
+  useEffect(() => {
+    if (!highlightKey || scrolling) return;
+    const timer = setTimeout(() => setHighlightKey(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightKey, scrolling]);
+
   const handleScroll = () => {
     const atEnd = virtualizer.isAtEnd(SCROLL_END_THRESHOLD);
     if (ownScrollRef.current) {
@@ -177,6 +222,14 @@ export function MessageList({
       return;
     }
     setFollowingBoth(atEnd);
+  };
+
+  /**
+   * 滚轮落在目录条的刻度上时接过来自己滚：刻度条是滚动容器的兄弟，浏览器不会把它的滚轮转交给那个容器，
+   * 不接的话指针停在对话区左侧那一条上就滚不动了。
+   */
+  const handleWheelScroll = (delta: number): void => {
+    scrollRef.current?.scrollBy({ top: delta });
   };
 
   const backToLatest = () => {
@@ -242,8 +295,20 @@ export function MessageList({
     return () => cancelAnimationFrame(frame);
   }, [rows.length, totalSize, scrollToLatest]);
 
+  /**
+   * 目录条常亮的那一条：视口顶端那一行之前（含）的最后一条用户消息。
+   * 取 `getVirtualItemForOffset` 而不是第一个虚拟项——后者含 overscan，会比视口顶多出好几行。
+   */
+  const topRowIndex =
+    virtualizer.getVirtualItemForOffset(virtualizer.scrollOffset ?? 0)?.index ?? 0;
+  const activeOutlineIndex = outlineEntries.reduce<number | undefined>(
+    (active, entry) => (entry.index <= topRowIndex ? entry.index : active),
+    undefined,
+  );
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    // `@container`：目录条（message-outline）只看这一块的宽度——分栏可拖、面板宽度与窗口宽度不是一回事
+    <div className="@container relative flex min-h-0 flex-1 flex-col">
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]"
@@ -283,6 +348,13 @@ export function MessageList({
           </div>
         )}
       </div>
+
+      <MessageOutline
+        entries={outlineEntries}
+        activeIndex={activeOutlineIndex}
+        onJump={jumpToRow}
+        onWheelScroll={handleWheelScroll}
+      />
 
       {following || rows.length === 0 ? null : (
         <button

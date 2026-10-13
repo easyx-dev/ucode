@@ -30,6 +30,8 @@ export type MessageRowContext = {
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话） */
   onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
+  /** 从目录条跳过来后要闪一下的那一行 key（由列表在 1.6s 后收掉） */
+  highlightKey?: string;
 };
 
 export function MessageRow({ row, context }: { row: ChatRow; context: MessageRowContext }) {
@@ -74,6 +76,7 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
         blocks={row.node.blocks}
         trailing={row.node.trailing}
         footer={row.footer}
+        highlight={row.key === context.highlightKey}
         onFork={context.onFork}
         onEdit={context.onEdit}
         isLastUser={row.isLastUser}

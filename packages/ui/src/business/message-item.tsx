@@ -18,6 +18,7 @@ export function MessageItem({
   blocks,
   trailing = true,
   footer,
+  highlight,
   onFork,
   onEdit,
   isLastUser,
@@ -35,6 +36,8 @@ export function MessageItem({
   onEdit?: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
   /** 是否为本会话最后一条用户消息；非最后一条会提示其后内容将被移除 */
   isLastUser?: boolean;
+  /** 从目录条跳过来时闪一下（时长由列表管） */
+  highlight?: boolean;
 }) {
   const { t } = useTranslation();
   const content = blocks ?? item.blocks;
@@ -47,6 +50,7 @@ export function MessageItem({
         onFork={onFork}
         onEdit={onEdit}
         isLastUser={isLastUser}
+        highlight={highlight}
       />
     );
   }
