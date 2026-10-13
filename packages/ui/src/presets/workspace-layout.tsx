@@ -807,7 +807,7 @@ export function WorkspaceLayout({
                   className="min-w-0"
                 >
                   <div className="flex h-full w-full">
-                    <div className="flex h-full w-full overflow-hidden bg-card md:rounded-md md:border md:border-border">
+                    <div className="flex h-full w-full overflow-hidden bg-surface md:rounded-md md:border md:border-border">
                       <WorkbenchPanel />
                     </div>
                   </div>

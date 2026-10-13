@@ -315,8 +315,8 @@ export function ChatPanel({
   return (
     <main
       // 四周留白都由外壳容器留（见 DESIGN.md「间距与尺寸」），网格与卡片的间隙交给分隔条；
-      // 贴窗口的卡取 `rounded-md`：与窗口自身的圆角相称（见 DESIGN.md「圆角」）
-      className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card md:rounded-md md:border md:border-border"
+      // 贴窗口的面板取 `rounded-md`：与窗口自身的圆角相称（见 DESIGN.md「圆角」）
+      className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface md:rounded-md md:border md:border-border"
     >
       <ChatHeader
         session={session}

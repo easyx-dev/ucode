@@ -16,7 +16,7 @@ export function DecisionPanel({ children }: DecisionPanelProps) {
   return (
     <>
       {/* 底衬：输入区整段（含它的上边框）都被它盖住，面板之外的点击也落在这里，不进输入区 */}
-      <div aria-hidden className="absolute inset-0 z-10 bg-card" />
+      <div aria-hidden className="absolute inset-0 z-10 bg-surface" />
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
         <div className="pointer-events-auto flex max-h-[70vh] w-full max-w-4xl flex-col overflow-y-auto rounded-xl bg-popover shadow-dialog ring-1 ring-border-strong">
           {children}

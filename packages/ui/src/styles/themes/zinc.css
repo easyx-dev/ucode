@@ -7,8 +7,9 @@
  */
 html[data-theme="zinc"] {
   --theme-shell: var(--color-zinc-50);
-  --theme-panel: var(--color-zinc-100);
+  --theme-panel: var(--palette-muted-light);
   --theme-raised: var(--color-white);
+  --theme-surface: var(--palette-surface-light);
   --theme-solid: var(--color-zinc-200);
   --theme-text: var(--color-zinc-800);
   --theme-primary: var(--color-zinc-900);
@@ -22,6 +23,7 @@ html.dark[data-theme="zinc"] {
   --theme-shell: var(--color-zinc-800);
   --theme-panel: var(--color-zinc-700);
   --theme-raised: var(--color-zinc-900);
+  --theme-surface: var(--color-zinc-900);
   --theme-solid: var(--color-zinc-700);
   --theme-text: var(--color-zinc-200);
   --theme-primary: var(--color-zinc-50);

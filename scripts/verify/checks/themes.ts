@@ -27,6 +27,7 @@ const REQUIRED_THEME_VARS = [
   "--theme-shell",
   "--theme-panel",
   "--theme-raised",
+  "--theme-surface",
   "--theme-solid",
   "--theme-text",
   "--theme-primary",

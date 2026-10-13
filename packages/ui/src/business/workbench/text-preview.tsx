@@ -31,7 +31,7 @@ export function TextPreview({ path, text }: { path: string; text: string }) {
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: 代码行没有自然 id，行号即身份
           <div key={index} className="flex whitespace-pre">
-            <span className="sticky left-0 w-12 shrink-0 select-none bg-card pr-3 text-right text-foreground-subtlest">
+            <span className="sticky left-0 w-12 shrink-0 select-none bg-surface pr-3 text-right text-foreground-subtlest">
               {index + 1}
             </span>
             <span className="min-w-0 flex-1">

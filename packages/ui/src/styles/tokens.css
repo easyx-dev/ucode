@@ -23,11 +23,15 @@
 :root {
   /*
    * 自建底料：深色要「外壳比内容卡亮一档」，Tailwind 内置档位里没有这一对
-   * （neutral-900 偏暗、neutral-800 偏亮），按设计稿定死。
+   * （neutral-900 偏暗、neutral-800 偏亮）；浅色的面板底要夹在外壳（neutral-50）与
+   * 内容卡（white）之间，而次级底还得再压一档才与面板底分得开——内置档位同样对不上
+   * （neutral-100 与面板底只差 3/255，看不出底色）。都按设计稿定死。
    * 字面色值只允许出现在这里，主题层与语义层一律引用。
    */
   --palette-shell-dark: #2b2b2b;
   --palette-raised-dark: #161616;
+  --palette-surface-light: #f8f8f8;
+  --palette-muted-light: #f2f2f2;
 
   /* 运行时参数：由外观设置写入 html 的行内样式，这里是默认值 */
   --font-size-base: 14px;
@@ -35,7 +39,7 @@
   /* 间距与尺寸的唯一基准，随密度缩放。定义在 :root 而非 @theme，供间距映射与高度层共用 */
   --base-unit: calc(0.25rem * var(--density));
   /*
-   * 内容卡（对话区 / 工作台）与窗口四周边缘的间距：留白由三栏外壳容器的 padding 统一承担。
+   * 面板（对话区 / 工作台）与窗口四周边缘的间距：留白由三栏外壳容器的 padding 统一承担。
    * 随密度走，且单独成变量——需要精确纵向定位的地方（桌面端窗口控件的中线）直接引用它。
    */
   --shell-inset: var(--base-unit);
@@ -65,8 +69,9 @@
 
   /* 主题层（浅色）：配色主题唯一允许覆盖的一组变量 */
   --theme-shell: var(--color-neutral-50);
-  --theme-panel: var(--color-neutral-100);
+  --theme-panel: var(--palette-muted-light);
   --theme-raised: var(--color-white);
+  --theme-surface: var(--palette-surface-light);
   --theme-solid: var(--color-neutral-200);
   --theme-text: var(--color-neutral-800);
   /* 次级 / 更弱文本的不透明度（百分比数字，配合 color-mix 使用） */
@@ -86,11 +91,13 @@
 /*
  * 深色：分层关系与浅色相反——外壳比内容卡亮一档（浅色是「灰壳 + 白卡」，深色是「灰壳 + 更暗的卡」），
  * 反色面翻转为近白。外壳与卡取自建底料，见上面的 `--palette-*`。
+ * 面板底在深色里与卡同色：浅色那层中间灰是为「卡片压得住面板」立的，深色不需要它。
  */
 .dark {
   --theme-shell: var(--palette-shell-dark);
   --theme-panel: var(--color-neutral-700);
   --theme-raised: var(--palette-raised-dark);
+  --theme-surface: var(--palette-raised-dark);
   --theme-solid: var(--color-neutral-700);
   --theme-text: var(--color-neutral-200);
   --theme-text-faint: 30;
@@ -119,9 +126,10 @@
  * 组件只能用这一层；新增语义前先确认现有语义表达不了（见 DESIGN.md「准入」）。
  */
 :root {
-  /* 表面：外壳 / 内容卡 / 浮层 / 次级底 / 次级实底 */
+  /* 表面：外壳 / 面板底 / 内容卡 / 浮层 / 次级底 / 次级实底 */
   --background: var(--theme-shell);
   --foreground: var(--theme-text);
+  --surface: var(--theme-surface);
   --card: var(--theme-raised);
   --card-foreground: var(--theme-text);
   --popover: var(--theme-raised);
@@ -313,6 +321,7 @@
   --shadow-edge: var(--elevation-edge);
 
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
   --color-foreground-subtle: var(--foreground-subtle);
   --color-foreground-subtlest: var(--foreground-subtlest);

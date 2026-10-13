@@ -10,9 +10,9 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 - **黑白单色品牌**：没有彩色品牌色。品牌感来自灰度分层、排版层级与克制的圆角，而不是色相。
 - **颜色只用于表达状态与数据**：功能色与图表色是惟一的彩色出口。
-- **外壳 + 内容卡两级**：`background` 是外壳底色，`card` / `popover` 是内容与浮层的面；两者刻意不同值，
-  且深浅两色下**方向相反**——浅色是灰壳 + 白卡（卡亮于壳），深色是灰壳 + 更暗的卡（卡暗于壳）。
-  这是整个视觉语言的基础。
+- **外壳 / 面板 / 卡三层**：`background` 是外壳底色，`surface` 是对话区与工作台那层面板底，`card` /
+  `popover` 是卡片与浮层的面。浅色由外向内逐层变亮（灰壳 → 面板 → 卡），深色反向（外壳最亮、卡最暗，
+  面板底与卡同色）。这是整个视觉语言的基础。
 - **低装饰**：默认无阴影、无渐变、无彩色光晕；分隔靠留白与极浅描边。
 - 界面文字统一简体中文。
 
@@ -38,7 +38,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 7. **玻璃面（`--glass`）**：外壳与侧栏用「外壳色掺 84% 透明」的面 + `backdrop-blur`（映射成 `bg-glass`）。
    它透出来的是什么取决于背后有没有东西——**桌面端窗口透明**（`transparent` + macOS `vibrancy`）时透出系统材质；
    **web 端用纯色**（2026-10 定：不铺背景图），因此那里的玻璃面与实色观感一致，留着是为了「同色掺透 + 模糊」
-   这层结构本身，日后要加背景图不必再动样式。内容卡仍是实色 `bg-card`（那是「纸」层）。
+   这层结构本身，日后要加背景图不必再动样式。面板底与内容卡仍是实色（`bg-surface` / `bg-card`，那是「纸」层）。
 
 ## 运行时参数
 
@@ -64,18 +64,21 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 底料全部来自 Tailwind 内置调色板变量（`--color-neutral-*` 等），语义层用 `var()` 与 `color-mix(in oklab, …)` 组装；
 组件里禁止写调色板 utility 与调色板变量。深浅由主题层翻转，语义层不重复。
-深色外壳与内容卡那一对灰在 Tailwind 内置档位里没有对应值（`neutral-900` 偏暗、`neutral-800` 偏亮），
-因此在 `tokens.css` 里自建两个底料（`--palette-shell-dark` / `--palette-raised-dark`）——
+深色外壳与内容卡那一对灰、浅色面板底与次级底那两档灰在 Tailwind 内置档位里都没有对应值
+（`neutral-900` 偏暗、`neutral-800` 偏亮；`neutral-50` 偏亮、`neutral-100` 与面板底几乎同色），
+因此在 `tokens.css` 里自建四个底料（`--palette-shell-dark` / `--palette-raised-dark` /
+`--palette-surface-light` / `--palette-muted-light`）——
 **全仓库只有那一处允许写字面色值**，主题层与语义层一律引用它们。
 
 ### 表面与文本
 
 | token | 用途 | 浅色 | 深色 |
 | --- | --- | --- | --- |
-| `background` | 外壳、主区底色 | `neutral-50` | `#2b2b2b`（自建底料） |
-| `card` | 内容卡与面板 | `white` | `#161616`（自建底料） |
+| `background` | 外壳底色 | `neutral-50` | `#2b2b2b`（自建底料） |
+| `surface` | 对话区 / 工作台的面板底 | `#f8f8f8`（自建底料） | `#161616`（与 `card` 同色） |
+| `card` | 面板里的卡片与浮起面（用量卡、diff 面、浮起按钮、选中的分段） | `white` | `#161616`（自建底料） |
 | `popover` | 弹层、下拉、对话框、输入框 | `white` | `#161616`（自建底料） |
-| `muted` | 次级面板底、悬停与嵌入块 | `neutral-100` | `neutral-700` |
+| `muted` | 次级面板底、悬停与嵌入块（代码块、表格头、用户消息） | `#f2f2f2`（自建底料） | `neutral-700` |
 | `secondary` | 次级实底（次按钮、次级徽标） | `neutral-200` | `neutral-700` |
 | `foreground` | 主文本 | `neutral-800` | `neutral-200` |
 | `foreground-subtle` | 次级文本、描述、时间、图标弱化 | 前景 60% | 前景 60% |
@@ -97,7 +100,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `state-selected` | 选中底（列表行、侧栏项、展开中的触发钮） | 8% | 12% |
 | `state-active` | 按下底 | 12% | 16% |
 
-叠加式的好处：同一个 `hover:bg-state-hover` 落在 `card`、`popover`、`muted` 上都保持同一层关系，不会因为底色不同而深浅乱跳。
+叠加式的好处：同一个 `hover:bg-state-hover` 落在 `surface`、`card`、`popover`、`muted` 上都保持同一层关系，不会因为底色不同而深浅乱跳。
 
 ### 功能色与数据色
 
@@ -159,8 +162,8 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 - 行高表（随密度缩放）：主区列表行 36 · 工作台列表行 28 · 工具行 32 · 标签条 36 · 活动栏 40。
 - 图标：`size-icon-xs`(12) / `-sm`(14) / `-base`(16，默认) / `-lg`(20)，由字号派生；更大的图形（空态插图、头像）用间距档。
 - 窗口控件的点：`size-window-control`(14) 固定值，不随密度与字号走——它仿的是系统标题栏按钮，属于系统镶边。
-- 内容卡与窗口四周边缘的间距 `--shell-inset`（1 档，密度默认下 4px）：由三栏骨架最外层的外壳容器统一留
-  （`md:p-shell-inset`），内容卡自己**不写 margin**——留白归外层，需要精确纵向定位的地方（桌面端窗口控件的中线）
+- 面板与窗口四周边缘的间距 `--shell-inset`（1 档，密度默认下 4px）：由三栏骨架最外层的外壳容器统一留
+  （`md:p-shell-inset`），面板自己**不写 margin**——留白归外层，需要精确纵向定位的地方（桌面端窗口控件的中线）
   可直接引用这个变量。
 - 内容区高度上限用间距档表达（如 `max-h-105` = 420px），避免任意值。
 
@@ -171,7 +174,7 @@ ucode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 取档只看**容器嵌套层级**，不看组件重要性：
 
 - 第一个圆角容器一律 `rounded-xl`；嵌套时逐级降为 `lg → md → sm`（`sm` 为下限）。
-- 例外：贴窗口边缘的内容卡（对话区、工作台）用 `rounded-md`——它们的圆角要与无标题栏窗口自身的圆角相称，
+- 例外：贴窗口边缘的面板（对话区、工作台）用 `rounded-md`——它们的圆角要与无标题栏窗口自身的圆角相称，
   取 `xl`（16.8px）会在窗口角上露出错位的月牙。
 - 控件（按钮、输入框、选择器）默认 `rounded-lg`；落在 `rounded-lg` 父容器里降为 `md`，落在 `rounded-md` / `sm` 里降为 `sm`。
 - 布局容器、分隔条、包装层不算一层。
