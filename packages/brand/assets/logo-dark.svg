@@ -1,2 +1,2 @@
-<!-- U 标：设计框 208×232、笔画 28（外描边 12 让切口带圆角）、四处收口沿用参考图的 18:26 斜切；改形状只需改下面的 path -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path fill="#fafafa" stroke="#fafafa" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" d="M12 12 H40 V218 L58 244 H174 L192 218 V12 H220 V218 L202 244 H30 L12 218 Z"/></svg>
+<!-- U 标：与 logo-light.svg 同形反色（深色主题下浅底板更立得住）。改字形只需改最后那个 path -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true" focusable="false"><path fill="#FFFFFF" stroke="#2D2D2D" stroke-width="0.6317" d="M24.51,28.51H5.49c-2.21,0-4-1.79-4-4V5.49c0-2.21,1.79-4,4-4h19.03c2.21,0,4,1.79,4,4v19.03 C28.51,26.72,26.72,28.51,24.51,28.51z"/><path fill="#2D2D2D" fill-rule="evenodd" d="M6.49,6.49H23.51V20.51A3,3 0 0 1 20.51,23.51H9.49A3,3 0 0 1 6.49,20.51ZM10.49,6.49H19.51V18.01A1.5,1.5 0 0 1 18.01,19.51H11.99A1.5,1.5 0 0 1 10.49,18.01Z"/></svg>
