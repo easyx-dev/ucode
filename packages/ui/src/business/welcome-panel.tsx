@@ -1,11 +1,11 @@
 /**
  * 空态：还没有任何消息时的起点（输入区常驻可用，直接打字就是第一个会话）。
  *
- * 只有品牌图与一句按时段的问候——模型在工具栏、工作目录在项目条，这里再说一遍是重复。
+ * 只有品牌字样与一句按时段的问候——模型在工具栏、工作目录在项目条，这里再说一遍是重复。
  */
 import { useTranslation } from "react-i18next";
 import { Button } from "../base/button";
-import { BrandLogo } from "./brand-logo";
+import { BrandWordmark } from "./brand-logo";
 
 type WelcomePanelProps = {
   configured: boolean;
@@ -39,7 +39,7 @@ export function WelcomePanel({ configured, onOpenSettings }: WelcomePanelProps) 
   return (
     <section className="flex flex-col items-center gap-4 pb-8 text-center">
       {/* 水印是装饰，不参与朗读 */}
-      <BrandLogo className="h-20 opacity-[0.07]" />
+      <BrandWordmark className="h-20 opacity-[0.2]" />
       <h2 className="text-xl font-semibold">{greeting()}</h2>
     </section>
   );

@@ -150,8 +150,9 @@ $APP_HOME/                 # 默认 ~/.ucode
 
 品牌名、浏览器标题与 logo / favicon 统一放在 `packages/brand/`（`@ucode/brand`），B 端交付只改这一处：
 
-- `src/brand.ts`：`name`（侧栏、空态水印）、`title`（浏览器标题）、`slug`（主题存储键、默认数据目录等命名空间）
-- `src/assets.ts`：`logoLight` / `logoDark` / `favicon` 三个图片引用，从 `assets/` 下的文件 import；
+- `src/brand.ts`：`name`（侧栏、输入区提问对象）、`title`（浏览器标题）、`slug`（主题存储键、默认数据目录等命名空间）
+- `src/assets.ts`：`logoLight` / `logoDark`（底板 + 字形，用于侧栏与登录页）、`wordmarkLight` / `wordmarkDark`
+  （品牌字样，用于空态水印）、`favicon` 五个图片引用，从 `assets/` 下的文件 import；
   换 logo 就替换文件，换格式就改这里的 import 扩展名（svg / png / jpg / webp … 都行）；
   只想要一套通用的 logo 时，把 `logoLight` / `logoDark` 指向同一个文件即可
 - 标题与主题存储键由 `@ucode/brand/vite` 的 `brandHtml` 插件在构建时注入 `index.html`，避免首屏闪烁
@@ -437,8 +438,8 @@ packages/contracts/
     {models,sessions,messages,config}/{input,output}.ts
 packages/brand/
   src/brand.ts             # 品牌唯一入口：name / title / slug（B 端定制只改这里）
-  src/assets.ts            # logoLight / logoDark / favicon 的图片引用（换格式改这里的 import）
-  assets/                  # logo-light.svg / logo-dark.svg / favicon.svg
+  src/assets.ts            # logoLight / logoDark / wordmarkLight / wordmarkDark / favicon 的图片引用（换格式改这里的 import）
+  assets/                  # logo-{light,dark}.svg（底板 + 字形）/ wordmark-{light,dark}.svg（品牌字样）/ favicon.svg
   scripts/verify.ts        # 品牌校验（品牌值 / 图片引用 / 硬编码品牌名）
   scripts/replace.ts       # 应急：批量替换残留的旧品牌串
 packages/i18n/             # 跨端 i18n 运行时与共享文案（只依赖 i18next）

@@ -247,8 +247,8 @@ insertCommand: (command: { kind: "prompt" | "skill"; name: string }) => boolean;
 
 ### 11. `business/welcome-panel.tsx`（改）
 
-- 水印：`brand.name` 文字 → `<BrandLogo className="h-20 opacity-[0.07]" />`（`aria-hidden`；深浅色资产由
-  `BrandLogo` 自己切）。
+- 水印：`brand.name` 文字 → `<BrandWordmark className="h-20 opacity-[0.2]" />`（线稿字样资源，`alt=""`
+  让读屏忽略；深浅色资产由 `BrandWordmark` 自己切）。
 - 问候语 4 条改为：`深夜好呀，有什么想让我帮忙的吗` / `上午好呀，…` / `下午好呀，…` / `晚上好呀，…`。
 - props 精简为 `{ configured, onOpenSettings }`：删 `defaultModel` / `workspacesDir` 与那段
   「模型已就绪」说明（理由见 §二）；`configured === false` 的分支（标题 + 说明 + 「打开设置」按钮）保留。

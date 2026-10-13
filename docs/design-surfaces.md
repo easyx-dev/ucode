@@ -221,7 +221,7 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 
 ## 空态与登录
 
-- 空态：品牌水印（`BrandLogo` 大尺寸 + `opacity-[0.07]`）+ 按时段问候语（`text-xl font-semibold`）+ 居中输入卡 + 建议行；
+- 空态：品牌字样水印（`BrandWordmark` 大尺寸 + `opacity-[0.2]`，线稿字样）+ 按时段问候语（`text-xl font-semibold`）+ 居中输入卡 + 建议行；
   未配置模型时换成「还没有配置模型」并给配置入口。
 - 登录页：`max-w-sm` 卡片（`rounded-xl border bg-popover p-6`），表单与按钮竖排，`space-y-5`。
 
