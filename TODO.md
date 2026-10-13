@@ -40,7 +40,7 @@ web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分�
 **开工前要定的三件事**：游标 vs offset（`docs/api.md:120-122` 的房规是 `limit` / `offset`，
 但历史会不断追加、offset 会漂，推荐条目 id 游标）；窗口是否按轮对齐；长工具输出是否在列表投影里截断
 （截断要新增「按条目取原文」的接口，且必须**头截断**保住结果首行的 `task_id:`，见
-`packages/ui/src/lib/tool-view.ts:150`；`write` / `edit` 的 diff 需要完整 args，见同文件 `:139`）。
+`packages/ui/src/business/chat/tool-view.ts:150`；`write` / `edit` 的 diff 需要完整 args，见同文件 `:139`）。
 
 **注意**：窗口化省的是传输 / 解析 / store 归并 / 首屏渲染，**不省服务端成本**——`/list` 仍要
 `SessionManager.open` + `buildContextEntries()` + `getBranch()` 走完整个 JSONL。

@@ -8,48 +8,114 @@
 ## 组件来源与维护
 
 组件与 hooks 位于 `packages/ui`（`@ucode/ui`），web 与桌面端共用。基础组件
-`packages/ui/src/base/**` 由 shadcn CLI 生成（配置见 `packages/ui/components.json`），但**只生成一次**：
-之后与其它代码一样由我们维护，同等适用本仓库的格式化、命名、颜色 token 与行数规则。
+`packages/ui/src/base/**` 里的 shadcn 产物由 shadcn CLI 生成（配置见 `packages/ui/components.json`），
+但**只生成一次**：之后与其它代码一样由我们维护，同等适用本仓库的格式化、命名、颜色 token 与行数规则。
 
 - 新增基础组件用 `npx shadcn@latest add <name>` 生成，生成完即视为项目代码，按本规范整理
-- 生成后要把 `@/` 导入改成包内相对路径，`@/lib/utils` 改成从 `cn` 包导入
+- 生成后要把 `@/` 导入改成包内相对路径，`@/utils` 改成从 `cn` 包导入
 - 对已经改过的组件再跑 CLI 会覆盖我们的改动，需要手工合并
-- 唯一豁免：`base/` 下都是对 Radix 的薄封装，不要求写文件级注释
+- CLI 生成的那批不要求写文件级注释（都是对 Radix 的薄封装）；`base/` 下自研的原语照常要写
 
 ## 目录与命名
 
 ```
 packages/ui/src/
-  base/               # 基础组件（shadcn 生成后归我们维护）
-  business/           # 业务组件，按功能分组
-    settings/         # 同功能多文件放同名文件夹
-    <kebab-name>.tsx  # 顶层业务组件
-  hooks/              # SDK store 的 React 绑定与派生
-  lib/                # 纯逻辑
-  provider/           # UiProvider：注入应用层创建好的 client
-  presets/            # 预置组合（workspace-layout）
+  base/               # 原语：无业务语义、只吃 props（shadcn 产物 + 自研原语）
+  utils/              # 跨域通用方法与类型门面（无 React）
+  hooks/              # 跨域复用的 React 绑定 + 无域语义的通用 hook
+    store/            # SDK store 的订阅与派生（薄绑定不论消费者多少都在这层）
+  business/<域>/      # 业务组件：一级一律是域文件夹，域内自含组件 + 私有逻辑 + 私有 hook + 用例
+    chat/             # 对话区骨架（面板、头部、空态、头部动作、会话状态底色）
+      message/        # 消息流：条目投影（nodes / rows / plan / goal-turns）、行渲染、目录条
+      tool/           # 工具与子智能体在消息流里的呈现（聚合行、工具卡、处理中指示、工具卡的 diff）
+      activity/       # 运行态浮层（子智能体 / 目标 / 后台服务）与子会话小窗
+      decision/       # 决策区：权限 / 问答 / 计划，盖在输入区上
+    composer/         # 输入区
+      editor/         # Tiptap 编辑器内部：扩展、建议、`@` 候选、附件 chip
+      picker/         # 四个 picker 与共用外观、它们的文案映射
+      document/       # 文档 ↔ 提交载荷、草稿落盘、正文标记编解码
+      project/        # 项目（工作目录）：取值、选择器、行、重命名弹层
+    session/          # 侧栏、会话列表与项目分组
+    goal/             # 目标栏与目标轮次线
+    markdown/         # 正文渲染：入口 + diff
+      code/ mermaid/ table/   # 代码高亮 / mermaid / 表格三块（各自含引擎、hook 与弹层）
+    attachment/ dialog/ notify/
+    shell/            # 应用外壳级：登录页、主题 Provider、错误提示、命令面板
+    settings/         # 设置面板
+      pages/          # 单个设置分页（外观、默认值、记忆、联网、远程访问）与它们的 hook
+      models/ plugins/ mcp/   # 模型与供应商 / 插件 / MCP 三块
+    workbench/        # 工作台：面板骨架 + git/（变更与 diff）+ file/（文件与编辑器）
+    usage/            # 用量统计
+  provider/           # UiProvider：注入应用层创建好的 client；外观偏好的事实源也在这里
+  presets/workspace/  # 预置组合：入口 + 按关注点拆的 hook（外壳几何 / 工作台 / 会话动作 / 目标与计划 / 内置命令 / 快捷键）
   styles/theme.css    # 设计 token 与基础样式
+  assets/             # 包内随包资源（提示音等）
+  types.ts            # 契约与 SDK 类型的包内出口
 ```
 
 - 一个文件一个主组件，文件名 kebab-case，与组件名对应（`xxx-card.tsx` → `XxxCard`）
-- 同功能的多文件放同名文件夹；文件名与目录名同名时不重复语义（`settings/settings-row.tsx`，不是 `settings/settings-settings-row.tsx`）
+- `business/` 一级一律是目录，不直接放 `.tsx`；域内文件超过十来个、或出现第二层职责时再开子目录
+  （`chat/` 就是这么分的：根上是对话区骨架，`message/` / `tool/` / `activity/` / `decision/` 各管一块）
+- 文件名与目录名同名时不重复语义（`settings/settings-row.tsx`，不是 `settings/settings-settings-row.tsx`）
 - 子组件只服务单个父组件时留在父组件文件内，不单独开文件
+- 用例放被测模块同级的 `__tests__/`，命名 `<模块>.test.ts`
+
+**落位判据**（新增一个模块时按这个选位置，别按「放哪顺手」）：
+
+| 情况 | 落位 |
+| --- | --- |
+| 只被一个域使用 | 该域目录内（逻辑 `.ts`、hook、用例都跟着走） |
+| 只做「SDK store ↔ React」的薄绑定（`useStore(client.x)` + 载入 / 动作转发） | `hooks/store/`，不论有几个消费者 |
+| 无域语义的通用 hook（视口观察、设计 token 取值、一次性取数） | `hooks/` |
+| 被 ≥2 个域使用、无 React | `utils/` |
+| 被 ≥2 个域使用、是 React 绑定 | `hooks/` |
+| 被 ≥2 个域使用、是纯展示组件 | `base/` |
+
+有域语义的模块不进 `utils/`：正文标记解析留在 `business/composer`、会话条目读法与消息流派生
+（`chat-item` / `goal-turns` / `session-activity`）留在 `business/chat`——它们看着像工具，实际只服务一组界面，
+搬进 `utils/` 只会让它重新变成杂物间。后两个是被 `chat` / `goal` / `session` 三处引用过的，
+但那三处本来就是同一层投影被拆到了三个目录：**共享是拆分造成的，不是真通用**，
+正确做法是把投影收回 `chat/`，让 `goal/` 与 `session/` 的展示件只从 `chat/` 借类型（数据由 `chat-panel` 以 props 传入）。
 
 ## 分层
 
 | 层 | 位置 | 职责 | 禁止 |
 | --- | --- | --- | --- |
-| 基础组件 | `packages/ui/src/base/` | 纯展示，只关心 props | 调接口、读全局状态 |
-| 业务组件 | `packages/ui/src/business/` | 组合基础组件、经 hooks 读 SDK store、渲染业务数据 | 直接 `fetch`、直接操作 DOM 存储 |
-| 状态层 | `packages/ui/src/hooks/` | SDK store 的订阅、派生与动作转发 | 渲染 JSX、自持跨组件状态 |
-| Provider | `packages/ui/src/provider/` | 注入应用层创建好的 `client` | 自行创建 client / 依赖模块级单例 |
-| 纯逻辑 | `packages/ui/src/lib/` | 无 React 依赖的纯函数（格式化、草稿、命令解析） | 依赖组件 |
+| 原语 | `packages/ui/src/base/` | 纯展示，只关心 props | 调接口、读全局状态 |
+| 业务组件 | `packages/ui/src/business/<域>/` | 组合原语、经 hooks 读 SDK store、渲染业务数据 | 直接 `fetch`、直接操作 DOM 存储 |
+| 状态层 | `packages/ui/src/hooks/` | 跨域复用的 SDK store 订阅、派生与动作转发 | 渲染 JSX、自持跨组件状态 |
+| Provider | `packages/ui/src/provider/` | 注入应用层创建好的 `client`；外观偏好的读写与应用 | 自行创建 client / 依赖模块级单例 |
+| 跨域方法 | `packages/ui/src/utils/` | 无 React 依赖的通用方法与类型出口（路径、时间、存储、剪贴板、格式化） | 依赖组件与 React |
+
+域内允许自定义私有 hook 与纯逻辑（`business/<域>/use-*.ts`、`business/<域>/<name>.ts`），
+它们只服务本域，不上提到 `hooks/` 与 `utils/`。
+
+**域间依赖是单向的**，允许的边只有下表这些，其余（尤其是反向与成环）都算摆错了位置：
+
+| 域 | 可以依赖的其他业务域 |
+| --- | --- |
+| `chat` | attachment · composer · dialog · goal · markdown · session |
+| `session` | composer · dialog |
+| `composer` | attachment · dialog · workbench（只用项目行的 git 状态） |
+| `workbench` | dialog · markdown |
+| `settings` | dialog · notify · session · workbench |
+| `notify` | session |
+| `shell` | composer · session |
+| `markdown` | attachment · dialog |
+| `attachment` | dialog |
+| `dialog` · `goal` · `usage` | 无（只依赖下层） |
+| `presets` | 全部 |
+
+每个域都可以依赖 `base` / `utils` / `hooks` / `provider` 与包根的 `types.ts`；
+`import type` 的边不计入方向（`hooks/store/use-chat` 取 `ComposerPayload` 类型、
+`provider/workbench` 取 `WorkbenchDoc` 类型都是这种）。工作台去引用消息流的渲染件、`utils` 去引用组件，
+这类同层反向或下层引用上层的写法仍是错的。
 
 - **数据自服务**：业务组件经 `hooks/use-*` 读 SDK store（会话、消息、目标、交互…），不再由应用层透传控制器
 - **导航受控**：当前会话、设置分区等平台相关状态由应用层持有，以 props 传入（`sessionId` / `onSelectSession` /
   `settingsSection` / `onSettingsSectionChange`），UI 不定义导航抽象、不写 URL
 - **组合优先**：应用层拼装 `base/*` 与 `business/*`；`presets/workspace` 只是一套默认组合，任何应用都可拆开自拼
-- 事件回调用 `on<动词>` 命名；纯函数下沉到 `lib/`，可单独测试
+- 事件回调用 `on<动词>` 命名；纯函数下沉到本域目录或 `utils/`，可单独测试
 
 ## props 约定
 
@@ -101,7 +167,7 @@ packages/ui/src/
 
 ## 弹层的调用方式
 
-弹层**默认函数式调用**（`packages/ui/src/lib/dialog.ts`）：调用方不持有 open 状态，等 Promise 拿结果。
+弹层**默认函数式调用**（`packages/ui/src/business/dialog/queue.ts`）：调用方不持有 open 状态，等 Promise 拿结果。
 
 - `confirm({ title, description?, confirmText?, cancelText?, destructive? })` → `Promise<boolean>`：确认是 `true`；
   取消 / Esc / 点遮罩 / 宿主卸载都算 `false`。
@@ -109,7 +175,7 @@ packages/ui/src/
 - `openDialog<T>((close) => <Xxx onCancel={() => close()} />)` → `Promise<T | undefined>`：自定义弹层用这个，
   `close(result)` 把结果交回调用方，省略即 `undefined`。
 
-队列串行——同一时刻只渲染队首，避免多层遮罩叠在一起；渲染由 `business/dialog-host` 负责，它挂在工作区里
+队列串行——同一时刻只渲染队首，避免多层遮罩叠在一起；渲染由 `business/dialog/dialog-host` 负责，它挂在工作区里
 与 `Toaster` 并列，未挂载时调用会同步报错（别让调用方的 await 悬着）。因此弹层组件自己不持有 open 状态：
 **挂载即打开，收起即结算**。
 
@@ -119,7 +185,7 @@ packages/ui/src/
 
 ## 决策区
 
-「等用户作答」的三件事（权限审批、question 提问、计划决策）共用 `business/decision-panel`：**用绝对定位盖在输入区上把它挡住**。
+「等用户作答」的三件事（权限审批、question 提问、计划决策）共用 `business/chat/decision/decision-panel`：**用绝对定位盖在输入区上把它挡住**。
 
 输入区仍留在原位（布局不跳），只是这段时间接不到事件；面板与输入区在同一个定位上下文里（`ChatPanel` 里包一层
 `relative`），分两层：`inset-0` 的**底衬**把输入区整段（含它的上边框）盖住并接住事件——面板宽 `max-w-4xl`，
@@ -149,6 +215,7 @@ packages/ui/src/
 
 具体写法直接读现有组件即可，下列只是**举例**，不代表必须覆盖的范围：
 
-- 列表行（选中态、相对时间、隐藏式操作）：`session-list-item.tsx`
-- 弹出层面板（搜索行、分组、条目说明）：`model-picker.tsx`
-- 分组设置（容器 + 行 + 右侧控件）：`settings/settings-row.tsx`
+- 列表行（选中态、相对时间、隐藏式操作）：`business/session/session-list-item.tsx`
+- 弹出层面板（搜索行、分组、条目说明）：`business/composer/model-picker.tsx`
+- 分组设置（容器 + 行 + 右侧控件）：`business/settings/settings-row.tsx`
+- 域内的编排与派生（组件 + 私有逻辑 + 私有 hook 同处）：`business/chat/`、`business/workbench/git/`

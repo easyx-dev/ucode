@@ -242,6 +242,20 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **`@ucode/ui` 目录按域重排**：`lib/` 拆掉——跨域通用方法归新的 `utils/`（`path` / `time` / `storage` / `clipboard`
+  / 格式化…），包的类型门面提到 `src/types.ts`，外观偏好的事实源（`appearance` / `themes` / `fonts`）随
+  `AppearanceProvider` 进 `provider/`，其余全部随使用它的域走；`business/` 一级不再平铺组件，改为
+  `chat`（域内再分 `message/` 消息流、`tool/` 工具呈现、`activity/` 运行态浮层、`decision/` 决策面）、
+  `composer`（`editor/` `picker/` `document/` `project/`）、`session`、`goal`、`markdown`（`code/` `mermaid/` `table/`）、
+  `attachment`、`dialog`、`notify`、`shell`、`settings`（`pages/` `models/` `plugins/` `mcp/`）、
+  `workbench`（含 `git/`、`file/`）、`usage` 十二个域，
+  域内自含组件 + 私有逻辑 + 私有 hook + 用例；`hooks/` 只留跨域复用与通用绑定，SDK store 的薄绑定全部进
+  `hooks/store/`（不论几个消费者）。功能与界面零改动。
+  影响使用方：`@ucode/ui/lib/*` 子路径导出改为 `@ucode/ui/utils/*`，`business/{login-page,theme-provider}`
+  移到 `business/shell/`，跨域错误文案 hook 移到 `hooks/use-error-text`；web 与桌面外壳的引用已同步。
+  落位判据与域间依赖方向写进 [`docs/components.md`](./docs/components.md)，搬迁与决策见
+  [`plans/ui-structure.md`](./plans/ui-structure.md)。
+
 - **品牌显示名统一为 `UCode`**：`@ucode/brand` 的 `name` / `title` 由 `ucode` 改为 `UCode`，侧栏标题、
   输入区占位、浏览器标签页标题、CLI 帮助与启动日志、模型身份提示词与内置技能描述随之更新；
   `slug` 仍是 `ucode`——主题 / 语言 / 外观 / 会话 token 存储键、`~/.ucode` 数据目录与项目级 `.ucode`

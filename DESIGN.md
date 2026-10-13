@@ -1,7 +1,7 @@
 # 设计系统
 
 UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./packages/ui/src/styles/tokens.css)，
-基础组件在 `packages/ui/src/base/`，业务组件的视觉取值见 [`docs/design-surfaces.md`](./docs/design-surfaces.md)。
+原语与界面件在 `packages/ui/src/base/`，业务组件的视觉取值见 [`docs/design-surfaces.md`](./docs/design-surfaces.md)。
 各端在 tailwind 入口 `@import "@ucode/ui/theme.css"` 并用 `@source` 扫描包内 className。
 
 规范靠 `pnpm check` 兜底：`scripts/verify` 的 `tokens`（颜色）、`design`（尺寸与档位）、`themes`（配色主题）三项会拦下越界写法。
@@ -53,11 +53,11 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 - 字号与密度**刻意不联动**：允许「字大 + 紧凑」这种组合，观感取舍交给用户；大字号配紧凑密度时界面会更挤，这是选择的结果而不是缺陷。
 - 派生链：字号 → 六档字号 + 图标四档 + 行高；密度 → `--base-unit = 0.25rem × density` → 间距基准、控件高度、高度层的 offset/blur。
-  **栏宽不在这条链上**：它由 `lib/panel-layout.ts` 的像素常量（侧栏 288 / 工作台 640 / 树列 275）给定，
+  **栏宽不在这条链上**：它由 `utils/panel-layout.ts` 的像素常量（侧栏 288 / 工作台 640 / 树列 275）给定，
   密度变化不重算，也不缩写用户拖出来的宽度。
-- 应用只有一个出口：`lib/appearance.ts` 的 `applyAppearance` 把参数写到 `<html>` 的行内样式与 `data-theme`；
+- 应用只有一个出口：`provider/appearance.ts` 的 `applyAppearance` 把参数写到 `<html>` 的行内样式与 `data-theme`；
   首屏由 `apps/web/index.html` 与 `apps/desktop/index.html` 的内联脚本按同一个键预先应用（否则会有一帧默认字号）。
-- 界面字体按需加载：`@fontsource-variable` 的 CSS 入口在选中时才动态引入，未加载完用回退字体渲染；字体族名与清单在 `lib/fonts.ts`。
+- 界面字体按需加载：`@fontsource-variable` 的 CSS 入口在选中时才动态引入，未加载完用回退字体渲染；字体族名与清单在 `provider/fonts.ts`。
 - 等宽只走系统字体，不打包 webfont：CJK 等宽字体（Sarasa Mono SC / Maple Mono CN）单字重就是几 MB，而收益只是「代码注释里的中文与 ASCII 严格 2:1 对齐」，不划算。栈里显式插入中文回退（见「排版」），中文能正常显示，代价是与 ASCII 不对齐。
 
 ## 颜色
@@ -286,7 +286,7 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
    而不是写死常量——否则改字号时它会掉队。
 3. **颜色采样**：库自己解析颜色字符串时，不能直接读变量的 computed 值——语义层用 `color-mix()` 合成，
    读出来是未求值的表达式（如 `color-mix(in oklab, oklch(…), transparent)`）。要经浏览器求值：
-   本仓库走 `lib/mermaid-color.ts` 的 1×1 canvas 采样（`CSS.supports` 先校验再采样，得 sRGB 四通道），
+   本仓库走 `business/markdown/mermaid-color.ts` 的 1×1 canvas 采样（`CSS.supports` 先校验再采样，得 sRGB 四通道），
     mermaid 的颜色引擎与语法高亮都吃这一层。
 
 ## 配色主题
@@ -295,7 +295,7 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
   覆盖 `--theme-shell` / `-panel` / `-raised` / `-solid` / `-text` / `-primary` / `-primary-fg` / `-ring` / `-line` 这九个变量（深浅各一块），
   强度类变量（`-text-soft` / `-text-faint` / `-line-soft` / `-overlay` / `-shadow-*`）按需覆写。
 - 选择器必须写 `html[data-theme="…"]` 与 `html.dark[data-theme="…"]`：后者不可省，否则深色会被基础主题层盖回去。
-- 新增主题要同时在 `lib/themes.ts` 的 `COLOR_THEME_IDS` 登记；`scripts/verify` 的 `themes` 校验比对两份清单与覆盖完整性。
+- 新增主题要同时在 `provider/themes.ts` 的 `COLOR_THEME_IDS` 登记；`scripts/verify` 的 `themes` 校验比对两份清单与覆盖完整性。
 - 主题不影响字体、字号与圆角——「换风格」需要新主题，而不是改这几个旋钮。
 
 ## 新增 token 的流程

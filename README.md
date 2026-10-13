@@ -456,12 +456,15 @@ packages/sdk/              # @ucode/sdk：server /api/v1 的跨端客户端（�
   src/stores/              # 各域同步 store（会话列表、消息流、交互、目标、配置…）
   src/client.ts            # createClient：apis + events + 各域 store
 packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
-  src/base/                # 基础组件（shadcn 生成后归我们维护）
-  src/business/            # 业务组件（侧栏、消息区、Composer、设置…）
-  src/hooks/               # SDK store 的 React 绑定与派生
-  src/lib/                 # 纯逻辑（类型出口、消息归并、草稿、格式化…）
-  src/provider/            # UiProvider：注入应用层创建好的 client
-  src/presets/workspace-layout.tsx  # 预置组合（侧栏 + 对话 + 输入 + 对话框）
+  src/base/                # 无业务语义的原语（shadcn 产物 + 少数自研件）
+  src/utils/               # 跨域通用方法（路径、时间、存储、剪贴板、格式化…）
+  src/hooks/               # 跨域复用的 React 绑定；store/ 放 SDK store 订阅与派生
+  src/types.ts             # 契约与 SDK 类型的包内出口
+  src/business/<域>/       # 业务组件：chat / composer / session / goal / markdown / attachment /
+                           #   dialog / notify / shell / settings / workbench / usage，域内自含私有逻辑
+  src/provider/            # UiProvider：注入应用层创建好的 client；外观偏好的事实源
+  src/presets/workspace/   # 预置组合：workspace-layout.tsx 入口 + 六个按关注点拆的 hook
+                           #   （外壳几何 / 工作台 / 会话动作 / 目标与计划 / 内置命令 / 快捷键）
   src/styles/theme.css     # 设计 token、base 层与 markdown 样式
   components.json          # shadcn CLI 配置
 server/src/
@@ -503,7 +506,7 @@ apps/web/src/
   App.tsx                  # 应用外壳：URL 导航（会话 / 设置） + WorkspaceLayout
   main.tsx                 # 入口：主题、i18n 接线与 client 的 Provider
   components/brand-head.tsx # 文档级品牌元素（favicon）
-  lib/i18n.ts              # 应用 i18n 单例（接线在 @ucode/ui/lib/app-i18n）
+  lib/i18n.ts              # 应用 i18n 单例（接线在 @ucode/ui/utils/app-i18n）
   lib/sdk.ts               # 创建 client 实例
   index.css                # tailwind 入口：import @ucode/ui/theme.css + @source 包源码
 apps/desktop/

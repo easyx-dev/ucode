@@ -28,8 +28,8 @@
 - 注释形式与标点：文件级与块注释用 `/** */`，行内用 `//`；JSDoc 块内句子用中文句号结尾，单行 `//` 不加句末句号。
 - 类型声明统一用 `type`，不引入 `interface`：`interface` 的声明合并本项目用不到，与 `type` 功能重叠；统一后不必在两者间反复选择。联合 / 映射等本来就只能用 `type`。
 - TS 类型从宽：`type` 的字段注释逐字段写即可，与字段名同义、略显冗余都可以接受，不必纠结「算不算复述」；要保证的是内容为业务口径而非错误含义。
-- 文件级注释：概述文件或模块职责，位于文件第一行（import 之前，`/** */` 且不复述文件名）；`packages/ui/src/base/`、入口与配置文件豁免；职责与路径同名的文件可不加。
-- 声明写法：React 组件与 hooks 用 `export function`；其余纯函数（web `lib/`、server 全部）一律 `export const xxx = (...) =>`；模块级常量用 `SCREAMING_SNAKE_CASE`。
+- 文件级注释：概述文件或模块职责，位于文件第一行（import 之前，`/** */` 且不复述文件名）；`packages/ui/src/base/` 里 shadcn 生成的那批、入口与配置文件豁免；职责与路径同名的文件可不加。
+- 声明写法：React 组件与 hooks 用 `export function`；其余纯函数（`packages/ui` 的 `utils/`、各域私有逻辑、server 全部）一律 `export const xxx = (...) =>`；模块级常量用 `SCREAMING_SNAKE_CASE`。
 - 命名动词保持一套：
   - 布尔值与判断函数用 `is*` / `has*` / `can*`，不用 `show*` 表达判断；
   - 转换函数统一 `<源>To<目标>`（`rowToRecord`）或 `to<目标>`（`toPosixPath`，源不言自明），不用 `<目标>From<源>`；
@@ -283,13 +283,15 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
     暴露 `getState` / `subscribe` + 动作，React 侧用 `useSyncExternalStore` 订阅。
   无模块级单例，多窗口多实例互不干扰。
 - `packages/ui/`（`@ucode/ui`）是 web 与桌面端共享的 UI 单一事实源：设计 token / 基础样式
-  （`src/styles/theme.css`）、基础组件（`src/base/*`）、业务组件（`src/business/*`）、Provider
-  （`src/provider`，收应用层创建好的 `client`）、SDK store 的 React 绑定 hooks（`src/hooks/*`）与纯逻辑
-  （`src/lib/*`）。子路径导出：`@ucode/ui/base/*`、`@ucode/ui/business/*`、`@ucode/ui/hooks/*`、
-  `@ucode/ui/lib/*`、`@ucode/ui/provider`、`@ucode/ui/presets/workspace`、`@ucode/ui/theme.css`。
+  （`src/styles/theme.css`）、无业务语义的原语（`src/base/*`）、业务组件（`src/business/<域>/`，一级一律是
+  域文件夹，域内自含组件 + 私有逻辑 + 私有 hook）、Provider（`src/provider`，收应用层创建好的 `client`，
+  外观偏好的事实源也在这里）、跨域复用的 React 绑定（`src/hooks/*`，SDK store 订阅在 `src/hooks/store/`）
+  与跨域通用方法（`src/utils/*`）。子路径导出：`@ucode/ui/base/*`、`@ucode/ui/business/*`、
+  `@ucode/ui/hooks/*`、`@ucode/ui/utils/*`、`@ucode/ui/provider`、`@ucode/ui/presets/workspace`、
+  `@ucode/ui/theme.css`。落位判据与域间依赖方向见 [`docs/components.md`](./docs/components.md)。
   组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
 - `apps/web/`（Vite + React）与 `apps/desktop/`（Electron）都是薄外壳：界面与逻辑在 `@ucode/ui` /
-  `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/lib/app-i18n`）、client 装配与导航状态。
+  `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/utils/app-i18n`）、client 装配与导航状态。
   桌面端主进程从 `$APP_HOME/app/service.json` 取端点与 `serviceToken`：渲染层与接口同源
   （生产走 `app://desktop` 协议、开发走 Vite 代理，`/api/*` 由主进程转发时注入 `Authorization: Bearer`）
   ——因此不需要服务端为它放开跨域，凭证也不进渲染层，渲染层只需要知道服务是否已注册。
@@ -328,10 +330,11 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 
 ### 组件来源
 
-`packages/ui/src/base/**` 是 shadcn CLI 的**一次性产出**，之后与其它代码一样由我们维护，
-同样适用本文件的命名、行数、颜色 token 与格式化规则。
+`packages/ui/src/base/**` 里 shadcn 生成的那批是 CLI 的**一次性产出**，之后与其它代码一样由我们维护，
+同样适用本文件的命名、行数、颜色 token 与格式化规则；`base/` 下的自研原语（分段控件、工具条图标按钮、
+细化线、复制动作、品牌标识）本来就是我们的代码，只是同样无业务语义、只吃 props。
 
-- 唯一豁免：不要求写文件级注释（都是对 Radix 的薄封装）
+- 豁免范围：只有 CLI 生成的那批不要求写文件级注释（都是对 Radix 的薄封装）
 - 新增基础组件用 CLI 在 `packages/ui`（配置见 `packages/ui/components.json`）生成。本包 tsconfig 没配 `@/*` 的
   paths，CLI 会把 aliases 当字面路径，产物落在 `packages/ui/@/base/<name>.tsx`：先生成、再挪到
   `src/base/<name>.tsx`，然后把 `@/` 导入改成包内相对路径、图标占位组件（`IconPlaceholder`）换成 `lucide-react`、

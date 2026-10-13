@@ -7,7 +7,7 @@
 
 主区是三栏：侧栏 | 对话区 | 工作台，用 `base/resizable`（底层 `react-resizable-panels`）。
 尺寸一律用**像素**（库把数字当像素、字符串当百分比），栏宽不随窗口缩放、也不随界面密度缩放
-（默认值是 `lib/panel-layout.ts` 的像素常量，密度只改间距、控件高度与内容高度上限）。
+（默认值是 `utils/panel-layout.ts` 的像素常量，密度只改间距、控件高度与内容高度上限）。
 
 | 位置 | 取法 |
 | --- | --- |
@@ -80,11 +80,11 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 | 活动栏 | 宽 40px，`border-r border-border`，竖排图标按钮（`size-8`）：项目文件 / 源代码管理 / 全部改动，最下是收起面板 |
 | 侧栏 | 宽 180–360（默认 240）；顶部一行控件（根名 + 筛选 + 刷新 / 改动与历史切换 + 分支 + 刷新），列表行高 28、`rounded-lg`、选中 `bg-state-selected` |
 | 标签条 | 高 36px（与对话区头部同档），`border-b border-border`；一份文档一格、溢出横滚；每格是「标题按钮 + 关闭按钮」两个同级元素 |
-| 编辑器区 | 占剩余宽度；内容自带 36px 工具条与滚动区；diff 用行号 + 增删底色 + 语法高亮（着色值走 `--code-*`，适配器见 `lib/shiki-diff.ts`） |
+| 编辑器区 | 占剩余宽度；内容自带 36px 工具条与滚动区；diff 用行号 + 增删底色 + 语法高亮（着色值走 `--code-*`，适配器见 `business/markdown/shiki-diff.ts`） |
 | 空态 | 垂直居中：图标 `size-7 text-foreground-subtle` + 主文案 `text-sm font-medium` + 说明 `text-xs` |
 | 分界 | 活动栏与侧栏各自用 `border-r` 画可见分界；侧栏与编辑器之间的分隔条不画线 |
 
-- 目录行只用折角符（`ChevronRight` 转 90°），不叠文件夹图标；文件按类型给图标（`lib/file-icons.ts` 的映射），不引图标资源。
+- 目录行只用折角符（`ChevronRight` 转 90°），不叠文件夹图标；文件按类型给图标（`utils/file-icons.ts` 的映射），不引图标资源。
 - 图标一律 `size-icon-sm text-foreground-subtle`。
 - 文件树的 git 装饰：改过的文件名用状态色（`git-*`）并在右侧给字母徽标（`U` / `!` / `M` / `A` / `D` / `R`…），
   目录按「其下最重的那一个标记」着色、不加字母——颜色与字母都只表达状态。
@@ -97,13 +97,14 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 ## 消息区
 
 对话流不是卡片列表，而是页面底色上的一列内容：分层靠留白、字号与颜色，不靠外框。
-实现落位 `lib/chat-rows.ts`（扁平行投影）、`business/message-row.tsx`（行渲染）、`business/message-list.tsx`（虚拟滚动）。
+实现落位 `business/chat/chat-rows.ts`（扁平行投影）、`business/chat/message-row.tsx`（行渲染）、
+`business/chat/message-list.tsx`（虚拟滚动）。
 
 ### 对话区头部
 
 | 元素 | 取法 |
 | --- | --- |
-| 状态底色 | 三种状态各一层铺满整行的淡色呼吸底（`-z-10` 的绝对层 + `animate-pulse`）：生成中 `bg-primary/10`、待填表单 `bg-warning/10`、待权限审批 `bg-destructive/10`；优先级与服务端 `status` 同序（待审批 > 待表单 > 生成中），判定在 `lib/session-tone.ts` |
+| 状态底色 | 三种状态各一层铺满整行的淡色呼吸底（`-z-10` 的绝对层 + `animate-pulse`）：生成中 `bg-primary/10`、待填表单 `bg-warning/10`、待权限审批 `bg-destructive/10`；优先级与服务端 `status` 同序（待审批 > 待表单 > 生成中），判定在 `business/chat/session-tone.ts` |
 | 状态的可见表达 | 底色只对看得见的人有效，故另给一行 `sr-only` 文案（生成中 / 等待你的输入 / 等待权限审批）；原先的「生成中」文字与转圈已去掉 |
 | 右侧入口 | 依次是：用量徽标（有占用或有用量才出现）、复制会话记录（取 JSONL 文本，点了才取）、重建运行时、工作台开关 |
 | 左侧 | 侧栏开关在最左、子会话返回键与「分叉自…」链接跟在标题后；无标题栏窗口里整行是拖拽区 |
@@ -144,8 +145,8 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 ## 活动面板
 
 三块「跑着但不在视野里」的状态收在一张只读浮层里：子智能体、目标进度、bash 起的后台服务。
-实现落位 `lib/session-activity.ts`（视图模型）、`business/session-activity-dock.tsx`（位置与展开）、
-`business/session-activity-panel.tsx`（面板）。
+实现落位 `business/chat/activity/session-activity.ts`（视图模型）、`business/chat/activity/session-activity-dock.tsx`（位置与展开）、
+`business/chat/activity/session-activity-panel.tsx`（面板）。
 
 | 元素 | 取法 |
 | --- | --- |
@@ -213,10 +214,10 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
   streamdown 默认那层「卡片 + 独立滚动容器」已由 `business/markdown-table.tsx` 整份替换，不要把它加回来。
 - 表格操作区：排在卡片**上方**、右对齐的一行（`min-h-7` 常驻占位，悬停或键盘聚焦时才现），
   表格级操作统一加在这里（`business/markdown-table.tsx`，按钮取 `ToolbarIconButton` + `Tooltip`），不再盖在表格右上角。
-  当前四项：自动换行（开关，`aria-pressed` + 按下态底色，偏好落 localStorage 见 `lib/table-prefs.ts`——
+  当前四项：自动换行（开关，`aria-pressed` + 按下态底色，偏好落 localStorage 见 `business/markdown/table-prefs.ts`——
   对话列表是虚拟滚动的，只存在组件里的开关滚出去就没了；这一份偏好**同屏所有表格共用**，
   模块级 store + `useSyncExternalStore`，见 `hooks/use-table-wrap.ts`）、复制为 Markdown、导出 CSV、全屏查看。
-  导出与复制都读眼前这张表的 DOM（`lib/table-export.ts`），转义交给 streamdown 的表格工具（与它内建控件同一口径），
+  导出与复制都读眼前这张表的 DOM（`business/markdown/table-export.ts`），转义交给 streamdown 的表格工具（与它内建控件同一口径），
   不另存一份 markdown 源。
 - 正文图片：本站附件先取字节转 blob 再渲染（`business/attachment-image.tsx`）；外层用 `span`，因为正文里的图片常落在 `<p>` 里。
 - 列表标记用 `text-foreground-subtle`；GFM 任务列表去掉圆点。
