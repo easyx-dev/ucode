@@ -1,10 +1,11 @@
-/** 用量明细两块：按模型的占比条，以及可点击打开的按会话列表 */
+/** 用量明细两块：按模型的占比条（带缓存命中率），以及可点击打开的按会话列表 */
 
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "../../base/badge";
 import type { ModelUsage, SessionUsageEntry } from "../../lib/types";
 import { formatTokens, usageKindLabel } from "../../lib/usage";
+import { cacheHitRate, ratioLabel } from "../../lib/usage-series";
 import { UsageEmpty, UsageSection } from "./usage-section";
 
 type UsageModelUsageProps = {
@@ -21,25 +22,34 @@ export function UsageModelUsage({ items }: UsageModelUsageProps) {
         <UsageEmpty text={t("当前区间暂无可用量数据")} />
       ) : (
         <ul className="space-y-2.5">
-          {items.map((item) => (
-            <li key={`${item.provider}/${item.model}`} className="space-y-1">
-              <div className="flex items-baseline justify-between gap-3 text-xs">
-                <span className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="truncate font-medium">{item.model}</span>
-                  <span className="shrink-0 text-foreground-subtle">{item.provider}</span>
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatTokens(item.totals.totalTokens)}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-chart-1"
-                  style={{ width: `${max > 0 ? (item.totals.totalTokens / max) * 100 : 0}%` }}
-                />
-              </div>
-            </li>
-          ))}
+          {items.map((item) => {
+            const rate = cacheHitRate(item.totals);
+            return (
+              <li key={`${item.provider}/${item.model}`} className="space-y-1">
+                <div className="flex items-baseline justify-between gap-3 text-xs">
+                  <span className="flex min-w-0 items-baseline gap-1.5">
+                    <span className="truncate font-medium">{item.model}</span>
+                    <span className="shrink-0 text-foreground-subtle">{item.provider}</span>
+                  </span>
+                  <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
+                    {/* 不同 provider 的缓存行为差异是这里最有信息量的对比 */}
+                    <span className="text-foreground-subtle">
+                      {t("命中 {{value}}", { value: ratioLabel(rate) })}
+                    </span>
+                    <span>{formatTokens(item.totals.totalTokens)}</span>
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-chart-1"
+                    style={{
+                      width: `${max > 0 ? (item.totals.totalTokens / max) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </UsageSection>

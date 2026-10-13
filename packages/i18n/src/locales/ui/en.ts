@@ -713,6 +713,37 @@ export default {
   "当前环境不支持系统通知。": "This environment doesn't support system notifications.",
 
   // Session transcript（会话原始记录导出）
+  // Usage steps（步级耗时）
+  步级耗时: "Per-step timings",
+  "{{steps}} 步 · {{turns}} 轮": "{{steps}} steps across {{turns}} turns",
+  "{{steps}} 步": "{{steps}} steps",
+  当前区间暂无步级数据: "No per-step data in this range",
+  每轮步数: "Steps per turn",
+  "{{value}} 步": "{{value}} steps",
+  平均步耗时: "Average step",
+  "中位 {{p50}} · P90 {{p90}}": "p50 {{p50}} · p90 {{p90}}",
+  "首 token 占比": "First-token share",
+  "平均等首帧 {{value}}": "{{value}} to first token",
+  工具耗时占比: "Tool time share",
+  已扣掉等用户的时间: "Excludes time spent waiting on you",
+  失败步数: "Failed steps",
+  按模型: "By model",
+  每日平均步耗时: "Daily average step time",
+  "最慢 {{value}}": "Slowest {{value}}",
+  "{{date}} · 平均每步 {{value}} · {{steps}} 步": "{{date}} · {{value}} per step · {{steps}} steps",
+  每步耗时: "Step time",
+
+  // Usage（使用统计：缓存命中率与趋势口径）
+  缓存命中: "Cache hits",
+  "缓存读 {{value}} token": "{{value}} tokens read from cache",
+  "命中 {{value}}": "{{value}} cached",
+  每日缓存命中率: "Daily cache hit rate",
+  趋势口径: "Trend series",
+  命中率: "Hit rate",
+  Token: "Tokens",
+  "最高 {{value}}": "Peak {{value}}",
+  "{{date}} · 命中 {{rate}} · {{messages}} 轮消息":
+    "{{date}} · {{rate}} cached · {{messages}} turns",
 
   // Desktop shell（桌面端启动时的连接态）
   未连接到本机服务: "Not connected to the local service",

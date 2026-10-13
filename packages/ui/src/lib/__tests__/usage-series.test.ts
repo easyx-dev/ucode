@@ -10,10 +10,13 @@ import type { UsageDayBucket, UsageWeekBucket } from "@ucode/contracts";
 
 import {
   buildCalendar,
+  cacheHitRate,
   dateKeyOfIndex,
   dayIndexOf,
   durationParts,
+  formatMs,
   levelOf,
+  ratioLabel,
   weekStartKeyOf,
 } from "../usage-series";
 
@@ -157,5 +160,33 @@ describe("buildCalendar", () => {
   it("消息轮次随当日数据带出，与模式无关", () => {
     const calendar = buildCalendar([day("2026-01-05", 10, 3)], [], "total");
     assert.equal(calendar.columns[0]?.cells[0]?.messages, 3);
+  });
+});
+
+describe("cacheHitRate", () => {
+  it("分母为 0 时不给比率（与「全没命中」区分开）", () => {
+    assert.equal(cacheHitRate({ inputTokens: 0, cacheReadTokens: 0 }), undefined);
+  });
+
+  it("全没命中为 0，全命中为 1", () => {
+    assert.equal(cacheHitRate({ inputTokens: 120, cacheReadTokens: 0 }), 0);
+    assert.equal(cacheHitRate({ inputTokens: 0, cacheReadTokens: 80 }), 1);
+  });
+
+  it("按「命中读 / (未命中输入 + 命中读)」算，缓存写入不进分母", () => {
+    assert.equal(cacheHitRate({ inputTokens: 30, cacheReadTokens: 70 }), 0.7);
+  });
+
+  it("文案保留一位小数，没有比率时给占位符", () => {
+    assert.equal(ratioLabel(0.7), "70.0%");
+    assert.equal(ratioLabel(0), "0.0%");
+    assert.equal(ratioLabel(undefined), "—");
+    assert.equal(ratioLabel(null), "—");
+  });
+
+  it("毫秒文案：一秒以内给毫秒，往上给一位小数的秒", () => {
+    assert.equal(formatMs(850), "850ms");
+    assert.equal(formatMs(1_234), "1.2s");
+    assert.equal(formatMs(null), "—");
   });
 });

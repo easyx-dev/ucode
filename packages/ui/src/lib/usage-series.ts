@@ -5,7 +5,7 @@
  * 日期同样按本地时区处理，与 `@ucode/server` 的分桶口径一致。
  */
 
-import type { UsageDayBucket, UsageWeekBucket } from "./types";
+import type { UsageDayBucket, UsageTotals, UsageWeekBucket } from "./types";
 
 /** 热力图的取值口径：当日 / 所在周 / 区间起点到当日的累计 */
 export type HeatMode = "day" | "week" | "total";
@@ -56,6 +56,33 @@ export const weekStartKeyOf = (dateKey: string): string => {
 export const levelOf = (value: number, max: number): number => {
   if (value <= 0 || max <= 0) return 0;
   return Math.min(4, Math.max(1, Math.ceil((value / max) * 4)));
+};
+
+/**
+ * 缓存命中率：命中读 /（未命中输入 + 命中读）。
+ *
+ * 口径与 `calculateContextTokens` 一致（`input + cacheRead` 是输入侧规模，即 `input` 是未命中那部分）；
+ * `cacheWriteTokens` 属成本侧，不进分母。分母为 0 时不给比率——「没有输入」与「全没命中」是两回事。
+ */
+export const cacheHitRate = (
+  totals: Pick<UsageTotals, "inputTokens" | "cacheReadTokens">,
+): number | undefined => {
+  const denominator = totals.inputTokens + totals.cacheReadTokens;
+  if (denominator <= 0) return undefined;
+  return totals.cacheReadTokens / denominator;
+};
+
+/**
+ * 占比文案（0-1 的比值 → 一位小数百分比）；没有比率时用占位符——
+ * 「分母为 0」与「占比为 0」不能长成一个样。
+ */
+export const ratioLabel = (value: number | null | undefined): string =>
+  value === null || value === undefined ? "—" : `${(value * 100).toFixed(1)}%`;
+
+/** 毫秒文案：一秒以内给整毫秒，往上给一位小数的秒；拿不到数给占位符 */
+export const formatMs = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return "—";
+  return value < 1_000 ? `${Math.round(value)}ms` : `${(value / 1_000).toFixed(1)}s`;
 };
 
 /** 毫秒拆成天 / 时 / 分 / 秒；负数按 0 处理 */

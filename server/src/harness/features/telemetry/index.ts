@@ -6,7 +6,8 @@
  * 拆不开就无从优化。这里用 pi 已经发出来的事件锚点补齐四段：
  *
  * - `turn_start → message_start`：请求发出到响应头到达（含上传与上游排队）；
- * - `message_start → 首个内容帧`：响应头之后到真正开始吐字之间的静默，推理模型的长思考落在这里；
+ * - `message_start → 首个内容帧`：响应头之后到真正开始吐字之间的静默，推理模型的长思考落在这里
+ *   （`ttftMs` 就是这个定义，不含上传与排队；累计首帧延迟 = `firstEventMs + ttftMs`）；
  * - `首个内容帧 → message_end`：流式解码；
  * - `message_end → turn_end`：工具执行；
  * - 另有「等用户」的时间单独累计（审批 / 提问挂起期间），不从系统耗时里混进来。
@@ -29,6 +30,11 @@ export const STEP_CUSTOM_TYPE = STEP_RECORD_CUSTOM_TYPE;
 export type StepRecord = {
   /** 本次装配内第几次模型往返，从 1 开始；会话被回收重装后重新计数 */
   turn: number;
+  /**
+   * 用户轮序号：一次用户输入（含目标的启动 / 续跑这类合成输入）算一轮，从 1 开始。
+   * 与 `turn` 的分工：`turn` 是本次装配内的往返序号、重装后归零，只有它才能当「每轮几步」的分组依据。
+   */
+  userTurn: number;
   startedAt: number;
   /** 首个流事件（响应头到达）的时刻；没等到就为空 */
   firstEventAt: number | null;
@@ -38,7 +44,7 @@ export type StepRecord = {
   endedAt: number;
   /** 请求发出 → 响应头到达：含请求上传与上游排队 */
   firstEventMs: number | null;
-  /** 请求发出 → 首个内容帧：响应头之后到真正开始吐字之间的静默 */
+  /** 响应头 → 首个内容帧：真正开始吐字之前的那段静默（不含上传与排队，那部分在 `firstEventMs`） */
   ttftMs: number | null;
   /** 首个内容帧 → message_end：流式解码 */
   streamMs: number | null;
@@ -60,12 +66,18 @@ export type StepRecord = {
   contextBudget: number | null;
   /** 本步生效的思考档位；未知为空 */
   thinkingLevel: ThinkingLevel | null;
+  /** 本步回答来自哪个 provider / 模型；中断或还没回答时为空 */
+  provider: string | null;
+  model: string | null;
+  /** 结束原因（pi 的 `stopReason`：`stop` / `length` / `aborted` / `error` 等）；未知为空 */
+  stopReason: string | null;
   /** 随消息进入上下文的媒体：只记数量与字节，字节按 base64 长度粗算 */
   attachments: { images: number; bytes: number };
 };
 
 type StepState = {
   turn: number;
+  userTurn: number;
   startedAt: number;
   firstEventAt: number | null;
   firstTokenAt: number | null;
@@ -79,6 +91,9 @@ type StepState = {
   waitingSince: number | null;
   budget: number | null;
   thinkingLevel: ThinkingLevel | null;
+  provider: string | null;
+  model: string | null;
+  stopReason: string | null;
 };
 
 const readNumber = (value: unknown): number =>
@@ -143,6 +158,7 @@ export class StepTelemetry {
     }
     this.sessions.set(sessionId, {
       turn: 0,
+      userTurn: 0,
       startedAt: this.now(),
       firstEventAt: null,
       firstTokenAt: null,
@@ -156,11 +172,23 @@ export class StepTelemetry {
       waitingSince: null,
       budget,
       thinkingLevel: null,
+      provider: null,
+      model: null,
+      stopReason: null,
     });
   }
 
   detach(sessionId: string): void {
     this.sessions.delete(sessionId);
+  }
+
+  /**
+   * 开一轮用户输入（用户发消息、目标续跑、计划批准这类合成输入都算）：轮序号加一。
+   * 由会话池在 run 入口驱动——`turn` 只能回答「本次装配内第几次往返」，轮边界得从外面给。
+   */
+  beginUserTurn(sessionId: string): void {
+    const state = this.sessions.get(sessionId);
+    if (state) state.userTurn += 1;
   }
 
   /** 交互请求出现：开始计入「等用户」 */
@@ -204,6 +232,9 @@ export class StepTelemetry {
         state.attachments = { images: 0, bytes: 0 };
         state.userWaitMs = state.waitingSince === null ? 0 : state.userWaitMs;
         state.thinkingLevel = thinkingLevel;
+        state.provider = null;
+        state.model = null;
+        state.stopReason = null;
         return;
       }
       case "message_start": {
@@ -226,6 +257,10 @@ export class StepTelemetry {
         state.toolNames = parsed.toolNames;
         state.hasText = parsed.hasText;
         state.attachments = parsed.attachments;
+        const answered = message as { provider?: unknown; model?: unknown; stopReason?: unknown };
+        state.provider = typeof answered.provider === "string" ? answered.provider : null;
+        state.model = typeof answered.model === "string" ? answered.model : null;
+        state.stopReason = typeof answered.stopReason === "string" ? answered.stopReason : null;
         return;
       }
       case "turn_end": {
@@ -245,7 +280,11 @@ export class StepTelemetry {
   ): void {
     if (state.turn === 0) return;
     const firstEventMs = state.firstEventAt === null ? null : state.firstEventAt - state.startedAt;
-    const ttftMs = state.firstTokenAt === null ? null : state.firstTokenAt - state.startedAt;
+    // 口径：响应头 → 首个内容帧（不含上传与排队）；四段之和因此等于总耗时
+    const ttftMs =
+      state.firstTokenAt === null || state.firstEventAt === null
+        ? null
+        : state.firstTokenAt - state.firstEventAt;
     const streamMs =
       state.firstTokenAt === null || state.respondedAt === null
         ? null
@@ -253,6 +292,7 @@ export class StepTelemetry {
     const toolMs = state.respondedAt === null ? null : endedAt - state.respondedAt;
     const record: StepRecord = {
       turn: state.turn,
+      userTurn: state.userTurn,
       startedAt: state.startedAt,
       firstEventAt: state.firstEventAt,
       firstTokenAt: state.firstTokenAt,
@@ -273,6 +313,9 @@ export class StepTelemetry {
       contextTokens: state.usage.input + state.usage.cacheRead,
       contextBudget: state.budget,
       thinkingLevel: state.thinkingLevel,
+      provider: state.provider,
+      model: state.model,
+      stopReason: state.stopReason,
       attachments: state.attachments,
     };
     try {

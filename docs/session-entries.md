@@ -36,7 +36,7 @@
 
 | customType | 类型 | payload | 写入点 | 界面 |
 | --- | --- | --- | --- | --- |
-| `ucode.step` | custom | `{ turn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/features/telemetry` | 不展示 |
+| `ucode.step` | custom | `{ turn, userTurn, startedAt, firstEventAt, firstTokenAt, respondedAt, endedAt, firstEventMs, ttftMs, streamMs, toolMs, userWaitMs, toolCalls, toolNames, hasText, inputTokens, cacheReadTokens, outputTokens, reasoningTokens, contextTokens, contextBudget, thinkingLevel, provider, model, stopReason, attachments }`（时间字段是毫秒时间戳） | `server/src/harness/features/telemetry` | 不展示 |
 | `ucode.permission-decision` | custom | `{ tool, subject, scope, decision, sourceSessionId?, sourceDescription? }` | `server/src/core/pool.ts` | 展示成审批记录 |
 | `ucode.compaction` | custom | `{ reason, outcome, tokensBefore?, tokensAfter?, keptFrom?, skip?, error?, at }`（`reason` 取 `manual` / `threshold` / `overflow`，`outcome` 取 `done` / `skipped` / `failed`） | `server/src/core/pool.ts` | 展示成压缩分隔行 |
 | `ucode.goal` | custom | `{ event, status?, cause?, turns?, turnTokens?, turnToolCalls?, turnMs?, verdict?, tokensUsed?, objective?, at }`（`event` 取 `set` / `pause` / `resume` / `clear` / `budget` / `verdict` / `completed`）；`turnTokens` 是本轮用量增量（含本轮校验开销），`turnToolCalls` / `turnMs` 是本轮的调用数与耗时 | `server/src/harness/features/goal` | `completed` 并进它那一轮的分隔行，找不到开轮条目时才单独成线；其余不展示 |
@@ -102,6 +102,10 @@
   内容帧）→ `streamMs`（首个内容帧 → `message_end`）→ `toolMs`（`message_end` → `turn_end`）。
   锚点取自 pi 的 `message_start` 与首个 `message_update`——它的 `start` 帧不会走 `message_update`。
   `hasText` 与 `toolNames` 用来事后区分「只有工具调用的执行步」与「有汇报的步」。
+  **四段可加**：`firstEventMs + ttftMs + streamMs + toolMs = endedAt - startedAt`；其中
+  `toolMs` 含等用户的时间，纯工具耗时 = `toolMs - userWaitMs`（等待起止可能跨轮，聚合时按下界 0 clamp）。
+  `turn` 是本次装配内的往返序号（会话重装后归零），按用户输入分组要用 `userTurn`
+  （由会话池在 run 入口推进，用户消息与目标续跑这类合成输入都算一轮）。
 - 只为回溯 / 观测的条目**不进** `serialize` 白名单，只在文件里；要上界面的条目必须在「界面」列写明形态。
 - 条目是追加语义：可以加字段，但不要改老字段的含义——看历史的人只能靠这一列对齐口径。
 - 排查时先按 `customType` 过滤，例如：

@@ -7,7 +7,8 @@ import type {
   ThinkingPreference,
 } from "../constants";
 import type { GoalView } from "../goals/output";
-import type { ContextUsage, UsageTotals } from "../stats/output";
+import type { ContextUsage } from "../stats/context";
+import type { UsageTotals } from "../stats/output";
 
 export type SessionSummary = {
   id: string;
@@ -77,3 +78,5 @@ export type SessionInfoResponse = {
 export type SessionArchiveResponse = SessionScoped & {
   archived: boolean;
 };
+
+/**

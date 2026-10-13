@@ -156,6 +156,9 @@ server/src/harness/features/usage/
   `prompt_tokens_details.cached_tokens` 从 `prompt_tokens` 里摊开，`inputTokens` 已含
   `cacheReadTokens`，命中率会算出 > 100%。届时在解析层归一（`inputTokens -= cacheReadTokens`）
   并记 `CHANGELOG.md`——项目不做历史兼容，直接改口径。
+  **已实测（2026-10）**：用一个 OpenAI 兼容的假端点回 `prompt_tokens_details.cached_tokens`，
+  走完整链路（pi → `usage` 条目 → 解析 → 统计）算出的命中率是 0.9（= 900 / (100 + 900)），
+  **没有 > 100%**——pi 已把缓存读从 `input` 里摊开，解析层不需要再做归一。
 
 ## 八、测试
 

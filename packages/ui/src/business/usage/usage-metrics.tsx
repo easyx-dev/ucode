@@ -1,13 +1,14 @@
 /**
- * 顶部指标卡：区间累计与峰值用量、最长聊天时长、活跃与连续天数，以及当前会话的上下文占用。
+ * 顶部指标卡：区间累计与峰值用量、缓存命中率、最长聊天时长、活跃与连续天数，以及当前会话的上下文占用。
  *
- * 卡片值随区间变化（`peak` / `longestSessionMs` 来自区间内），连续天数与活跃天数是全量历史口径。
+ * 卡片值随区间变化（`peak` / `longestSessionMs` / 命中率来自区间内），连续天数与活跃天数是全量历史口径。
  */
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import type { ContextUsage, StatsSummaryResponse } from "../../lib/types";
 import { contextPercentLabel, formatDuration, formatTokens } from "../../lib/usage";
+import { cacheHitRate, ratioLabel } from "../../lib/usage-series";
 
 type UsageMetricsProps = {
   data: StatsSummaryResponse;
@@ -39,11 +40,16 @@ export function UsageMetrics({ data, context }: UsageMetricsProps) {
   const peak = data.peak;
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
       <MetricCard
         label={t("累计 token")}
         value={formatTokens(data.total.totalTokens)}
         hint={t("工具调用 {{value}} 次", { value: data.toolCalls })}
+      />
+      <MetricCard
+        label={t("缓存命中")}
+        value={ratioLabel(cacheHitRate(data.total))}
+        hint={t("缓存读 {{value}} token", { value: formatTokens(data.total.cacheReadTokens) })}
       />
       <MetricCard
         label={t("峰值 token")}

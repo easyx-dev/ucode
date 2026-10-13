@@ -370,6 +370,8 @@ export class SessionPool {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
     }
     this.recordRunSettings(sessionId);
+    // 轮序号由这里推进一步：步级统计要按「用户轮」分组，而 telemetry 自己看不到轮边界
+    this.telemetry.beginUserTurn(sessionId);
     void session
       .prompt(text, images.length > 0 ? { images: [...images] } : undefined)
       .catch((error) => this.reportRunError(sessionId, error))
@@ -390,6 +392,8 @@ export class SessionPool {
       throw new AppError(ERROR_CODES.sessionBusy, "会话正在生成，请先中断或等本轮结束", 409);
     }
     this.recordRunSettings(sessionId);
+    // 合成输入同样算一轮（目标续跑 / 计划批准），与用户发消息同一口径
+    this.telemetry.beginUserTurn(sessionId);
     void session
       .sendCustomMessage(
         {

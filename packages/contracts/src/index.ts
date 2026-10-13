@@ -44,5 +44,6 @@ export * from "./service/input";
 export * from "./service/output";
 export * from "./sessions/input";
 export * from "./sessions/output";
+export * from "./stats/context";
 export * from "./stats/input";
 export * from "./stats/output";

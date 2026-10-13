@@ -1,10 +1,13 @@
 /**
  * 用量的纯计算：token 合计工具、逐日 / 逐周分桶、活跃与连续天数、会话时长。
  *
- * 只吃「时间 + token 合计」的用量点，不碰文件与 pi 条目（解析与装配在 `index.ts`）。
+ * 只吃「时间 + token 合计」的用量点，不碰文件与 pi 条目（解析在 `parse.ts`，读盘在 `index.ts`）。
  * 日期一律按服务端本地时区切分；天数间隔用天序号推导，避免夏令时把一天算成 23 或 25 小时。
  */
 import type {
+  ModelUsage,
+  StepUsageBucket,
+  StepUsageTotals,
   UsageDayBucket,
   UsagePeakDay,
   UsageStreak,
@@ -37,6 +40,47 @@ export const addInto = (target: UsageTotals, usage: UsageTotals): void => {
 export type SeriesPoint = {
   timeMs: number;
   totals: UsageTotals;
+};
+
+/** 一次 LLM 调用 / 一条 `usage` 条目解析出的用量点（`parse.ts` 的产物） */
+export type UsagePoint = SeriesPoint & {
+  provider: string | null;
+  model: string | null;
+  /** 该次回答里的工具调用数 */
+  toolCalls: number;
+};
+
+export type Aggregate = {
+  totals: UsageTotals;
+  byModel: ModelUsage[];
+  toolCalls: number;
+};
+
+/** 聚合用量点；`sinceMs` 非空时只统计其后的点，按模型归并并按总量降序 */
+export const aggregatePoints = (points: readonly UsagePoint[], sinceMs?: number): Aggregate => {
+  const totals = emptyTotals();
+  const byModel = new Map<string, ModelUsage>();
+  let toolCalls = 0;
+
+  for (const point of points) {
+    if (sinceMs !== undefined && point.timeMs < sinceMs) continue;
+    addInto(totals, point.totals);
+    toolCalls += point.toolCalls;
+    if (!point.model) continue;
+    const key = `${point.provider ?? ""}/${point.model}`;
+    let entry = byModel.get(key);
+    if (!entry) {
+      entry = { provider: point.provider ?? "", model: point.model, totals: emptyTotals() };
+      byModel.set(key, entry);
+    }
+    addInto(entry.totals, point.totals);
+  }
+
+  return {
+    totals,
+    byModel: [...byModel.values()].sort((a, b) => b.totals.totalTokens - a.totals.totalTokens),
+    toolCalls,
+  };
 };
 
 /** 本地时区的 `YYYY-MM-DD` */
@@ -218,4 +262,124 @@ export const peakDayOf = (daily: ReadonlyArray<UsageDayBucket>): UsagePeakDay | 
     if (!peak || totalTokens > peak.totalTokens) peak = { date: day.date, totalTokens };
   }
   return peak;
+};
+
+/**
+ * 一个步级样本：每步耗时记录里聚合用得到的部分（解析在 `parse.ts`）。
+ * `totalMs` 已换算成毫秒时长；四个分段可能为空（中断轮没有首帧锚点）。
+ */
+export type StepPoint = {
+  /** 该步结束时刻（毫秒时间戳），区间过滤按它算 */
+  at: number;
+  /** 用户轮序号，由会话池推进；0 表示这条记录没有轮序号（老记录） */
+  userTurn: number;
+  provider: string | null;
+  model: string | null;
+  thinkingLevel: string | null;
+  /** 以失败 / 中断收尾 */
+  failed: boolean;
+  toolCalls: number;
+  totalMs: number;
+  firstEventMs: number | null;
+  ttftMs: number | null;
+  streamMs: number | null;
+  toolMs: number | null;
+  userWaitMs: number;
+  inputTokens: number;
+  cacheReadTokens: number;
+};
+
+/** 最近秩分位：升序取第 ceil(p × n) 个（n=4、p=0.5 → 第 2 个）；空集合给 null */
+const percentileOf = (sorted: readonly number[], p: number): number | null =>
+  sorted.length === 0 ? null : (sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? null);
+
+const meanOf = (values: readonly number[]): number | null =>
+  values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
+
+/** 比值：分母为 0 时给 null（「没有数据」与「占比为 0」是两回事） */
+const shareOf = (part: number, whole: number): number | null => (whole > 0 ? part / whole : null);
+
+const emptyStepTotals = (): StepUsageTotals => ({
+  steps: 0,
+  turns: 0,
+  stepsPerTurn: null,
+  avgStepMs: null,
+  p50StepMs: null,
+  p90StepMs: null,
+  avgFirstEventMs: null,
+  avgTtftMs: null,
+  ttftShare: null,
+  toolShare: null,
+  toolCalls: 0,
+  failedSteps: 0,
+  cacheHitRate: null,
+});
+
+/**
+ * 步级聚合。
+ *
+ * 「纯工具耗时」= `toolMs - userWaitMs` 并按下界 0 夹一下：`toolMs` 是 `message_end → turn_end`，
+ * 其中包含等用户的时间，而等待起止可能跨轮（`userWaitMs` 会结转），不减就把等用户算成工具时间。
+ * 首帧占比取「含排队的累计首帧延迟」：`firstEventMs + ttftMs`。
+ */
+export const aggregateSteps = (points: readonly StepPoint[]): StepUsageTotals => {
+  const totals = emptyStepTotals();
+  if (points.length === 0) return totals;
+
+  const durations: number[] = [];
+  const firstEvents: number[] = [];
+  const ttfts: number[] = [];
+  const turns = new Set<number>();
+  let totalMs = 0;
+  let firstTokenMs = 0;
+  let toolMs = 0;
+  let inputTokens = 0;
+  let cacheReadTokens = 0;
+
+  for (const point of points) {
+    totals.steps += 1;
+    totals.toolCalls += point.toolCalls;
+    if (point.failed) totals.failedSteps += 1;
+    turns.add(point.userTurn);
+    durations.push(point.totalMs);
+    totalMs += point.totalMs;
+    if (point.firstEventMs !== null) firstEvents.push(point.firstEventMs);
+    if (point.ttftMs !== null) ttfts.push(point.ttftMs);
+    firstTokenMs += (point.firstEventMs ?? 0) + (point.ttftMs ?? 0);
+    if (point.toolMs !== null) toolMs += Math.max(0, point.toolMs - point.userWaitMs);
+    inputTokens += point.inputTokens;
+    cacheReadTokens += point.cacheReadTokens;
+  }
+
+  const sorted = [...durations].sort((a, b) => a - b);
+  totals.turns = turns.size;
+  totals.stepsPerTurn = turns.size > 0 ? totals.steps / turns.size : null;
+  totals.avgStepMs = meanOf(durations);
+  totals.p50StepMs = percentileOf(sorted, 0.5);
+  totals.p90StepMs = percentileOf(sorted, 0.9);
+  totals.avgFirstEventMs = meanOf(firstEvents);
+  totals.avgTtftMs = meanOf(ttfts);
+  totals.ttftShare = shareOf(firstTokenMs, totalMs);
+  totals.toolShare = shareOf(toolMs, totalMs);
+  totals.cacheHitRate = shareOf(cacheReadTokens, inputTokens + cacheReadTokens);
+  return totals;
+};
+
+/**
+ * 按 `keyOf` 分桶聚合；桶序由首次出现顺序决定，调用方要别的顺序就自己排。
+ * `keyOf` 返回 null 表示这条不进任何桶（比如模型不明的步）。
+ */
+export const stepBuckets = (
+  points: readonly StepPoint[],
+  keyOf: (point: StepPoint) => string | null,
+): StepUsageBucket[] => {
+  const grouped = new Map<string, StepPoint[]>();
+  for (const point of points) {
+    const key = keyOf(point);
+    if (key === null) continue;
+    const bucket = grouped.get(key);
+    if (bucket) bucket.push(point);
+    else grouped.set(key, [point]);
+  }
+  return [...grouped.entries()].map(([key, group]) => ({ key, totals: aggregateSteps(group) }));
 };

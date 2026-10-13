@@ -16,6 +16,7 @@ import { UsageModelUsage, UsageSessionList } from "./usage-breakdown";
 import { UsageHeatmap } from "./usage-heatmap";
 import { UsageMetrics } from "./usage-metrics";
 import { UsageEmpty } from "./usage-section";
+import { UsageSteps } from "./usage-steps";
 import { UsageTrendChart } from "./usage-trend-chart";
 
 type RangeValue = "30" | "7";
@@ -101,9 +102,10 @@ export function UsagePanel({
                 ) : (
                   <>
                     <UsageMetrics data={data} context={context ?? null} />
+                    <UsageSteps steps={data.steps} />
                     <UsageHeatmap daily={data.daily} weekly={data.weekly} />
                     <div className="grid gap-4 lg:grid-cols-2">
-                      <UsageTrendChart daily={data.daily} />
+                      <UsageTrendChart daily={data.daily} steps={data.steps.daily} />
                       <UsageModelUsage items={data.byModel} />
                     </div>
                     <UsageSessionList items={data.bySession} onOpen={openSession} />

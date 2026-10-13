@@ -29,6 +29,17 @@ const stepRecordOf = (manager: SessionManager): StepRecord | undefined => {
   return undefined;
 };
 
+/** 最后一条每步记录：多步用例要看的是最近那步，而不是分支里最早的一条 */
+const lastStepRecordOf = (manager: SessionManager): StepRecord | undefined => {
+  let latest: StepRecord | undefined;
+  for (const entry of manager.getBranch()) {
+    if (entry.type === "custom" && entry.customType === STEP_CUSTOM_TYPE) {
+      latest = entry.data as StepRecord;
+    }
+  }
+  return latest;
+};
+
 const event = (value: Record<string, unknown>): AgentSessionEvent =>
   value as unknown as AgentSessionEvent;
 
@@ -74,7 +85,8 @@ describe("每步耗时归因", () => {
     assert.ok(record, "应写入一条每步耗时记录");
     assert.equal(record.turn, 1);
     assert.equal(record.firstEventMs, 100);
-    assert.equal(record.ttftMs, 200);
+    // ttftMs 是「响应头 → 首个内容帧」：200 - 100，不含上传与排队
+    assert.equal(record.ttftMs, 100);
     assert.equal(record.streamMs, 1_000);
     assert.equal(record.toolMs, 600);
     assert.equal(record.toolCalls, 1);
@@ -84,6 +96,83 @@ describe("每步耗时归因", () => {
     assert.equal(record.contextTokens, 50_100);
     assert.equal(record.contextBudget, 400_000);
     assert.deepEqual(record.attachments, { images: 1, bytes: 4 });
+    // 四段之和等于总耗时（本步没有等用户）
+    assert.equal(
+      (record.firstEventMs ?? 0) +
+        (record.ttftMs ?? 0) +
+        (record.streamMs ?? 0) +
+        (record.toolMs ?? 0),
+      record.endedAt - record.startedAt,
+    );
+  });
+
+  it("记下回答来自哪个模型与结束原因", () => {
+    const { manager, telemetry } = setup();
+    telemetry.attach("s1", null);
+    telemetry.observe("s1", event({ type: "turn_start" }), manager);
+    telemetry.observe(
+      "s1",
+      event({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          provider: "anthropic",
+          model: "claude-x",
+          stopReason: "stop",
+          usage: {},
+          content: [],
+        },
+      }),
+      manager,
+    );
+    telemetry.observe("s1", event({ type: "turn_end" }), manager);
+
+    const record = stepRecordOf(manager);
+    assert.equal(record?.provider, "anthropic");
+    assert.equal(record?.model, "claude-x");
+    assert.equal(record?.stopReason, "stop");
+  });
+
+  it("失败轮没有首帧锚点，四段里首帧两段为空但不影响落盘", () => {
+    const { manager, telemetry } = setup();
+    telemetry.attach("s1", null);
+    telemetry.observe("s1", event({ type: "turn_start" }), manager);
+    clock.now = 30;
+    telemetry.observe(
+      "s1",
+      event({
+        type: "message_end",
+        message: { role: "assistant", stopReason: "error", usage: {}, content: [] },
+      }),
+      manager,
+    );
+    clock.now = 40;
+    telemetry.observe("s1", event({ type: "turn_end" }), manager);
+
+    const record = stepRecordOf(manager);
+    assert.equal(record?.firstEventMs, null);
+    assert.equal(record?.ttftMs, null);
+    assert.equal(record?.streamMs, null);
+    assert.equal(record?.stopReason, "error");
+  });
+
+  it("用户轮序号由会话池推进：同一轮里的多步共用一个 userTurn", () => {
+    const { manager, telemetry } = setup();
+    telemetry.attach("s1", null);
+    telemetry.beginUserTurn("s1");
+    const turns: number[] = [];
+    for (let step = 0; step < 3; step += 1) {
+      telemetry.observe("s1", event({ type: "turn_start" }), manager);
+      telemetry.observe("s1", event({ type: "turn_end" }), manager);
+      const record = lastStepRecordOf(manager);
+      if (record) turns.push(record.userTurn);
+    }
+    assert.deepEqual(turns, [1, 1, 1]);
+
+    telemetry.beginUserTurn("s1");
+    telemetry.observe("s1", event({ type: "turn_start" }), manager);
+    telemetry.observe("s1", event({ type: "turn_end" }), manager);
+    assert.equal(lastStepRecordOf(manager)?.userTurn, 2);
   });
 
   it("只有工具调用的步记为执行步：没有文本，工具名按序去重", () => {

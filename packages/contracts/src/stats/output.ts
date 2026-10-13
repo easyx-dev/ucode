@@ -13,32 +13,6 @@ export type UsageTotals = {
   totalTokens: number;
 };
 
-/**
- * 会话当前上下文占用：最近一次回答所在上下文的大小（该次请求的提示 + 回复），与模型窗口配对。
- *
- * 与 `UsageTotals` 的累计口径不同——累计用量只增不减，占用会随压缩回落。
- * 还没回答过时给不出这个值；压缩完成到新一轮回答之间只能给估算（见 `estimated`），
- * 连估算都没有时整体为空（见 `SessionInfoResponse.contextUsage`）。
- */
-export type ContextUsage = {
-  /** 上下文里的 token 数 */
-  tokens: number;
-  /** 该会话当前生效模型的上下文窗口 */
-  contextWindow: number;
-  /**
-   * 是否为估算值：压缩会重写上下文，而压缩点之前那次回答的用量反映的是压缩前的规模，
-   * 因此压缩完成到新一轮回答之间没有可信的实测值，只能用压缩结果里的估算规模顶替。
-   */
-  estimated: boolean;
-  /**
-   * 本次会话的压缩触发阈值（token）：到达它就自动压缩（见 `harness/setup/budget`）。
-   * 与窗口分开给出，因为触发点按「有效预算」算，不等于模型声明的窗口。
-   */
-  budget?: number | null;
-  /** 最近一次自动压缩：原因与实际发生时间；没发生过为空 */
-  lastCompaction?: { reason: string; at: number } | null;
-};
-
 /** 按模型归并的用量；模型键为 `provider/model` */
 export type ModelUsage = {
   provider: string;
@@ -96,6 +70,56 @@ export type UsagePeakDay = {
   totalTokens: number;
 };
 
+/**
+ * 步级聚合：把 `ucode.step` 记录按「步」算出来的耗时画像。
+ *
+ * 步是「一次模型往返」，一轮用户输入下有若干步；耗时四段的口径见 `docs/session-entries.md`。
+ * 取不到数的指标一律为空（不拿 0 冒充）——比如中断轮没有首帧锚点。
+ */
+export type StepUsageTotals = {
+  /** 记录到耗时数据的步数 */
+  steps: number;
+  /** 有步的用户轮数（按 `userTurn` 去重） */
+  turns: number;
+  /** 平均每轮步数；没有步时为空 */
+  stepsPerTurn: number | null;
+  /** 单步总耗时：均值与两个分位（毫秒） */
+  avgStepMs: number | null;
+  p50StepMs: number | null;
+  p90StepMs: number | null;
+  /** 请求发出 → 响应头（含上传与排队）的均值 */
+  avgFirstEventMs: number | null;
+  /** 响应头 → 首个内容帧的均值（真正开始吐字前的静默） */
+  avgTtftMs: number | null;
+  /** 累计首帧延迟（含排队）占总耗时的比例；分母为 0 时为空 */
+  ttftShare: number | null;
+  /** 纯工具耗时（已扣掉等用户）占总耗时的比例；分母为 0 时为空 */
+  toolShare: number | null;
+  /** 步里的工具调用合计 */
+  toolCalls: number;
+  /** 以失败 / 中断收尾的步数（`stopReason` 为 `error` / `aborted`） */
+  failedSteps: number;
+  /** 缓存命中率：命中读 /（未命中输入 + 命中读）；分母为 0 时为空 */
+  cacheHitRate: number | null;
+};
+
+/** 步级聚合的一个桶；`key` 的含义随维度而定（模型键、思考档位、`YYYY-MM-DD`） */
+export type StepUsageBucket = {
+  key: string;
+  totals: StepUsageTotals;
+};
+
+/** 步级总览：整体 + 按模型 / 按思考档位 / 按日三个维度的分桶 */
+export type StatsStepSummary = {
+  total: StepUsageTotals;
+  /** 按 `provider/model` 分桶，按步数降序 */
+  byModel: StepUsageBucket[];
+  /** 按思考档位分桶；取不到档位的步归 `unknown` */
+  byThinking: StepUsageBucket[];
+  /** 按服务端本地日期分桶（`YYYY-MM-DD`，只出有步的日） */
+  daily: StepUsageBucket[];
+};
+
 /** 全局统计：总量、工具调用次数、按模型 / 按会话两个维度，以及仪表盘用的逐日 / 逐周序列与活跃度 */
 export type StatsSummaryResponse = {
   total: UsageTotals;
@@ -116,4 +140,6 @@ export type StatsSummaryResponse = {
    * 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。
    */
   longestSessionMs: number;
+  /** 区间内的步级耗时画像；区间内没有任何步记录时各指标为空 */
+  steps: StatsStepSummary;
 };

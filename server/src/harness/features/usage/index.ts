@@ -1,21 +1,13 @@
 /**
- * 使用统计：从 pi 会话记录里聚合每次 LLM 调用的 token 用量，并给出当前的上下文占用。
+ * 使用统计的门面：读会话文件（按 mtime 缓存）、按会话现取用量，并给出全局汇总。
  *
- * 用量已经在会话 JSONL 里（assistant 消息的 `usage`、独立 `usage` 条目、compaction / branch_summary 的 `usage`），
- * 这里只做读取与聚合，不落库；按会话文件 mtime 缓存解析结果，避免重复扫描。
+ * 解析在 `parse.ts`、纯派生在 `aggregate.ts`、上下文占用的运行期状态在 `context.ts`；
+ * 这里只管「数据从哪来、缓存怎么失效」，不自己解析条目，也不做分桶计算。
  * 口径与 pi 的 `getSessionStats()` 一致（合计 = input + output + cacheRead + cacheWrite），不计成本。
- * 上下文占用取最近一次可信回答的规模；压缩后到新一轮回答之间用压缩结果的估算顶替（见 `estimated`）。
  */
 import { existsSync, statSync } from "node:fs";
 
-import {
-  type AgentSession,
-  calculateContextTokens,
-  getLastAssistantUsage,
-  getLatestCompactionEntry,
-  type SessionEntry,
-  SessionManager,
-} from "@earendil-works/pi-coding-agent";
+import { type AgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
   ContextUsage,
   ModelUsage,
@@ -27,9 +19,10 @@ import type {
 
 import type { SessionRecord, SessionRepository } from "../../../db/session-repository";
 import { logger } from "../../../platform/logger";
-import { isRecord } from "../../../utils/object";
 import {
   addInto,
+  aggregatePoints,
+  aggregateSteps,
   dailyBuckets,
   dateKeysOf,
   emptyTotals,
@@ -37,154 +30,19 @@ import {
   maxChatDurationMs,
   nextDayStartMs,
   peakDayOf,
+  type StepPoint,
   startOfDayMsOfKey,
+  stepBuckets,
   streaksOf,
+  type UsagePoint,
   weeklyBuckets,
 } from "./aggregate";
-
-/** 从 pi 的 `Usage` 形状安全取出四类 token；缺失或非数字按 0 处理 */
-const readUsage = (value: unknown): UsageTotals => {
-  if (!isRecord(value)) return emptyTotals();
-  const num = (field: unknown): number =>
-    typeof field === "number" && Number.isFinite(field) ? field : 0;
-  const input = num(value.input);
-  const output = num(value.output);
-  const cacheRead = num(value.cacheRead);
-  const cacheWrite = num(value.cacheWrite);
-  return {
-    inputTokens: input,
-    outputTokens: output,
-    cacheReadTokens: cacheRead,
-    cacheWriteTokens: cacheWrite,
-    totalTokens: input + output + cacheRead + cacheWrite,
-  };
-};
-
-/** 条目时间：优先消息自身毫秒时间戳，回落条目 ISO 时间；都拿不到为 0 */
-const entryTimeMs = (entry: SessionEntry): number => {
-  if (entry.type === "message") {
-    const timestamp = (entry.message as { timestamp?: unknown }).timestamp;
-    if (typeof timestamp === "number" && Number.isFinite(timestamp)) return timestamp;
-  }
-  const parsed = Date.parse(entry.timestamp);
-  return Number.isNaN(parsed) ? 0 : parsed;
-};
-
-/** assistant 消息 content 里的工具调用数 */
-const countToolCalls = (message: unknown): number => {
-  if (!isRecord(message) || !Array.isArray(message.content)) return 0;
-  return message.content.filter((part) => isRecord(part) && part.type === "toolCall").length;
-};
-
-/** 一次 LLM 调用 / 用量条目解析出的一个用量点 */
-type UsagePoint = {
-  timeMs: number;
-  provider: string | null;
-  model: string | null;
-  totals: UsageTotals;
-  toolCalls: number;
-};
-
-/**
- * 当前分支的上下文占用 token 数：最近一次可信回答所面对的上下文大小。
- *
- * 可信口径复用 pi 的 `getLastAssistantUsage()`（中断 / 出错 / 零值的回答都不算基准）；压缩会重写上下文，
- * 压缩点之前那条回答的用量反映的是压缩前的规模，因此只有压缩之后新出的回答才能当基准——压缩后还没回答时
- * 只能算未知，与 pi 的 `getContextUsage()` 一致。
- * 与它的差别：这里不估算基准回答之后追加的消息（pi 的 `estimateProjectedContextTokens` 会加上这部分），
- * 落定时最后一条就是那条回答、两者相等，基准回答之后还有消息时（排队输入、中断轮）pi 会略高。
- */
-const contextTokensOfBranch = (manager: SessionManager): number | null => {
-  const branch = manager.getBranch();
-  const compaction = getLatestCompactionEntry(branch);
-  const afterCompaction = compaction ? branch.slice(branch.indexOf(compaction) + 1) : branch;
-  const usage = getLastAssistantUsage(afterCompaction);
-  return usage ? calculateContextTokens(usage) : null;
-};
-
-/** 把会话条目解析成用量点；不含用量的条目被跳过 */
-const collectPoints = (entries: SessionEntry[]): UsagePoint[] => {
-  const points: UsagePoint[] = [];
-  for (const entry of entries) {
-    if (entry.type === "message") {
-      // AgentMessage 是联合类型，这里按记录读取，避免对着判别联合做不安全的窄化
-      const message = entry.message as unknown as Record<string, unknown>;
-      if (message.role !== "assistant") continue;
-      const totals = readUsage(message.usage);
-      const toolCalls = countToolCalls(entry.message);
-      if (totals.totalTokens === 0 && toolCalls === 0) continue;
-      points.push({
-        timeMs: entryTimeMs(entry),
-        provider: typeof message.provider === "string" ? message.provider : null,
-        model: typeof message.model === "string" ? message.model : null,
-        totals,
-        toolCalls,
-      });
-      continue;
-    }
-    if (entry.type === "usage") {
-      const totals = readUsage(entry.usage);
-      if (totals.totalTokens === 0) continue;
-      points.push({
-        timeMs: entryTimeMs(entry),
-        provider: entry.provider,
-        model: entry.model,
-        totals,
-        toolCalls: 0,
-      });
-      continue;
-    }
-    if (entry.type === "compaction" || entry.type === "branch_summary") {
-      const totals = readUsage(entry.usage);
-      if (totals.totalTokens === 0) continue;
-      points.push({
-        timeMs: entryTimeMs(entry),
-        provider: null,
-        model: null,
-        totals,
-        toolCalls: 0,
-      });
-    }
-  }
-  return points;
-};
-
-type Aggregate = {
-  totals: UsageTotals;
-  byModel: ModelUsage[];
-  toolCalls: number;
-};
-
-/** 聚合用量点；`sinceMs` 非空时只统计其后的点 */
-const aggregate = (points: UsagePoint[], sinceMs?: number): Aggregate => {
-  const totals = emptyTotals();
-  const byModel = new Map<string, ModelUsage>();
-  let toolCalls = 0;
-
-  for (const point of points) {
-    if (sinceMs !== undefined && point.timeMs < sinceMs) continue;
-    addInto(totals, point.totals);
-    toolCalls += point.toolCalls;
-    if (!point.model) continue;
-    const key = `${point.provider ?? ""}/${point.model}`;
-    let entry = byModel.get(key);
-    if (!entry) {
-      entry = { provider: point.provider ?? "", model: point.model, totals: emptyTotals() };
-      byModel.set(key, entry);
-    }
-    addInto(entry.totals, point.totals);
-  }
-
-  return {
-    totals,
-    byModel: [...byModel.values()].sort((a, b) => b.totals.totalTokens - a.totals.totalTokens),
-    toolCalls,
-  };
-};
+import { ContextState } from "./context";
+import { collectPoints, collectSteps, contextTokensOfBranch } from "./parse";
 
 /** 把条目直接聚合成用量；服务内部按文件 mtime 缓存的是用量点，这里供测试与一次性读取 */
-export const collectUsage = (entries: SessionEntry[], sinceMs?: number): Aggregate =>
-  aggregate(collectPoints(entries), sinceMs);
+export const collectUsage = (entries: Parameters<typeof collectPoints>[0], sinceMs?: number) =>
+  aggregatePoints(collectPoints(entries), sinceMs);
 
 /** 会话在统计里的来源分类 */
 const kindOf = (record: SessionRecord): SessionUsageKind => {
@@ -198,7 +56,9 @@ type CachedSessionUsage = {
   path: string;
   mtimeMs: number;
   points: UsagePoint[];
-  /** 解析出的上下文占用 token 数；拿不到可信基准时为 null（见 `contextTokensOfBranch`） */
+  /** 步级样本：与用量点同一批条目里解析出来，跟着同一份缓存走 */
+  steps: StepPoint[];
+  /** 解析出的上下文占用 token 数；拿不到可信基准时为 null（见 `parse.ts` 的 `contextTokensOfBranch`） */
   contextTokens: number | null;
 };
 
@@ -208,27 +68,18 @@ type CachedSessionUsage = {
  */
 export class UsageService {
   private readonly cache = new Map<string, CachedSessionUsage>();
-  /**
-   * 压缩后、还没有新回答时的上下文估算（pi 压缩结果里的 `estimatedTokensAfter`），按会话索引。
-   * 存在进程内存：它只是「等新回答期间的展示回填」，服务重启后拿不到也不影响实测口径。
-   */
-  private readonly estimated = new Map<string, number>();
-  /** 最近一次自动压缩：原因与时间，供界面说明「它为什么突然小了」 */
-  private readonly compactions = new Map<string, { reason: string; at: number }>();
-  /**
-   * 装配时算出的压缩触发点（会话池写入）。**优先于下面按 `record.model` 的推算**：
-   * 会话实际用的模型可能来自角色声明而不是记录上的覆盖，按记录推算会在「窗口来自实际模型、
-   * 预算来自默认模型」之间对不上号。
-   */
-  private readonly budgets = new Map<string, number>();
+  /** 上下文占用的运行期状态（估算 / 最近一次压缩 / 触发点） */
+  private readonly context: ContextState;
 
   constructor(
     private readonly sessions: SessionRepository,
     /** 解析 `provider/model` 的上下文窗口；解析不到为 null（运行时相关，由装配层注入） */
-    private readonly contextWindowOf: (modelRef: string | null) => number | null,
+    contextWindowOf: (modelRef: string | null) => number | null,
     /** 该模型的压缩触发点（与装配层注入 pi 的阈值同源）；解析不到为 null */
-    private readonly contextBudgetOf: (modelRef: string | null) => number | null = () => null,
-  ) {}
+    contextBudgetOf: (modelRef: string | null) => number | null = () => null,
+  ) {
+    this.context = new ContextState({ contextWindowOf, contextBudgetOf });
+  }
 
   /**
    * 单会话累计用量。
@@ -243,7 +94,7 @@ export class UsageService {
     const points = options.live
       ? collectPoints(options.live.sessionManager.getEntries())
       : this.pointsOf(record);
-    return aggregate(points, options.sinceMs).totals;
+    return aggregatePoints(points, options.sinceMs).totals;
   }
 
   /**
@@ -258,49 +109,32 @@ export class UsageService {
   ): ContextUsage | null {
     // pi 的 getContextUsage() 每次都要重建投影，只问一次，窗口与 token 数同源取
     const piUsage = options.live?.getContextUsage();
-    const contextWindow = piUsage?.contextWindow ?? this.contextWindowOf(record.model);
-    const measured = options.live
-      ? (piUsage?.tokens ?? null)
-      : (this.cachedOf(record)?.contextTokens ?? null);
-    const budget = this.budgets.get(record.id) ?? this.contextBudgetOf(record.model);
-    const lastCompaction = this.compactions.get(record.id) ?? null;
-    if (measured !== null && contextWindow !== null) {
-      return { tokens: measured, contextWindow, estimated: false, budget, lastCompaction };
-    }
-
-    const estimated = this.estimated.get(record.id);
-    if (estimated !== undefined && contextWindow !== null) {
-      return { tokens: estimated, contextWindow, estimated: true, budget, lastCompaction };
-    }
-    return null;
+    return this.context.usageOf(record.id, record.model, {
+      window: piUsage?.contextWindow ?? null,
+      tokens: options.live
+        ? (piUsage?.tokens ?? null)
+        : (this.cachedOf(record)?.contextTokens ?? null),
+    });
   }
 
   /** 记下装配时算出的压缩触发点；与注入 pi 的阈值同源，见 `harness/setup/budget` */
   rememberBudget(sessionId: string, triggerTokens: number): void {
-    if (Number.isFinite(triggerTokens) && triggerTokens > 0) {
-      this.budgets.set(sessionId, triggerTokens);
-    }
+    this.context.rememberBudget(sessionId, triggerTokens);
   }
 
-  /**
-   * 记下一次压缩的结果：压缩后的估算规模 + 发生原因。
-   * `tokens` 非法（非有限数 / 负数）时只记原因，不写估算——宁可继续给不出占用，也不要展示一个没意义的数。
-   */
+  /** 记下一次压缩的结果：压缩后的估算规模 + 发生原因 */
   rememberCompaction(
     sessionId: string,
     tokens: number,
     info?: { reason: string; at: number },
   ): void {
-    if (Number.isFinite(tokens) && tokens >= 0) this.estimated.set(sessionId, tokens);
-    if (info) this.compactions.set(sessionId, info);
+    this.context.rememberCompaction(sessionId, tokens, info);
   }
 
-  /** 会话被释放（归档 / 删除 / 重建）时丢掉该会话的缓存与估算，避免键无限累积 */
+  /** 会话被释放（归档 / 删除 / 重建）时丢掉该会话的缓存与瞬时值，避免键无限累积 */
   forget(sessionId: string): void {
     this.cache.delete(sessionId);
-    this.estimated.delete(sessionId);
-    this.compactions.delete(sessionId);
-    this.budgets.delete(sessionId);
+    this.context.forget(sessionId);
   }
 
   /**
@@ -319,11 +153,16 @@ export class UsageService {
     const inRange = (point: UsagePoint): boolean => point.timeMs >= startMs && point.timeMs < endMs;
 
     const all: UsagePoint[] = [];
+    const allSteps: StepPoint[] = [];
     const perSession: Array<{ record: SessionRecord; points: UsagePoint[] }> = [];
     for (const record of this.sessions.list()) {
-      const points = this.pointsOf(record);
-      if (points.length === 0) continue;
+      const cached = this.cachedOf(record);
+      const points = cached?.points ?? [];
+      // 步级样本可能比用量点多（比如只有工具调用的步不进用量点），所以两种情况都要看
+      const steps = cached?.steps ?? [];
+      if (points.length === 0 && steps.length === 0) continue;
       all.push(...points);
+      allSteps.push(...steps.filter((step) => step.at >= startMs && step.at < endMs));
       perSession.push({ record, points: points.filter(inRange) });
     }
 
@@ -337,7 +176,7 @@ export class UsageService {
     let toolCalls = 0;
 
     for (const { record, points } of perSession) {
-      const aggregateOfSession = aggregate(points);
+      const aggregateOfSession = aggregatePoints(points);
       if (aggregateOfSession.totals.totalTokens === 0 && aggregateOfSession.toolCalls === 0)
         continue;
 
@@ -371,6 +210,18 @@ export class UsageService {
       streak: streaksOf(all, localDateKeyOf(now)),
       peak: peakDayOf(daily),
       longestSessionMs: maxChatDurationMs(perSession.map((entry) => entry.points)),
+      steps: {
+        total: aggregateSteps(allSteps),
+        byModel: stepBuckets(allSteps, (step) =>
+          step.model ? `${step.provider ?? ""}/${step.model}` : null,
+        ).sort((a, b) => b.totals.steps - a.totals.steps),
+        byThinking: stepBuckets(allSteps, (step) => step.thinkingLevel ?? "unknown").sort(
+          (a, b) => b.totals.steps - a.totals.steps,
+        ),
+        daily: stepBuckets(allSteps, (step) => localDateKeyOf(step.at)).sort((a, b) =>
+          a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+        ),
+      },
     };
   }
 
@@ -392,10 +243,12 @@ export class UsageService {
 
     try {
       const manager = SessionManager.open(path);
+      const entries = manager.getEntries();
       const entry: CachedSessionUsage = {
         path,
         mtimeMs,
-        points: collectPoints(manager.getEntries()),
+        points: collectPoints(entries),
+        steps: collectSteps(entries),
         contextTokens: contextTokensOfBranch(manager),
       };
       this.cache.set(record.id, entry);
