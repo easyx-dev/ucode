@@ -1,7 +1,7 @@
 /**
  * 外观偏好的运行时注入：Provider 读取本地偏好、写到文档根节点，并把读写入口下发给设置面板。
  *
- * 偏好只有一处真相（`lib/appearance`），组件不各自读写 localStorage；
+ * 偏好只有一处真相（`provider/appearance`），组件不各自读写 localStorage；
  * 应用效果全部落在 CSS 变量与 `data-theme` 上，所以改偏好不触发业务组件重渲染。
  */
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
@@ -14,7 +14,7 @@ import {
   PERSIST_DELAY_MS,
   readAppearance,
   writeAppearance,
-} from "../lib/appearance";
+} from "./appearance";
 
 type AppearanceValue = {
   /** 当前外观偏好 */

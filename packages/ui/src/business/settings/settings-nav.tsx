@@ -15,8 +15,8 @@ import {
   SETTINGS_SECTION_IDS,
   type SettingsGroupId,
   type SettingsSectionId,
-} from "../../lib/settings-section";
-import { LocalUserRow } from "../local-user-row";
+} from "../../utils/settings-section";
+import { LocalUserRow } from "../session/local-user-row";
 import { useSettingsSectionMeta } from "./settings-sections";
 
 type SettingsNavProps = {

@@ -7,7 +7,7 @@
 import { brand } from "@ucode/brand";
 import { useSyncExternalStore } from "react";
 
-import { readStorage, writeStorage } from "../lib/storage";
+import { readStorage, writeStorage } from "../utils/storage";
 
 const STORAGE_KEY = `${brand.slug}-show-thinking`;
 

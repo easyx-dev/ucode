@@ -11,9 +11,9 @@
     "./base/*": "./src/base/*.tsx",
     "./business/*": "./src/business/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
-    "./lib/*": "./src/lib/*.ts",
+    "./utils/*": "./src/utils/*.ts",
     "./provider": "./src/provider/index.tsx",
-    "./presets/workspace": "./src/presets/workspace-layout.tsx",
+    "./presets/workspace": "./src/presets/workspace/workspace-layout.tsx",
     "./theme.css": "./src/styles/theme.css"
   },
   "types": "./src/index.ts",

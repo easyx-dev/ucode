@@ -55,7 +55,7 @@ export const registerNotificationIpc = (): void => {
       id: notificationIdOf(request.sessionId),
       title: request.title,
       body: request.body,
-      // 提示音由渲染层放（`@ucode/ui/lib/sound`，另有开关），系统再响一声就成了双响
+      // 提示音由渲染层放（`@ucode/ui/business/notify/sound`，另有开关），系统再响一声就成了双响
       silent: true,
     });
     liveNotifications.add(notification);

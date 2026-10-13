@@ -3,9 +3,9 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "../../base/badge";
-import type { ModelUsage, SessionUsageEntry } from "../../lib/types";
-import { formatTokens, usageKindLabel } from "../../lib/usage";
-import { cacheHitRate, ratioLabel } from "../../lib/usage-series";
+import type { ModelUsage, SessionUsageEntry } from "../../types";
+import { formatTokens, usageKindLabel } from "../../utils/usage";
+import { cacheHitRate, ratioLabel } from "../../utils/usage-series";
 import { UsageEmpty, UsageSection } from "./usage-section";
 
 type UsageModelUsageProps = {

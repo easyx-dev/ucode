@@ -7,13 +7,12 @@
 import { FileQuestionMark } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { GitReview } from "../../hooks/use-git-review";
-import { buildGitMarks } from "../../lib/git-marks";
 import { useWorkbench } from "../../provider/workbench";
-import { FileTree } from "./file-tree";
+import { FileTree } from "./file/file-tree";
+import { buildGitMarks } from "./git/git-marks";
+import { ReviewTree } from "./git/review-tree";
+import type { GitReview } from "./git/use-git-review";
 import { PanelEmpty } from "./panel-empty";
-import { ReviewTree } from "./review-tree";
 
 export function WorkbenchSidebar({
   review,

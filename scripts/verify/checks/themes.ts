@@ -7,12 +7,12 @@
  *
  * 1. 每份 `styles/themes/*.css` 里的每个主题，浅色块与 `html.dark[data-theme]` 块都必须存在；
  * 2. 两块都要覆盖 `tokens.css` 基础 `:root` 里声明的全部 `--theme-*` 变量；
- * 3. `lib/themes.ts` 的主题清单与 CSS 里的 `data-theme` 取值一一对应。
+ * 3. `provider/themes.ts` 的主题清单与 CSS 里的 `data-theme` 取值一一对应。
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { COLOR_THEME_IDS } from "../../../packages/ui/src/lib/themes.ts";
+import { COLOR_THEME_IDS } from "../../../packages/ui/src/provider/themes.ts";
 import { listFiles } from "../files.ts";
 
 const TOKENS = "packages/ui/src/styles/tokens.css";
@@ -132,12 +132,12 @@ export const run = (root: string): string[] => {
   for (const id of COLOR_THEME_IDS) {
     if (id === "default") continue;
     if (!declaredThemes.has(id)) {
-      problems.push(`lib/themes.ts：主题 ${id} 没有对应的 styles/themes/*.css 定义`);
+      problems.push(`provider/themes.ts：主题 ${id} 没有对应的 styles/themes/*.css 定义`);
     }
   }
   for (const id of declaredThemes.keys()) {
     if (!(COLOR_THEME_IDS as readonly string[]).includes(id)) {
-      problems.push(`styles/themes：主题 ${id} 没有登记在 lib/themes.ts 的 COLOR_THEME_IDS`);
+      problems.push(`styles/themes：主题 ${id} 没有登记在 provider/themes.ts 的 COLOR_THEME_IDS`);
     }
   }
 

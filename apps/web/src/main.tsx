@@ -1,4 +1,4 @@
-import { ThemeProvider } from "@ucode/ui/business/theme-provider";
+import { ThemeProvider } from "@ucode/ui/business/shell/theme-provider";
 import { UiProvider } from "@ucode/ui/provider";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

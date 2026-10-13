@@ -1,14 +1,14 @@
 /**
  * 首屏外观脚本守卫（见 DESIGN.md「运行时参数」）。
  *
- * 两份 `index.html` 的内联脚本必须与 `lib/appearance.ts` 的常量一致：字号区间与密度档位是同一份事实，
+ * 两份 `index.html` 的内联脚本必须与 `provider/appearance.ts` 的常量一致：字号区间与密度档位是同一份事实，
  * 分头维护迟早漂移——而漂移的表现是「首帧先按默认值渲染、随后被运行时纠正」的一次闪动，
  * 平时注意不到，只有把区间调大时才会暴露。脚本必须在构建前就能跑（不能引模块），所以这里比对文本。
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SOURCE = "packages/ui/src/lib/appearance.ts";
+const SOURCE = "packages/ui/src/provider/appearance.ts";
 const HTML_FILES = ["apps/web/index.html", "apps/desktop/index.html"];
 
 const scaleOf = (source: string, id: string): string | undefined =>

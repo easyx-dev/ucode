@@ -6,9 +6,9 @@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-import type { ContextUsage, StatsSummaryResponse } from "../../lib/types";
-import { contextPercentLabel, formatDuration, formatTokens } from "../../lib/usage";
-import { cacheHitRate, ratioLabel } from "../../lib/usage-series";
+import type { ContextUsage, StatsSummaryResponse } from "../../types";
+import { contextPercentLabel, formatDuration, formatTokens } from "../../utils/usage";
+import { cacheHitRate, ratioLabel } from "../../utils/usage-series";
 
 type UsageMetricsProps = {
   data: StatsSummaryResponse;

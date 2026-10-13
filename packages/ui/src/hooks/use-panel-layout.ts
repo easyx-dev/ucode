@@ -14,7 +14,7 @@ import {
   type PanelSpec,
   readPanelLayout,
   writePanelLayout,
-} from "../lib/panel-layout";
+} from "../utils/panel-layout";
 
 export function usePanelLayout(
   group: string,

@@ -15,8 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../base/dropdown-menu";
-import { useCommands } from "../../hooks/use-commands";
-import { PICKER_TRIGGER_CLASS, usePickerCloseFocus } from "../picker-options";
+import { PICKER_TRIGGER_CLASS, usePickerCloseFocus } from "./picker/picker-options";
+import { useCommands } from "./use-commands";
 
 type AddMenuProps = {
   sessionId: string | null;

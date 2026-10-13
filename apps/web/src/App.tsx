@@ -8,13 +8,13 @@
 import { sessionTokenStorageKey } from "@ucode/brand";
 import { errorMessageKey } from "@ucode/i18n";
 import { Button } from "@ucode/ui/base/button";
-import { LoginPage } from "@ucode/ui/business/login-page";
+import { LoginPage } from "@ucode/ui/business/shell/login-page";
+import { useSessions } from "@ucode/ui/hooks/store/use-sessions";
 import { useAuth } from "@ucode/ui/hooks/use-auth";
-import { useSessions } from "@ucode/ui/hooks/use-sessions";
-import { useErrorText } from "@ucode/ui/lib/error";
-import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/lib/settings-section";
+import { useErrorText } from "@ucode/ui/hooks/use-error-text";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useClient } from "@ucode/ui/provider";
+import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/utils/settings-section";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 

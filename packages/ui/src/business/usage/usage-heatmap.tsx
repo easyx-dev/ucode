@@ -8,17 +8,16 @@ import { cn } from "cn";
 import type { TFunction } from "i18next";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { UsageDayBucket, UsageWeekBucket } from "../../lib/types";
-import { formatTokens } from "../../lib/usage";
+import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
+import type { UsageDayBucket, UsageWeekBucket } from "../../types";
+import { formatTokens } from "../../utils/usage";
 import {
   buildCalendar,
   dateKeyOfIndex,
   dayIndexOf,
   type HeatCell,
   type HeatMode,
-} from "../../lib/usage-series";
-import { SegmentedControl, type SegmentedOption } from "../segmented-control";
+} from "../../utils/usage-series";
 import { UsageEmpty, UsageSection } from "./usage-section";
 import { type HoverTip, UsageTip } from "./usage-tip";
 

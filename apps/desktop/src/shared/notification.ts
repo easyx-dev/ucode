@@ -2,7 +2,7 @@
  * 系统通知的跨进程契约：渲染层、preload 与主进程共用这一份形状。
  *
  * 渲染层负责文案（i18n 在 `@ucode/ui`），主进程只管弹系统通知与聚焦窗口；
- * 同形声明在 `@ucode/ui/lib/notice` 的 `DesktopNoticePort`——那边不能反过来依赖 electron。
+ * 同形声明在 `@ucode/ui/business/notify/notice` 的 `DesktopNoticePort`——那边不能反过来依赖 electron。
  */
 export type DesktopNotificationRequest = {
   /** 通知标题：事件本身（等待输入 / 完成 / 出错），已在渲染层按当前语言渲染 */

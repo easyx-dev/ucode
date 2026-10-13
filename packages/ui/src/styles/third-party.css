@@ -12,8 +12,8 @@
  * （`--diff-aside-width--`），外面再写宽度也只是与它打架——想更窄/更宽应当先确认估算规则本身出了问题。
  *
  * diff 视图（@git-diff-view/react）：库把配色收敛成一组 `--diff-*` 变量，深浅色由 token 自己跟随，
- * 不再分 light / dark 两套。语法高亮由我们注册的 shiki 适配器着色（`lib/shiki-diff.ts`），
- * token 自己带 `--shiki-light` / `--shiki-dark`（见 `lib/shiki.ts`），所以这里不需要再映射库自带的
+ * 不再分 light / dark 两套。语法高亮由我们注册的 shiki 适配器着色（`business/markdown/shiki-diff.ts`），
+ * token 自己带 `--shiki-light` / `--shiki-dark`（见 `business/markdown/shiki.ts`），所以这里不需要再映射库自带的
  * `.hljs-*` 配色。
  */
 .diff-tailwindcss-wrapper[data-theme] .diff-style-root {

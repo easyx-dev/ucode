@@ -3,9 +3,9 @@
  *
  * 界面本体全部来自 `@ucode/ui`；本文件只负责导航状态的存放与默认选中。
  */
-import { useSessions } from "@ucode/ui/hooks/use-sessions";
-import type { SettingsSectionId } from "@ucode/ui/lib/settings-section";
+import { useSessions } from "@ucode/ui/hooks/store/use-sessions";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
+import type { SettingsSectionId } from "@ucode/ui/utils/settings-section";
 import { useEffect, useRef, useState } from "react";
 import { WindowControls } from "./components/window-controls";
 import { titleBarInset, windowControlsWidth } from "./lib/window-chrome";

@@ -8,10 +8,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../base/dialog";
+import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
 import { Spinner } from "../../base/spinner";
-import { useUsage } from "../../hooks/use-usage";
-import type { ContextUsage } from "../../lib/types";
-import { SegmentedControl, type SegmentedOption } from "../segmented-control";
+import { useUsage } from "../../hooks/store/use-usage";
+import type { ContextUsage } from "../../types";
 import { UsageModelUsage, UsageSessionList } from "./usage-breakdown";
 import { UsageHeatmap } from "./usage-heatmap";
 import { UsageMetrics } from "./usage-metrics";

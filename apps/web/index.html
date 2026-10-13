@@ -18,7 +18,7 @@
         if (locale === "zh-CN" || locale === "en") document.documentElement.lang = locale;
         // 外观参数（字号 / 密度 / 配色主题）预先写进根节点，否则首帧会用默认字号与配色。
         // 字体不在这里应用：它需要按需加载，交给运行时，未加载完本来就该用回退字体。
-        // 区间与档位改动时同步 `packages/ui/src/lib/appearance.ts`。
+        // 区间与档位改动时同步 `packages/ui/src/provider/appearance.ts`。
         const appearance = localStorage.getItem("%BRAND_APPEARANCE_KEY%");
         if (appearance) {
           const prefs = JSON.parse(appearance);

@@ -9,20 +9,20 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../base/dialog";
 import { Spinner } from "../../base/spinner";
-import { type ConfigDraft, useConfigDraft } from "../../hooks/use-config-draft";
-import { type ConfigSave, useConfigSave } from "../../hooks/use-config-save";
-import type { SettingsSectionId } from "../../lib/settings-section";
-import { SettingsAppearance } from "./settings-appearance";
-import { SettingsDefaults } from "./settings-defaults";
-import { SettingsMcp } from "./settings-mcp";
-import { SettingsMemory } from "./settings-memory";
-import { SettingsModels } from "./settings-models";
+import type { SettingsSectionId } from "../../utils/settings-section";
+import { SettingsMcp } from "./mcp/settings-mcp";
+import { SettingsModels } from "./models/settings-models";
+import { SettingsAppearance } from "./pages/settings-appearance";
+import { SettingsDefaults } from "./pages/settings-defaults";
+import { SettingsMemory } from "./pages/settings-memory";
+import { SettingsRemoteAccess } from "./pages/settings-remote-access";
+import { SettingsWebsearch } from "./pages/settings-websearch";
+import { SettingsPlugins } from "./plugins/settings-plugins";
 import { SettingsNav } from "./settings-nav";
 import { SettingsPage } from "./settings-page";
-import { SettingsPlugins } from "./settings-plugins";
-import { SettingsRemoteAccess } from "./settings-remote-access";
 import { useSettingsSectionMeta } from "./settings-sections";
-import { SettingsWebsearch } from "./settings-websearch";
+import { type ConfigDraft, useConfigDraft } from "./use-config-draft";
+import { type ConfigSave, useConfigSave } from "./use-config-save";
 
 type SettingsPanelProps = {
   /** 无标题栏窗口顶部留给系统窗口控件的高度（px）；带系统标题栏的窗口不需要（默认 0） */

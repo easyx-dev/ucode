@@ -9,7 +9,7 @@
 import type { GitCommitSummary } from "@ucode/contracts";
 import { createContext, type ReactNode, useContext } from "react";
 
-import type { WorkbenchDoc } from "../lib/workbench-docs";
+import type { WorkbenchDoc } from "../business/workbench/workbench-docs";
 
 /** 侧栏的两个视图（顺序即活动栏自上而下的排布：代码管理在前，它是最常看的） */
 export const WORKBENCH_VIEWS = ["changes", "files"] as const;

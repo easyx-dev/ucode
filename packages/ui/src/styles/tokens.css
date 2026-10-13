@@ -248,7 +248,7 @@
   --elevation-edge: 0 calc(var(--base-unit) * -0.25) calc(var(--base-unit) * 0.5) var(--shadow-soft);
 
   /* 语法高亮不给令牌：shiki 用内置 GitHub 明暗双主题，token 自己带
-     `--shiki-light` / `--shiki-dark`，由 base.css 按 `.dark` 取用（见 lib/shiki.ts） */
+     `--shiki-light` / `--shiki-dark`，由 base.css 按 `.dark` 取用（见 business/markdown/shiki.ts） */
 }
 
 /*

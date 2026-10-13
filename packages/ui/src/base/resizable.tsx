@@ -4,7 +4,7 @@ import * as ResizablePrimitive from "react-resizable-panels";
 /**
  * 分栏容器。三个面板的组用 `orientation="horizontal"`（左右并排，分隔条是竖的）。
  * 尺寸单位沿用库的约定：数字是像素、字符串是百分比——本项目一律用像素，
- * 于是栏宽不随窗口变化（见 `lib/panel-layout`）。
+ * 于是栏宽不随窗口变化（见 `utils/panel-layout`）。
  */
 function ResizablePanelGroup({ className, ...props }: ResizablePrimitive.GroupProps) {
   return (

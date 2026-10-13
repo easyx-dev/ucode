@@ -7,17 +7,17 @@
 import { useEffect } from "react";
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../base/resizable";
-import { useGitReview } from "../../hooks/use-git-review";
 import { useIsDesktop } from "../../hooks/use-is-desktop";
 import { usePanelLayout } from "../../hooks/use-panel-layout";
+import { useWorkbench } from "../../provider/workbench";
 import {
   HANDLE_IDS,
   PANEL_IDS,
   WORKBENCH_SIDE_PANEL,
   WORKBENCH_SIDE_PANELS,
-} from "../../lib/panel-layout";
-import { useWorkbench } from "../../provider/workbench";
-import { EditorArea } from "./editor-area";
+} from "../../utils/panel-layout";
+import { EditorArea } from "./file/editor-area";
+import { useGitReview } from "./git/use-git-review";
 import { WorkbenchActivityBar } from "./workbench-activity-bar";
 import { WorkbenchSidebar } from "./workbench-sidebar";
 

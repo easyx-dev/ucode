@@ -5,7 +5,7 @@
  * 未找到服务 / 连不上 / 凭证失效时落到「服务不可用」态，而不是 web 的登录页。
  */
 import { createClient, type Translate } from "@ucode/sdk";
-import { ThemeProvider } from "@ucode/ui/business/theme-provider";
+import { ThemeProvider } from "@ucode/ui/business/shell/theme-provider";
 import { useAuth } from "@ucode/ui/hooks/use-auth";
 import { UiProvider } from "@ucode/ui/provider";
 import { type ReactNode, StrictMode } from "react";

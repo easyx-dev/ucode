@@ -8,11 +8,10 @@
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { StepUsageBucket, UsageDayBucket } from "../../lib/types";
-import { formatTokens } from "../../lib/usage";
-import { cacheHitRate, formatMs, ratioLabel } from "../../lib/usage-series";
-import { SegmentedControl, type SegmentedOption } from "../segmented-control";
+import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
+import type { StepUsageBucket, UsageDayBucket } from "../../types";
+import { formatTokens } from "../../utils/usage";
+import { cacheHitRate, formatMs, ratioLabel } from "../../utils/usage-series";
 import { UsageEmpty, UsageSection } from "./usage-section";
 import { type HoverTip, UsageTip } from "./usage-tip";
 

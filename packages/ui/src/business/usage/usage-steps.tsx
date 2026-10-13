@@ -7,8 +7,8 @@
  */
 import { useTranslation } from "react-i18next";
 
-import type { StatsStepSummary, StepUsageBucket, StepUsageTotals } from "../../lib/types";
-import { formatMs, ratioLabel } from "../../lib/usage-series";
+import type { StatsStepSummary, StepUsageBucket, StepUsageTotals } from "../../types";
+import { formatMs, ratioLabel } from "../../utils/usage-series";
 import { UsageEmpty, UsageSection } from "./usage-section";
 
 function StepCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
