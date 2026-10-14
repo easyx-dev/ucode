@@ -7,6 +7,7 @@ import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../base/badge";
+import { useModelNames } from "../../../hooks/store/use-model-names";
 import type { CatalogModel, CatalogProvider } from "../../../types";
 import {
   PICKER_TRIGGER_CLASS,
@@ -46,6 +47,7 @@ export function ModelPicker({
   onRefocus,
 }: ModelPickerProps) {
   const { t } = useTranslation();
+  const names = useModelNames();
   const [internalOpen, setInternalOpen] = useState(false);
   const [query, setQuery] = useState("");
   const isControlled = open !== undefined;
@@ -81,7 +83,7 @@ export function ModelPicker({
         <button type="button" className={PICKER_TRIGGER_CLASS} title={t("切换模型")}>
           <Cpu />
           <span className={cn(PICKER_TRIGGER_LABEL_CLASS, "max-w-48 truncate")}>
-            {value || t("选择模型")}
+            {value ? names.refLabel(value) : t("选择模型")}
           </span>
         </button>
       </Popover.Trigger>

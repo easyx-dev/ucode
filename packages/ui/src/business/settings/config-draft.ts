@@ -11,6 +11,7 @@ import type {
   ThinkingLevel,
   WebsearchView,
 } from "../../types";
+import { modelRefText } from "../../utils/model";
 
 /** 数字字段用字符串承载，否则编辑中间态（空串、半截数字）会被 Number() 吃掉 */
 export type DraftModel = {
@@ -328,6 +329,6 @@ export const modelOptions = (drafts: DraftProvider[]): Array<{ value: string; la
       .filter((model) => model.id)
       .map((model) => ({
         value: `${id}/${model.id}`,
-        label: `${provider.name || id} · ${model.name || model.id}`,
+        label: modelRefText(provider.name || id, model.name || model.id),
       }));
   });

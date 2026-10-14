@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "../../base/badge";
+import { useModelNames } from "../../hooks/store/use-model-names";
 import type { ModelUsage, SessionUsageEntry } from "../../types";
 import { formatTokens, usageKindLabel } from "../../utils/usage";
 import { cacheHitRate, ratioLabel } from "../../utils/usage-series";
@@ -14,6 +15,7 @@ type UsageModelUsageProps = {
 
 export function UsageModelUsage({ items }: UsageModelUsageProps) {
   const { t } = useTranslation();
+  const names = useModelNames();
   const max = items.reduce((peak, item) => Math.max(peak, item.totals.totalTokens), 0);
 
   return (
@@ -28,8 +30,12 @@ export function UsageModelUsage({ items }: UsageModelUsageProps) {
               <li key={`${item.provider}/${item.model}`} className="space-y-1">
                 <div className="flex items-baseline justify-between gap-3 text-xs">
                   <span className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="truncate font-medium">{item.model}</span>
-                    <span className="shrink-0 text-foreground-subtle">{item.provider}</span>
+                    <span className="truncate font-medium">
+                      {names.modelName(item.provider, item.model)}
+                    </span>
+                    <span className="shrink-0 text-foreground-subtle">
+                      {names.providerName(item.provider)}
+                    </span>
                   </span>
                   <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                     {/* 不同 provider 的缓存行为差异是这里最有信息量的对比 */}
