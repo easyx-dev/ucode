@@ -2,7 +2,7 @@
 
 > 状态：**已实现**。契约见 `docs/api.md`「文件系统（fs）」「Git（只读）」，视觉规则见 `DESIGN.md`
 > 「分栏」「面板内部」「语法高亮」。面板的版式与信息架构见 [`workbench-panel-layout.md`](./workbench-panel-layout.md)；
-> 内置浏览器不在本文范围，见 [`builtin-browser.md`](./builtin-browser.md)。
+> agent 驱动的浏览器工具与它的实时面板不在本文范围，见 [`browser-tools.md`](./browser-tools.md)。
 
 ## 目标
 

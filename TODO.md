@@ -5,8 +5,20 @@
 每条写清三件事：现象、落点（文件:行）、验收。口径或素材没定的放「需要你拍板 / 给素材」；
 本轮明确不做、留着记录与依据的放「暂缓」。写完的条目整条删掉，不留「已完成」记录——那属于 CHANGELOG。
 
-当前没有「已定稿、可直接开工」的条目：第四批与使用统计 S2–S4 已完成，暂缓项都在等明确指令。
+当前只有一条「已定稿、可直接开工」的条目（浏览器工具集），其余暂缓项都在等明确指令。
 web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分层」），不再单列条目。
+
+---
+
+## 已定稿、可直接开工
+
+### 浏览器工具集（含 screencast 面板）
+
+方案见 [`plans/browser-tools.md`](./plans/browser-tools.md)（**定稿，未实施**）。口径已定：内置功能形态
+（`harness/features/browser` + 内联扩展工厂，不做插件包）、服务进程内 Playwright headless、从零实现、
+可视化同步做源文档的档位 2（CDP screencast → 新 SSE 帧端点 → 工作台面板）；浏览器身份可配（默认隔离实例，
+可选 attach 用户自带的调试端点），隔离数据按命名 profile 长期保留并在设置页管理。旧的桌面端
+`WebContentsView` 方案已废弃删除。实施步骤与验收口径见该文第十、十一章。
 
 ---
 
@@ -44,17 +56,6 @@ web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分�
 
 **注意**：窗口化省的是传输 / 解析 / store 归并 / 首屏渲染，**不省服务端成本**——`/list` 仍要
 `SessionManager.open` + `buildContextEntries()` + `getBranch()` 走完整个 JSONL。
-
-### 浏览器 / 桌面端操作能力——本轮明确不做
-
-撤掉的内置 `browser` 工具（`playwright-core`）能力面太窄，已整体移除（依赖、`APP_BROWSER_PATH` /
-`APP_DESKTOP_PATH`、工具名与权限规则、提示词分节与 `<page>` 边界都删了；桌面端 `resolveHomeDir` 的
-`~` 展开修复是独立的现存 bug，予以保留）。重做要覆盖的能力与安全边界见
-[`plans/builtin-browser.md`](./plans/builtin-browser.md)（该方案写的是**桌面端内置浏览器**路线：
-`WebContentsView` + 独立 partition + overlay-lock + 服务端挂起桥 + `browser_*` 工具集）。
-
-开工前要定：路线（内置浏览器 vs 插件——插件平台已收窄为「资源 + 代码扩展」，没有界面贡献与会话级 API，
-走插件要另开一版插件能力）；做到哪一档（动作集范围）；是否给「需要登录态的流程」开口子以及怎么隔离。
 
 ### 内置供应商的「拉取模型列表」入口——本轮明确不做
 
