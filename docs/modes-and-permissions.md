@@ -27,9 +27,9 @@
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
 | --- | --- | --- | --- | --- | --- |
-| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`） | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
-| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write` / `bash` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
-| `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | `deny` `edit` / `write` / `bash` | `medium` | 只读分析与回答 |
+| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）；Windows 上另有 `powershell` | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
+| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write` / `bash` / `powershell` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
+| `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | `deny` `edit` / `write` / `bash` / `powershell` | `medium` | 只读分析与回答 |
 
 ### 只读为什么不收窄工具集
 
@@ -60,7 +60,8 @@
 新建会话时请求里没给档位的话，取所属项目**最近一次选择**的档位（没记住即 `auto`）——项目按 cwd 归口，
 见 [`docs/api.md`](./api.md)「项目」。
 
-- 只读模式**直接 `deny` `bash`**，不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
+- 只读模式**直接 `deny` 每一个写盘 / 执行工具**（`edit` / `write` / `bash`，Windows 上另有 `powershell`），
+  不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
   它落在规则层（不是从工具表里去掉），所以连同 `codemode` 的嵌套调用与子会话一起拦住。
 - 自定义 primary agent 可覆盖同名内置项或另取新名；`mode` 是字符串 slug，服务端按角色注册表校验。
 - 子智能体是独立的 subagent 角色（`general` / `explore`），能力 =「父会话 ∩ 角色定义」；工具取交集、
@@ -139,7 +140,7 @@ MCP 工具没有命中显式规则时，按服务器声明的 annotations 兜底
 
 - `auto` 覆盖内置工具与 MCP 写类工具；`full`（完全访问）连工作目录之外的读取与写入审批也跳过，
   即除 `deny` 外不再有审批弹窗。
-- `deny` 在任何档位都不变：`.env` 阻断、只读模式对 `edit` / `write` / `bash` 的阻断都不受档位影响。
+- `deny` 在任何档位都不变：`.env` 阻断、只读模式对写盘 / 执行工具（含 `powershell`）的阻断都不受档位影响。
 - `full` 在输入区用 warning 色标记，提示它已跳过越界审批；选中时不弹二次确认。
 - 切换档位与换模型 / 换模式同款处理：生成中拒绝（`409 session_busy`），落库后重建会话实例（`pool.dispose`），
   并用 `session_updated` 事件下发，多端同步。
@@ -159,7 +160,8 @@ MCP 工具没有命中显式规则时，按服务器声明的 annotations 兜底
 
 - 本仓库**没有 OS 级沙箱**：`cwd` 与只读规则都不是安全边界（pi 的 `security.md` 明示 cwd 不阻止命令访问其他路径）。
   对外承诺的是「**只读模式下调不了写盘 / 执行工具**」：它由权限引擎在 `tool_call` 上 `deny`（含 codemode 的
-  嵌套调用与子会话），而不是靠工具不存在；切到编码模式后 `bash` 能做什么仍然不受限。
+  嵌套调用与子会话），而不是靠工具不存在；切到编码模式后 `bash` / `powershell` 能做什么仍然不受限。
 - `deny` 只是应用层拦截，不是内核约束；档位与「恒允」都只能在这个层内放宽 `ask`。
-- 服务默认无 HTTP 鉴权且监听所有网卡，背后的 agent 带 `read` / `write` / `edit` / `bash` 权限。
+- 服务默认只监听回环且 `/api/v1` 已加鉴权（见 [`docs/api.md`](./api.md)「鉴权」），但**通过鉴权即等于本机 owner**：
+  背后的 agent 带 `read` / `write` / `edit` / `bash`（Windows 上还有 `powershell`）权限。
   **不要把服务暴露到公网或不可信网络**，见 [`README.md`](../README.md) 的安全提示与 [`TODO.md`](../TODO.md)。

@@ -113,24 +113,20 @@
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify` |
+| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍：本机只有一个平台，跟平台相关的回归靠它兜住 |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / api-docs / tokens / brand / i18n / manifest） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web` / `apps/desktop`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
-| `pnpm start` | `NODE_ENV=production node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
+| `pnpm start` | `node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
-| `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`）+ web `:5173` 同时启动 |
+| `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`，`APP_HOME` 由脚本固定为 `.tmp/.ucode`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层固定 `:5174`，`strictPort`；`/api/*` 由 Vite 代理转给 `.env` 里的 `APP_PORT`）。服务需另行启动，不需要为桌面端配 `APP_CORS_ORIGIN`。开发形态会独立开一窗 DevTools，`⌘⌥I` / `F12` 切换（生产不自动开）。端口被占时渲染层直接报错、electron 随之退出（`concurrently -k`），不会再连上别的 dev server |
 | `pnpm start:desktop` | 构建桌面端后由 Electron 以应用内协议 `app://desktop` 加载产物（不起渲染层服务、与接口同源；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
 
-**起 dev 前显式覆盖 `APP_HOME`**：服务的取值顺序是「显式环境变量 > `service.json` > `.env`」，
-所以从已导出 `APP_HOME` 的 shell 里起 dev（生产实例自己起的会话、桌面端进程都会导出）会绕过 `.env`，
-直接写到那个目录——dev 命令本身不区分环境，别指望 `.env` 兜底：
-
-```bash
-APP_HOME=.tmp/.ucode APP_HOST=127.0.0.1 APP_PORT=<dev 端口，即 .env 里声明的那个> pnpm dev
-```
+**`pnpm dev` 固定写 `.tmp/.ucode`**：脚本里显式声明了 `APP_HOME`，压过继承来的值——服务的取值顺序是
+「显式环境变量 > `service.json` > `.env`」，而生产实例自己起的会话、桌面端进程都会导出 `APP_HOME`，
+不压就会直接写进那个目录。要换目录就直接跑 `APP_HOME=<目录> pnpm -F @ucode/server dev`。
 
 `~/.ucode`（以及任何非 `.tmp/` 的 `APP_HOME`）一律当作生产数据目录：不手工改、不拿来跑 dev / 验证；
 要试就换一个 `APP_HOME`。
@@ -209,7 +205,9 @@ agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里�
 - **CLI 生命周期**：`server/src/cli.ts` 提供 `--port` / `--host` / `--open` / `--restart` /
   `--status` / `--version`。`node dist/ucode.js` 不被 watch，编辑源码不会重启它——这正是
   「用 UCode 开发 UCode」时避免打断会话的关键；改完显式 `pnpm build && pnpm start -- --restart`
-  即可停旧起新。见 README「生产启动与自迭代」。
+  即可停旧起新。`--restart` 先拿注册文件的 `instanceId` 与 `GET /api/v1/health` 核对身份，对不上就跳过
+  （陈旧 pid 在 Windows 上必然存在——那边 `SIGTERM` 不触发优雅退出），不依赖 `lsof`。
+  见 README「生产启动与自迭代」。
 - **`APP_HOST` / `APP_PORT` 是默认值**：`APP_HOST` 取值顺序为 显式（`--host` 或启动前已有环境变量）
   > `service.json`（设置里改过的值）> `.env(.prod)`，故「局域网访问」开关重启后生效；`APP_PORT` 无设置入口，
   取值 显式（`--port`）> `.env(.prod)`，`service.json` 仅兜底。
@@ -238,7 +236,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 | `harness/plugins/` | 插件宿主：清单、组件解析、注册表与来源门控 | 接缝层，不被 `harness/{pi,features}`、`core`、`platform` 反向依赖（装配期的按值依赖是例外，见下） |
 | `core/` | 内核·会话运行态 | 持有 `AgentSession` 或进程内运行态（池、占位、挂起请求、事件流） |
 | `harness/` | 基于 pi 的能力 | 直接构造 / 转换 / 驱动 pi 的对象与数据结构 |
-| `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
+| `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` / `instance` / `file-permissions` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
 | `utils/` | 纯函数：`object` / `time` | 无 IO、不引用任何 server 层 |
 
 - `platform/` 里的 `paths` 与 `resources` 是两回事：前者是**用户 / 会话给出的路径**的归一与校验

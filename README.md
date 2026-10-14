@@ -38,7 +38,7 @@ pnpm start:desktop      # 生产：构建后由 Electron 直接加载产物（�
 ### 生产启动与自迭代
 
 生产启动是「先构建、再跑产物」：`pnpm build` 把 web 构到 `apps/web/dist`，再由 esbuild 把
-server 打成单文件 `dist/ucode.js`，`pnpm start` 即 `NODE_ENV=production node dist/ucode.js`。
+server 打成单文件 `dist/ucode.js`，`pnpm start` 即 `node dist/ucode.js`（cli 默认按生产形态跑）。
 主要用途之一是**用 UCode 开发 UCode**：`node dist/ucode.js` 不被 watch，编辑源码不会重启它，
 只在你显式重启时才生效——避开开发环境存盘即重启打断会话的问题。
 
@@ -63,14 +63,17 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 - 生产（`NODE_ENV=production`）读 **`.env.prod`**（模板 `.env.prod.example`），从 cwd 向上查找；
   `.env.prod` 声明 `APP_HOME=~/.ucode`、端口 `19688`，与开发（`.env` → `.tmp/.ucode`）的数据目录隔离。
   缺失必需项会直接报错退出，代码不带默认值。
-- 需要 Node ≥ 24（`node:sqlite`）。全局命令 / npm 包 / 安装包分发尚未做，留待发布阶段。
+- 需要 Node ≥ 24（`node:sqlite`）。macOS / Linux / Windows 都是目标平台，CI（`.github/workflows/check.yml`）
+  在 ubuntu 与 windows 上各跑一遍 `pnpm check`。Windows 上 `bash` 工具需要 Git for Windows，另有 `powershell`
+  工具可用（见 [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md)）；桌面端的无标题栏窗口只在
+  macOS 生效，其他平台保留系统边框。全局命令 / npm 包 / 安装包分发尚未做，留待发布阶段。
 
 ### 桌面端（Electron）
 
 `apps/desktop` 是独立客户端，当前有 dev 与生产（跑构建产物）两种运行方式（不做安装包、不拉起服务），
 只连**已运行**的本机服务（按启动时的 `NODE_ENV` 选择连开发还是生产实例）：
 
-- 渲染层来源：开发时由 `:5174` 的 Vite dev server 提供（启动脚本声明 `DESKTOP_RENDERER_URL`，改代码即时生效）；
+- 渲染层来源：开发时由 `:5174` 的 Vite dev server 提供（`electron . --dev` 启动，改代码即时生效）；
   生产形态由 Electron 以应用内协议 `app://desktop/` 加载构建产物：页面与接口同源，不起渲染层服务。
 - 窗口：macOS 去掉系统标题栏，系统红绿灯也一并隐藏，改由界面自绘三颗窗口控件（关 / 最小化 / 全屏，
   ⌥ 点击绿点是最大化 / 还原，`windowControl` IPC）；

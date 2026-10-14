@@ -49,6 +49,37 @@
 
 ### 新增
 
+- **Windows 与 Linux 纳入目标平台（不再默认只在 macOS 上成立）**：跟平台相关的假设逐个对齐，
+  并给跨平台回归加了兜底：
+  - **新增 CI**（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍 `pnpm check`——开发机只有
+    一个平台，跟平台相关的回归只能靠它兜住。`.env` / `.env.prod` 不入库，CI 上由 `scripts/ci-env.mjs` 从模板生成。
+  - **Windows 上新增 `powershell` 工具**：默认工具集按平台组装（pi 只在 Windows 提供它，非 Windows 上多列
+    一个会直接装配失败），由 `harness/features/shell` 按 bash 同款接管（默认超时、空转看门狗、非交互环境、
+    插件 `bin/`）。它计入 `WRITE_TOOLS` 与权限引擎的命令类 subject——漏掉任一处，只读模式都能借它执行命令；
+    模式约束文案的工具列举因此改为按实际工具表生成（`modeConstraints` 从常量改成函数，与 `toolPolicy` 同形）。
+    空转拦截也认 `Start-Sleep` 与 `timeout /t` 了。
+  - **插件 hook 在 Windows 上优先用 Git Bash 执行**：Claude 生态的 hook 是 `.sh` 加 `$CLAUDE_PLUGIN_ROOT`
+    这类 POSIX 语法，`cmd.exe` 两个都不认；找不到 bash 才回退 `cmd.exe`（此时用 `.cmd` / `.bat` 写的仍可用）。
+    非零退出连同 stderr 记日志，不再只剩一句摘要。
+  - **组件清单路径接受 Windows 写法**（`.\hooks\x.sh` 与 `./hooks/x.sh` 等价），`~` 展开同时认 `~\`。
+  - 修掉两处只在 Windows 上暴露的缺陷：**zip 来源的插件装不上**（解包的越界判定手拼 `${root}/`，而 Windows 上
+    `resolve` 产出反斜杠，于是每个条目都被判成越界）、**zip 解出的 `bin/` 脚本没有可执行位**（zip 不携带
+    unix 权限位、tgz 会保留，于是同一插件按来源不同表现不同——macOS 与 Linux 上同样存在）。
+  - PATH 键名按实际大小写查找：Windows 的环境块写的是 `Path`，原先直接读 `env.PATH` 会取不到、另写出一个
+    `PATH` 键，子进程的 PATH 可能被截成只剩插件目录。
+  - 测试按平台收敛：权限位、符号链接、`.sh` hook、清空 PATH 这几类用例在 Windows 上跳过或改用
+    `delimiter` / `tmpdir()`，不再写死 POSIX 假设。
+
+- **服务实例身份（`GET /api/v1/health` 新增 `instanceId`）**：注册文件记录本次启动的实例标识，`--restart`
+  据此确认端口上的服务就是注册文件描述的那个进程，对不上就跳过而不是误杀。于是 `--restart` 不再依赖
+  `lsof`（精简的 Linux 环境可能没装它），Windows 上「陈旧 pid 被系统复用」的误杀风险也一并关掉——那边
+  `SIGTERM` 不触发优雅退出，残留 pid 是常态。
+
+- **本地凭证文件的权限在两个平台都收紧**：新增 `platform/file-permissions`（POSIX 走 `chmod 0600`，
+  Windows 走 `icacls /inheritance:r`——那边 `chmod` 只影响只读位，访问控制由 ACL 决定）。顺带发现并修掉
+  `config.json`（存 provider 的 `apiKey`）**从未设过权限**：在 macOS / Linux 上一律是 umask 默认值，
+  同机其他用户可读。
+
 - **资产（角色 / 技能 / 命令）的可视化管理**：新增契约域 `assets`
   （`POST /api/v1/assets/{list,read,save,delete}`）与设置页的「子智能体」「技能」「命令」三个分区——
   列出全部来源（全局 / 项目 / 插件 / 内置）并标出被同名项压住的条目，可直接新建、编辑、删除。
@@ -256,6 +287,12 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **脚本层对齐三平台**：`pnpm-workspace.yaml` 开 `shellEmulator`（脚本里的行内环境变量赋值在 Windows 的
+  `cmd.exe` 下不成立）；`pnpm start` 去掉冗余的 `NODE_ENV=production`（cli 本就把缺省看作生产形态）；
+  `pnpm dev` 脚本内显式声明 `APP_HOME=.tmp/.ucode`，不再依赖手工前缀；桌面端开发形态改由 `electron . --dev`
+  声明（原来那条行内赋值由 concurrently 在自己的 shell 里执行，pnpm 的 shellEmulator 管不到它），渲染层端口
+  抽到 `apps/desktop/src/shared/renderer.ts`，由 vite 配置与主进程共用。
+
 - **`@ucode/ui` 公开面收口**：删掉无人使用的根入口（`src/index.ts`，`types` 改指 `src/types.ts`）。
   公开面即 `exports` 的几条子路径：`./base/*`（原语）、`./business/*`（**业务组件**）、`./hooks/*`、
   `./utils/*`、`./provider`、`./presets/workspace`、`./theme.css`；域内逻辑与 hook（`business/**/*.ts`）
@@ -385,6 +422,9 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   这两张贴窗口的卡圆角由 `rounded-xl` 收到 `rounded-md`，与无标题栏窗口自身的圆角相称。
 
 ### 修复
+
+- **`pnpm start -- --restart` 这类参数透传一直不工作**：pnpm 会把 `--` 一并传给 node，CLI 遂报「未知参数」
+  （与 `shellEmulator` 无关，关掉也一样）。现在 CLI 丢弃裸 `--`。
 
 - **技能命令的边界可被正文伪造**：`/skill:name` 展开的 `<skill …>` 块原先是手工拼字符串，没走
   `wrapUntrusted`，技能正文里写一行 `</skill>` 就能提前闭合边界——既能把后续文字伪装成对话本身，
