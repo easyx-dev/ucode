@@ -21,6 +21,7 @@ export {
 export { createEventStream, type EventConnect, type EventStream } from "./events";
 export { readSseStream } from "./sse";
 export { createStore, type Store } from "./store";
+export { type AssetsState, type AssetsStore, createAssetsStore } from "./stores/assets";
 export { type AuthState, type AuthStore, createAuthStore } from "./stores/auth";
 export { type CommandAssets, type CommandsStore, createCommandsStore } from "./stores/commands";
 export { type ConfigState, type ConfigStore, createConfigStore } from "./stores/config";

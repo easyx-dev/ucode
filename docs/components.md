@@ -43,7 +43,7 @@ packages/ui/src/
     shell/            # 应用外壳级：登录页、主题 Provider、错误提示、命令面板
     settings/         # 设置面板
       pages/          # 单个设置分页（外观、默认值、记忆、联网、远程访问）与它们的 hook
-      models/ plugins/ mcp/   # 模型与供应商 / 插件 / MCP 三块
+      models/ plugins/ mcp/ assets/   # 模型与供应商 / 插件 / MCP / 角色·技能·命令三块
     workbench/        # 工作台：面板骨架 + git/（变更与 diff）+ file/（文件与编辑器）
     usage/            # 用量统计
   provider/           # UiProvider：注入应用层创建好的 client；外观偏好的事实源也在这里

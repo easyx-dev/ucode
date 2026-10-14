@@ -6,6 +6,7 @@
  */
 import { type Apis, type ApisOptions, createApis } from "./apis";
 import { createEventStream, type EventStream } from "./events";
+import { createAssetsStore } from "./stores/assets";
 import { createAuthStore } from "./stores/auth";
 import { createCommandsStore } from "./stores/commands";
 import { createConfigStore } from "./stores/config";
@@ -31,6 +32,7 @@ export const createClient = (options: ClientOptions = {}) => {
   const auth = createAuthStore({ apis });
   onUnauthorized = () => auth.markAnonymous();
 
+  const assets = createAssetsStore({ apis });
   const sessions = createSessionsStore({ apis, events });
   const messages = createMessagesStore({ apis, events });
   const interactions = createInteractionsStore({ apis, events });
@@ -48,6 +50,7 @@ export const createClient = (options: ClientOptions = {}) => {
     apis,
     events,
     auth,
+    assets,
     sessions,
     messages,
     interactions,

@@ -581,6 +581,28 @@ export const AGENT_SOURCES = ["project", "global", "plugin", "builtin"] as const
 
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 
+/**
+ * 设置页可管理的资产类别。三者在磁盘上分别是：
+ * `agents/<slug>.md`（角色）、`skills/<name>/SKILL.md`（技能）、`prompts/<name>.md`（命令）。
+ */
+export const ASSET_KINDS = ["agent", "skill", "command"] as const;
+
+export type AssetKind = (typeof ASSET_KINDS)[number];
+
+/**
+ * 资产的写入作用域：全局 `$APP_HOME`，或当前项目（cwd 祖先链上最近的 `.<slug>` 配置目录）。
+ * 只读来源（插件 / 内置 / `.agents` 兼容目录）不在其中，改它们只能靠改插件或用全局 / 项目档覆盖。
+ */
+export const ASSET_SCOPES = ["global", "project"] as const;
+
+export type AssetScope = (typeof ASSET_SCOPES)[number];
+
+/** 资产名（角色 slug / 技能目录名 / 命令文件名）的长度上限 */
+export const ASSET_NAME_MAX_LENGTH = 64;
+
+/** 资产正文（frontmatter 之外的部分）的字符上限；服务端另有文件字节上限兜底 */
+export const ASSET_BODY_MAX_LENGTH = 200_000;
+
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";
 

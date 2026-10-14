@@ -1,5 +1,7 @@
 /** 设置分区的展示元数据：导航标题与图标，导航栏与各页页头共用同一份 */
 import {
+  BookOpen,
+  Bot,
   Brain,
   Globe,
   type LucideIcon,
@@ -9,6 +11,7 @@ import {
   Plug,
   SlidersHorizontal,
   Sparkles,
+  Terminal,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { SettingsSectionId } from "../../utils/settings-section";
@@ -22,6 +25,9 @@ export const useSettingsSectionMeta = (): Record<SettingsSectionId, SettingsSect
     appearance: { label: t("外观"), icon: Palette },
     models: { label: t("模型设置"), icon: Sparkles },
     defaults: { label: t("默认值"), icon: SlidersHorizontal },
+    agents: { label: t("子智能体"), icon: Bot },
+    skills: { label: t("技能"), icon: BookOpen },
+    commands: { label: t("命令"), icon: Terminal },
     memory: { label: t("记忆"), icon: Brain },
     websearch: { label: t("联网搜索"), icon: Globe },
     mcp: { label: t("MCP 服务器"), icon: Plug },

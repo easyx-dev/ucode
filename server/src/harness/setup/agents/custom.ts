@@ -191,11 +191,31 @@ export const parseCustomAgent = (slug: string, content: string): ParsedCustomAge
   return { mode, profile };
 };
 
+/** 文件名能否用作 slug：设置页保存前用它给中文错误，装载路径用它跳过坏文件 */
+export const isUsableAgentSlug = (slug: string): boolean =>
+  SLUG_PATTERN.test(slug) && slug.length <= CUSTOM_AGENT_SLUG_MAX_LENGTH;
+
 /** 校验文件名可用作 slug（长度与字符集） */
 const assertUsableSlug = (slug: string): void => {
-  if (!SLUG_PATTERN.test(slug) || slug.length > CUSTOM_AGENT_SLUG_MAX_LENGTH) {
-    throw new Error("文件名需为小写字母开头、仅含小写字母 / 数字 / 连字符的 slug");
+  if (isUsableAgentSlug(slug)) return;
+  throw new Error("文件名需为小写字母开头、仅含小写字母 / 数字 / 连字符的 slug");
+};
+
+/**
+ * 解析并校验一个角色文件能不能被装载：文件名、体积、frontmatter，以及「纯子角色不许占用主模式名」。
+ *
+ * `loadAgentRegistry` 与设置页的资产列表共用这一处判定——否则界面会说某条在生效，
+ * 而装配时它已被跳过（同名主模式、超大文件、frontmatter 非法三种都是这种“隐形跳过”）。
+ * 抛出的原因即诊断文案。
+ */
+export const assertLoadableAgent = (slug: string, content: string): ParsedCustomAgent => {
+  assertUsableSlug(slug);
+  if (Buffer.byteLength(content, "utf8") > CUSTOM_AGENT_MAX_BYTES) throw new Error("文件过大");
+  const parsed = parseCustomAgent(slug, content);
+  if (parsed.mode === "subagent" && (SESSION_MODES as readonly string[]).includes(slug)) {
+    throw new Error(`与主模式同名：${slug}`);
   }
+  return parsed;
 };
 
 const isDirectory = (path: string): boolean => {
@@ -206,14 +226,22 @@ const isDirectory = (path: string): boolean => {
   }
 };
 
-/** 角色目录链：项目配置目录下的 `agents`（近→远）+ 全局 `$APP_HOME/agents`，去重且只留存在的 */
-const agentDirs = (input: AgentRegistryInput): Array<{ dir: string; source: AgentSource }> => {
+/**
+ * 角色目录链：项目配置目录下的 `agents`（近→远）+ 全局 `$APP_HOME/agents`，去重且只留存在的。
+ * 顺序即同名优先级，设置页的资产列表直接用这份次序。
+ */
+export const agentDirs = (
+  input: AgentRegistryInput,
+): Array<{ dir: string; source: AgentSource }> => {
   const userHome = resolve(input.userHome ?? homedir());
   const appHome = resolve(input.appHome);
   const candidates: Array<{ dir: string; source: AgentSource }> = [];
 
   for (const dir of ancestorDirs(input.cwd, [userHome])) {
     if (dir === userHome || dir === appHome) continue;
+    // `$APP_HOME` 本身就是 `.<slug>` 形态：不能再把它当成上一层目录的项目配置目录，
+    // 否则未绑定项目的会话（cwd 在 `$APP_HOME/workspace` 下）会把全局角色再算一次「项目档」
+    if (resolve(dir, PROJECT_CONFIG_DIRNAME) === appHome) continue;
     candidates.push({
       dir: resolve(dir, PROJECT_CONFIG_DIRNAME, AGENTS_DIRNAME),
       source: "project",
@@ -242,21 +270,18 @@ const listAgentFiles = (dir: string): string[] => {
   }
 };
 
-/** 载入一个角色文件并按 mode 归位；返回错误原因或 null */
+/** 载入一个角色文件并按 mode 归位；同名只留先到者（同名规则已由 `assertLoadableAgent` 挡过） */
 const placeAgent = (
   registry: { primary: Record<string, AgentProfile>; subagents: Record<string, AgentProfile> },
   seen: { primary: Set<string>; subagent: Set<string> },
   slug: string,
-  content: string,
+  parsed: ParsedCustomAgent,
   source: AgentSource,
 ): void => {
-  const { mode, profile } = parseCustomAgent(slug, content);
+  const { mode, profile } = parsed;
   const tagged: AgentProfile = { ...profile, source };
 
   if (mode === "subagent") {
-    if ((SESSION_MODES as readonly string[]).includes(slug)) {
-      throw new Error(`与主模式同名：${slug}`);
-    }
     if (!seen.subagent.has(slug)) {
       registry.subagents[slug] = tagged;
       seen.subagent.add(slug);
@@ -330,10 +355,10 @@ export const loadAgentRegistry = (input: AgentRegistryInput): AgentRegistry => {
       const slug = file.slice(0, -".md".length);
       const path = join(dir, file);
       try {
-        assertUsableSlug(slug);
         // 先按文件大小挡一道，再读取，避免超大文件整块进内存
         if (statSync(path).size > CUSTOM_AGENT_MAX_BYTES) throw new Error("文件过大");
-        placeAgent(registry, seen, slug, readFileSync(path, "utf8"), source);
+        const parsed = assertLoadableAgent(slug, readFileSync(path, "utf8"));
+        placeAgent(registry, seen, slug, parsed, source);
       } catch (error) {
         registry.errors.push({
           file,

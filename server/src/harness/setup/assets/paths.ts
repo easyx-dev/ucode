@@ -76,9 +76,11 @@ const existingUnique = (items: CommandAssetPath[]): CommandAssetPath[] => {
 export const commandAssetPaths = (input: CommandAssetPathInput): CommandAssetPaths => {
   const userHome = resolve(input.userHome ?? homedir());
   const appHome = resolve(input.appHome);
-  // 主目录这一级由「全局 / 用户」两档负责，避免在项目档里被误标成 project
+  // 主目录这一级由「全局 / 用户」两档负责，避免在项目档里被误标成 project；
+  // 同理排掉「上一层目录的 `.<slug>` 恰好就是 `$APP_HOME`」的情形
   const dirs = ancestorDirs(input.cwd, [userHome]).filter(
-    (dir) => dir !== userHome && dir !== appHome,
+    (dir) =>
+      dir !== userHome && dir !== appHome && resolve(dir, PROJECT_CONFIG_DIRNAME) !== appHome,
   );
 
   // 插件的技能 / 命令目录排在用户档之后：同名时用户手写的仍胜出，内置资产恒垫底

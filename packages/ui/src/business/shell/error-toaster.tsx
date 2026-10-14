@@ -31,6 +31,7 @@ export function ErrorToaster() {
       ["projects", client.projects],
       ["usage", client.usage],
       ["goal", client.goal],
+      ["assets", client.assets],
     ];
 
     const check = (name: string, error: ApiError | null): void => {

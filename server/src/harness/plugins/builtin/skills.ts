@@ -15,6 +15,9 @@ const MANIFEST_DIRNAME = `.${brand.slug}-plugin`;
 /** 环境变量前缀：`<SLUG>_PLUGIN_ROOT` 这类 */
 const ENV_PREFIX = brand.slug.toUpperCase();
 
+/** 全局档目录名与项目配置目录名：都是 `.<slug>`，正文里给模型指路用 */
+const HOME_DIRNAME = `.${brand.slug}`;
+
 /** 内置技能：文件以插件包内的相对路径为键，`SKILL.md` 必须有 */
 export type BuiltinSkill = {
   /** 目录名与技能名 */
@@ -153,6 +156,188 @@ description: 审计第三方插件（清单、钩子、bin、MCP、扩展的信�
 （例如「来自第三方市场，钩子与扩展本来就不会注入」）。
 `;
 
+const SKILL_CREATE_SKILL = `---
+name: skill-create
+description: 引导创建一个技能（skills/<name>/SKILL.md），让模型按描述自动选用
+---
+
+# 创建技能
+
+技能是给模型的说明书：**什么时候用、按什么步骤做**。模型只看得到技能的 description，
+由它决定要不要读正文，所以描述要写触发场景（「审查改动时」「写提交信息时」），不要写「一个技能」。
+
+## 1. 放哪
+
+| 作用域 | 路径 | 何时选 |
+| --- | --- | --- |
+| 全局 | \`~/${HOME_DIRNAME}/skills/<name>/SKILL.md\` | 所有会话都能用 |
+| 项目 | \`<项目根>/${HOME_DIRNAME}/skills/<name>/SKILL.md\` | 只在这个仓库里用；同名时压过全局 |
+
+两条等价路径：**设置 → 技能**里新建（有表单与校验），或直接写文件——同一份磁盘文件，界面只是编辑器。
+直接写文件时目录要自己建：\`mkdir -p <目录>\`，再写 \`SKILL.md\`。
+
+- 目录名就是技能名：小写字母或数字，单词之间用单个连字符（\`commit-helper\` 可以，\`Commit_Helper\` 不行）。
+- 技能可以带别的文件：\`references/*.md\` 放参考资料、\`scripts/*.sh\` 放脚本，正文里按相对路径引用。
+
+## 2. 最小骨架
+
+\`\`\`markdown
+---
+name: commit-helper
+description: 按本仓库的规范写提交信息（用户说「提交」「写提交信息」时使用）
+---
+
+# 写提交信息
+
+1. \`git diff --staged\` 看改了什么。
+2. 若仓库里有提交规范文档，先读它取本仓库的口径。
+3. 标题写「type(scope): 摘要」，正文说清为什么改。
+\`\`\`
+
+\`description\` **必填**：缺了它整条技能不会被装载（不是警告，是直接消失）。\`name\` 可省，会用目录名。
+
+## 3. 怎么用、什么时候生效
+
+- 模型按 \`description\` 自动选用；用户也可以 \`/skill:<name>\` 显式调用。
+- **改动只对下一个新会话生效**：当前会话的技能清单在装配时就定下来了，写完当场用不上。
+
+## 4. 写完自查
+
+打开 **设置 → 技能**：确认这条出现在「本机与项目」段、来源是全局还是当前项目；
+被同名的其他来源压住时，行上会写「被同名项覆盖：<路径>」。解析失败的文件列在页面底部的错误区
+（缺 \`description\`、frontmatter 写坏都会出现在那里）。
+
+## 常见坑
+
+- 只有 \`skills/<name>/SKILL.md\` 这种「一个目录一个技能」的形态会被扫到，散在别处的 \`.md\` 不算。
+- frontmatter 是 YAML：值里带冒号时要加引号，否则整段解析失败、技能消失。
+- 正文写给模型看：写步骤与判据，不写给人看的背景介绍。
+`;
+
+const AGENT_CREATE_SKILL = `---
+name: agent-create
+description: 引导创建一个自定义角色（主模式或子智能体），写进 agents/<slug>.md
+---
+
+# 创建角色
+
+角色 = 一段提示词 + 一组能力开关。两种用途：
+
+- **主模式**（\`mode: primary\`）：像 build / plan / ask 那样当会话模式，决定这一轮的工具与提示词倾向；
+- **子智能体**（\`mode: subagent\`，缺省）：由 \`subagent\` 工具委派出去干一件自包含的事。
+
+## 1. 放哪
+
+| 作用域 | 路径 | 何时选 |
+| --- | --- | --- |
+| 全局 | \`~/${HOME_DIRNAME}/agents/<角色名>.md\` | 所有会话都能用 |
+| 项目 | \`<项目根>/${HOME_DIRNAME}/agents/<角色名>.md\` | 只在这个仓库里用；同名时压过全局 |
+
+两条等价路径：**设置 → 子智能体**里新建，或直接写文件。
+文件名就是 slug：小写字母开头，只含小写字母、数字与连字符。
+
+## 2. frontmatter 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| \`description\` | 是 | 写进工具描述与角色选择器，模型按它挑选；说清「什么时候派它」 |
+| \`name\` | | 展示名，缺省用文件名 |
+| \`mode\` | | \`primary\` / \`subagent\` / \`all\`，缺省 \`subagent\` |
+| \`tools\` | | 逗号分隔的工具名白名单；写 \`inherit\` 或留空即继承父会话（子角色）；主模式留空用默认工具集 |
+| \`model\` | | 覆盖模型；留空继承父会话 |
+| \`thinking\` | | 推荐思考档位，**只对主模式有效**（子角色写它会直接报错） |
+| \`advertise\` | | \`false\` 时不列进工具描述，仍可按名调用 |
+| \`hidden\` | | \`true\` 时不进角色选择器，仍可按名调用 |
+
+**未知字段一律报错**：整个文件被跳过。写错拼写尤其危险——\`tools\` 写成 \`tool\` 会让能力静默变成「继承父会话」。
+
+## 3. 最小骨架（只读审查角色）
+
+\`\`\`markdown
+---
+name: 代码审查
+description: 只读审查改动并列出问题（用户要求 review / 检查代码时委派）
+tools: read, grep, find, ls
+---
+
+你只做审查，不改文件。
+
+1. 先 \`git diff\` 看改动范围，再按文件读上下文。
+2. 按「阻断 / 建议 / 提示」三档列问题，每条给 \`文件:行号\` 与理由。
+3. 没有问题就说没有，不为了凑数挑风格。
+\`\`\`
+
+## 4. 生效与自查
+
+- **新会话生效**；同名的自定义角色会覆盖内置的 build / plan / ask 与 general / explore。
+- **设置 → 子智能体**：看来源（全局 / 当前项目）与是否被同名项覆盖；解析失败的条目在页面底部错误区。
+
+## 常见坑
+
+- 纯子角色不能与主模式同名（build / plan / ask）；要占位得用 \`mode: primary\` 或 \`all\`。
+- 能力是「父会话 ∩ 角色定义」，收窄只能靠 \`tools\` 白名单：想要只读就别把 \`bash\` / \`write\` / \`edit\` 列进去。
+- 子角色的思考档位按所属模式解析，自己声明不了。
+`;
+
+const COMMAND_CREATE_SKILL = `---
+name: command-create
+description: 引导创建一条提示词命令（prompts/<name>.md），用户用 /名字 调用
+---
+
+# 创建命令
+
+命令 = 一个常用提示词模板：用户输入 \`/名字 参数\`，这段正文会替换掉命令本身。
+与技能的分工：技能由模型按描述自动选用，命令是**用户主动**敲出来的。
+
+## 1. 放哪
+
+| 作用域 | 路径 | 何时选 |
+| --- | --- | --- |
+| 全局 | \`~/${HOME_DIRNAME}/prompts/<名字>.md\` | 所有会话都能用 |
+| 项目 | \`<项目根>/${HOME_DIRNAME}/prompts/<名字>.md\` | 只在这个仓库里用；同名时压过全局 |
+
+两条等价路径：**设置 → 命令**里新建，或直接写文件。文件名就是命令名
+（小写字母或数字开头，只含小写字母、数字与连字符），只扫目录一级的 \`.md\`。
+
+## 2. frontmatter
+
+| 字段 | 说明 |
+| --- | --- |
+| \`description\` | 可选：显示在 \`/\` 菜单；留空取正文首行（截 60 字） |
+| \`argument-hint\` | 可选：命令名后面的用法提示，如 \`[focus]\` |
+
+## 3. 参数占位符
+
+- \`$1\` \`$2\`：第 1、2 个参数（按空格拆分，引号可以保住空格）
+- \`$@\` 或 \`$ARGUMENTS\`：全部参数
+- \`\${1:-默认值}\`：参数缺失时用默认值；\`\${@:2}\` 从第 2 个起的全部；\`\${@:2:3}\` 再取 3 个
+
+## 4. 最小骨架
+
+\`\`\`markdown
+---
+description: 审查当前改动
+argument-hint: [关注点]
+---
+
+审查这些改动，重点看 $1。
+
+1. \`git diff\` 看全部改动。
+2. 按「阻断 / 建议」两档给结论，每条带 \`文件:行号\`。
+\`\`\`
+
+## 5. 生效与自查
+
+- **新会话生效**；命令只在输入框**开头**整条匹配（\`/名字 参数\`），写在正文中间不生效。
+- 与内置动作重名（\`/new\`、\`/compact\`、\`/models\`、\`/help\` 等）不会覆盖它们，换个名字。
+- **设置 → 命令**：核对来源与是否被同名项覆盖；它出现在 \`/\` 菜单里就算装载成功。
+
+## 常见坑
+
+- 正文里写 \`$1\` 这类占位符时想清楚用户会不会真给参数，缺参数会被替换成空串。
+- 别在正文开头写标题式废话，模型看到的就是这段文字本身。
+`;
+
 export const BUILTIN_SKILLS: readonly BuiltinSkill[] = [
   {
     id: "plugin-create",
@@ -166,6 +351,27 @@ export const BUILTIN_SKILLS: readonly BuiltinSkill[] = [
     description: "审计第三方插件（清单、钩子、bin、MCP、扩展的信任面），输出分级结论",
     version: "0.1.0",
     files: { "SKILL.md": PLUGIN_REVIEW_SKILL },
+    requiredFiles: ["SKILL.md"],
+  },
+  {
+    id: "skill-create",
+    description: "引导创建一个技能（模型按 description 自动选用，也可 /skill:名字 调用）",
+    version: "0.1.0",
+    files: { "SKILL.md": SKILL_CREATE_SKILL },
+    requiredFiles: ["SKILL.md"],
+  },
+  {
+    id: "agent-create",
+    description: "引导创建一个自定义角色（主模式或子智能体）",
+    version: "0.1.0",
+    files: { "SKILL.md": AGENT_CREATE_SKILL },
+    requiredFiles: ["SKILL.md"],
+  },
+  {
+    id: "command-create",
+    description: "引导创建一条提示词命令（用户在输入框用 /名字 调用）",
+    version: "0.1.0",
+    files: { "SKILL.md": COMMAND_CREATE_SKILL },
     requiredFiles: ["SKILL.md"],
   },
 ];

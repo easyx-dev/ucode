@@ -78,6 +78,10 @@
 | POST | `/api/v1/marketplace/delete` | 移除市场登记（下挂插件只失去来源，内容不删） |
 | POST | `/api/v1/marketplace/refresh` | 刷新市场清单（本地目录 / url / github / git） |
 | POST | `/api/v1/agents/list` | 列出可选的 primary / subagent 角色 |
+| POST | `/api/v1/assets/list` | 列出角色 / 技能 / 命令三类资产（含只读来源、被覆盖关系与解析失败的条目） |
+| POST | `/api/v1/assets/read` | 读一条资产的详情（frontmatter 字段 + 正文 + 保留的额外行） |
+| POST | `/api/v1/assets/save` | 新建或覆盖一条资产（落点由 kind + scope 决定，不接受路径） |
+| POST | `/api/v1/assets/delete` | 删除一条资产（技能连目录一起删），只读来源拒绝 |
 | POST | `/api/v1/attachments` | 上传附件（请求体为原始字节，文件名走 ?name=；图片归一化后入库） |
 | GET | `/api/v1/attachments/:id` | 按 id 返回附件原始字节（非 JSON，不走封套） |
 | POST | `/api/v1/commands/list` | 列出可用的提示词命令与技能 |
@@ -1523,6 +1527,121 @@
 | `primary` | [AgentView](#agentview)[] | 是 | 主会话角色：内置 build / plan / ask 与自定义 primary |
 | `subagents` | [AgentView](#agentview)[] | 是 | 子角色：内置 general / explore 与自定义 subagent |
 
+## 资产（角色 / 技能 / 命令）（`assets`）
+
+### POST /api/v1/assets/list
+
+列出角色 / 技能 / 命令三类资产（含只读来源、被覆盖关系与解析失败的条目）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+
+**响应类型**：`AssetsListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `agents` | [AssetView](#assetview)[] | 是 | — |
+| `skills` | [AssetView](#assetview)[] | 是 | — |
+| `commands` | [AssetView](#assetview)[] | 是 | — |
+| `errors` | [AssetError](#asseterror)[] | 是 | 无法解析 / 被跳过的条目；模型用 write 直接写坏的文件也在这里暴露 |
+
+### POST /api/v1/assets/read
+
+读一条资产的详情（frontmatter 字段 + 正文 + 保留的额外行）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+| `kind` | "agent" \| "skill" \| "command" | 是 | — | — |
+| `path` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`AssetDetail`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `name` | string | 是 | — |
+| `label` | string | 是 | — |
+| `description` | string | 是 | — |
+| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | — |
+| `editable` | boolean | 是 | — |
+| `scope` | "project" \| "global" | 否 | — |
+| `path` | string | 是 | — |
+| `mode` | "all" \| "primary" \| "subagent" | 否 | 角色专有字段 |
+| `tools` | string[] | 否 | — |
+| `model` | string | 否 | — |
+| `thinking` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — |
+| `advertise` | boolean | 否 | — |
+| `hidden` | boolean | 否 | — |
+| `argumentHint` | string | 否 | 命令专有字段 |
+| `body` | string | 是 | frontmatter 之外的提示词正文 |
+| `files` | string[] | 否 | 技能目录内的其余文件（相对技能目录）；删除时会一并删掉 |
+| `extraLines` | string[] | 是 | 未建模的 frontmatter 行；保存时原样回传 |
+| `warnings` | string[] | 是 | 非阻断的提示：技能名与目录名不一致、命令缺 description 等 |
+
+### POST /api/v1/assets/save
+
+新建或覆盖一条资产（落点由 kind + scope 决定，不接受路径）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+| `kind` | "agent" \| "skill" \| "command" | 是 | — | — |
+| `name` | string（长度 1–64） | 是 | — | — |
+| `scope` | "global" \| "project" | 是 | — | — |
+| `label` | string（长度 1–120） | 否 | — | 角色的展示名（frontmatter `name`）；缺省用文件名 |
+| `description` | string（长度 1–1024） | 否 | — | 一句话说明；角色与技能必填，命令可缺省（pi 会取正文首行） |
+| `mode` | "primary" \| "subagent" \| "all" | 否 | — | 角色类别；缺省 subagent |
+| `tools` | string[] | 否 | — | 角色工具档位：空数组或 `["inherit"]` 表示继承父会话，其余为工具名白名单 |
+| `model` | string（长度≥1） | 否 | — | — |
+| `thinking` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — | — |
+| `advertise` | boolean | 否 | — | — |
+| `hidden` | boolean | 否 | — | — |
+| `argumentHint` | string（长度 1–120） | 否 | — | 命令的参数提示（frontmatter `argument-hint`） |
+| `body` | string（长度 1–200000） | 是 | — | frontmatter 之外的提示词正文 |
+| `extraLines` | string[] | 否 | — | 未建模的 frontmatter 行，读详情时给出、保存时原样写回。 传文本而不是传值：服务端只做行拼接，不替用户重新序列化自己加的字段。 |
+
+**响应类型**：`AssetSaveResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `name` | string | 是 | — |
+| `path` | string | 是 | — |
+| `created` | boolean | 是 | 本次是新建（true）还是覆盖已有文件（false） |
+
+### POST /api/v1/assets/delete
+
+删除一条资产（技能连目录一起删），只读来源拒绝
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+| `kind` | "agent" \| "skill" \| "command" | 是 | — | — |
+| `path` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`AssetDeleteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `name` | string | 是 | — |
+| `path` | string | 是 | — |
+| `removed` | boolean | 是 | 是否命中并删除；目标不存在时为 false |
+
 ## 附件（`attachments`）
 
 ### POST /api/v1/attachments
@@ -2107,7 +2226,7 @@
 | `version` | string | 是 | — |
 | `source` | "official" \| "local" \| "market" | 是 | 信任档位：执行类组件是否注入按它判定 |
 | `enabled` | boolean | 是 | 生效的启用状态：项目 / 本地覆盖优先于用户登记表里的值 |
-| `enabledBy` | "user" \| "local" \| "project" | 是 | `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 |
+| `enabledBy` | "project" \| "user" \| "local" | 是 | `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 |
 | `path` | string | 是 | 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） |
 | `installedAt` | string | 是 | 安装时间（ISO 8601） |
 | `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
@@ -2207,8 +2326,32 @@
 | `label` | string | 是 | 展示名 |
 | `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
 | `kind` | "primary" \| "subagent" | 是 | — |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" | 是 | — |
+| `source` | "project" \| "global" \| "plugin" \| "builtin" | 是 | — |
 | `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
+
+### AssetView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `name` | string | 是 | 资产名：角色的 slug、技能的目录名、命令的文件名 |
+| `label` | string | 是 | 展示名：角色取 frontmatter `name`，其余同 `name` |
+| `description` | string | 是 | 一句话说明；解析失败时为空串 |
+| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源档位，顺序即同名优先级（前者胜） |
+| `editable` | boolean | 是 | 是否可编辑（全局 / 项目两档为 true） |
+| `scope` | "project" \| "global" | 否 | 可写档的落点作用域；只读来源缺省 |
+| `path` | string | 是 | 磁盘路径；内置命令这类没有真身的项给 `builtin:<name>` |
+| `active` | boolean | 是 | 是否生效：同名时优先级最高者为 true，被压住的为 false |
+| `overriddenBy` | string | 否 | 压住它的那一条的路径；仅 `active` 为 false 时有 |
+
+### AssetError
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `name` | string | 是 | — |
+| `path` | string | 是 | — |
+| `reason` | string | 是 | — |
 
 ### PromptCommandView
 
@@ -2217,7 +2360,7 @@
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -2225,7 +2368,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | — |
+| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | — |
 
 ### ModelUsage
 
@@ -2454,7 +2597,7 @@
 | `event` | "invoke" \| "hit" | 是 | 使用方式 |
 | `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
-| `source` | "builtin" \| "project" \| "global" \| "plugin" \| "agents-project" \| "agents-user" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 

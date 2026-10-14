@@ -37,12 +37,12 @@ afterEach(() => {
 });
 
 describe("内置资产注册表", () => {
-  it("随包集合含提示词命令与两个内置技能，且与云同步口子同源", () => {
+  it("随包集合含提示词命令与五个内置技能，且与云同步口子同源", () => {
     const assets = resolveBuiltinAssets();
     assert.equal(assets, PACKAGED_BUILTIN_ASSETS, "本轮云同步恒回落随包集合");
     assert.deepEqual(
       assets.filter((asset) => asset.kind === "skill").map((asset) => asset.id),
-      ["plugin-create", "plugin-review"],
+      ["plugin-create", "plugin-review", "skill-create", "agent-create", "command-create"],
     );
     assert.deepEqual(
       builtinPromptCommands().map((command) => command.name),

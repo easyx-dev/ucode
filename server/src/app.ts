@@ -12,6 +12,7 @@ import { env } from "./env";
 import { logger, requestLogger } from "./platform/logger";
 import { AppError, fail } from "./platform/response";
 import { createAgentsRoute } from "./routes/agents";
+import { createAssetsRoute } from "./routes/assets";
 import { createAttachmentsRoute } from "./routes/attachments";
 import { createAuthRoute } from "./routes/auth";
 import { createCommandsRoute } from "./routes/commands";
@@ -82,6 +83,7 @@ export const createApp = (services: Services): Hono<AuthVariables> => {
   v1.route("/commands", createCommandsRoute(services));
   v1.route("/attachments", createAttachmentsRoute(services));
   v1.route("/agents", createAgentsRoute(services));
+  v1.route("/assets", createAssetsRoute(services));
 
   app.route(API_BASE_PATH, v1);
 

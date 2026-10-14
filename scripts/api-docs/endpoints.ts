@@ -621,6 +621,43 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
 
   {
+    domain: "assets",
+    action: "list",
+    method: "POST",
+    input: "assetsListInputSchema",
+    requestType: "AssetsListInput",
+    output: "AssetsListResponse",
+    summary: "列出角色 / 技能 / 命令三类资产（含只读来源、被覆盖关系与解析失败的条目）",
+  },
+  {
+    domain: "assets",
+    action: "read",
+    method: "POST",
+    input: "assetsReadInputSchema",
+    requestType: "AssetsReadInput",
+    output: "AssetDetail",
+    summary: "读一条资产的详情（frontmatter 字段 + 正文 + 保留的额外行）",
+  },
+  {
+    domain: "assets",
+    action: "save",
+    method: "POST",
+    input: "assetsSaveInputSchema",
+    requestType: "AssetsSaveInput",
+    output: "AssetSaveResponse",
+    summary: "新建或覆盖一条资产（落点由 kind + scope 决定，不接受路径）",
+  },
+  {
+    domain: "assets",
+    action: "delete",
+    method: "POST",
+    input: "assetsDeleteInputSchema",
+    requestType: "AssetsDeleteInput",
+    output: "AssetDeleteResponse",
+    summary: "删除一条资产（技能连目录一起删），只读来源拒绝",
+  },
+
+  {
     domain: "attachments",
     action: "",
     method: "POST",

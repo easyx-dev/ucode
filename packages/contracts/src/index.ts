@@ -4,6 +4,8 @@
 export { toJSONSchema } from "zod";
 export * from "./agents/input";
 export * from "./agents/output";
+export * from "./assets/input";
+export * from "./assets/output";
 export * from "./attachments/output";
 export * from "./auth/input";
 export * from "./auth/output";

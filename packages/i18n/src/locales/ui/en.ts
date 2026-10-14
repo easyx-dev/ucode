@@ -580,6 +580,97 @@ export default {
   "MCP 服务器保存失败": "Failed to save the MCP server",
   "MCP 服务器删除失败": "Failed to delete the MCP server",
 
+  // Settings · assets（角色 / 技能 / 命令）
+  主模式: "Primary",
+  两者皆可: "Both",
+  "自定义子智能体：改动写入本机或本项目的配置文件，新会话生效。":
+    "Custom agents: changes go to the global or project config and apply to new sessions.",
+  "技能是给模型的说明书：改动写入磁盘，新会话生效。":
+    "Skills are instructions for the model: changes go to disk and apply to new sessions.",
+  "提示词命令：改动写入磁盘，新会话生效。":
+    "Prompt commands: changes go to disk and apply to new sessions.",
+  本机与项目: "This machine and project",
+  "{{count}} 项": "{{count}}",
+  插件与内置: "From plugins and built-ins",
+  "本机与项目里还没有自定义项。": "No custom entry here yet.",
+  "有无法解析的文件：": "Files that could not be parsed:",
+  当前项目: "Current project",
+  "项目 .agents": "Project .agents",
+  全局: "Global",
+  "用户 .agents": "User .agents",
+  "被同名项覆盖：{{path}}": "Overridden by a same-named entry: {{path}}",
+  "删除 {{name}}？": "Delete {{name}}?",
+  删除角色: "Delete agent",
+  删除技能: "Delete skill",
+  删除命令: "Delete command",
+  "技能目录连同其中的引用文件、脚本一并删除，无法撤销。":
+    "The skill directory, including its references and scripts, is deleted. This cannot be undone.",
+  "文件从磁盘上删除，无法撤销。": "The file is deleted from disk. This cannot be undone.",
+  新建角色: "New agent",
+  编辑角色: "Edit agent",
+  新建技能: "New skill",
+  编辑技能: "Edit skill",
+  新建命令: "New command",
+  编辑命令: "Edit command",
+  还没有自定义角色: "No custom agent yet",
+  "角色决定工具集与提示词。内置的 build / plan / ask 与 general / explore 始终可用，同名的自定义角色会覆盖它们。":
+    "An agent defines its tools and prompt. The built-in build / plan / ask and general / explore are always available; a same-named custom agent overrides them.",
+  还没有自定义技能: "No custom skill yet",
+  "技能是写给模型的说明书：把步骤、约定或命令放进 SKILL.md，模型按说明里的描述判断何时使用。":
+    "A skill is an instruction sheet for the model: put steps, conventions or commands in SKILL.md and the model uses its description to decide when to use it.",
+  还没有自定义命令: "No custom command yet",
+  "命令是常用的提示词模板：写好正文后，在输入框用 /名字 调用，正文会替换掉命令本身。":
+    "A command is a reusable prompt template: call it with /name in the composer and its body replaces the command itself.",
+  "新建后写入磁盘，改动在下一个新会话生效。":
+    "Saved to disk; the change applies to the next new session.",
+  "字段改动直接覆盖原文件，未建模的 frontmatter 行原样保留。":
+    "Edits overwrite the file; frontmatter keys the app does not model are kept as they are.",
+  "小写字母开头，只能用字母、数字与连字符；它也是文件名。":
+    "Starts with a lowercase letter; letters, digits and hyphens only. This is also the file name.",
+  "小写字母或数字，单词之间用单个连字符；它也是技能目录名。":
+    "Lowercase letters or digits with single hyphens; this is also the skill directory name.",
+  "小写字母或数字开头，只能用字母、数字与连字符；调用时写作 /名字。":
+    "Starts with a lowercase letter or digit; letters, digits and hyphens only. Call it as /name.",
+  "全局（所有会话）": "Global (all sessions)",
+  保存位置: "Where to save",
+  "项目档只对当前项目生效，同名时压过全局档。":
+    "The project scope applies to this project only and wins over the global one when names match.",
+  "当前没有工作目录，只能存到全局档。":
+    "No working directory right now, so only the global scope is available.",
+  展示名: "Display name",
+  "留空即用文件名。": "Leave empty to use the file name.",
+  说明: "Description",
+  "写进角色选择器与 subagent 工具的描述，模型按它挑选。":
+    "Shown in the agent picker and in the subagent tool description; the model picks by it.",
+  类别: "Kind",
+  "主模式可作会话模式（与 build / plan / ask 并列），子智能体由 subagent 工具委派。":
+    "Primary agents join the session modes (build / plan / ask); subagents are delegated by the subagent tool.",
+  可用工具: "Tools",
+  "逗号或换行分隔；留空即继承父会话（子角色）或用默认工具集（主模式）。":
+    "Separated by commas or newlines; empty inherits the parent session (subagents) or uses the default tool set (primary).",
+  模型: "Model",
+  "留空即继承父会话。": "Leave empty to inherit the parent session.",
+  "只对主模式有效。": "Primary agents only.",
+  不指定: "Not set",
+  列进工具描述: "List in the tool description",
+  "关掉后仍可按名字调用，只是模型看不到它。":
+    "When off it can still be called by name — it is just not advertised to the model.",
+  从角色选择器里隐藏: "Hide from the agent picker",
+  "只对主模式有效；隐藏后仍可按名字使用。":
+    "Primary agents only; hidden ones can still be used by name.",
+  参数提示: "Argument hint",
+  "如 [focus]；显示在 / 菜单的命令名后面。":
+    "For example [focus]; shown after the command in the / menu.",
+  "留空即取正文首行；显示在 / 菜单里。":
+    "Empty uses the first line of the body; shown in the / menu.",
+  "必填：模型按它判断何时用这个技能，缺了整条不会被装载。":
+    "Required: the model uses it to decide when to run the skill; without it the skill is not loaded at all.",
+  命令正文: "Command body",
+  提示词正文: "Prompt body",
+  "用户输入 / 名字 后，这段文字会替换掉命令本身；$1、$@ 可用参数。":
+    "After the user types /name, this text replaces the command itself; $1 and $@ take arguments.",
+  "写给模型的指令本身。": "The instruction itself.",
+
   // Usage statistics
   使用统计: "Usage",
   当前会话上下文占用: "Current session context usage",

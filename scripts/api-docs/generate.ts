@@ -28,6 +28,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   fs: "文件系统",
   attachments: "附件",
   agents: "角色",
+  assets: "资产（角色 / 技能 / 命令）",
   mcp: "MCP 服务器",
   plugins: "插件",
   marketplace: "插件市场",

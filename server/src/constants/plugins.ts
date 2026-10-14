@@ -34,7 +34,13 @@ export const PLUGIN_IGNORED_MANIFEST_KEYS = [
 export const PLUGIN_IGNORED_DEPENDENCY_KEY = "dependencies";
 
 /** 内置技能名：视为已占用的组件 token，插件同名时追加哈希后缀 */
-export const PLUGIN_RESERVED_COMPONENT_TOKENS = ["plugin-create", "plugin-review"] as const;
+export const PLUGIN_RESERVED_COMPONENT_TOKENS = [
+  "plugin-create",
+  "plugin-review",
+  "skill-create",
+  "agent-create",
+  "command-create",
+] as const;
 
 /** 冲突后缀长度：够区分、肉眼仍可读 */
 export const PLUGIN_TOKEN_HASH_LENGTH = 6;

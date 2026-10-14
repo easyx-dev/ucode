@@ -17,9 +17,12 @@ export {
 export {
   type AgentRegistry,
   type AgentRegistryInput,
+  agentDirs,
   allSubagents,
+  assertLoadableAgent,
   type CustomAgentError,
   type CustomAgentMode,
+  isUsableAgentSlug,
   loadAgentRegistry,
   type ParsedCustomAgent,
   parseCustomAgent,

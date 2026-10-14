@@ -49,6 +49,20 @@
 
 ### 新增
 
+- **资产（角色 / 技能 / 命令）的可视化管理**：新增契约域 `assets`
+  （`POST /api/v1/assets/{list,read,save,delete}`）与设置页的「子智能体」「技能」「命令」三个分区——
+  列出全部来源（全局 / 项目 / 插件 / 内置）并标出被同名项压住的条目，可直接新建、编辑、删除。
+  写入只接受 `kind + name + scope`，路径由服务端按 `$APP_HOME` 与 cwd 祖先链上最近的 `.ucode` 解析并做穿越校验；
+  插件与内置来源只读；保存前用运行时同一套解析校验（角色的 `parseCustomAgent`、技能 `description` 必填），
+  解析失败的文件在页面上以诊断列出（模型用 `write` 写坏的文件也在这里暴露），判定与装配同一套：
+  frontmatter 非法、与主模式同名的纯子角色、超大字文件都在那里现形，不会出现「界面说生效、运行时跳过」。
+  新增三个错误码 `asset_name_invalid` / `asset_read_only` / `asset_content_invalid`。表单的多行正文重新引入基础原语
+  `base/textarea.tsx`（用语义 token 拼装，供设置页表单共用；Composer 的输入卡保持不变）。
+
+- **内置 `skill-create` / `agent-create` / `command-create` 三个引导技能**：与 `plugin-create` 同源，
+  物化到 `$APP_HOME/app/builtin/skills/`，在会话里引导把角色 / 技能 / 命令写对（落点、frontmatter 字段、
+  命令的参数占位符、生效时机与在设置页自查）；三个 id 一并计入插件组件的保留 token。
+
 - **侧栏项目拖拽排序**：新增 `POST /api/v1/projects/reorder`（`paths` 是侧栏从上到下的项目目录，
   没提到的行接在后面），`project` 表加 `sort_order` 列（schema v10），项目列表的次序从此就是侧栏的次序
   （排过的在前，没排过的按登记时间降序接在最后）；`projects_changed` 照旧广播整份列表——
@@ -1361,6 +1375,13 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 - 移除未再引用的基础组件 `ui/card.tsx` 与 `ui/textarea.tsx`：空态改用纯排版，Composer 改为自绘输入卡
   （带边框的 `Textarea` / `Card` 与其内表面冲突，改用语义 token 直接拼装）。
 - `useModels()` 不再返回 `loading`：调用处改用 `data` 是否为空表达加载态。
+
+### 修复
+
+- **`$APP_HOME` 落在 cwd 祖先链上时被当成项目配置目录**：未绑定项目的会话 cwd 就在 `$APP_HOME/workspace/<id>` 下，
+  而 `$APP_HOME` 本身就是 `.<slug>` 形态，于是它的父层目录会把 `$APP_HOME` 再认成一份「项目档」——
+  技能 / 命令 / 角色的来源标注与同名优先级随之出错（开发布局 `.tmp/.ucode` 下必现）。
+  现在解析项目配置目录与资产目录时排除 `$APP_HOME` 自身，并对同一目录去重。
 
 ## [0.2.0] - 2026-09-29
 

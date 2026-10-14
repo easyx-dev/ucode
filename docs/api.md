@@ -236,6 +236,21 @@
   **客户端传相对路径时必须自己拼成绝对路径**：服务端的相对路径基准是服务进程的 cwd，不是会话 cwd。
 - `fs` 与其他接口一致，需通过鉴权（见「鉴权」）；agent 具备文件读写权限，不要把本服务暴露到不可信网络。
 
+## 资产（assets）
+
+设置页管理角色 / 技能 / 命令三类资产。磁盘形态分别是 `$APP_HOME/agents/<slug>.md`、
+`$APP_HOME/skills/<name>/SKILL.md`、`$APP_HOME/prompts/<name>.md`，项目档在 `<项目>/.<slug>/` 下的同名目录。
+
+- `list`：按会话 / cwd 解析目录，返回三类条目（含只读来源与被同名压住的条目）与解析失败的条目。
+  `active` 为假表示同名时被优先级更高的来源压住，`overriddenBy` 给出那一条的路径；`editable` 为假即只读来源。
+- `read` / `delete`：按 `path` 定位，路径必须落在资产目录内（否则 `path_not_found`）；`delete` 对技能
+  连同目录一起删，只读来源报 `asset_read_only`。
+- `save`：按 `kind + name + scope` 落盘（不接受路径），`scope` 取 `global` 或 `project`，同名文件即覆盖。
+  内容先过运行时同一套校验，失败报 `asset_content_invalid`，`params.reason` 是中文原因。
+- 未建模的 frontmatter 行由 `read` 以 `extraLines` 给出，`save` 原样回传即可保留用户自己加的字段。
+- 与 `agents/list`、`commands/list` 的分工：后两者是选择器与 `/` 菜单的数据源（只给视图字段），
+  本域只服务设置页，故带路径、正文与可写标记。
+
 ## Git（只读）
 
 `git` 域给工作台的面板提供仓库状态与 diff，**全部只读**：没有任何 stage / commit / checkout 能力。

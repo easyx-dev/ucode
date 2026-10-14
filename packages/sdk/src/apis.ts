@@ -3,6 +3,14 @@ import type {
   AgentsListRequest,
   AgentsListResponse,
   AppConfigPatchRequest,
+  AssetDeleteResponse,
+  AssetDetail,
+  AssetSaveResponse,
+  AssetsDeleteRequest,
+  AssetsListRequest,
+  AssetsListResponse,
+  AssetsReadRequest,
+  AssetsSaveRequest,
   AttachmentUploadResponse,
   AuthLoginRequest,
   AuthLoginResponse,
@@ -291,6 +299,18 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 列出可选的 primary / subagent 角色 */
       list: (body: AgentsListRequest = {}) =>
         transport.post<AgentsListResponse>("agents/list", body),
+    },
+    assets: {
+      /** 列出角色 / 技能 / 命令三类资产（含只读来源与解析失败的条目） */
+      list: (body: AssetsListRequest = {}) =>
+        transport.post<AssetsListResponse>("assets/list", body),
+      /** 读一条资产的详情（frontmatter 字段 + 正文） */
+      read: (body: AssetsReadRequest) => transport.post<AssetDetail>("assets/read", body),
+      /** 新建或覆盖一条资产：落点由 kind + scope 决定 */
+      save: (body: AssetsSaveRequest) => transport.post<AssetSaveResponse>("assets/save", body),
+      /** 删除一条资产（技能连目录一起删） */
+      remove: (body: AssetsDeleteRequest) =>
+        transport.post<AssetDeleteResponse>("assets/delete", body),
     },
     mcp: {
       list: () => transport.post<McpListResponse>("mcp/list"),

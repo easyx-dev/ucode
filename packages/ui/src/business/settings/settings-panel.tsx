@@ -10,6 +10,9 @@ import { Button } from "../../base/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../base/dialog";
 import { Spinner } from "../../base/spinner";
 import type { SettingsSectionId } from "../../utils/settings-section";
+import { SettingsAgents } from "./assets/settings-agents";
+import { SettingsCommands } from "./assets/settings-commands";
+import { SettingsSkills } from "./assets/settings-skills";
 import { SettingsMcp } from "./mcp/settings-mcp";
 import { SettingsModels } from "./models/settings-models";
 import { SettingsAppearance } from "./pages/settings-appearance";
@@ -120,6 +123,36 @@ function SectionContent({
       return (
         <DraftDefaultsPage title={meta.defaults.label} draft={draft} saveActions={saveActions} />
       );
+    case "agents":
+      return (
+        <SettingsPage
+          title={meta.agents.label}
+          description={t("自定义子智能体：改动写入本机或本项目的配置文件，新会话生效。")}
+          trailing={saveActions}
+        >
+          <SettingsAgents />
+        </SettingsPage>
+      );
+    case "skills":
+      return (
+        <SettingsPage
+          title={meta.skills.label}
+          description={t("技能是给模型的说明书：改动写入磁盘，新会话生效。")}
+          trailing={saveActions}
+        >
+          <SettingsSkills />
+        </SettingsPage>
+      );
+    case "commands":
+      return (
+        <SettingsPage
+          title={meta.commands.label}
+          description={t("提示词命令：改动写入磁盘，新会话生效。")}
+          trailing={saveActions}
+        >
+          <SettingsCommands />
+        </SettingsPage>
+      );
     case "websearch":
       return (
         <DraftWebsearchPage title={meta.websearch.label} draft={draft} saveActions={saveActions} />
@@ -167,6 +200,10 @@ function SectionContent({
         </SettingsPage>
       );
   }
+
+  // 分区列表新增而这里漏写时，这一行会编译失败
+  section satisfies never;
+  return null;
 }
 
 export function SettingsPanel({

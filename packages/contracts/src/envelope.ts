@@ -90,6 +90,13 @@ export const ERROR_CODES = {
   /** 路径存在但不是普通文件（目录 / 特殊文件） */
   notAFile: "not_a_file",
 
+  /** 资产名（角色 slug / 技能目录名 / 命令文件名）不合法 */
+  assetNameInvalid: "asset_name_invalid",
+  /** 该来源的资产不可写（插件 / 内置 / 兼容目录） */
+  assetReadOnly: "asset_read_only",
+  /** 资产内容校验失败（frontmatter 非法、缺正文等） */
+  assetContentInvalid: "asset_content_invalid",
+
   /** 目标目录不是 git 仓库（或不在仓库内） */
   notARepository: "not_a_repository",
   /** 机器上没有可用的 git */
