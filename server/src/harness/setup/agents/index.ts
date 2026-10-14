@@ -1,4 +1,4 @@
-/** 角色注册表与能力解析的统一出口（见 `plans/stage-7c-subagents.md`）。 */
+/** 角色注册表与能力解析的统一出口。 */
 
 export {
   effectiveToolNames,

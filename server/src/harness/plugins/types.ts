@@ -54,7 +54,7 @@ export type PluginContributions = {
   binDirs: (cwd?: string) => string[];
   /** 可信来源的命令式 hook 绑定；第三方市场的不挂载 */
   hooks: (cwd?: string) => PluginHookBinding[];
-  /** 插件声明的 MCP 服务器；MCP 不在执行类组件的来源门控名单里（见 plans/plugins.md 第五章） */
+  /** 插件声明的 MCP 服务器；MCP 不在执行类组件的来源门控名单里 */
   mcpServers: (cwd?: string) => PluginMcpServer[];
 };
 
@@ -86,7 +86,7 @@ export type PluginDescriptor = {
   displayName: string;
   description: string;
   version: string;
-  /** 信任档位，由来源决定（见 `plans/plugins.md` 第五章） */
+  /** 信任档位，由来源决定 */
   source: PluginSource;
   enabled: boolean;
   /** 安装目录绝对路径 */

@@ -1,7 +1,7 @@
 /**
  * 插件 MCP 服务器的读取：`.mcp.json`（或清单 `mcpServers` 内联）→ 可并入会话 MCP 配置的条目。
  *
- * 三件事在这里定死（见 `plans/plugins.md` 4.1 / 4.5）：
+ * 三件事在这里定死：
  * - **命名**：服务器名 `plugin_<pluginToken>_<server>`，与用户自己的服务器分处两个命名空间；
  * - **变量**：`command` / `args` / `env` / `url` / `headers` 允许 `${user_config.*}`（都是直接 argv，不经 shell），
  *   而 `headersHelper` 是 shell 字符串，**拒绝** `${user_config.*}`（值会被 shell 再解析）；

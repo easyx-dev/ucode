@@ -66,7 +66,7 @@
 - 自定义 primary agent 可覆盖同名内置项或另取新名；`mode` 是字符串 slug，服务端按角色注册表校验。
 - 子智能体是独立的 subagent 角色（`general` / `explore`），能力 =「父会话 ∩ 角色定义」；工具取交集、
   权限取较严者（`general` 这类 `inherit` 在默认集父下保留默认集，不再被收窄成只读），**只读父会话靠
-  父模式的规则拦住子会话**（见 [`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
+  父模式的规则拦住子会话**。
   父一侧施加的只是**父会话模式的规则**（`parentModeRules`，即该模式 `capability.permissions` 里的 `ask` /
   `deny`）：全局默认规则与会话授权在子会话自己的规则里已有一份，父一侧重复施加会把它们（以及技能目录放行）
   重新打回审批——用户在父会话放行过的范围，子会话里照样弹窗。
@@ -110,7 +110,7 @@
 
 MCP 工具没有命中显式规则时，按服务器声明的 annotations 兜底：`readOnlyHint === true` 默认放行，
 其余默认审批。annotations 由 MCP 服务器作者声明、未经校验，所以只信「只读」这一侧；
-显式规则与会话恒允照常覆盖（见 [`plans/stage-7a-mcp.md`](../plans/stage-7a-mcp.md)）。
+显式规则与会话恒允照常覆盖。
 
 ### 审批与「本会话恒允」
 

@@ -89,12 +89,26 @@ web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分�
 - **唯一的高风险点**：`core/pool.ts:1115` 在 `statusOf()` 里被列表每行调用，换成注册表查询会把 IO 加进热路径
   ——声明必须缓存进 `PooledSession`。
 
+### 插件平台收尾项
+
+原 `plans/plugins.md` 一～九章主体已落地，随方案文档删除留下这几处没做：
+
+- **执行类组件的总开关**：一个开关停掉全部 hooks / `extensions/` / `bin`（资源型组件照常加载）。
+  现在只有逐插件与逐来源门控，没有全局开关。落点 `services/plugins/index.ts` 的 `trustedAssets`。
+- **`userConfig` 的 `sensitive`**：现在与普通值一样明文落 `plugins.json`（0600），只在视图层不回显
+  （`harness/plugins/view.ts`）；方案要求走系统凭据库、取不到就拒绝保存。
+- **npm 来源的 integrity**：npm 分支不记 `integrity`（`services/plugins/sources`），`updates.ts` 只比
+  `npm view … version`；方案要求按 registry 的 integrity 校验。
+- **清单 `ui` 键（ZCode 的 `ui.surfaces`）识别保留**：现在按未知字段剥离，方案要求识别、保留并出诊断。
+  落点 `constants/plugins.ts` 的 `PLUGIN_IGNORED_MANIFEST_KEYS`。
+- **插件测试夹具与冒烟**：没有 `harness/plugins/__tests__/fixtures/` 下的真实 Claude / ZCode 插件形状存档
+  （现在都在临时目录里内联构造），也没有 `pnpm smoke` 的「启用含 skill 的插件后模型可调用」用例。
+
 ### 内置技能的 `.md` 真身
 
 `server/src/harness/plugins/builtin/skills/` 曾是空目录（已删），技能真身是 TS 常量
 （`builtin/skills.ts`）。改成 `.md` 要同时解决 esbuild text loader、开发 / 测试链路（tsx）加载 `.md`、
-以及正文里品牌派生值的模板替换三件事，收益只是编辑时有 Markdown 高亮——不划算，暂不做
-（理由记在 `plans/plugins.md` 复盘）。
+以及正文里品牌派生值的模板替换三件事，收益只是编辑时有 Markdown 高亮——不划算，暂不做。
 
 ### 内置 TODO 工具 / wiki
 

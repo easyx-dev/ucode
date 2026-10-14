@@ -408,7 +408,7 @@ export type CompactionNotice =
   | { kind: "busy" };
 
 /**
- * 会话模式：决定工具集、权限与提示词倾向（见 `plans/agent-tools-and-modes.md`）。
+ * 会话模式：决定工具集、权限与提示词倾向（见 `docs/modes-and-permissions.md`）。
  * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
  *
  * 这里是**内置默认集合**：`sessions` 的 `mode` 是字符串 slug，允许自定义 primary agent

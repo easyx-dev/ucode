@@ -5,7 +5,7 @@
  * 清单目录名与环境变量前缀（换品牌必须跟着变，不能落成字面量），改成 `.md` 真身要额外解决
  * 三件事——esbuild 的 text loader、开发与测试链路（tsx）对 `.md` 的加载、以及模板占位替换。
  * 现在只有 `docs/plugin-authoring.md` 一个生成物还指着这里（`scripts/plugin-docs`），
- * 单独为它引进这套流水线不划算。真要改时按上述三件事一起做（见 `plans/plugins.md` 复盘）。
+ * 单独为它引进这套流水线不划算。真要改时按上述三件事一起做。
  */
 import { brand } from "@ucode/brand/values";
 

@@ -23,7 +23,7 @@ const urlSchema = z
 
 /**
  * 安装来源：只列已实现的五种形式。Claude 的 `command` 一类来源不在 schema 内，
- * 校验阶段就被拒，不会走到运行期再静默失败（见 `plans/plugins.md` 6.1）。
+ * 校验阶段就被拒，不会走到运行期再静默失败。
  */
 export const pluginSourceSchema = z.discriminatedUnion("source", [
   z.object({

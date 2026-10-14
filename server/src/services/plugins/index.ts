@@ -82,7 +82,7 @@ export type PluginService = {
   commandAssets(cwd?: string): PluginCommandAssets;
   /** 启用插件声明的子角色：角色注册表（装配 + `agents/list`）共用 */
   agentProfiles(cwd?: string): PluginAgentFile[];
-  /** 可信来源插件的 pi 扩展路径；第三方市场的扩展不注入（来源门控，见 plans/plugins.md 第五章） */
+  /** 可信来源插件的 pi 扩展路径；第三方市场的扩展不注入（来源门控） */
   extensionPaths(cwd?: string): string[];
   /** 可信来源插件的 bin 目录；第三方市场的不注入 */
   binDirs(cwd?: string): string[];

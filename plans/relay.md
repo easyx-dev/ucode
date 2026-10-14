@@ -50,9 +50,9 @@ app/移动端 ──只登中继──▶ [中继] ══隧道══▶ [UCode 
 ## 内置资产云同步（接口约定，待实现）
 
 插件平台的「内置资产」（内置技能、提示词、内置插件）要能从云端下发更新，而不是只能等产品发版。
-中继侧按下面的约定暴露接口，UCode 侧的口子已在
-[`plugins.md`](./plugins.md) 第七节定好（`resolveBuiltinAssets()`、`app/builtin/manifest.json`、
-来源 `packaged` / `cloud`）。
+中继侧按下面的约定暴露接口，UCode 侧的口子挂在
+`harness/plugins/builtin/index.ts` 的 `resolveBuiltinAssets()` 上（恒返回随包集合，云端替换未接；
+状态记 `app/builtin/manifest.json`）。
 
 **方向**：UCode 作为客户端**主动出站拉取**（与隧道相反，不需要中继发起连接），因此中继不可达只是
 「拿不到更新」，不影响服务启动与装配。

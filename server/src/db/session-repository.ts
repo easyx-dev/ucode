@@ -64,13 +64,13 @@ export type SessionRecord = {
   mode: string;
   /** 会话级权限档位；为空表示未设置，序列化时回落默认 */
   permissionMode: string | null;
-  /** 子会话指向父会话；主会话为空（见 plans/stage-7c-subagents.md） */
+  /** 子会话指向父会话；主会话为空 */
   parentSessionId: string | null;
   /** 子会话的角色 slug（如 general / explore）；主会话为空 */
   agent: string | null;
   /** 本会话分叉自哪个会话；非分叉会话为空 */
   forkedFromId: string | null;
-  /** 会话目标的 JSON 状态（见 plans/stage-11-goal.md）；为空表示未设置目标 */
+  /** 会话目标的 JSON 状态；为空表示未设置目标 */
   goalState: string | null;
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
@@ -92,7 +92,7 @@ export type SessionSearchInput = {
   limit: number;
   /**
    * 父子过滤：传字符串时列出该会话的子会话；缺省 / null 只出根会话。
-   * 子智能体会话因此默认不进主列表（见 plans/stage-7c-subagents.md）。
+   * 子智能体会话因此默认不进主列表。
    */
   parentSessionId?: string | null;
 };

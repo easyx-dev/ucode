@@ -35,13 +35,13 @@ iframe / closed Shadow DOM / 虚拟滚动列表的完整支持、移动端模拟
    要解决就得把插件包放进仓库树内，或把依赖装进插件目录。
 2. **「随包插件包」没有落点**。`harness/plugins/builtin/index.ts:14-27` 的 `BuiltinAsset` 只有
    `kind: "prompt" | "skill"`，`materialize.ts` 只物化技能；`harness/plugins/registry.ts` 的
-   「发现只认登记表」要求先补一段 seed + 登记机器。`plans/plugins.md:522-524` 承诺过 seed 进官方市场 cache，
-   但 `harness/plugins/state.ts:47-70` 已把该形态作废（官方市场改成 git 仓，走那边就要联网）。
+   「发现只认登记表」要求先补一段 seed + 登记机器，而 `harness/plugins/state.ts:47-70` 已把「随包插件包」
+   这一形态作废（官方市场改成 git 仓，走那边就要联网）。
 3. **权限与只读门控要靠服务端清单**。只读模式（plan / ask）的判定是
    `harness/setup/agents/capability.ts:92` 用 `WRITE_TOOLS`（`harness/setup/tools/names.ts:66`）整批 deny
    推出来的。扩展注册的工具名不进这份清单，plan / ask 会话就会拿到浏览器工具（后果 = 任意导航 +
    可能读本地文件）。走内置功能时这套门控在同一处收口。
-4. **可视化层超出插件能力面**。`plans/plugins.md` 第十一章明确插件不提供界面贡献与界面插槽；
+4. **可视化层超出插件能力面**。插件平台明确不提供界面贡献与界面插槽；
    而 screencast 的目的地是界面。源文档第 2 档要的是一块渲染面板 + 一条帧通道，只能做内置功能。
 
 ## 三、能力层（`server/src/harness/features/browser/`）
@@ -297,8 +297,7 @@ Playwright（headless）→ CDP Page.startScreencast → screencastFrame（base6
   另起一个（帧不需要 `seq` 切分，但需要同样的「半死连接」处理）。
 - UI：`packages/ui/src/business/browser/`（帧渲染、地址与状态条、动作日志、空态与错误态）+ 工作台活动栏
   新增入口（`business/workbench/workbench-activity-bar.tsx`、`workbench-sidebar.tsx`、`workbench-panel.tsx`
-  的视图枚举）+ 订阅 hook（`hooks/store/`）。视觉规则按 `DESIGN.md`，版式按
-  [`workbench-panel-layout.md`](./workbench-panel-layout.md)。
+  的视图枚举）+ 订阅 hook（`hooks/store/`）。视觉规则按 `DESIGN.md`，版式按其「分栏」与「面板内部」两节。
 
 ## 八、优化层（源文档 §11）
 

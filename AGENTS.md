@@ -273,7 +273,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   - `features/`：会话跑起来之后的能力（`goal` / `memory` / `prune` / `telemetry` / `title` / `usage` /
     `subagents` / `shell` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
     这批是「内置功能」，随包实现、随版本演进；它们**不是插件**（插件平台只承载资源与受信任的代码扩展，
-    见 [`plans/plugins.md`](./plans/plugins.md)）；
+    见 [`docs/plugins.md`](./docs/plugins.md)）；
   - `plugins/`：插件宿主（`manifest` 清单发现与解析 / `components` 组件解析与路径校验 /
     `agent-file` 插件角色解析 / `hooks` + `hooks-runner` hook 解析与执行 / `marketplace` 市场清单读取 /
     `sanitize` 命名 / `registry` 注册表与来源门控 / `state` 状态结构与判定 / `view` 视图映射）。

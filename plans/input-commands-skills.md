@@ -1,6 +1,6 @@
 # 输入区与命令 / 技能 / 附件（整合方案）
 
-> 本文整合并取代仓库内的 `plans/composer.md`（输入区富文本 + 命令快捷输入），并纳入资源发现、
+> 本文整合输入区富文本与命令快捷输入（原 `plans/composer.md`，已随实现删除），并纳入资源发现、
 > 内置命令、自定义 primary agent、技能权限等 P0 决策。
 > 底层复用 pi SDK 的 Skills / Prompt Templates / `DefaultResourceLoader`，不重写；
 > 前端输入区按 Tiptap 方案实施。

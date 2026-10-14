@@ -132,7 +132,7 @@ packages/ui/src/
 
 **域内的逻辑与 hook（`business/**/*.ts`）是内部实现，不在公开面内**：要复用的能力应该先上提到 `hooks/*`
 （React 绑定）或 `utils/*`（无 React 的通用方法），而不是直接深链某个域的实现；真的只属于某个域、
-又确实要给外壳用，才给它加一条具名 exports（这两条路径记在 [`plans/ui-exports.md`](./plans/ui-exports.md)）。
+又确实要给外壳用，才给它加一条具名 exports。
 按 Node 的子路径模式，通配只能映射到一个具体后缀，所以 `./business/*` 引不到 `.ts`——这是有意的边界，不是缺口。
 
 三条通配的后缀与目录实际内容由 ui-exports 校验看着（`base/` 全 `.tsx`、`hooks/` 与 `utils/` 全 `.ts`；

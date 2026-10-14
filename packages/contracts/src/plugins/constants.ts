@@ -2,7 +2,7 @@
 
 /**
  * 信任来源。执行类组件（hooks / extensions / bin）只有 `official` 与 `local` 会注入运行时，
- * 第三方市场来的只解析出诊断——判定与理由见 `plans/plugins.md` 第五章。
+ * 第三方市场来的只解析出诊断。
  */
 export const PLUGIN_SOURCES = ["official", "local", "market"] as const;
 

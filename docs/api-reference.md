@@ -501,7 +501,7 @@
 | --- | --- | --- | --- | --- |
 | `q` | string | 否 | — | — |
 | `limit` | integer（>0，≤500） | 否 | `100` | — |
-| `parentSessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | 列表的父子过滤：缺省只出根会话（`parentSessionId` 为空的）； 传某个会话 id 时改为列出它的子会话。见 `plans/stage-7c-subagents.md`。 |
+| `parentSessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 否 | — | 列表的父子过滤：缺省只出根会话（`parentSessionId` 为空的）； 传某个会话 id 时改为列出它的子会话。 |
 
 **响应类型**：`SessionListResponse`
 
@@ -540,7 +540,7 @@
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
-| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
@@ -567,7 +567,7 @@
 | `session` | [SessionSummary](#sessionsummary) | 是 | — |
 | `usage` | [UsageTotals](#usagetotals) | 是 | 本会话累计 token 用量（见 stage-10）；未落盘 / 无用量时为零值 |
 | `contextUsage` | [ContextUsage](#contextusage) \| null | 是 | 本会话当前上下文占用；判断依据不足时为空——未落盘、模型窗口不可知、压缩后还没出新一轮回答。 |
-| `goal` | [GoalView](#goalview) \| null | 是 | 当前会话目标（见 plans/stage-11-goal.md）；未设置或已清除时为空 |
+| `goal` | [GoalView](#goalview) \| null | 是 | 当前会话目标；未设置或已清除时为空 |
 
 ### POST /api/v1/sessions/update
 
@@ -600,7 +600,7 @@
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
-| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
@@ -669,7 +669,7 @@
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
-| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
@@ -706,7 +706,7 @@
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
-| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
@@ -1999,7 +1999,7 @@
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
 | `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
-| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） |
+| `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |

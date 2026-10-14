@@ -33,17 +33,17 @@ const migrations: Record<number, string> = {
     );
     CREATE INDEX idx_session_updated_at ON session(updated_at DESC);
   `,
-  // 子智能体：子会话记父会话 id 与角色 slug（见 plans/stage-7c-subagents.md）
+  // 子智能体：子会话记父会话 id 与角色 slug
   2: `
     ALTER TABLE session ADD COLUMN parent_session_id TEXT;
     ALTER TABLE session ADD COLUMN agent TEXT;
     CREATE INDEX idx_session_parent ON session(parent_session_id);
   `,
-  // 会话分叉：新会话记分叉来源会话 id（见 plans/stage-8-session-fork.md）
+  // 会话分叉：新会话记分叉来源会话 id
   3: `
     ALTER TABLE session ADD COLUMN forked_from_session_id TEXT;
   `,
-  // 目标模式：会话目标状态以 JSON 存一列（见 plans/stage-11-goal.md）
+  // 目标模式：会话目标状态以 JSON 存一列
   4: `
     ALTER TABLE session ADD COLUMN goal_state TEXT;
   `,

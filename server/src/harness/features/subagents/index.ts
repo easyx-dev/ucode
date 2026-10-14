@@ -1,4 +1,4 @@
-/** 子智能体运行时的统一出口（见 `plans/stage-7c-subagents.md`）。 */
+/** 子智能体运行时的统一出口。 */
 export { resolveContextPlan, type SubagentContextPlan } from "./context";
 export { type SubagentSlot, SubagentSlots } from "./slots";
 export { type SubagentSpawnDeps, spawnSubagent } from "./spawn";

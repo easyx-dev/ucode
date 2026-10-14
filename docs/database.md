@@ -55,7 +55,7 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
   `deleted_at`（软删标记，非空即已归档）/
   `parent_session_id`（子智能体的父会话，主会话为空）/ `agent`（子智能体的角色 slug，主会话为空）/
   `forked_from_session_id`（会话分叉的来源会话，非分叉会话为空）/
-  `goal_state`（会话目标的 JSON 状态，见 [`plans/stage-11-goal.md`](../plans/stage-11-goal.md)；为空即未设置目标）/
+  `goal_state`（会话目标的 JSON 状态；为空即未设置目标）/
   `pinned_at`（置顶时间，非空即置顶）
 
   `mode` / `permission_mode` 在会话文件里有一条同义的审计记录——每次「轮开始」追加的 `ucode.mode`，
@@ -67,11 +67,9 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
   `preview` / `created_at` / `updated_at` / `last_read_at`（上次打开时间，用于未读判定）
 
 `parent_session_id` / `agent` 让子智能体会话成为真实会话行：列表默认只出主会话
-（`parent_session_id IS NULL`），传 `parentSessionId` 才取某个会话的子会话（见
-[`plans/stage-7c-subagents.md`](../plans/stage-7c-subagents.md)）。
+（`parent_session_id IS NULL`），传 `parentSessionId` 才取某个会话的子会话。
 
-`forked_from_session_id` 记录会话分叉的来源（见
-[`plans/stage-8-session-fork.md`](../plans/stage-8-session-fork.md)）：分叉会话仍是**顶层主会话**
+`forked_from_session_id` 记录会话分叉的来源：分叉会话仍是**顶层主会话**
 （`parent_session_id` 为空、照常进列表），与子智能体的父子关系不是一回事。
 
 `cwd` 在建会话时按 pi 的 `resolvePath` 口径规范化（绝对化并折叠 `.` / `..`），

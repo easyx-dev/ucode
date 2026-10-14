@@ -1,7 +1,7 @@
 /**
  * 插件 hooks 的执行与挂载：起子进程喂 JSON、读结论，再按事件把结论接进 pi。
  *
- * 安全边界（见 `plans/plugins.md` 4.2）：**hook 只能收紧**。`PreToolUse` 的 block 与权限扩展的
+ * 安全边界：**hook 只能收紧**。`PreToolUse` 的 block 与权限扩展的
  * `deny` 天然取并集——两者各自返回 `block`，任一方阻断即阻断；钩子挂载顺序排在权限扩展之后，
  * 权限先判定、hook 只做追加。
  */

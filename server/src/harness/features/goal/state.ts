@@ -1,7 +1,7 @@
 /**
  * 会话目标的状态机：解析存储 JSON、状态迁移与上限判定。
  *
- * 状态以 JSON 存在 `session.goal_state`（见 plans/stage-11-goal.md），
+ * 状态以 JSON 存在 `session.goal_state`，
  * 这里只做纯数据操作；持久化与事件由 `GoalService` 负责。
  * 迁移函数一律返回新对象，调用方拿到即可直接落库。
  */

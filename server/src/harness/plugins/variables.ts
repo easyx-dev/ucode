@@ -1,7 +1,7 @@
 /**
  * 插件变量解析：`${…_PLUGIN_ROOT}` / `${…_PLUGIN_DATA}` / `${…_PROJECT_DIR}` 与 `${user_config.KEY}`。
  *
- * 变量名一律由品牌派生（`CLAUDE_*` / `ZCODE_*` 是别名）。两条边界来自 `plans/plugins.md` 3.4：
+ * 变量名一律由品牌派生（`CLAUDE_*` / `ZCODE_*` 是别名）。两条边界：
  * - **shell 形式的 hook `command` 与 MCP `headersHelper` 里禁止 `${user_config.*}`**：值会被 shell 再解析一遍，
  *   等于把注入面交给用户输入；这类字段上遇到就丢弃并出诊断。
  * - 解析不了的名字原样保留并出诊断：静默替换成空串会让插件「看起来在跑」。

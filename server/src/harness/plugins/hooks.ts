@@ -2,8 +2,7 @@
  * 插件 hooks 的解析：Claude 的 `hooks/hooks.json` 语义 → 一份可直接挂到 pi 事件上的绑定表。
  *
  * 宽松解析（与清单、角色文件同一口径）：不认识的字段、非 `command` 型 handler、认不出的 matcher
- * 正则都只出诊断，不影响其它 hook 与其他插件。**执行类组件**，由来源门控决定是否真的挂上
- * （见 `plans/plugins.md` 第五章）。
+ * 正则都只出诊断，不影响其它 hook 与其他插件。**执行类组件**，由来源门控决定是否真的挂上。
  */
 
 import type { PluginDiagnosticView } from "@ucode/contracts";

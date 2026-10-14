@@ -35,7 +35,7 @@ export const isLocalMarketplace = (name: string | undefined): boolean =>
 
 /**
  * 开箱内置的市场。`claude-plugins-official` 不是强依赖：GitHub 不可达时刷新必然失败，
- * 这种失败只落 `lastError`（见 `plans/plugins.md` 6.2）。
+ * 这种失败只落 `lastError`。
  *
  * 自有官方市场（`<slug>-plugins-official`）等它的 CDN 直链定下来再加——不在这里编造地址。
  */
@@ -77,7 +77,6 @@ const marketplaceRecordSchema = z.object({
    * 执行类组件的信任档位。与 `builtin` **无关**：随包内置只表示「开箱就有 + 失败静默」，
    * 档位看的是**市场是谁的**——只有随包资产与我们自己的官方市场算 `official`，
    * 其余（含 `claude-plugins-official` 这种别人的官方市场）都是 `market`，hooks / extensions / bin 只出诊断。
-   * 依据见 `plans/plugins.md` 第五章的来源门控表。
    */
   trust: z.enum(["official", "market"]).default("market"),
   lastRefreshAt: z.string().optional(),
@@ -159,7 +158,7 @@ export const pluginStateSchema = z.object({
 /**
  * 项目级覆盖文件（`<cwd>/.<slug>/plugins.json` 与 `plugins.local.json`）：只承载启停覆盖。
  * 键是插件 id，值是「在这个仓库里开不开」；**只对已登记的 id 生效**，查不到的 id 一律忽略——
- * 项目文件永远不能把新代码带进这台机器（见 `plans/plugins.md` 第一章）。
+ * 项目文件永远不能把新代码带进这台机器。
  */
 export const projectPluginOverridesSchema = z.object({
   enabledPlugins: z.record(z.string(), z.boolean()).default({}),

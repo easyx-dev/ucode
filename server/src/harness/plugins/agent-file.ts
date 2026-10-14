@@ -5,7 +5,7 @@
  * - 宽松解析：插件作者写的 Claude 专属字段（`effort` / `color` 等）只出诊断，不让整个角色文件失败——
  *   那是别人的生态，不认识不等于写错了；
  * - slug 带插件前缀（`<pluginToken>-<agentToken>`），与项目 / 全局角色天然分处两个命名空间；
- *   `mode` 字段不解释：插件角色不做主模式（见 `plans/plugins.md` 第十一章）。
+ *   `mode` 字段不解释：插件角色不做主模式。
  */
 import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";

@@ -35,7 +35,7 @@ export type SessionSummary = {
   mode: string;
   /** 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` */
   permissionMode: PermissionMode;
-  /** 父会话 id；子智能体会话非空（见 `plans/stage-7c-subagents.md`） */
+  /** 父会话 id；子智能体会话非空 */
   parentSessionId: string | null;
   /** 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 */
   agent: string | null;
@@ -71,7 +71,7 @@ export type SessionInfoResponse = {
    * 本会话当前上下文占用；判断依据不足时为空——未落盘、模型窗口不可知、压缩后还没出新一轮回答。
    */
   contextUsage: ContextUsage | null;
-  /** 当前会话目标（见 plans/stage-11-goal.md）；未设置或已清除时为空 */
+  /** 当前会话目标；未设置或已清除时为空 */
   goal: GoalView | null;
 };
 

@@ -790,7 +790,7 @@ export class SessionPool {
       // `bindExtensions` 是 `session_start` 的唯一触发点：MCP 扩展靠它连 mcp.json，
       // 插件的 SessionStart hook 也靠它。**所有会话都要调**——plan / ask 模式与只读角色
       // 会话里挂的扩展少（没有 MCP、没有 tool_search），但插件 hook 与权限扩展都在，
-      // 漏调会让插件作者拿不到任何诊断（见 plans/plugins.md 4.2）。
+      // 漏调会让插件作者拿不到任何诊断。
       await session.bindExtensions({});
 
       const unsubscribe = session.subscribe((event) => {
