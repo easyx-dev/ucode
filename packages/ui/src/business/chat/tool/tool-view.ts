@@ -21,6 +21,7 @@ const KIND_BY_NAME: Record<string, ToolKind> = {
   write: "write",
   edit: "edit",
   bash: "command",
+  powershell: "command",
   grep: "search",
   find: "search",
   ls: "list",

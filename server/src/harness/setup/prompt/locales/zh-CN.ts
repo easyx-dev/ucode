@@ -60,6 +60,11 @@ export const zhCN: PromptCatalog = {
     if (readers.length > 0) {
       rules.push(`检索与阅读用 ${readers.join(" / ")} 这些专用工具，不要用 shell 命令代替。`);
     }
+    if (has("powershell")) {
+      rules.push(
+        "Windows 上除了 bash 还有 powershell：需要 Windows 原生命令、注册表或 PowerShell 模块时用它。",
+      );
+    }
     if (has("edit")) {
       rules.push("edit 用最小且唯一的旧文本定位；同一文件多处不相邻的改动合成一次调用。");
     }
@@ -99,17 +104,20 @@ export const zhCN: PromptCatalog = {
 
   modeHeading: "## 当前模式",
 
-  modeConstraints: {
-    build: "当前处于「编码」模式：可以直接读写文件、执行命令，把任务做完。",
-    plan:
-      "当前处于「计划」模式：只做只读调研，产出一份可执行的方案，" +
-      "不要修改文件或执行命令——write / edit / bash 的调用会被直接阻断。" +
-      "需要用户拍板方向（多候选、需求不明、是否动手）时，先用 question 提问，不要先写计划；" +
-      "方案已具体到可落地步骤时，才在回复末尾调用 present_plan 收尾——调用后本轮立即结束，不要再补充提问；" +
-      "用户在界面里批准或反馈。",
-    ask:
-      "当前处于「问答」模式：只做只读分析与回答，不要修改文件或执行命令——" +
-      "write / edit / bash 的调用会被直接阻断。",
+  modeConstraints: (blockedTools) => {
+    const listed = blockedTools.join(" / ");
+    return {
+      build: "当前处于「编码」模式：可以直接读写文件、执行命令，把任务做完。",
+      plan:
+        "当前处于「计划」模式：只做只读调研，产出一份可执行的方案，" +
+        `不要修改文件或执行命令——${listed} 的调用会被直接阻断。` +
+        "需要用户拍板方向（多候选、需求不明、是否动手）时，先用 question 提问，不要先写计划；" +
+        "方案已具体到可落地步骤时，才在回复末尾调用 present_plan 收尾——调用后本轮立即结束，不要再补充提问；" +
+        "用户在界面里批准或反馈。",
+      ask:
+        "当前处于「问答」模式：只做只读分析与回答，不要修改文件或执行命令——" +
+        `${listed} 的调用会被直接阻断。`,
+    };
   },
 
   subagentConstraints: {

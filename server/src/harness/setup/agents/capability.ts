@@ -86,7 +86,7 @@ export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
  * 只读与工具选择是两件事：plan / ask 与 build 共用同一套工具声明，只读性完全落在规则上
  * （`deny` 不受权限档位影响），所以判断「能不能落盘」要看规则，不能看 `toolSelection`。
  *
- * 「整批」是三个工具都要被断掉（用空对象判定，即不限目标的全量 deny）：只断 `bash` 而留着
+ * 「整批」是写盘与执行的工具都要被断掉（用空对象判定，即不限目标的全量 deny）：只断 `bash` 而留着
  * `edit` / `write` 的能力不是只读，不该因此拿不到扩展与目标结算工具。
  */
 export const isReadOnlyCapability = (capability: ResolvedCapability): boolean =>

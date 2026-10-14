@@ -250,7 +250,7 @@ const createSessionLoader = async (
       : {}),
     ...promptLoaderOptions(input.promptSource ?? env.promptSource, {
       mode: input.mode,
-      agentSection: promptSectionOf(profile),
+      agentSection: promptSectionOf(profile, toolNames),
       tools: toolNames,
       variant,
       memoryEnabled: input.memory?.enabled === true,

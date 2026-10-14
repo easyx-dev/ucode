@@ -12,6 +12,7 @@ import { parseCustomAgent } from "../../agents";
 import { buildCustomTools, DEFAULT_BUILTIN_TOOLS, GOAL_TOOL_NAMES } from "..";
 import type { GoalToolHooks } from "../goal";
 import { GOAL_BLOCKED_TOOL } from "../goal";
+import { POWERSHELL_TOOL_NAME } from "../names";
 import type { QuestionHooks } from "../question";
 
 const readConfig = (): WebsearchConfig => ({ provider: "tavily", apiKey: "", baseUrl: "" });
@@ -81,11 +82,15 @@ const agentOptions = (tool: { parameters?: unknown }): string[] => {
 };
 
 describe("buildCustomTools", () => {
-  it("内置清单包含只读检索工具，不含未启用的 powershell", () => {
+  it("内置清单包含只读检索工具，PowerShell 只随 Windows 出现", () => {
     for (const name of ["read", "bash", "edit", "write", "grep", "find", "ls"]) {
       assert.ok(DEFAULT_BUILTIN_TOOLS.includes(name), `缺少内置工具 ${name}`);
     }
-    assert.ok(!DEFAULT_BUILTIN_TOOLS.includes("powershell"));
+    // pi 的 PowerShell 工具在非 Windows 上直接抛错，而这份默认集会被原样交给它装配
+    assert.equal(
+      DEFAULT_BUILTIN_TOOLS.includes(POWERSHELL_TOOL_NAME),
+      process.platform === "win32",
+    );
   });
 
   it("build 只注册联网、提问与子智能体工具", () => {

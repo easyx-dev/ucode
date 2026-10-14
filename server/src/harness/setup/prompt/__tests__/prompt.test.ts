@@ -9,7 +9,8 @@ import { describe, it } from "node:test";
 
 import { brand } from "@ucode/brand/values";
 import { SESSION_MODES } from "@ucode/contracts";
-import { buildFullPrompt, buildPromptOverlay, composeFullPrompt } from "..";
+import { PRIMARY_PROFILES, primaryToolNames } from "../../agents";
+import { buildFullPrompt, buildPromptOverlay, composeFullPrompt, promptSectionOf } from "..";
 import { catalogFor, DEFAULT_PROMPT_LOCALE, PROMPT_LOCALES } from "../locales";
 import { DEFAULT_PROMPT_VARIANT, PROMPT_VARIANTS, type PromptCatalog } from "../types";
 import { resolvePromptVariant } from "../variant";
@@ -20,7 +21,7 @@ describe("语言目录", () => {
   it("默认语言已注册，且每个模式都有约束文案", () => {
     assert.ok((PROMPT_LOCALES as readonly string[]).includes(DEFAULT_PROMPT_LOCALE));
     for (const mode of SESSION_MODES) {
-      assert.ok(catalog.modeConstraints[mode].length > 0, `${mode} 缺少约束文案`);
+      assert.ok(promptSectionOf(PRIMARY_PROFILES[mode]).length > 0, `${mode} 缺少约束文案`);
     }
   });
 
@@ -39,7 +40,10 @@ describe("语言目录", () => {
       ]) {
         assert.ok(prompt.includes(section), `${mode} 缺少分节：${section.split("\n")[0]}`);
       }
-      assert.ok(prompt.includes(catalog.modeConstraints[mode]), `${mode} 未拼入模式约束`);
+      assert.ok(
+        prompt.includes(promptSectionOf(PRIMARY_PROFILES[mode], primaryToolNames(mode))),
+        `${mode} 未拼入模式约束`,
+      );
       assert.ok(prompt.includes(catalog.untrusted), `${mode} 缺少外部内容边界`);
     }
   });
@@ -55,8 +59,10 @@ describe("语言目录", () => {
       const prompt = buildFullPrompt({ mode });
       assert.ok(prompt.includes("edit 用最小且唯一"), `${mode} 工具说明应含 edit 用法`);
       assert.ok(prompt.includes("检索与阅读用"), `${mode} 应保留只读检索指引`);
-      assert.ok(
-        catalog.modeConstraints[mode].includes("write / edit / bash 的调用会被直接阻断"),
+      // 列举的工具名必须与实际工具表一致：Windows 上另有 powershell，非 Windows 上不该提到它
+      assert.match(
+        prompt,
+        /edit \/ write \/ bash( \/ powershell)? 的调用会被直接阻断/,
         `${mode} 模式约束应声明写盘 / 执行被阻断`,
       );
     }
@@ -68,7 +74,10 @@ describe("pi 源叠加片段", () => {
     for (const mode of SESSION_MODES) {
       const overlay = buildPromptOverlay({ mode });
       assert.ok(overlay.includes(brand.name), `${mode} 叠加片段缺少品牌名`);
-      assert.ok(overlay.includes(catalog.modeConstraints[mode]), `${mode} 未拼入模式约束`);
+      assert.ok(
+        overlay.includes(promptSectionOf(PRIMARY_PROFILES[mode])),
+        `${mode} 未拼入模式约束`,
+      );
       assert.ok(overlay.includes(catalog.untrusted), `${mode} 缺少外部内容边界`);
       assert.ok(!overlay.includes(catalog.toolPolicy(["read"])), "pi 源不应重复工具说明");
     }

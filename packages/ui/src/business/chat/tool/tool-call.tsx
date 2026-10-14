@@ -52,6 +52,8 @@ export const toolTitleOf = (name: string, t: TFunction): string => {
       return t("编辑");
     case "bash":
       return t("Shell");
+    case "powershell":
+      return t("PowerShell");
     case "grep":
       return t("搜索");
     case "find":

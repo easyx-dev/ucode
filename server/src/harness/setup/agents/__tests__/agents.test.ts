@@ -10,7 +10,12 @@ import { SESSION_MODES } from "@ucode/contracts";
 
 import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../../../constants/session";
 import { DEFAULT_PERMISSION_RULES, decidePermission } from "../../permissions";
-import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS } from "../../tools/names";
+import {
+  DEFAULT_BUILTIN_TOOLS,
+  DEFAULT_EXTENSION_TOOLS,
+  isExecTool,
+  WRITE_TOOLS,
+} from "../../tools/names";
 import {
   type AgentRegistry,
   agentRules,
@@ -56,7 +61,7 @@ describe("角色注册表", () => {
 
   it("只读模式靠规则断掉写盘 / 执行，不靠收窄工具集", () => {
     const rules = parentModeRules("plan");
-    for (const name of ["edit", "write", "bash"]) {
+    for (const name of WRITE_TOOLS) {
       assert.ok(
         rules.some((rule) => rule.tool === name && rule.action === "deny" && rule.pattern === "*"),
         `plan 应 deny ${name}`,
@@ -68,7 +73,7 @@ describe("角色注册表", () => {
     assert.equal(isReadOnlyCapability(primaryCapability("build")), false);
   });
 
-  it("只读判定要三个工具都断掉：只禁一个不算只读", () => {
+  it("只读判定要求写盘与执行工具全断：只禁一个不算只读", () => {
     const build = primaryCapability("build");
     const deny = (tool: string) => ({ tool, pattern: "*", action: "deny" as const });
     // 只断 bash：还有 edit / write 能落盘，不该因此拿不到扩展与目标结算工具
@@ -84,7 +89,7 @@ describe("角色注册表", () => {
     assert.equal(
       isReadOnlyCapability({
         ...build,
-        permissions: [deny("edit"), deny("write"), deny("bash")],
+        permissions: WRITE_TOOLS.map(deny),
       }),
       true,
     );
@@ -185,11 +190,11 @@ describe("能力交集", () => {
     }
     // 真正的闸门：装配层把父会话模式的规则一并交给子会话，判定取较严者
     // （端到端行为见 permissions/__tests__/extension.test 的「父会话模式的 deny 仍然拦住子会话」）
-    for (const tool of ["edit", "write", "bash"] as const) {
+    for (const tool of WRITE_TOOLS) {
       const verdict = decidePermission(
         parentModeRules("plan"),
         tool,
-        tool === "bash" ? { command: "rm -rf ." } : { path: "/work/src/a.ts" },
+        isExecTool(tool) ? { command: "rm -rf ." } : { path: "/work/src/a.ts" },
         "/work",
       );
       assert.equal(verdict.action, "deny", `plan 父下 ${tool} 应被拦下`);
@@ -236,7 +241,7 @@ describe("能力交集", () => {
     }
 
     const plan = parentModeRules("plan");
-    for (const tool of ["edit", "write", "bash"]) {
+    for (const tool of WRITE_TOOLS) {
       assert.ok(plan.some((rule) => rule.tool === tool && rule.action === "deny"));
     }
   });

@@ -18,7 +18,12 @@ import { CUSTOM_AGENT_MAX_BYTES, CUSTOM_AGENT_SLUG_MAX_LENGTH } from "../../../c
 import { AGENTS_DIRNAME, PROJECT_CONFIG_DIRNAME } from "../../../constants/dirs";
 import { ancestorDirs } from "../../../platform/paths";
 import type { PluginAgentFile } from "../../plugins/types";
-import { DEFAULT_BUILTIN_TOOLS, DEFAULT_EXTENSION_TOOLS, KNOWN_TOOL_NAMES } from "../tools/names";
+import {
+  DEFAULT_BUILTIN_TOOLS,
+  DEFAULT_EXTENSION_TOOLS,
+  EXEC_TOOL_NAMES,
+  KNOWN_TOOL_NAMES,
+} from "../tools/names";
 import { SUBAGENT_PROFILES } from "./profiles";
 import type { AgentCapability, AgentProfile, ToolSelection } from "./types";
 
@@ -302,14 +307,25 @@ const placeAgent = (
 /**
  * 工具档位：显式白名单优先；只给了黑名单时按「已知工具减去它」算白名单；
  * 两者都没有则继承父会话（`inherit` 会与父能力取交集，不会放大）。
+ *
+ * 两条容错分支都按「宁可不可用，不放大权限」处理：
+ * - 黑名单按**能力组**减而不是按名字：插件作者看不出本项目把「执行命令」拆成了 `bash` 与 Windows 上的
+ *   `powershell`，声明 `disallowedTools: ["bash"]` 的意图是「不要执行命令」——只减字面量会在 Windows 上
+ *   留着另一条执行通道，而黑名单是插件收窄自己的手段，漏一个就是放大。
+ * - 白名单过滤后为空时给空集而不是退回家继承：插件可能按 Claude 的工具名（`Bash` / `Read`）写，
+ *   而退回继承等于把「只用这几个」放大成「用父会话的全部工具」，方向最危险的一侧必须挡住
+ *   （`frontmatterSchema` 对未知键报错就是为同一件事）。
  */
 const pluginToolSelection = (agent: PluginAgentFile): AgentCapability["toolSelection"] => {
   if (agent.tools.length > 0) {
     const allowed = agent.tools.filter((tool) => KNOWN_TOOL_NAMES.has(tool));
-    return allowed.length > 0 ? { kind: "allowlist", tools: allowed } : { kind: "inherit" };
+    return { kind: "allowlist", tools: allowed };
   }
   if (agent.disallowedTools.length > 0) {
     const denied = new Set(agent.disallowedTools);
+    if (EXEC_TOOL_NAMES.some((name) => denied.has(name))) {
+      for (const name of EXEC_TOOL_NAMES) denied.add(name);
+    }
     return { kind: "allowlist", tools: [...KNOWN_TOOL_NAMES].filter((tool) => !denied.has(tool)) };
   }
   return { kind: "inherit" };

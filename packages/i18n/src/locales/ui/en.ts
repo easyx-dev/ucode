@@ -380,6 +380,7 @@ export default {
   读取: "Read",
   写入: "Write",
   Shell: "Shell",
+  PowerShell: "PowerShell",
   查找: "Find",
   列出: "List",
   获取网页: "Fetch",

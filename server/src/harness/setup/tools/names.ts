@@ -6,8 +6,25 @@
 import { MEMORY_TOOL_NAMES } from "../../features/memory/tools";
 import { GOAL_BLOCKED_TOOL, GOAL_COMPLETE_TOOL } from "./goal";
 
-/** 内置工具：读写执行 + 只读检索（grep / find / ls） */
-export const DEFAULT_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+/** PowerShell 工具名：pi 只在 Windows 上提供它（`getPowerShellConfig` 在别的平台直接抛错） */
+export const POWERSHELL_TOOL_NAME = "powershell";
+
+/**
+ * 内置工具：读写执行 + 只读检索（grep / find / ls）；Windows 上另有 PowerShell 通道。
+ *
+ * 按平台组这份清单是必须的：它会被原样 `applyOverrides({ defaultTools })` 交给 pi 装配，
+ * 在非 Windows 上多列一个 powershell 会让整轮装配失败。
+ */
+export const DEFAULT_BUILTIN_TOOLS: readonly string[] = [
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+  ...(process.platform === "win32" ? [POWERSHELL_TOOL_NAME] : []),
+];
 
 /** 内置扩展工具：注册即存在但不默认激活，由默认集一并开启 */
 export const DEFAULT_EXTENSION_TOOLS = ["codemode"];
@@ -38,8 +55,15 @@ export const SUBAGENT_TOOL_NAME = "subagent";
 /** 计划模式的收尾工具名：只在计划模式注册，调用即提交方案、本轮结束 */
 export const PRESENT_PLAN_TOOL_NAME = "present_plan";
 
+/** 执行命令的工具名：与写盘同属「改变机器状态」，只读角色一并断掉 */
+export const EXEC_TOOL_NAMES = ["bash", POWERSHELL_TOOL_NAME] as const;
+
+/** 是否属于执行命令的工具：只读角色的规则文案要把它与写盘分开说 */
+export const isExecTool = (name: string): boolean =>
+  (EXEC_TOOL_NAMES as readonly string[]).includes(name);
+
 /** 会写盘 / 执行命令的工具名：只读角色用规则把它们整批断掉（见 `harness/setup/agents/profiles`） */
-export const WRITE_TOOLS = ["edit", "write", "bash"] as const;
+export const WRITE_TOOLS = ["edit", "write", ...EXEC_TOOL_NAMES] as const;
 
 /** 子会话永远拿不到的工具：递归、计划提交、记忆写入与目标结算（子会话不该结算父目标） */
 export const SUBAGENT_EXCLUDED_TOOLS = [

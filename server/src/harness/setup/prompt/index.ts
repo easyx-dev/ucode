@@ -14,6 +14,7 @@
 import { brand } from "@ucode/brand/values";
 import { MEMORY_TOOL_NAMES } from "../../features/memory/tools";
 import { type AgentProfile, primaryToolNames, type SubagentSlug } from "../agents";
+import { WRITE_TOOLS } from "../tools/names";
 import { catalogFor, type PromptLocale } from "./locales";
 import { DEFAULT_PROMPT_VARIANT, type PromptCatalog, type PromptVariant } from "./types";
 
@@ -40,8 +41,20 @@ const promptToolNames = (input: PromptBuildInput): string[] => {
   ];
 };
 
+/**
+ * 本次工具表里真正会写盘 / 执行命令的工具：只读模式的约束文案要列举它们。
+ * 不直接用 `WRITE_TOOLS`：那份清单按平台不同（Windows 上另有 powershell），文案列举必须跟着工具表走，
+ * 否则会提到本次会话根本没有的工具。
+ */
+const blockedToolsOf = (tools: readonly string[]): string[] =>
+  WRITE_TOOLS.filter((name) => tools.includes(name));
+
 const resolvedSection = (catalog: PromptCatalog, input: PromptBuildInput): string =>
-  input.agentSection ?? (catalog.modeConstraints as Record<string, string>)[input.mode] ?? "";
+  input.agentSection ??
+  (catalog.modeConstraints(blockedToolsOf(promptToolNames(input))) as Record<string, string>)[
+    input.mode
+  ] ??
+  "";
 
 const modeBlock = (catalog: PromptCatalog, section: string): string =>
   `${catalog.modeHeading}\n${section}`;
@@ -93,11 +106,16 @@ export const buildPromptOverlay = (input: PromptBuildInput): string =>
   composeOverlayPrompt(catalogFor(input.locale), brand.name, input);
 
 /** 解析角色的提示词约束正文：自定义角色用自己的正文，内置角色取语言目录 */
-export const promptSectionOf = (profile: AgentProfile, locale?: PromptLocale): string => {
+export const promptSectionOf = (
+  profile: AgentProfile,
+  tools: readonly string[] = primaryToolNames(profile.slug),
+  locale?: PromptLocale,
+): string => {
   if (profile.promptSection) return profile.promptSection;
   const catalog = catalogFor(locale);
   return profile.kind === "primary"
-    ? ((catalog.modeConstraints as Record<string, string>)[profile.slug] ?? "")
+    ? ((catalog.modeConstraints(blockedToolsOf(tools)) as Record<string, string>)[profile.slug] ??
+        "")
     : (catalog.subagentConstraints[profile.slug as SubagentSlug] ?? "");
 };
 

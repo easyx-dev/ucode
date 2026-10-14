@@ -357,8 +357,10 @@ describe("buildSessionOptions 系统提示词", () => {
     const ask = (await snapshotOf("ask", "custom")).systemPrompt;
     assert.ok(build.includes("codemode"), "build 工具说明应含 codemode");
     assert.ok(ask.includes("codemode"), "ask 与 build 同工具表，说明里同样会提到 codemode");
-    assert.ok(
-      ask.includes("write / edit / bash 的调用会被直接阻断"),
+    // 列举的工具名跟着实际工具表走：Windows 上多一个 powershell
+    assert.match(
+      ask,
+      /edit \/ write \/ bash( \/ powershell)? 的调用会被直接阻断/,
       "只读模式的约束文案随模式拼入，与声明的工具表不矛盾",
     );
   });

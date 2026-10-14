@@ -255,6 +255,23 @@ describe("插件角色", () => {
     assert.ok(!tools.includes("bash"));
     assert.ok(!tools.includes("edit"));
     assert.ok(tools.includes("read"));
+    // 执行类工具按能力组成组：插件只写 bash 时，Windows 上的 powershell 也必须一并拿掉，
+    // 否则「不要执行命令」的收窄在那边漏掉一条通道
+    assert.ok(!tools.includes("powershell"));
+  });
+
+  it("白名单里没有一个认识的名字时给空集，不退回继承（那是权限放大）", () => {
+    const registry = loadAgentRegistry({
+      cwd: "/tmp",
+      appHome: "/tmp",
+      // Claude 生态常按自己的工具名写（大写），本项目认不出任何一个
+      pluginAgents: [pluginAgent({ tools: ["Bash", "Read", "Glob"] })],
+    });
+
+    assert.deepEqual(registry.subagents["my-plugin-reviewer"]?.capability.toolSelection, {
+      kind: "allowlist",
+      tools: [],
+    });
   });
 
   it("模型声明透传，权限规则留空（插件的权限只能由模式侧收紧）", () => {

@@ -10,6 +10,7 @@ import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import type { PermissionAction, PermissionMode } from "@ucode/contracts";
 
 import { toPosixPath } from "../../../platform/paths";
+import { POWERSHELL_TOOL_NAME } from "../tools/names";
 
 export type PermissionRule = {
   /** 工具名；`external_directory` 表示工作目录之外的路径检查 */
@@ -100,7 +101,9 @@ export const toolTarget = (
     return { subject: toPosixPath(absolutePath), absolutePath };
   }
   switch (tool) {
+    // PowerShell 与 bash 复用同一套入参（`command`）：不并列在这里，规则匹配到的对象就是空串
     case "bash":
+    case POWERSHELL_TOOL_NAME:
       return { subject: text(input.command) };
     case "webfetch":
       return { subject: text(input.url) };
