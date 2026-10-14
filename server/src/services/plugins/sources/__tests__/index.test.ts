@@ -8,13 +8,14 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { zipSync } from "fflate";
-import { PLUGIN_MANIFEST_DIRNAME } from "../../../../constants/dirs";
+import { PLUGIN_BIN_DIRNAME, PLUGIN_MANIFEST_DIRNAME } from "../../../../constants/dirs";
 
 import { SourceError, type SourceRunner, stagePluginSource } from "..";
 
@@ -91,6 +92,35 @@ describe("stagePluginSource", () => {
     assert.equal(existsSync(join(staged.path, PLUGIN_MANIFEST_DIRNAME, "plugin.json")), true);
     assert.equal(readFileSync(join(staged.path, "skills", "review", "SKILL.md"), "utf8"), "正文");
     assert.match(staged.integrity ?? "", /^[0-9a-f]{64}$/);
+  });
+
+  it("url 来源：zip 里的 bin/ 脚本补上了可执行位（zip 不携带 unix 权限位）", async () => {
+    const archive = zipSync({
+      [`pkg/${PLUGIN_MANIFEST_DIRNAME}/plugin.json`]: new TextEncoder().encode(
+        '{"name":"zip-bin"}',
+      ),
+      [`pkg/${PLUGIN_BIN_DIRNAME}/run`]: new TextEncoder().encode("#!/bin/sh\necho hi\n"),
+    });
+
+    const staged = await stagePluginSource({
+      source: { source: "url", url: "https://example.com/pkg.zip" },
+      stagingRoot: makeDir(),
+      fetch: async () => ({
+        url: new URL("https://example.com/pkg.zip"),
+        status: 200,
+        body: archive,
+        truncated: false,
+        contentType: "application/zip",
+        etag: null,
+        lastModified: null,
+      }),
+    });
+
+    const script = join(staged.path, PLUGIN_BIN_DIRNAME, "run");
+    assert.equal(existsSync(script), true, "bin 目录随包一起解出来了");
+    if (process.platform !== "win32") {
+      assert.equal(statSync(script).mode & 0o111, 0o111, "bin 脚本应可执行");
+    }
   });
 
   it("url 来源：非 2xx、截断、认不出格式都失败", async () => {

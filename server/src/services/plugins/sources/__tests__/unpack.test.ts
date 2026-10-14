@@ -122,7 +122,8 @@ describe("unpackArchive", () => {
     );
   });
 
-  it("tgz 里的符号链接被拒", async () => {
+  // 造归档用的符号链接在 Windows 上需要开发者模式或管理员权限
+  it("tgz 里的符号链接被拒", { skip: process.platform === "win32" }, async () => {
     const target = makeDir();
     await assert.rejects(
       unpackArchive({

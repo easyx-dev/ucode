@@ -6,11 +6,12 @@
  * 出网与进程调用都可注入，便于单测（真实实现是 `publicFetch` 与 `execa`）。
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { execa } from "execa";
 
+import { PLUGIN_BIN_DIRNAME } from "../../../constants/dirs";
 import {
   PLUGIN_FETCH_TIMEOUT_MS,
   PLUGIN_GIT_TIMEOUT_MS,
@@ -126,6 +127,25 @@ const listDirNames = (dir: string): string[] => {
   }
 };
 
+/** `bin/` 下脚本的权限：属主可写、其余可读可执行 */
+const BIN_FILE_MODE = 0o755;
+
+/**
+ * 给插件 `bin/` 下的文件补可执行位。
+ *
+ * zip 不携带 unix 权限位，解出来的脚本一律是默认 mode——`bin/` 组件于是形同虚设：目录被追加进
+ * PATH，里面的文件却没有执行权限，于是「插件带的命令跑不了」。tgz 与 git 来源自带 mode，不受影响；
+ * Windows 不认权限位，由 `PATHEXT` 决定，跳过。
+ */
+const grantBinExecutables = (root: string): void => {
+  if (process.platform === "win32") return;
+  const binDir = join(root, PLUGIN_BIN_DIRNAME);
+  if (!existsSync(binDir)) return;
+  for (const entry of readdirSync(binDir, { withFileTypes: true, recursive: true })) {
+    if (entry.isFile()) chmodSync(join(entry.parentPath, entry.name), BIN_FILE_MODE);
+  }
+};
+
 /** url 来源：取压缩体 → 解包到暂存目录 */
 const stageFromUrl = async (
   source: Extract<PluginSourceSpec, { source: "url" }>,
@@ -155,8 +175,10 @@ const stageFromUrl = async (
   input.onProgress?.("解包…");
   const dir = makeStagingDir(input.stagingRoot, "url");
   await unpackArchive({ data: response.body, format, targetDir: dir });
+  const root = descendToPackageRoot(dir);
+  grantBinExecutables(root);
   return {
-    path: descendToPackageRoot(dir),
+    path: root,
     staged: true,
     stagingDir: dir,
     integrity: createHash("sha256").update(response.body).digest("hex"),

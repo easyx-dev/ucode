@@ -15,6 +15,7 @@ import {
   PLUGIN_UNPACK_MAX_BYTES,
   PLUGIN_UNPACK_MAX_ENTRIES,
 } from "../../../constants/plugins";
+import { isInsidePath } from "../../../platform/paths";
 
 /** 解包失败：越界、超限、格式不对都归这一类，由调用方转成来源无效的失败 */
 export class UnpackError extends Error {
@@ -35,12 +36,17 @@ const isSafeEntryPath = (name: string): boolean => {
   return !name.split(/[\\/]/).includes("..");
 };
 
-/** 归一化后的落点；越界即抛 `UnpackError` */
+/**
+ * 归一化后的落点；越界即抛 `UnpackError`。
+ *
+ * 前缀比较走 `isInsidePath`（带分隔符、按运行平台）：手拼 `${root}/` 在 Windows 上恒不匹配
+ * ——`resolve` 产出的是反斜杠，于是每个条目都被判成越界、zip 来源整条装不上。
+ */
 const resolveEntryPath = (targetDir: string, name: string): string => {
   if (!isSafeEntryPath(name)) throw new UnpackError(`归档条目路径越界：${name}`);
   const root = resolve(targetDir);
   const path = resolve(root, ...name.split(/[\\/]/));
-  if (path !== root && !path.startsWith(`${root}/`)) {
+  if (!isInsidePath(root, path)) {
     throw new UnpackError(`归档条目逃出目标目录：${name}`);
   }
   return path;
