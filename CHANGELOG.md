@@ -287,6 +287,11 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
 
 ### 变更
 
+- **反色面独立成 token 对**（语义 `inverse` / `inverse-foreground`，主题层 `--theme-inverse` / `--theme-inverse-fg`）：
+  用户消息气泡与 tooltip 从 `bg-foreground` + `text-background` 改过来；`styles/themes/*.css` 深浅两块同步覆盖，
+  `scripts/verify` 的 themes 校验把它并入必备变量清单。浅色取值与原先一致（`neutral-800` 底 + `neutral-50` 字），
+  深色不再翻成近白底 + 深字，改取次级实底那一档（`neutral-700` 底 + `neutral-50` 字）——整块近白的气泡在深色下过亮。
+
 - **脚本层对齐三平台**：`pnpm-workspace.yaml` 开 `shellEmulator`（脚本里的行内环境变量赋值在 Windows 的
   `cmd.exe` 下不成立）；`pnpm start` 去掉冗余的 `NODE_ENV=production`（cli 本就把缺省看作生产形态）；
   `pnpm dev` 脚本内显式声明 `APP_HOME=.tmp/.ucode`，不再依赖手工前缀；桌面端开发形态改由 `electron . --dev`

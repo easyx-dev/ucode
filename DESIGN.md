@@ -81,7 +81,9 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | `popover` | 弹层、下拉、对话框、输入框 | `white` | `#161616`（自建底料） |
 | `muted` | 次级面板底、悬停与嵌入块（代码块、表格头） | `#f2f2f2`（自建底料） | `neutral-700` |
 | `secondary` | 次级实底（次按钮、次级徽标） | `neutral-200` | `neutral-700` |
-| `foreground` | 主文本（兼作反色面：用户消息气泡拿它当底、`background` 当字） | `neutral-800` | `neutral-200` |
+| `foreground` | 主文本 | `neutral-800` | `neutral-200` |
+| `inverse` | 反色面：用户消息气泡、tooltip 的底 | `neutral-800` | `neutral-700` |
+| `inverse-foreground` | 反色面上的字 | `neutral-50` | `neutral-50` |
 | `foreground-subtle` | 次级文本、描述、时间、图标弱化 | 前景 60% | 前景 60% |
 | `foreground-subtlest` | 占位、最弱元数据、禁用邻接文案 | 前景 40% | 前景 30% |
 | `border` | 描边、分隔 | 叠加基准 10% | 同 |
@@ -91,6 +93,8 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 - 「叠加基准」浅色是近黑、深色是近白，所以描边、状态层、遮罩在两种模式下都朝同一方向变化。
 - 三级文本是**唯一**的文本层级口径；不要用 `text-foreground/70` 这类自造透明度。
+- 反色面（`inverse`）是**唯一不随深浅翻转**的一对：浅色近黑底 + 浅字，深色压到次级实底那一档（`neutral-700` 底 + `neutral-50` 字）。
+  深色若也取近白，一整块用户气泡会成为画面里最亮的东西——小面积浮起（按钮、徽标）随深浅翻转，大面积反色面不翻。
 - 透明度只用 `5 / 10 / 20 / 40 / 50 / 60 / 80` 七档（状态层在 CSS 里合成，组件不写）。
 
 ### 交互态

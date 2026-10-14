@@ -79,6 +79,9 @@
   --theme-text-faint: 40;
   --theme-primary: var(--color-neutral-900);
   --theme-primary-fg: var(--color-neutral-50);
+  /* 反色面：近黑底配浅字，深色那一块见 `.dark` */
+  --theme-inverse: var(--color-neutral-800);
+  --theme-inverse-fg: var(--color-neutral-50);
   --theme-ring: var(--color-neutral-400);
   /* 叠加基准色与描边强度：状态层、描边、分组外框都由这一对派生 */
   --theme-line: var(--color-neutral-950);
@@ -90,7 +93,7 @@
 
 /*
  * 深色：分层关系与浅色相反——外壳比内容卡亮一档（浅色是「灰壳 + 白卡」，深色是「灰壳 + 更暗的卡」），
- * 反色面翻转为近白。外壳与卡取自建底料，见上面的 `--palette-*`。
+ * 反色面是唯一不翻转的一对（见下）。外壳与卡取自建底料，见上面的 `--palette-*`。
  * 面板底在深色里与卡同色：浅色那层中间灰是为「卡片压得住面板」立的，深色不需要它。
  */
 .dark {
@@ -103,6 +106,12 @@
   --theme-text-faint: 30;
   --theme-primary: var(--color-neutral-50);
   --theme-primary-fg: var(--color-neutral-900);
+  /*
+   * 反色面不翻转：深色下若也取近白，整块用户气泡会成为画面里最亮的东西。
+   * 压到次级实底那一档（与 muted / solid 同色）——既与内容卡分得开，又不抢注意力。
+   */
+  --theme-inverse: var(--color-neutral-700);
+  --theme-inverse-fg: var(--color-neutral-50);
   --theme-ring: var(--color-neutral-500);
   --theme-line: var(--color-white);
   --theme-overlay: 60;
@@ -190,6 +199,10 @@
   /* 主色：浅色近黑、深色近白 */
   --primary: var(--theme-primary);
   --primary-foreground: var(--theme-primary-fg);
+
+  /* 反色面：气泡与 tooltip 这类「深底浅字」的面，深浅两模式都取实处（见主题层） */
+  --inverse: var(--theme-inverse);
+  --inverse-foreground: var(--theme-inverse-fg);
 
   /* 功能色：只表达状态，不参与品牌 */
   --destructive: var(--color-red-600);
@@ -357,6 +370,8 @@
   --color-overlay: var(--overlay);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);

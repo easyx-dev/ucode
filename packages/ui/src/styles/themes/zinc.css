@@ -14,6 +14,8 @@ html[data-theme="zinc"] {
   --theme-text: var(--color-zinc-800);
   --theme-primary: var(--color-zinc-900);
   --theme-primary-fg: var(--color-zinc-50);
+  --theme-inverse: var(--color-zinc-800);
+  --theme-inverse-fg: var(--color-zinc-50);
   --theme-ring: var(--color-zinc-400);
   --theme-line: var(--color-zinc-950);
 }
@@ -28,6 +30,8 @@ html.dark[data-theme="zinc"] {
   --theme-text: var(--color-zinc-200);
   --theme-primary: var(--color-zinc-50);
   --theme-primary-fg: var(--color-zinc-900);
+  --theme-inverse: var(--color-zinc-700);
+  --theme-inverse-fg: var(--color-zinc-50);
   --theme-ring: var(--color-zinc-500);
   --theme-line: var(--color-white);
 }

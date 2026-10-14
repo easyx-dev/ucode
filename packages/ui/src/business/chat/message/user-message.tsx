@@ -5,7 +5,7 @@
  * 图片开弹层看原图，附件下载），位置就是用户当初放的位置；技能与命令不属于任何句子，排在气泡上方。
  * 时刻与操作（分叉 / 编辑 / 复制）落在气泡下方，常驻占位、悬停才现，出现时不顶动内容。
  *
- * 气泡走反色面：浅色深底白字、深色浅底深字，让它直接铺在面板底上的 assistant 正文一眼分得开。
+ * 气泡走反色面：深浅两模式都是深底浅字（见 `inverse` token 对），让它直接铺在面板底上的 assistant 正文一眼分得开。
  * 句子成分因此落在反色底上，各自带底色的引用 chip 与附件 token 都留着原来的取法（它们本来就有面）。
  *
  * 正文超过一段高度就折叠（底部渐隐 + 展开入口）：用户贴整段日志时不该把屏幕占满。
@@ -237,8 +237,8 @@ export function UserMessage({
       {segments.length > 0 ? (
         <div
           className={cn(
-            // 反色面（与浮层同一对 token）：浅色近黑底白字、深色近白底深字；右下收一档，读起来像说话的一角
-            "max-w-full rounded-lg rounded-br-xs bg-foreground text-background",
+            // 反色面：深浅两模式都是深底浅字（与 tooltip 同一对 token）；右下收一档，读起来像说话的一角
+            "max-w-full rounded-lg rounded-br-xs bg-inverse text-inverse-foreground",
             highlight && "ring-2 ring-ring/50",
           )}
         >

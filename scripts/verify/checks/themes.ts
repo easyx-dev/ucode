@@ -32,6 +32,8 @@ const REQUIRED_THEME_VARS = [
   "--theme-text",
   "--theme-primary",
   "--theme-primary-fg",
+  "--theme-inverse",
+  "--theme-inverse-fg",
   "--theme-ring",
   "--theme-line",
 ];
