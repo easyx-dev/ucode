@@ -2,7 +2,7 @@
  * 决策面板：权限审批、提问与计划决策共用的外形——绝对定位盖在输入区上，把输入区挡住。
  *
  * 分两层：先给输入区整段铺一层底衬（面板未必盖得住整段的每一处，露出来的地方必须是干净的，
- * 否则会看到输入区的上边框与没被盖住的按钮），面板再浮在底衬上、与整段下沿留出间距。
+ * 否则会看到输入区的上边框、卡内目标条与没被盖住的按钮），面板再浮在底衬上、与整段下沿留出间距。
  * 底衬接住事件，输入区这段时间不响应；面板更高时向上撑开盖住对话尾部，限高后内部滚动。
  */
 import type { LucideIcon } from "lucide-react";
@@ -15,7 +15,7 @@ type DecisionPanelProps = {
 export function DecisionPanel({ children }: DecisionPanelProps) {
   return (
     <>
-      {/* 底衬：输入区整段（含它的上边框）都被它盖住，面板之外的点击也落在这里，不进输入区 */}
+      {/* 底衬：输入区整段（含它的上边框与卡内的目标条）都被它盖住，面板之外的点击也落在这里，不进输入区 */}
       <div aria-hidden className="absolute inset-0 z-10 bg-surface" />
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
         <div className="pointer-events-auto flex max-h-[70vh] w-full max-w-4xl flex-col overflow-y-auto rounded-xl bg-popover shadow-dialog ring-1 ring-border-strong">

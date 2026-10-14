@@ -735,8 +735,11 @@ export default {
   达到用量上限: "Paused: token budget",
   生成出错已暂停: "Paused: error",
   因受阻暂停: "Paused: blocked",
-  目标轮次: "Goal rounds",
+  逐轮记录: "Turn log",
+  展开逐轮记录: "Show the turn log",
+  收起逐轮记录: "Hide the turn log",
   目标进行中: "Goal in progress",
+  目标已暂停: "Goal paused",
   设置预算: "Set budget",
   "输入 token 上限，留空表示不限": "Enter a token limit; leave it empty for no limit",
 

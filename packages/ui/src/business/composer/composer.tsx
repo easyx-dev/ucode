@@ -1,9 +1,9 @@
-/** 输入区：白卡容器，顶部上下文行 + Tiptap 编辑器 + 底部工具栏（添加 · 模式 · 权限 · 模型 · 思考 · 发送） */
+/** 输入区：白卡容器（可带一条上沿条）+ Tiptap 编辑器 + 底部工具栏（添加 · 模式 · 权限 · 模型 · 思考 · 发送） */
 
 import { brand } from "@ucode/brand";
 import { cn } from "cn";
 import { ArrowUp, Square } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { IconButton } from "../../base/button";
@@ -43,6 +43,11 @@ type ComposerProps = {
   /** 编辑器重挂载键：上下文 + 外部填充版本 */
   editorKey: string;
   onDocChange: (doc: ComposerNode) => void;
+  /**
+   * 卡内最上方的一条（当前是目标栏）：宽度、居中与圆角都由卡给，它自己只画下沿分划线。
+   * 不传时卡与以前一致。
+   */
+  topBar?: ReactNode;
   /** 发送：带上当时那份文档，投递被拒时外层用它原样填回输入框 */
   onSend: (payload: ComposerPayload, doc: ComposerNode) => void;
   onStop: () => void;
@@ -77,6 +82,7 @@ export function Composer({
   cwdPath,
   initialDoc,
   editorKey,
+  topBar,
   onDocChange,
   onSend,
   onStop,
@@ -330,6 +336,8 @@ export function Composer({
               "focus-within:ring-ring",
             )}
           >
+            {topBar}
+
             {attachmentError ? (
               <p className="px-3 pt-2 text-xs text-destructive">
                 {t("无法添加附件：{{names}}", { names: attachmentError })}

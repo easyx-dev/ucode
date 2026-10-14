@@ -375,16 +375,6 @@ export function ChatPanel({
         </div>
       )}
 
-      {/* 完成后收起状态条：目标在哪儿结束由对话里的「目标完成」细线负责，条不再常驻 */}
-      {!isChild && goal && goal.status !== "completed" ? (
-        <GoalBar
-          goal={goal}
-          turns={goalTurns}
-          onCommand={(command) => onGoalCommand(command)}
-          onBudget={onGoalBudget}
-        />
-      ) : null}
-
       {/* 输入区照常留在原位，等用户作答时由决策面板盖住它（待答交互优先于计划决策）；子会话只读，连同输入区一起收起 */}
       {isChild ? (
         <div className="flex items-center gap-2 border-t border-border px-4 py-3">
@@ -407,6 +397,18 @@ export function ChatPanel({
               cwdPath={session?.cwd ?? draft.cwd}
               initialDoc={initialDoc}
               editorKey={draftKey}
+              // 目标栏是输入卡的上沿一条，随卡一起被决策面板的底衬盖住；
+              // 完成后不再挂它：目标在哪儿结束由对话里的「目标完成」细线负责
+              topBar={
+                goal && goal.status !== "completed" ? (
+                  <GoalBar
+                    goal={goal}
+                    turns={goalTurns}
+                    onCommand={(command) => onGoalCommand(command)}
+                    onBudget={onGoalBudget}
+                  />
+                ) : null
+              }
               onDocChange={(doc) =>
                 composer.update(draftKey, { doc, text: docToPayload(doc).text })
               }

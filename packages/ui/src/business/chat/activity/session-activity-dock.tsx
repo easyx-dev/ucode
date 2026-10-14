@@ -81,7 +81,10 @@ export function SessionActivityDock({
   if (activity.services.length > 0) {
     parts.push(t("{{n}} 个服务", { n: activity.services.length }));
   }
-  if (activity.goalActive) parts.push(t("目标进行中"));
+  // 目标段的措辞跟着状态走：暂停 / 中断的目标仍留在这条摘要里（它还要被恢复），但不能报「进行中」
+  if (activity.goal) {
+    parts.push(activity.goal.status === "active" ? t("目标进行中") : t("目标已暂停"));
+  }
 
   return (
     <div ref={containerRef} className="pointer-events-none absolute inset-0 z-10">
