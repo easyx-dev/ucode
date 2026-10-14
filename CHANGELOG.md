@@ -292,6 +292,11 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   `scripts/verify` 的 themes 校验把它并入必备变量清单。浅色取值与原先一致（`neutral-800` 底 + `neutral-50` 字），
   深色不再翻成近白底 + 深字，改取次级实底那一档（`neutral-700` 底 + `neutral-50` 字）——整块近白的气泡在深色下过亮。
 
+- **小尺寸控件统一圆角 `md`、文件树筛选行提到 28px**：输入族（`Input` / `InputSearch` / `Textarea`，圆角在共用底座
+  `INPUT_BASE_CLASS` 上）与图标按钮四档（`icon-xs` / `icon-sm` / `icon` / `icon-lg`）一律 `md`；分段控件由 `lg` 容器 +
+  `xs` 选中项改为 `md` 容器 + `sm` 选中项（`p-0.5` 内边距下仍同心）；工作台侧栏那批 28px 列表行（文件树 / 改动树）
+  也由 `lg` 收到 `md`。文件树头部的筛选行由 `h-6` 提到 `h-7`，与列表行、代码管理头部里的分段控件同高。
+
 - **脚本层对齐三平台**：`pnpm-workspace.yaml` 开 `shellEmulator`（脚本里的行内环境变量赋值在 Windows 的
   `cmd.exe` 下不成立）；`pnpm start` 去掉冗余的 `NODE_ENV=production`（cli 本就把缺省看作生产形态）；
   `pnpm dev` 脚本内显式声明 `APP_HOME=.tmp/.ucode`，不再依赖手工前缀；桌面端开发形态改由 `electron . --dev`

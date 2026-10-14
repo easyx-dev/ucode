@@ -32,7 +32,7 @@ export function SegmentedControl<T extends string>({
     <fieldset
       className={cn(
         // 自身不可压缩、选项不折行：窄栏里宁可挤掉旁边的文字，也不要把选项压成竖排
-        "inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5",
+        "inline-flex shrink-0 items-center gap-0.5 rounded-md bg-muted p-0.5",
         className,
       )}
     >
@@ -43,7 +43,8 @@ export function SegmentedControl<T extends string>({
           <label
             key={option.value}
             className={cn(
-              "flex cursor-pointer items-center gap-1 rounded-xs px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+              // 与容器同心：外圈 rounded-md 减掉 p-0.5 的内边距，落在 rounded-sm 上
+              "flex cursor-pointer items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
               "has-focus-visible:ring-2 has-focus-visible:ring-ring/50",
               selected
                 ? "bg-card text-foreground shadow-raised"

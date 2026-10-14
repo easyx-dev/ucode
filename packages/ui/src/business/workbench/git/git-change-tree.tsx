@@ -69,7 +69,7 @@ export function GitChangeTree({
             <button
               type="button"
               style={{ paddingLeft: `${depth * 14 + 10}px` }}
-              className="group flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
+              className="group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
               title={node.path}
               onClick={() => onSelect({ file: entry.path, staged: group.staged })}
             >
@@ -93,7 +93,7 @@ export function GitChangeTree({
             <button
               type="button"
               style={{ paddingLeft: `${depth * 14 + 10}px` }}
-              className="flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
+              className="flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
               onClick={() => toggle(collapseKey)}
             >
               <ChevronRight

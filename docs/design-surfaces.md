@@ -78,7 +78,7 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
 | 区域 | 取法 |
 | --- | --- |
 | 活动栏 | 宽 40px，`border-r border-border`，竖排图标按钮（`size-8`）：项目文件 / 源代码管理 / 全部改动，最下是收起面板 |
-| 侧栏 | 宽 180–360（默认 240）；顶部一行控件（根名 + 筛选 + 刷新 / 改动与历史切换 + 分支 + 刷新），列表行高 28、`rounded-lg`、选中 `bg-state-selected` |
+| 侧栏 | 宽 180–360（默认 240）；顶部一行控件（根名 + 筛选 + 刷新 / 改动与历史切换 + 分支 + 刷新），行高 36、行内控件 28（筛选行 `h-7` 与下方的列表行同高）；列表行高 28、`rounded-md`、选中 `bg-state-selected` |
 | 标签条 | 高 36px（与对话区头部同档），`border-b border-border`；一份文档一格、溢出横滚；每格是「标题按钮 + 关闭按钮」两个同级元素 |
 | 编辑器区 | 占剩余宽度；内容自带 36px 工具条与滚动区；diff 用行号 + 增删底色 + 语法高亮（着色值走 `--code-*`，适配器见 `business/markdown/shiki-diff.ts`） |
 | 空态 | 垂直居中：图标 `size-7 text-foreground-subtle` + 主文案 `text-sm font-medium` + 说明 `text-xs` |
