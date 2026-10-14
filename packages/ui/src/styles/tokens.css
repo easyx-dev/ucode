@@ -397,6 +397,23 @@
   --color-window-control-foreground: var(--window-control-foreground);
 
   /*
+   * 动效：目前只有对话区头部的状态条扫光。位移用自身宽度的百分比表达
+   * （短条占轨道 1/3，`-100% → 300%` 正好从轨道左侧外走到右侧外），短条换宽度不必改 keyframes；
+   * 周期自定——持续的循环动效不进 100/150/200ms 三档（见 DESIGN.md「动效」），
+   * 取 3s 而非更快的一档：这条线一直在视野顶部扫，越慢越不抢注意力。
+   */
+  --animate-tone-sweep: tone-sweep 3s linear infinite;
+
+  @keyframes tone-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+
+  /*
    * 层级：系统窗口镶边（自绘窗口控件与拖拽条）常驻在应用所有层之上——
    * 它扮演的是系统标题栏，弹层（`z-50`）也不应该遮住它，否则窗口就没法关、拖、缩了。
    */

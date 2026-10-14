@@ -210,7 +210,7 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 
 ## 动效
 
-- 时长三档：`100ms`（遮罩淡入淡出）、`150ms`（颜色、悬停、聚焦，默认）、`200ms`（弹层出现与消失）。
+- 时长三档：`100ms`（遮罩淡入淡出）、`150ms`（颜色、悬停、聚焦，默认）、`200ms`（弹层出现与消失）；三档只管交互过渡，循环类动效（加载扫光、状态条扫光）自定周期。
 - 缓动只用 `ease-out`；线性只用于扫光这类持续动画。
 - 属性只做 `colors` / `opacity` / `transform`；禁 `transition-all`。
 - 位移类动效（按下 `translate-y-px`）必须在 `prefers-reduced-motion: reduce` 下关闭；呼吸类动画同理由基础层统一关闭。

@@ -24,13 +24,24 @@ import { CopyTranscriptAction } from "./copy-transcript-action";
 import { type SessionTone, sessionToneOf } from "./session-tone";
 
 /**
- * 状态底色：淡色一层铺满头部并呼吸。只用语义 token，透明度取白名单档位；
- * 呼吸是纯 opacity 动画，减弱动效偏好下由 `base.css` 一律关掉。
+ * 状态底色：淡色一层铺满头部，**静态**不呼吸——大面积闪动会把整行变成噪音，动感交给顶缘那条状态条。
+ * 只用语义 token，透明度取白名单档位。
  */
-const TONE_CLASS: Record<SessionTone, string> = {
+const TONE_TINT: Record<SessionTone, string> = {
   busy: "bg-primary/10",
   form: "bg-warning/10",
   permission: "bg-destructive/10",
+};
+
+/**
+ * 状态条（头部顶缘 2px）：生成中是一条轨道加一段扫过的短条，等用户的两态本身停着、整条满色。
+ * 生成中的两层用**文本弱色**而不是 `primary`：`primary` 在暗色下是近白，一条持续扫动的近白线会刺眼；
+ * 轨道用最弱那档——减弱动效偏好下短条整条收掉，靠它仍然看得出「在跑」。
+ */
+const TONE_BAR: Record<SessionTone, string> = {
+  busy: "bg-foreground-subtlest",
+  form: "bg-warning",
+  permission: "bg-destructive",
 };
 
 /** 状态的无障碍文案：底色只对看得见的人有效，读屏与色盲用户靠这一行 */
@@ -164,16 +175,25 @@ export function ChatHeader({
           : undefined
       }
     >
-      {/* 状态底色铺在内容之下：头部自身背景透明，负 z 层不会盖住任何东西 */}
+      {/* 状态层铺在内容之下：头部自身背景透明，负 z 层不会盖住任何东西 */}
       {tone ? (
         <div
           aria-hidden
           data-slot="chat-header-tone"
-          className={cn(
-            "pointer-events-none absolute inset-0 -z-10 animate-pulse",
-            TONE_CLASS[tone],
-          )}
-        />
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className={cn("absolute inset-0 transition-colors duration-150", TONE_TINT[tone])} />
+          <div
+            className={cn(
+              "absolute inset-x-0 top-0 h-0.5 overflow-hidden transition-colors duration-150",
+              TONE_BAR[tone],
+            )}
+          >
+            {tone === "busy" ? (
+              <span className="block h-full w-1/3 bg-foreground-subtle animate-tone-sweep motion-reduce:hidden" />
+            ) : null}
+          </div>
+        </div>
       ) : null}
       {windowControls}
       {onToggleSidebar ? (
