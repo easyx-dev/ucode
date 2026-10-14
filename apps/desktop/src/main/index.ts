@@ -11,16 +11,17 @@ import { brand } from "@ucode/brand/values";
 import { app, BrowserWindow, ipcMain, session } from "electron";
 
 import { isFrameless } from "../shared/chrome.ts";
+import { isDevLaunch, RENDERER_DEV_URL } from "../shared/renderer.ts";
 import { readServiceConnection, serviceFilePath } from "./connection.ts";
 import { registerNotificationIpc } from "./notification.ts";
 import { installRendererProtocol, RENDERER_ORIGIN, registerRendererScheme } from "./proxy.ts";
 import { registerWindowControlsIpc, watchWindowState } from "./window-controls.ts";
 
 /**
- * 未声明时加载 `app://` 下的构建产物（生产形态）；开发时声明为 Vite 服务地址。
- * 两个来源的渲染层不会同时用：声明了就不读盘上的产物，避免跑着旧界面却以为在看新代码。
+ * 开发形态（`electron . --dev`）由 Vite dev server 提供界面，否则加载盘上的构建产物。
+ * 两个来源不会同时用：起了 dev server 就不读盘上的产物，避免跑着旧界面却以为在看新代码。
  */
-const rendererDevUrl = process.env.DESKTOP_RENDERER_URL;
+const rendererDevUrl = isDevLaunch(process.argv) ? RENDERER_DEV_URL : undefined;
 const rendererDist = resolve(import.meta.dirname, "../dist");
 
 /**
@@ -124,7 +125,7 @@ const createWindow = (): void => {
     watchWindowState(window);
   }
 
-  // 打包后不受 `DESKTOP_RENDERER_URL` 影响：分发的应用只跑自己带的那份渲染层
+  // 打包后不受 `--dev` 影响：分发的应用只跑自己带的那份渲染层
   if (rendererDevUrl && !app.isPackaged) {
     installDevTools(window);
     void loadRenderer(window, rendererDevUrl);

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "node scripts/build-main.mjs && concurrently -k -n renderer,electron -c cyan,magenta \"vite\" \"DESKTOP_RENDERER_URL=http://localhost:5174 electron .\"",
+    "dev": "node scripts/build-main.mjs && concurrently -k -n renderer,electron -c cyan,magenta \"vite\" \"electron . --dev\"",
     "start": "pnpm build && electron .",
     "build:main": "node scripts/build-main.mjs",
     "build": "vite build && node scripts/build-main.mjs",

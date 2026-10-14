@@ -4,6 +4,10 @@ packages:
   - "apps/desktop"
   - "packages/*"
 
+# 用 pnpm 自带的 JS shell 执行脚本：脚本里的行内环境变量赋值（`NODE_ENV=production …`）
+# 在 Windows 的 cmd.exe 下不成立，而本项目把 Windows 当目标平台
+shellEmulator: true
+
 # 允许执行安装脚本的依赖（pnpm 默认阻止）
 allowBuilds:
   "@google/genai": true

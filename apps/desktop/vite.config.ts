@@ -6,6 +6,8 @@ import { brandHtml } from "@ucode/brand/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
+import { RENDERER_DEV_PORT } from "./src/shared/renderer.ts";
+
 /** 从 start 向上找含 pnpm-workspace.yaml 的仓库根（`.env` 所在处），不依赖当前运行目录 */
 const findRepoRoot = (start: string): string => {
   let current = start;
@@ -32,7 +34,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [react(), tailwindcss(), brandHtml()],
     server: {
       // 桌面渲染层的固定来源（开发）；生产形态下渲染层走 `app://`，两边都不需要服务端放开跨域
-      port: 5174,
+      port: RENDERER_DEV_PORT,
       strictPort: true,
       // 与会话同源：页面发出的 `/api/*` 由这里转给本机服务（令牌由主进程加在请求头上，见 src/main/index.ts）
       proxy: { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true } },
