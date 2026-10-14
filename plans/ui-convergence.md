@@ -126,8 +126,9 @@
     `harness/setup/assets/index.ts` 放宽「无目录即空集」早退、合并内置（磁盘同名跳过）、内置来源标 `builtin`；
     `harness/setup/session-config.ts` 的 loader 用 `promptsOverride` 追加未被占用的内置命令（`createSyntheticSourceInfo`
     造合成路径）；`assets/__tests__/assets.test.ts` 补「无磁盘目录仍有内置 `/review`」与「磁盘同名覆盖内置」。
-15. 仓库自带的 `.agents/commands/review.md` **保留**（同名优先级更高，本地仍可随手改）；`CHANGELOG.md` 记
-    「新增内置提示词命令」与「`commands` 响应的 `source` 增加 `builtin`」。
+15. 仓库自带的 `.agents/commands/review.md` 随后删掉了（正文与内置逐字一致，留着只是同一份真身的拷贝）：
+    `/review` 走内置版、来源标 `builtin`，需要项目定制时改用设置页新建同名命令压过它；
+    `CHANGELOG.md` 记「新增内置提示词命令」与「`commands` 响应的 `source` 增加 `builtin`」。
 
 ## 四、批次二方案（附件内联 + 编辑态复用编辑器）
 

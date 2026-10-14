@@ -1383,6 +1383,13 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   技能 / 命令 / 角色的来源标注与同名优先级随之出错（开发布局 `.tmp/.ucode` 下必现）。
   现在解析项目配置目录与资产目录时排除 `$APP_HOME` 自身，并对同一目录去重。
 
+### 移除
+
+- **仓库不再自带 `.agents/commands/review.md`**：它与内置 `/review` 的正文逐字一致
+  （`server/src/harness/plugins/builtin/prompts.ts`），留着只是同一份真身的第二份拷贝；
+  删掉后 `/review` 走内置版，来源由 `agents-project` 变为 `builtin`（设置页里相应只读）。
+  需要项目定制时改用设置页新建同名命令（全局或项目档），同名会压过内置版。
+
 ## [0.2.0] - 2026-09-29
 
 ### 新增
