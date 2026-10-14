@@ -99,6 +99,12 @@ const listMarkdownFiles = (dir: string, depth = 0): string[] => {
 };
 
 /**
+ * 清单里的组件路径统一按 `/` 解析：`\` 也当分隔符看（与解包时的归档条目名同口径），
+ * 于是 Windows 作者写的 `.\hooks\x.sh` 与 `./hooks/x.sh` 等价。
+ */
+const toPosixComponentPath = (raw: string): string => raw.replace(/\\/g, "/");
+
+/**
  * 组件路径的硬校验：`./` 前缀、落在插件根内、符号链接不逃出根。
  * 越界抛 `plugin_component_invalid`——显式安装时直接失败，发现路径上由调用方收敛成诊断。
  */
@@ -106,7 +112,7 @@ export const assertComponentPath = (root: string, raw: string, allowRoot = false
   const invalid = (message: string): AppError =>
     new AppError(ERROR_CODES.pluginComponentInvalid, message, 400, undefined, { path: raw });
 
-  const trimmed = raw.trim();
+  const trimmed = toPosixComponentPath(raw.trim());
   if (allowRoot && (trimmed === "." || trimmed === "./")) return root;
   if (!trimmed.startsWith("./")) throw invalid(`组件路径需以 "./" 开头：${raw}`);
 

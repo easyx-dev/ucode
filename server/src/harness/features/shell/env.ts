@@ -32,15 +32,19 @@ export const withNonInteractiveEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 /**
  * 把插件 `bin/` 目录追加到 PATH 末尾：只影响这条命令的环境，不动服务进程。
  * 追加而非前置，系统命令与用户自己的 PATH 顺序都不受扰动。
+ *
+ * 键名按实际大小写找：Windows 上环境块的键通常是 `Path`，而这里拿到的是展开过的普通对象，
+ * 直接读 `env.PATH` 会取不到、反而再写出一个 `PATH` 键，子进程的 PATH 可能被截成只剩插件目录。
  */
 export const withPluginPath = (
   env: NodeJS.ProcessEnv,
   dirs: readonly string[],
 ): NodeJS.ProcessEnv => {
   if (dirs.length === 0) return env;
-  const current = env.PATH ?? "";
+  const key = Object.keys(env).find((name) => name.toLowerCase() === "path") ?? "PATH";
   const appended = dirs.join(delimiter);
-  return { ...env, PATH: current ? `${current}${delimiter}${appended}` : appended };
+  const current = env[key] ?? "";
+  return { ...env, [key]: current ? `${current}${delimiter}${appended}` : appended };
 };
 
 /** spawn 钩子：命令执行前合并非交互环境，并追加插件 bin 目录 */

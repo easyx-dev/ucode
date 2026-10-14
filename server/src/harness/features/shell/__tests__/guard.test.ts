@@ -36,7 +36,7 @@ describe("withShellGuard", () => {
     );
 
     await assert.rejects(
-      operations.exec("git rebase --continue", "/tmp", {
+      operations.exec("git rebase --continue", tmpdir(), {
         onData: (data) => chunks.push(data.toString()),
         env: {},
       }),
@@ -63,7 +63,7 @@ describe("withShellGuard", () => {
     );
     const chunks: string[] = [];
 
-    const result = await operations.exec("build", "/tmp", {
+    const result = await operations.exec("build", tmpdir(), {
       onData: (data) => chunks.push(data.toString()),
       env: {},
     });
@@ -79,7 +79,7 @@ describe("withShellGuard", () => {
       defaultTimeoutSeconds: 7,
     });
 
-    const pending = operations.exec("sleep 1", "/tmp", {
+    const pending = operations.exec("sleep 1", tmpdir(), {
       onData: () => {},
       env: {},
       signal: controller.signal,
@@ -102,7 +102,7 @@ describe("withShellGuard", () => {
       { idlenessMs: 30, defaultTimeoutSeconds: 7 },
     );
 
-    const pending = operations.exec("sleep 1", "/tmp", {
+    const pending = operations.exec("sleep 1", tmpdir(), {
       onData: () => {},
       env: {},
       signal: controller.signal,
@@ -124,7 +124,7 @@ describe("withShellGuard", () => {
       GUARD,
     );
 
-    await operations.exec("ls", "/tmp", { onData: () => {}, env: {}, timeout: 1 });
+    await operations.exec("ls", tmpdir(), { onData: () => {}, env: {}, timeout: 1 });
 
     assert.equal(seenTimeout, 1);
   });

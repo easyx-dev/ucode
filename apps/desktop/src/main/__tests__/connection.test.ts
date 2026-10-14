@@ -46,6 +46,10 @@ test("resolveHomeDir：`~` 展开为用户主目录（.env.prod 写的就是这�
   assert.ok(!resolveHomeDir(withTilde).includes("/~/"), "不应把 `~` 当普通目录名");
 });
 
+test("resolveHomeDir：Windows 习惯的 `~\\` 与 `~/` 等价", () => {
+  assert.equal(resolveHomeDir(`~\\${appHomeDirname}`), resolve(homedir(), appHomeDirname));
+});
+
 test("envFileName：生产读 .env.prod，其余读 .env", () => {
   const original = process.env.NODE_ENV;
   try {

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
+import { delimiter } from "node:path";
 import { describe, it } from "node:test";
 
 import { createLocalBashOperations } from "@earendil-works/pi-coding-agent";
@@ -67,9 +68,19 @@ describe("withNonInteractiveEnv", () => {
 
 describe("withPluginPath", () => {
   it("把插件 bin 目录追加到 PATH 末尾，不遮蔽系统命令", () => {
-    const merged = withPluginPath({ PATH: "/usr/bin:/bin" }, ["/plugins/a/bin", "/plugins/b/bin"]);
-    assert.equal(merged.PATH?.split(":").slice(0, 2).join(":"), "/usr/bin:/bin");
-    assert.ok(merged.PATH?.endsWith("/plugins/a/bin:/plugins/b/bin"));
+    const original = ["/usr/bin", "/bin"].join(delimiter);
+    const merged = withPluginPath({ PATH: original }, ["/plugins/a/bin", "/plugins/b/bin"]);
+
+    assert.ok(merged.PATH?.startsWith(`${original}${delimiter}`));
+    assert.ok(merged.PATH?.endsWith(["/plugins/a/bin", "/plugins/b/bin"].join(delimiter)));
+  });
+
+  it("PATH 键按实际大小写找：Windows 的环境块写的是 `Path`", () => {
+    // 直接读 env.PATH 会取不到，于是另写一个 `PATH` 键出来，子进程的 PATH 可能被截成只剩插件目录
+    const merged = withPluginPath({ Path: "/usr/bin" }, ["/plugins/a/bin"]);
+
+    assert.equal(Object.hasOwn(merged, "PATH"), false);
+    assert.equal(merged.Path, `/usr/bin${delimiter}/plugins/a/bin`);
   });
 
   it("没有目录时原样返回；PATH 缺失时只放插件目录", () => {

@@ -47,7 +47,9 @@ if (repoRoot) {
 export const resolveHomeDir = (value = process.env.APP_HOME): string => {
   const raw = value?.trim();
   if (!raw) return resolve(homedir(), appHomeDirname);
-  const expanded = raw.startsWith("~/") ? resolve(homedir(), raw.slice(2)) : raw;
+  // `~\` 与 `~/` 等价（Windows 习惯的写法），分隔符统一按 `/` 解析
+  const homeRelative = raw.startsWith("~/") || raw.startsWith("~\\");
+  const expanded = homeRelative ? resolve(homedir(), raw.slice(2).replace(/\\/g, "/")) : raw;
   const withTilde = raw === "~" ? homedir() : expanded;
   return isAbsolute(withTilde) ? withTilde : resolve(repoRoot ?? process.cwd(), withTilde);
 };

@@ -6,6 +6,9 @@
  * 权限先判定、hook 只做追加。
  */
 
+import { existsSync } from "node:fs";
+import { delimiter, join } from "node:path";
+
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { brand } from "@ucode/brand/values";
 import { execa } from "execa";
@@ -98,6 +101,51 @@ const readOutcome = (
   }
 };
 
+/** 探测结果缓存：一次运行内不会变，而它在每次 hook 调用上都要用（PreToolUse 与工具调用同频，逐个绑定会重复跑） */
+let gitBashPath: string | null | undefined;
+
+/**
+ * Windows 上 Git Bash 的常见位置：`Program Files` 下的标准安装，或在 PATH 上的 Cygwin / MSYS2。
+ * 只做够用的探测，不穷举——本仓库的 `bash` 工具本来就要求装 Git for Windows。
+ */
+const probeGitBash = (): string | null => {
+  const programFiles = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]];
+  for (const dir of programFiles) {
+    if (!dir) continue;
+    const candidate = join(dir, "Git", "bin", "bash.exe");
+    if (existsSync(candidate)) return candidate;
+  }
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, "bash.exe");
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+};
+
+const findGitBash = (): string | null => {
+  if (gitBashPath === undefined) gitBashPath = probeGitBash();
+  return gitBashPath;
+};
+
+/**
+ * hook 命令交给谁执行。
+ *
+ * Claude 生态的 hook 是 `.sh` 脚本加 `$CLAUDE_PLUGIN_ROOT` 这类 POSIX 变量语法，`cmd.exe` 两个都不认，
+ * 所以 Windows 上优先走 Git Bash；找不到才回退到 `shell: true`（即 cmd.exe），此时用 `.cmd` / `.bat`
+ * 写的 hook 仍然可用。
+ */
+const resolveHookInvocation = (
+  command: string,
+): { file: string; args: string[]; shell: boolean } => {
+  if (process.platform === "win32") {
+    const bash = findGitBash();
+    // 不带 shell：命令原样作为一个参数交给 bash -c，不必再跟引号规则搏斗
+    if (bash) return { file: bash, args: ["-c", command], shell: false };
+  }
+  return { file: command, args: [], shell: true };
+};
+
 /**
  * 执行一次 hook。失败一律**不阻断**（除非 exit 2）：hook 是别人的进程，
  * 它自己崩掉不该把用户这一轮卡死；超时同理。
@@ -106,8 +154,9 @@ export const runPluginHook = async (
   binding: PluginHookBinding,
   payload: PluginHookPayload,
 ): Promise<PluginHookOutcome> => {
-  const result = await execa(binding.command, {
-    shell: true,
+  const invocation = resolveHookInvocation(binding.command);
+  const result = await execa(invocation.file, invocation.args, {
+    shell: invocation.shell,
     input: `${JSON.stringify(payload)}\n`,
     timeout: binding.timeoutMs,
     reject: false,
@@ -145,6 +194,17 @@ export const runPluginHook = async (
     };
   }
 
+  // hook 没按预期生效时，原因多半在 stderr 里：摘要只给结论，细节留日志（界面上不刷屏）
+  if (result.exitCode !== 0) {
+    logger.warn(
+      {
+        command: binding.command,
+        exitCode: result.exitCode,
+        stderr: stderr.trim().slice(-500),
+      },
+      "插件 hook 非零退出（不阻断）",
+    );
+  }
   const notice = result.exitCode !== 0 ? `非零退出（${result.exitCode}），不阻断` : "通过";
   return {
     blocked: false,

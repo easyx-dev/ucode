@@ -164,7 +164,8 @@ describe("组件路径规则", () => {
     assert.ok(load.diagnostics.every((item) => item.level === "error"));
   });
 
-  it("经符号链接逃出插件根时同样拒绝", () => {
+  // Windows 上建符号链接需要开发者模式或管理员权限，跳过（实现分支本身与平台无关）
+  it("经符号链接逃出插件根时同样拒绝", { skip: process.platform === "win32" }, () => {
     const root = makePlugin();
     const outside = mkdtempSync(join(tmpdir(), "outside-"));
     created.push(outside);
@@ -176,6 +177,15 @@ describe("组件路径规则", () => {
     const load = loadPluginManifest(root);
     assert.deepEqual(load.components, []);
     assert.match(load.diagnostics[0]?.message ?? "", /符号链接越出插件根/);
+  });
+
+  it("组件路径接受 Windows 写法：`.\\` 与前导 `./` 等价", () => {
+    const root = makePlugin();
+    writeSkill(root, "review");
+    writeManifest(root, { name: "my-plugin", skills: [".\\skills\\review"] });
+
+    const load = loadPluginManifest(root);
+    assert.deepEqual(groupsOf(load.components, "skills"), ["review"]);
   });
 
   it("skills 声明直接指向某个技能目录时按单个技能收", () => {

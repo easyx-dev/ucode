@@ -321,7 +321,12 @@ describe("git 底座与解析", { skip: !GIT_AVAILABLE }, () => {
  * execa 的 `reject: false` 会把「命令不存在」也落成 result，判定错就会退化成 `git_failed`。
  */
 describe("git 底座 · 找不到 git", () => {
-  it("报 git_unavailable 而不是 git_failed", async () => {
+  it("报 git_unavailable 而不是 git_failed", async (t) => {
+    // Windows 上清空 PATH 不足以让 spawn 找不到 git（还会在应用目录等位置搜索）
+    if (process.platform === "win32") {
+      t.skip("Windows 的 spawn 搜索路径不只依赖 PATH");
+      return;
+    }
     const originalPath = process.env.PATH;
     process.env.PATH = join(tmpdir(), "no-git-bin");
     try {

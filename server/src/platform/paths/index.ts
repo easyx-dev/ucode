@@ -25,10 +25,15 @@ export const ancestorDirs = (cwd: string, stopAt: readonly string[] = []): strin
   return dirs;
 };
 
-/** 展开开头的 `~`；只处理 `~` 与 `~/`，`~user` 交给 realpath 报「不存在」 */
+/**
+ * 展开开头的 `~`；只处理 `~` 与 `~/`（Windows 习惯的 `~\` 同样认），`~user` 交给 realpath 报「不存在」。
+ * 分隔符统一按 `/` 解析，两平台同一口径。
+ */
 export const expandHome = (input: string): string => {
   if (input === "~") return homedir();
-  if (input.startsWith("~/")) return resolve(homedir(), input.slice(2));
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
+    return resolve(homedir(), input.slice(2).replace(/\\/g, "/"));
+  }
   return input;
 };
 

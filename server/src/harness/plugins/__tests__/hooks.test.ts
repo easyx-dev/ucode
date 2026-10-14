@@ -11,6 +11,13 @@ import { PLUGIN_VARIABLE_PREFIX } from "../variables";
 
 const created: string[] = [];
 
+/**
+ * 下面两个套件里的用例真跑 `.sh` 脚本：Windows 上没有 Git Bash 时 hook 会落到 `cmd.exe`，
+ * POSIX 语法（`read -r`、`$VAR`）跑不起来（有 Git Bash 时走 bash，见 `resolveHookInvocation`）——
+ * 那是环境差异，不是实现差异。
+ */
+const SKIP_WITHOUT_POSIX_SHELL = process.platform === "win32";
+
 const makeScript = (body: string): string => {
   const dir = mkdtempSync(join(tmpdir(), "plugin-hook-"));
   created.push(dir);
@@ -188,7 +195,7 @@ describe("matchesToolName", () => {
   });
 });
 
-describe("runPluginHook", () => {
+describe("runPluginHook", { skip: SKIP_WITHOUT_POSIX_SHELL }, () => {
   const payload = {
     hook_event_name: "PreToolUse" as const,
     cwd: "/tmp/project",
@@ -245,7 +252,7 @@ describe("runPluginHook", () => {
   });
 });
 
-describe("createPluginHooksExtension", () => {
+describe("createPluginHooksExtension", { skip: SKIP_WITHOUT_POSIX_SHELL }, () => {
   const collectHandlers = (bindings: PluginHookBinding[], cwd = "/tmp/project") => {
     const handlers = new Map<string, (event: never) => unknown>();
     const pi = {
