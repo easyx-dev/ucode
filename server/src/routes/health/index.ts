@@ -2,6 +2,7 @@
 import type { HealthMinimalResponse } from "@ucode/contracts";
 import { Hono } from "hono";
 
+import { instanceId } from "../../platform/instance";
 import { ok } from "../../platform/response";
 import { serviceVersion } from "../../platform/version";
 
@@ -9,7 +10,7 @@ export const createHealthRoute = () => {
   const router = new Hono();
 
   router.get("/", (c) =>
-    c.json(ok({ up: true, version: serviceVersion } satisfies HealthMinimalResponse)),
+    c.json(ok({ up: true, version: serviceVersion, instanceId } satisfies HealthMinimalResponse)),
   );
 
   return router;

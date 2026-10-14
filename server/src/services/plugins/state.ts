@@ -2,7 +2,8 @@
  * plugins.json 的读写：登记表与市场状态的唯一出口。
  *
  * 文件缺失时按初始状态建立（含内置市场）；解析失败直接报 `invalid_config`——这是我们自己写的
- * 状态文件，坏了就是坏了，不做静默丢弃。写入走「临时文件 + 重命名」，权限 0600（里面有 `userConfig` 的值）。
+ * 状态文件，坏了就是坏了，不做静默丢弃。写入走「临时文件 + 重命名」，权限收紧到仅属主可读写
+ * （里面有 `userConfig` 的值）。
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -17,6 +18,7 @@ import {
   pluginStateSchema,
   withBuiltinMarketplaces,
 } from "../../harness/plugins/state";
+import { hardenOwnerOnly, OWNER_ONLY_MODE } from "../../platform/file-permissions";
 import { AppError } from "../../platform/response";
 
 export class PluginStateStore {
@@ -51,8 +53,12 @@ export class PluginStateStore {
     const parsed = pluginStateSchema.parse(next);
     mkdirSync(dirname(this.path), { recursive: true });
     const tmp = `${this.path}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: OWNER_ONLY_MODE,
+    });
     renameSync(tmp, this.path);
+    hardenOwnerOnly(this.path);
     this.state = parsed;
     return parsed;
   }

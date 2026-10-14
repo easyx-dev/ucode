@@ -3,18 +3,24 @@
  *
  * 生产入口：`pnpm start` 跑的就是本文件经 esbuild 打成的 `dist/` 产物；
  * 开发走 `server/src/main.ts`（tsx watch），不经这里。
- * 参数也面向「用自己开发自己」：`--restart` 按注册文件的 pid 结束旧实例再启动，
+ * 参数也面向「用自己开发自己」：`--restart` 先核对注册文件里的 pid 确实还在监听那个端口（见
+ * `isRegisteredInstance`），再结束它，然后启动新实例；
  * 让服务生命周期由手动控制，避免开发环境 watch 重启打断正在进行的会话。
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import { brand } from "@ucode/brand/values";
 
+import { matchesInstance } from "./platform/instance";
 import { resourceRoot } from "./platform/resources";
-import { readServiceRegistration } from "./platform/service-registration";
+import {
+  readServiceRegistration,
+  type ServiceRegistration,
+  toUrlHost,
+} from "./platform/service-registration";
 
 const HELP = `用法：${brand.name} [选项]
 
@@ -25,6 +31,9 @@ const HELP = `用法：${brand.name} [选项]
   --status        仅查询是否在运行，不启动（运行中退出码 0，否则 1）
   --version       打印版本
   -h, --help      打印帮助`;
+
+/** 核对实例身份的超时：服务在跑就立即回，逾期说明端口上不是它 */
+const INSTANCE_PROBE_TIMEOUT_MS = 1500;
 
 const readVersion = (): string => {
   try {
@@ -48,17 +57,24 @@ const isAlive = (pid: number): boolean => {
 };
 
 /**
- * pid 是否就是监听在该端口的本服务进程。
- * 崩溃退出会留下陈旧 pid，若恰好被系统复用，仅凭存活判定会误杀无关进程；用「端口归属」核对身份。
- * lsof 找不到匹配时以非零码退出（故用 spawnSync 避免被当成异常）；lsof 自身不可用时退化为存活判定（返回 true）。
+ * 端口上的服务是不是注册文件描述的那个实例。
+ *
+ * 只认服务自己的回答（`GET /api/v1/health` 回报的 `instanceId`）：比核对 pid 更准——pid 会被系统
+ * 复用给无关进程，而崩溃退出留下的陈旧 pid 在 Windows 上尤其常见（`SIGTERM` 不触发优雅退出）；
+ * 也不依赖 `lsof` / `netstat` 这类外部命令，精简的 Linux 环境与 Windows 上都没有这个负担。
+ * 探不到就返回 false（宁可不动：误杀一个无关进程比多留一个旧实例糟得多）。
  */
-const isServicePid = (pid: number, port: number): boolean => {
-  if (process.platform === "win32") return true;
-  const result = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], {
-    encoding: "utf8",
-  });
-  if (result.error) return true;
-  return result.stdout.split("\n").some((line) => Number(line.trim()) === pid);
+const isRegisteredInstance = async (registration: ServiceRegistration): Promise<boolean> => {
+  try {
+    const response = await fetch(
+      `http://${toUrlHost(registration.host)}:${registration.port}/api/v1/health`,
+      { signal: AbortSignal.timeout(INSTANCE_PROBE_TIMEOUT_MS) },
+    );
+    if (!response.ok) return false;
+    return matchesInstance(registration.instanceId, await response.json());
+  } catch {
+    return false;
+  }
 };
 
 /** 等待进程退出；超时返回 false */
@@ -71,14 +87,22 @@ const waitExit = async (pid: number, timeoutMs: number): Promise<boolean> => {
   return !isAlive(pid);
 };
 
-/** 结束注册文件里记录的旧实例；pid 缺失、已死、或与端口不匹配（疑似复用）时跳过 */
+/**
+ * 结束注册文件里记录的旧实例；pid 缺失、已死、或身份核对不过（陈旧 pid / 端口上是别的服务）时跳过。
+ *
+ * 比 `--status` 严：那边只判进程存活（轻量探针，可能把被复用的陈旧 pid 报成「运行中」），
+ * 这里要多一次实例身份核对——结束进程不可逆，宁可留一个旧实例让用户手工处理。
+ */
 const stopRunning = async (servicePath: string): Promise<void> => {
   const registration = readServiceRegistration(servicePath);
   if (!registration || registration.pid === null || !isAlive(registration.pid)) return;
 
   const pid = registration.pid;
-  if (!isServicePid(pid, registration.port)) {
-    console.warn(`pid ${pid} 未监听端口 ${registration.port}，疑似已被复用，跳过结束`);
+  if (!(await isRegisteredInstance(registration))) {
+    console.warn(
+      `pid ${pid} 未确认是本服务的实例（端口 ${registration.port} 上没有回报同一个 instanceId），跳过结束；` +
+        "确认它确实该结束后可手工结束",
+    );
     return;
   }
   console.log(`结束旧实例（pid ${pid}）…`);
@@ -97,10 +121,6 @@ const stopRunning = async (servicePath: string): Promise<void> => {
   }
   await waitExit(pid, 2000);
 };
-
-/** 通配监听地址不可直接访问，展示 / 打开时改用回环 */
-const toDisplayHost = (host: string): string =>
-  host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
 
 const openBrowser = (url: string): void => {
   const [command, args] =
@@ -126,7 +146,9 @@ let parsed: {
 };
 try {
   parsed = parseArgs({
-    args: process.argv.slice(2),
+    // pnpm 会把 `pnpm start -- --restart` 的 `--` 一并传下来（npm 会去掉它）；
+    // 本 CLI 没有位置参数，裸 `--` 一律丢弃，否则文档里的写法会直接报「未知参数」
+    args: process.argv.slice(2).filter((arg) => arg !== "--"),
     options: {
       port: { type: "string" },
       host: { type: "string" },
@@ -165,7 +187,7 @@ if (parsed.status) {
     console.log("未运行");
     process.exit(1);
   }
-  const displayHost = toDisplayHost(env.host);
+  const displayHost = toUrlHost(env.host);
   console.log(`运行中：http://${displayHost}:${registration.port}（pid ${registration.pid}）`);
   process.exit(0);
 }
@@ -174,6 +196,6 @@ if (parsed.restart) await stopRunning(env.servicePath);
 
 const { listening } = await import("./main");
 const port = await listening;
-const url = `http://${toDisplayHost(env.host)}:${port}`;
+const url = `http://${toUrlHost(env.host)}:${port}`;
 console.log(`${brand.name} 已启动：${url}`);
 if (parsed.open) openBrowser(url);

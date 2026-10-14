@@ -24,6 +24,7 @@ const makeApp = () => {
     host: "127.0.0.1",
     port: 19688,
     pid: null,
+    instanceId: null,
     serviceToken: "service-token-value",
     password: "登录密码",
     createdAt: "2026-01-01T00:00:00.000Z",

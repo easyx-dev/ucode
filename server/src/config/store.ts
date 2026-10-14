@@ -14,6 +14,7 @@ import {
 } from "@ucode/contracts";
 
 import { env } from "../env";
+import { hardenOwnerOnly } from "../platform/file-permissions";
 import { AppError } from "../platform/response";
 
 export const emptyConfig = (): AppConfig => ({
@@ -67,6 +68,8 @@ export class ConfigStore {
     const tmp = `${this.path}.tmp`;
     writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
     renameSync(tmp, this.path);
+    // provider 的 apiKey 明文存在这里：权限得跟着文件走，而 Windows 上 chmod 不生效
+    hardenOwnerOnly(this.path);
     this.config = parsed;
     return parsed;
   }

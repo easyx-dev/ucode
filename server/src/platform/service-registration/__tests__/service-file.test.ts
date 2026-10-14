@@ -8,6 +8,7 @@ import {
   createPassword,
   ensureServiceRegistration,
   readServiceRegistration,
+  toUrlHost,
   writeServicePid,
   writeServiceRegistration,
 } from "..";
@@ -41,7 +42,8 @@ describe("service-file", () => {
     assert.equal(registration.pid, null);
     assert.ok(registration.serviceToken.length >= 20);
     assert.match(registration.password, /^(?:[a-z2-9]{4}-){4}[a-z2-9]{4}$/);
-    assert.equal(modeOf(path), 0o600);
+    // Windows 上权限落在 ACL 而不是 mode 上（见 platform/file-permissions）
+    if (process.platform !== "win32") assert.equal(modeOf(path), 0o600);
     assert.deepEqual(readServiceRegistration(path), registration);
   });
 
@@ -58,6 +60,37 @@ describe("service-file", () => {
     assert.equal(second.registration.port, 3000);
     assert.equal(second.registration.pid, 111);
     assert.equal(readServiceRegistration(path)?.pid, 111);
+  });
+
+  it("注册文件带本次启动的实例标识，缺这一项的老文件照样能读", () => {
+    const path = makePath();
+    const { registration } = ensureServiceRegistration({ path, host: "127.0.0.1", port: 2048 });
+    assert.ok(registration.instanceId);
+    assert.equal(readServiceRegistration(path)?.instanceId, registration.instanceId);
+
+    // 老注册文件没有 instanceId：不能判成损坏（那会连凭证一起重新生成、把已配对的客户端踢掉）
+    const legacy: Record<string, unknown> = { ...registration };
+    delete legacy.instanceId;
+    writeFileSync(path, JSON.stringify(legacy), "utf8");
+    assert.equal(readServiceRegistration(path)?.instanceId, null);
+    assert.equal(readServiceRegistration(path)?.serviceToken, registration.serviceToken);
+  });
+
+  it("再次 ensure 不动注册文件里的实例标识：改 host / 端口重起不该把在跑实例的身份换掉", () => {
+    const path = makePath();
+    const { registration } = ensureServiceRegistration({ path, host: "127.0.0.1", port: 2048 });
+    // 模拟「另一个进程还在跑」：文件里记的是它的身份
+    writeServiceRegistration(path, {
+      ...registration,
+      instanceId: "other-instance",
+      host: "127.0.0.1",
+      port: 2048,
+    });
+
+    const again = ensureServiceRegistration({ path, host: "0.0.0.0", port: 2048 });
+
+    assert.equal(again.registration.instanceId, "other-instance");
+    assert.equal(readServiceRegistration(path)?.instanceId, "other-instance");
   });
 
   it("端口回写后可被下次读取复用", () => {
@@ -104,5 +137,17 @@ describe("service-file", () => {
     const b = createPassword();
     assert.notEqual(a, b);
     assert.match(a, /^[a-z2-9-]+$/);
+  });
+});
+
+describe("toUrlHost", () => {
+  it("通配地址改用回环，IPv6 字面量加方括号", () => {
+    assert.equal(toUrlHost("127.0.0.1"), "127.0.0.1");
+    assert.equal(toUrlHost("192.168.1.2"), "192.168.1.2");
+    assert.equal(toUrlHost("0.0.0.0"), "127.0.0.1");
+    assert.equal(toUrlHost("::"), "127.0.0.1");
+    // 不加方括号拼出的 `http://::1:19688` 不是合法 URL，`fetch` 会直接抛错
+    assert.equal(toUrlHost("::1"), "[::1]");
+    assert.equal(toUrlHost("2001:db8::1"), "[2001:db8::1]");
   });
 });

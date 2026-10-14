@@ -52,7 +52,8 @@ describe("PluginStateStore", () => {
     );
     assert.deepEqual(state.installed, []);
     assert.equal(state.revision, 0);
-    assert.equal(statSync(path).mode & 0o777, 0o600);
+    // Windows 上权限落在 ACL 而不是 mode 上（见 platform/file-permissions）
+    if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600);
   });
 
   it("坏状态文件直接报 invalid_config，不静默丢弃", () => {
@@ -89,7 +90,7 @@ describe("PluginStateStore", () => {
 
     assert.equal(next.revision, 1);
     assert.equal(new PluginStateStore(path).load().revision, 1);
-    assert.equal(statSync(path).mode & 0o777, 0o600);
+    if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600);
   });
 
   it("按 id 取登记记录，缺失时抛 plugin_not_found", () => {

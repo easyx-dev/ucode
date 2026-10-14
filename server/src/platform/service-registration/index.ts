@@ -1,17 +1,18 @@
 /**
  * 服务注册文件：`$APP_HOME/app/service.json` 的定位、读写与凭证生成。
  *
- * 文件由服务独占写入、客户端只读，权限固定 `0600`——整份文件的信任根是「只有属主读得到」，
+ * 文件由服务独占写入、客户端只读，权限收紧到「仅属主可读写」——整份文件的信任根就是这一条，
  * 因此 `serviceToken` / `password` 均为明文（同一文件里已含等价的 owner 凭证，再做哈希无收益）。
+ * 两个平台的具体做法见 `platform/file-permissions`。
  * 本模块不读 env，路径由调用方传入，便于单测。
  */
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
 
-/** 注册文件权限：仅属主可读写 */
-const FILE_MODE = 0o600;
+import { hardenOwnerOnly, OWNER_ONLY_MODE } from "../file-permissions";
+import { instanceId } from "../instance";
 
 /** 可读凭证字符集：去掉 0/O/1/l/I 等易混字符，密码要能被人抄写 */
 const PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -30,6 +31,12 @@ const registrationSchema = z.object({
   port: z.number().int().min(0).max(65535),
   /** 服务进程 pid，供 `--restart` 精确结束旧实例；优雅退出时清空，崩溃后为陈旧值 */
   pid: z.number().int().nullable(),
+  /**
+   * 本次启动的实例标识，与 `GET /api/v1/health` 回报的一致。
+   * 可为 null：早期版本的注册文件没有这一项，缺失即视为「无法核对身份」。
+   * 这里**不**覆盖成当前进程的值（见下面的注释），由 `main` 在 listen 成功后写入。
+   */
+  instanceId: z.string().min(1).nullable().default(null),
   /** 本机原生客户端的免交互凭证 */
   serviceToken: z.string().min(1),
   /** 超管密码，明文；供登录页与忘记时回显 */
@@ -71,16 +78,25 @@ export const readServiceRegistration = (path: string): ServiceRegistration | nul
   }
 };
 
-/** 原子写入（临时文件 + rename），并兜底校正权限为 0600 */
+/**
+ * 把注册文件里的监听地址拼成可直接访问的主机：通配地址改用回环（`0.0.0.0` / `::` 不可直接访问），
+ * IPv6 字面量加方括号（`http://::1:19688` 不是合法 URL，`fetch` 会直接抛错、看起来就像「服务不在」）。
+ */
+export const toUrlHost = (host: string): string => {
+  const target = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+  return target.includes(":") ? `[${target}]` : target;
+};
+
+/** 原子写入（临时文件 + rename），再收紧权限：Windows 上靠 `mode` / `chmod` 拿不到「仅属主可读」 */
 export const writeServiceRegistration = (path: string, registration: ServiceRegistration): void => {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(registration, null, 2)}\n`, {
     encoding: "utf8",
-    mode: FILE_MODE,
+    mode: OWNER_ONLY_MODE,
   });
   renameSync(temporary, path);
-  chmodSync(path, FILE_MODE);
+  hardenOwnerOnly(path);
 };
 
 export type EnsureOptions = {
@@ -110,8 +126,10 @@ export const ensureServiceRegistration = (
     host: options.host,
     port: options.port,
     pid: null,
+    instanceId,
   };
-  // 不动 pid：绑定失败（如端口占用）时注册文件里的旧实例 pid 必须保持不变
+  // 不动 pid、不动 instanceId：绑定失败（如端口占用、改了 host 后重起）时注册文件里的旧实例信息
+  // 必须保持不变，否则会把正在运行的实例的身份改成即将退出的本进程的，让它的 `--restart` 永远核对不上
   const registration: ServiceRegistration = {
     ...base,
     host: options.host,

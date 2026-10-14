@@ -9,6 +9,8 @@ export type HealthMinimalResponse = {
   up: boolean;
   /** 服务端版本（根 package.json 的 version） */
   version: string;
+  /** 本次启动的实例标识：CLI 据此核对端口上的服务是不是注册文件描述的那个进程 */
+  instanceId: string;
 };
 
 /**

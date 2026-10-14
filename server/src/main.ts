@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 
 import { createApp, webBuildExists } from "./app";
 import { env } from "./env";
+import { instanceId } from "./platform/instance";
 import { logger } from "./platform/logger";
 import {
   ensureServiceRegistration,
@@ -37,6 +38,8 @@ const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (
   // 否则会把正在运行实例的 pid 覆盖成即将退出的本进程
   registration.port = info.port;
   registration.pid = process.pid;
+  // 本进程的身份在这里才定：ensure 阶段写它会在绑定失败时改掉在跑实例的标识（见 service-registration）
+  registration.instanceId = instanceId;
   writeServiceRegistration(env.servicePath, registration);
   resolveListening(info.port);
   const status = services.runtime.getStatus();
