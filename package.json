@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "check": "biome check . && pnpm -r typecheck && pnpm -r test && tsx scripts/verify/index.ts",
+    "check:fast": "tsx scripts/check-fast.ts",
     "verify": "tsx scripts/verify/index.ts",
     "brand:replace": "node packages/brand/scripts/replace.ts",
     "format": "biome format --write .",

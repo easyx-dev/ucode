@@ -106,16 +106,17 @@
 | [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、分层依赖方向（layers）、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、分层依赖方向（layers）、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本、变更日志的规模与结构），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍：本机只有一个平台，跟平台相关的回归靠它兜住 |
+| `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍：本机只有一个平台，跟平台相关的回归靠它兜住 |
+| `pnpm check:fast` | 中途收窄：只查工作区改动的文件（biome）+ 全部包 typecheck + 约定校验，跳过测试（约 11 秒，全量约 22 秒） |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
-| `pnpm verify` | 只跑约定校验（`scripts/verify/index.ts`：migrations / contracts / api-docs / tokens / brand / i18n / manifest） |
+| `pnpm verify` | 只跑约定校验（各项见 `scripts/verify/checks/`；可 `--only` 只跑指定项） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web` / `apps/desktop`） |
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
 | `pnpm start` | `node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
@@ -149,9 +150,11 @@
 是唯一的验证数据目录。需要生产数据（会话、配置、插件）时，把要用的文件从生产目录
 **拷一份**到 `.tmp/` 再用，不就地读写。
 
-`pnpm check` 是提交前的强制入口，一轮里只跑一次：它要把 biome / typecheck / test / verify 全跑一遍，
-在一轮里反复全量跑会直接排进会话耗时前排（实测一轮里 102 步、8.8 分钟）。要收窄范围用 `--filter`
-（如 `pnpm -F @ucode/server typecheck`），改完一批再统一跑。
+`pnpm check` 全量一趟约 22 秒（测试 11、全仓 typecheck 9、biome 与 verify 各 1），一轮里只跑一次、放在最后一次
+代码改动之后；中途要看有没有低级错误用 `pnpm check:fast`（跳过测试），只改了文档就直接
+`pnpm exec biome check <文件>`。在一轮里反复全量跑会直接排进会话耗时前排（实测一轮里 102 步、8.8 分钟）。
+
+`pnpm verify` 可只跑指定项：`pnpm verify -- --only changelog,i18n`（全量在 1 秒级，收窄是为了少看无关输出）。
 
 单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
 （如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
