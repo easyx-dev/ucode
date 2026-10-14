@@ -4,7 +4,7 @@
  */
 import { type GoalPromptDetails, PLAN_APPROVED_CUSTOM_TYPE } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
-import { DividerLine } from "../../../base/divider-line";
+import { DividerLine } from "./divider-line";
 
 type InjectedLineProps = {
   /** 注入条目的 customType：决定文案口径 */

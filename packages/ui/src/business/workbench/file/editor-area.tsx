@@ -6,12 +6,12 @@
  */
 import { FilePlus2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Empty } from "../../../base/empty";
 import { useWorkbench } from "../../../provider/workbench";
 import { ChangesStack } from "../git/changes-stack";
 import { GitFileDiff } from "../git/git-file-diff";
 import { CommitDetail } from "../git/git-history";
 import type { GitReview } from "../git/use-git-review";
-import { PanelEmpty } from "../panel-empty";
 import { EditorTabs } from "./editor-tabs";
 import { FileContent } from "./file-content";
 
@@ -26,7 +26,8 @@ export function EditorArea({ review, onBack }: { review: GitReview; onBack?: () 
     <div className="flex h-full min-h-0 w-full flex-col">
       <EditorTabs onBack={onBack} />
       {doc === null ? (
-        <PanelEmpty
+        <Empty
+          className="h-full"
           icon={<FilePlus2 className="size-7" />}
           title={t("打开文件")}
           hint={t("在左侧项目树里选一个文件")}

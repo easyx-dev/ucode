@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../base/badge";
 import { Button } from "../../../base/button";
+import { useCopyFeedback } from "../../../base/copy-action";
+import { Empty } from "../../../base/empty";
 import { Input } from "../../../base/input";
 import { Label } from "../../../base/label";
 import { SegmentedControl, type SegmentedOption } from "../../../base/segmented-control";
@@ -13,7 +15,6 @@ import { Spinner } from "../../../base/spinner";
 import { useAuth } from "../../../hooks/use-auth";
 import { useErrorText } from "../../../hooks/use-error-text";
 import { useClient } from "../../../provider";
-import { copyText } from "../../../utils/clipboard";
 import { SettingsSectionHeader } from "../settings-page";
 import { SettingsGroup, SettingsRow } from "../settings-row";
 import { type RemoteAccess, useRemoteAccess } from "./use-remote-access";
@@ -75,14 +76,15 @@ function PairingPanel({
 }) {
   const { t } = useTranslation();
   const remaining = useCountdown(pairing?.expiresAt);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy, reset } = useCopyFeedback();
 
-  useEffect(() => setCopied(false), [pairing?.code]);
+  // 换一条配对链接时立刻清掉上一个的「已复制」：那是另一条链接的反馈
+  useEffect(() => reset(), [pairing?.code, reset]);
 
-  const copy = (): void => {
+  const copyUrl = (): void => {
     if (!pairing) return;
     // 局域网明文 HTTP 是非安全上下文（没有 `navigator.clipboard`），这里靠 utils/clipboard 的兜底能照样复制
-    void copyText(pairing.url).then((ok) => setCopied(ok));
+    copy(pairing.url);
   };
 
   return (
@@ -98,7 +100,7 @@ function PairingPanel({
             <PairingQrCode url={pairing.url} />
             <div className="flex items-center gap-2">
               <Input readOnly value={pairing.url} className="font-mono text-xs" />
-              <Button variant="outline" size="icon-sm" aria-label={t("复制链接")} onClick={copy}>
+              <Button variant="outline" size="icon-sm" aria-label={t("复制链接")} onClick={copyUrl}>
                 {copied ? (
                   <Check className="size-icon-base" />
                 ) : (
@@ -146,9 +148,7 @@ function SessionList({
         meta={t("{{count}} 个", { count: sessions.length })}
       />
       {sessions.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
-          {t("暂无活动会话")}
-        </p>
+        <Empty className="rounded-xl border border-dashed px-4 py-6" title={t("暂无活动会话")} />
       ) : (
         <SettingsGroup>
           {sessions.map((session) => (

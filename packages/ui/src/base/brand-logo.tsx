@@ -15,12 +15,12 @@ export function BrandLogo({ className }: BrandAssetProps) {
       <img
         src={brandAssets.logoLight}
         alt=""
-        className={cn("shrink-0 object-contain", className, "dark:hidden")}
+        className={cn("shrink-0 object-contain dark:hidden", className)}
       />
       <img
         src={brandAssets.logoDark}
         alt=""
-        className={cn("hidden shrink-0 object-contain", className, "dark:block")}
+        className={cn("hidden shrink-0 object-contain dark:block", className)}
       />
     </>
   );
@@ -36,12 +36,12 @@ export function BrandWordmark({ className }: BrandAssetProps) {
       <img
         src={brandAssets.wordmarkLight}
         alt=""
-        className={cn("shrink-0 object-contain", className, "dark:hidden")}
+        className={cn("shrink-0 object-contain dark:hidden", className)}
       />
       <img
         src={brandAssets.wordmarkDark}
         alt=""
-        className={cn("hidden shrink-0 object-contain", className, "dark:block")}
+        className={cn("hidden shrink-0 object-contain dark:block", className)}
       />
     </>
   );

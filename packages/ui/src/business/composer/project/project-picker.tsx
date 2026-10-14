@@ -3,7 +3,7 @@
  *
  * 列表直接用项目登记表（行随会话创建自动登记、带展示名），不再从会话列表派生一份。
  */
-import { ChevronDown, Folder, FolderOpen, Search, Sparkles } from "lucide-react";
+import { ChevronDown, Folder, FolderOpen, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../../base/dropdown-menu";
+import { InputSearch } from "../../../base/input";
 import { useProjects } from "../../../hooks/store/use-projects";
 import type { ProjectSummary } from "../../../types";
 import { abbreviateHome, baseName, dirName } from "../../../utils/path";
@@ -87,13 +88,12 @@ export function ProjectPicker({ name, path, onSelect }: ProjectPickerProps) {
         <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-80 rounded-xl">
-        <div className="relative p-1">
-          <Search className="absolute top-1/2 left-3.5 size-icon-base -translate-y-1/2 text-foreground-subtle" />
-          <input
+        <div className="p-1">
+          <InputSearch
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("搜索工作区")}
-            className="h-11 w-full bg-transparent pr-2 pl-9 text-sm outline-none placeholder:text-foreground-subtle"
+            className="h-11 border-0 bg-transparent pl-9"
             // 菜单会拦方向键与字符键做导航，输入框必须把它们留在自己这里
             onKeyDown={(event) => event.stopPropagation()}
           />

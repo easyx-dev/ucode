@@ -1,14 +1,13 @@
 /**
  * 对话里的「细线」分隔行：一条压暗的横线 + 文案（可带右侧补充），需要时点开看展开内容。
  *
- * 上下文压缩、目标完成、合成输入三处共用同一形态——它们都不是回答，只是历史里的一个事实，
- * 铺成正常消息会被当成一轮对话读。
+ * 上下文压缩、合成输入、失败重试、目标完成与目标轮次都用它——它们都不是回答，只是历史里的一个事实，
+ * 铺成正常消息会被当成一轮对话读。语义属于消息流，故不进 `base/`，由目标栏的展示件从这里借。
  */
 import { cn } from "cn";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 
 type DividerLineProps = {
   /** 行文案，如「对话已压缩」 */
@@ -19,10 +18,17 @@ type DividerLineProps = {
   children?: ReactNode;
   /** 展开内容默认是否打开 */
   defaultOpen?: boolean;
+  /** 外层类名（如段落间距） */
+  className?: string;
 };
 
-export function DividerLine({ label, detail, children, defaultOpen = false }: DividerLineProps) {
-  const { t } = useTranslation();
+export function DividerLine({
+  className,
+  defaultOpen = false,
+  detail,
+  label,
+  children,
+}: DividerLineProps) {
   const [open, setOpen] = useState(defaultOpen);
   const expandable = children !== undefined;
 
@@ -41,12 +47,11 @@ export function DividerLine({ label, detail, children, defaultOpen = false }: Di
   );
 
   return (
-    <div className="text-xs text-foreground-subtle">
+    <div className={cn("text-xs text-foreground-subtle", className)}>
       {expandable ? (
         <button
           type="button"
-          className="group flex w-full items-center gap-3 focus-visible:outline-none"
-          title={open ? t("收起") : t("展开")}
+          className="group flex w-full items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
         >

@@ -195,11 +195,12 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
   即弹层真正卸载那一刻——早了它自己的 FocusScope 还开着焦点陷阱，聚焦弹层外会被 `focusin` 拉回去。
   点在别处不插手，焦点跟 Radix 默认口径走（模态下拉关闭时会把焦点收给触发钮）。输入区传的就是 `focusEditor`。
 - 模式 / 权限 / 思考三个选择器都用菜单的 radio 组（选型见 `components.md`），弹层开在触发钮上方（`side="top"`）；
-  带副标题的模式 / 权限固定 `w-72`，只有档位名的思考收到 `w-40`。模型选择器不在这条口径里：它要按 provider 分组 + 搜索，
+  带副标题的模式 / 权限固定 `w-72`，只有档位名的思考收到 `w-40`。模型选择器不在这条口径里：它要按 provider 分组，
   用 Popover 列表（`w-80`），只有触发钮与另三个同形（`PICKER_TRIGGER_CLASS`）。
 - 选择器的选项行：图标占一列（`items-start`），标题与副标题都从图标之后起排，间距 `gap-1.5` / `gap-1`；
   带副标题的行 `py-2`，只有标题的行 `py-1.5`；选中打勾跟着标题行走（单行 `items-center`、带副标题 `items-start`）。
-- 项目弹层取「搜索行 + 单行条目」：面板 `rounded-xl`；搜索行 `h-11`（图标 `left-3.5 size-icon-base`、输入 `pl-9 text-sm`）；
+- 项目弹层取「搜索行 + 单行条目」：面板 `rounded-xl`；搜索行 `h-11`（搜索行一律用 `base/input` 的 `InputSearch`：
+  放大镜固定在 `left-2 size-icon-sm`，输入 `pl-9`）；
   条目行 `px-2 py-3` + `gap-2.5`；名称重名的才在名字后补父目录名，全路径落在条目的 `title`。
 
 ## Markdown 渲染
@@ -217,7 +218,8 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
   （列多时靠卡片自己横向滚，不把内容挤成竖条）；宽表仍然只滚表格自身。
   streamdown 默认那层「卡片 + 独立滚动容器」已由 `business/markdown-table.tsx` 整份替换，不要把它加回来。
 - 表格操作区：排在卡片**上方**、右对齐的一行（`min-h-7` 常驻占位，悬停或键盘聚焦时才现），
-  表格级操作统一加在这里（`business/markdown-table.tsx`，按钮取 `ToolbarIconButton` + `Tooltip`），不再盖在表格右上角。
+  表格级操作统一加在这里（`business/markdown/table/markdown-table.tsx`，按钮取 `IconButton`，`label` 兼作悬停说明），
+  不再盖在表格右上角。
   当前四项：自动换行（开关，`aria-pressed` + 按下态底色，偏好落 localStorage 见 `business/markdown/table-prefs.ts`——
   对话列表是虚拟滚动的，只存在组件里的开关滚出去就没了；这一份偏好**同屏所有表格共用**，
   模块级 store + `useSyncExternalStore`，见 `hooks/use-table-wrap.ts`）、复制为 Markdown、导出 CSV、全屏查看。
@@ -259,7 +261,7 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，条状区高度与列表�
   右侧页面动作（模型页的「添加供应商」）。
 - 正文独立滚动，内容列 `mx-auto w-full max-w-4xl`，左右 `px-6 md:px-8`，底部 `pb-8`。
 - 一页要分段时用 `SettingsSectionHeader`（`text-sm font-medium` 标题 + 计数 `text-foreground-subtle tabular-nums` +
-  右侧区块动作）；列表为空用 `SettingsEmptyState`（虚线框内居中：图标 + 主文案 + 说明 + 一个动作）。
+  右侧区块动作）；列表为空用 `Empty`（`@ucode/ui/base/empty`，虚线框从 `className` 传）。
 
 **卡片与行**（`business/settings/settings-row.tsx`）
 

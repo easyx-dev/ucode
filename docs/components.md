@@ -103,7 +103,8 @@ packages/ui/src/
 | `shell` | composer · session |
 | `markdown` | attachment · dialog |
 | `attachment` | dialog |
-| `dialog` · `goal` · `usage` | 无（只依赖下层） |
+| `dialog` · `usage` | 无（只依赖下层） |
+| `goal` | chat（只取消息流里的展示件，如分隔行；不取投影与数据） |
 | `presets` | 全部 |
 
 每个域都可以依赖 `base` / `utils` / `hooks` / `provider` 与包根的 `types.ts`；
@@ -145,6 +146,8 @@ packages/ui/src/
 - 布尔 prop 用肯定语义（`disabled`、`streaming`、`dense`），不用反义命名
 - 变体用 `cva` 而不是三元堆叠；本项目自己的组件优先 `className` + `cn`，只有真正多变的才上 `cva`
 - 不传「样式开关」类 prop（`hideBorder`、`big`）；需要不同外观就在调用处传 `className` 或拆组件
+- **包裹类关注点**可以由 prop 内聚（`Button` 的 `tooltip`、`CopyAction` 的复制反馈）：它们不改动内容结构，
+  只为内容包一层容器。内容是另一回事——插槽仍走 children，`icon` / `title` 这类 prop 只用来接文案
 
 ## 状态覆盖矩阵
 
@@ -169,7 +172,11 @@ packages/ui/src/
 
 ## 可访问性
 
-- 纯图标按钮必须带 `title` 或 `aria-label`
+- 纯图标按钮一律用 `IconButton`：`label` 同时是 `aria-label` 与悬停说明（一个动作只写一份文案），
+  它已经把 tooltip（含按下态）挂好，不要再手写 `<button>` + `title`。存量还有十几处没迁（会话侧栏的设置、
+  标签条关闭、选择器触发钮、goal 栏、provider 详情等）：改到哪处顺手收哪处，新写的不要再加。
+- `title` 只在截断兜底时用（挂在 `truncate` 的那一层）；讲操作的用 Tooltip，即 `Button` 的 `tooltip` prop。
+  两者并存会让同一颗按钮先后弹两次——Radix 不摘原生 `title`，浏览器灰框约 1 秒后才出
 - 表单控件与 `Label` 关联；同一控件的说明文字用 `aria-describedby`
 - 互斥选项组用原生 `fieldset` + `legend` + `radio`，不能只靠视觉高亮表示选中
 - 装饰性元素（水印、纯装饰图标）加 `aria-hidden`
@@ -183,7 +190,7 @@ packages/ui/src/
 - 需要搜索、分组、带说明的选择用弹出层面板；选项少且无需说明时用普通下拉
 - 互斥选项需要带说明时用 `base/dropdown-menu` 的 radio 组（`PickerOptions`）：`select` 塞不下副标题。
   同一组相邻控件（如输入区工具栏的模型 / 模式 / 权限 / 思考）保持**触发钮**同形，不因某一项没说明就混用两种控件；
-  触发钮同形不等于弹层同形——模型要按 provider 分组 + 搜索，仍用 Popover 列表
+  触发钮同形不等于弹层同形——模型要按 provider 分组，仍用 Popover 列表
 
 ## 弹层的调用方式
 
@@ -236,6 +243,6 @@ packages/ui/src/
 具体写法直接读现有组件即可，下列只是**举例**，不代表必须覆盖的范围：
 
 - 列表行（选中态、相对时间、隐藏式操作）：`business/session/session-list-item.tsx`
-- 弹出层面板（搜索行、分组、条目说明）：`business/composer/model-picker.tsx`
+- 弹出层面板（分组、条目说明）：`business/composer/picker/model-picker.tsx`
 - 分组设置（容器 + 行 + 右侧控件）：`business/settings/settings-row.tsx`
 - 域内的编排与派生（组件 + 私有逻辑 + 私有 hook 同处）：`business/chat/`、`business/workbench/git/`

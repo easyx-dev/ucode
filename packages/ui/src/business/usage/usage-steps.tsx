@@ -7,9 +7,10 @@
  */
 import { useTranslation } from "react-i18next";
 
+import { Empty } from "../../base/empty";
 import type { StatsStepSummary, StepUsageBucket, StepUsageTotals } from "../../types";
 import { formatMs, ratioLabel } from "../../utils/usage-series";
-import { UsageEmpty, UsageSection } from "./usage-section";
+import { UsageSection } from "./usage-section";
 
 function StepCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -77,7 +78,10 @@ export function UsageSteps({ steps }: { steps: StatsStepSummary }) {
       }
     >
       {total.steps === 0 ? (
-        <UsageEmpty text={t("当前区间暂无步级数据")} />
+        <Empty
+          className="rounded-lg border border-dashed border-border px-3 py-6"
+          title={t("当前区间暂无步级数据")}
+        />
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">

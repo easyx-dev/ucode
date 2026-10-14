@@ -8,11 +8,12 @@
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Empty } from "../../base/empty";
 import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
 import type { StepUsageBucket, UsageDayBucket } from "../../types";
 import { formatTokens } from "../../utils/usage";
 import { cacheHitRate, formatMs, ratioLabel } from "../../utils/usage-series";
-import { UsageEmpty, UsageSection } from "./usage-section";
+import { UsageSection } from "./usage-section";
 import { type HoverTip, UsageTip } from "./usage-tip";
 
 /** 折线在视图里的上下留白（百分比），避免描边贴边被裁 */
@@ -185,7 +186,10 @@ export function UsageTrendChart({ daily, steps }: UsageTrendChartProps) {
       }
     >
       {empty || !first || !last ? (
-        <UsageEmpty text={t("当前区间暂无可用量数据")} />
+        <Empty
+          className="rounded-lg border border-dashed border-border px-3 py-6"
+          title={t("当前区间暂无可用量数据")}
+        />
       ) : (
         <>
           {/* biome-ignore lint/a11y/noStaticElementInteractions: 只作鼠标命中区，图表本身是 role="img" */}

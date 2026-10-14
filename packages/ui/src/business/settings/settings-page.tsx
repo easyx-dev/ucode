@@ -1,6 +1,5 @@
-/** 设置页的骨架：页头（标题 / 说明 / 动作 / 保存区）、区块标题与空态 */
+/** 设置页的骨架：页头（标题 / 说明 / 动作 / 保存区）与区块标题 */
 import { cn } from "cn";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 /** 正文内容列：各分区页共用同一宽度，切页时不左右跳；两栏布局的模型设置也按它收口 */
@@ -88,38 +87,6 @@ export function SettingsSectionHeader({
       <h3 className="text-sm font-medium">{title}</h3>
       {meta ? <span className="text-sm text-foreground-subtle tabular-nums">{meta}</span> : null}
       {action ? <div className="ml-auto flex shrink-0 items-center gap-2">{action}</div> : null}
-    </div>
-  );
-}
-
-type SettingsEmptyStateProps = {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  /** 下一步动作：空态必须给一个明确出口 */
-  action?: ReactNode;
-  className?: string;
-};
-
-/** 列表为空时的占位：虚线框内居中给出「这是什么、怎么开始」 */
-export function SettingsEmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-}: SettingsEmptyStateProps) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-9 text-center",
-        className,
-      )}
-    >
-      <Icon className="size-icon-lg text-foreground-subtle" aria-hidden />
-      <p className="text-sm font-medium">{title}</p>
-      <p className="max-w-md text-sm leading-relaxed text-foreground-subtle">{description}</p>
-      {action ? <div className="mt-1 flex items-center gap-2">{action}</div> : null}
     </div>
   );
 }

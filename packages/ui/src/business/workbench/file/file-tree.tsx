@@ -11,15 +11,14 @@
  */
 import type { FsEntry } from "@ucode/contracts";
 import { cn } from "cn";
-import { ChevronRight, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../../base/button";
+import { IconButton } from "../../../base/button";
 import { ContextMenu, ContextMenuTrigger } from "../../../base/context-menu";
-import { Input } from "../../../base/input";
+import { InputSearch } from "../../../base/input";
 import { Spinner } from "../../../base/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../base/tooltip";
 import { useClient } from "../../../provider";
 import { useWorkbench } from "../../../provider/workbench";
 import { fileIconOf } from "../../../utils/file-icons";
@@ -186,29 +185,17 @@ export function FileTree({
     <div className="flex h-full min-h-0 w-full flex-col">
       {/* 与代码管理的头部同高（36px）：切视图时列表不会跳 */}
       <div className="flex h-9 shrink-0 items-center gap-1.5 px-2">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2 size-icon-sm -translate-y-1/2 text-foreground-subtle" />
-          <Input
+        <div className="min-w-0 flex-1">
+          <InputSearch
             value={query}
             placeholder={t("在「{{name}}」中筛选文件", { name: baseName(root) || root })}
-            className="h-6 pl-7 text-xs"
+            className="h-6 text-xs md:text-xs"
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0"
-              title={t("刷新目录")}
-              onClick={() => setTree(emptyTree())}
-            >
-              <RefreshCw className="size-icon-sm" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("刷新目录")}</TooltipContent>
-        </Tooltip>
+        <IconButton label={t("刷新目录")} size="icon-xs" onClick={() => setTree(emptyTree())}>
+          <RefreshCw className="size-icon-sm" />
+        </IconButton>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={t("项目文件")}>

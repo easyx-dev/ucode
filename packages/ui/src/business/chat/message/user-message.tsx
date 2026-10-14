@@ -16,6 +16,7 @@ import { cn } from "cn";
 import { Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "../../../base/button";
 import { CopyAction } from "../../../base/copy-action";
 import { useWorkbench } from "../../../provider/workbench";
 import type { ChatItem, EditMessagePayload, MessageBlock } from "../../../types";
@@ -304,13 +305,13 @@ export function UserMessage({
 function EditAction({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
-    <button
-      type="button"
-      className="shrink-0 rounded-xs p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
-      title={t("编辑并重新发送")}
+    <IconButton
+      className="text-foreground-subtle hover:text-foreground"
+      label={t("编辑并重新发送")}
+      size="icon-xs"
       onClick={onClick}
     >
       <Pencil className="size-icon-sm" />
-    </button>
+    </IconButton>
   );
 }

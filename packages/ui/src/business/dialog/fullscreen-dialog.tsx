@@ -8,8 +8,8 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "../../base/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../base/dialog";
-import { ToolbarIconButton } from "../../base/toolbar-icon-button";
 
 export function FullscreenDialog({
   actions,
@@ -48,9 +48,9 @@ export function FullscreenDialog({
           <div className="min-w-0 truncate font-medium text-sm">{title}</div>
           <div className="flex shrink-0 items-center gap-1">
             {actions}
-            <ToolbarIconButton label={t("关闭预览")} onClick={onClose}>
+            <IconButton label={t("关闭预览")} onClick={onClose}>
               <X />
-            </ToolbarIconButton>
+            </IconButton>
           </div>
         </div>
         {children}

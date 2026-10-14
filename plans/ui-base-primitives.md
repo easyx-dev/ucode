@@ -2,7 +2,8 @@
 
 > 来源：对 `packages/ui/src/base/`（25 个原语）与 `business/**` 重复形态的一次盘点——哪些该抽成原语、
 > 哪些原语本身要改、以及 `title` 的收敛口径。
-> 状态：**待批**（未开工）。本文只记结论与方案，不动代码。
+> 状态：**已落地**（批次 0–6）。`IconButton` / `Empty` / `InputSearch` 已进 `base/`，
+> `base/toolbar-icon-button` 与 `base/divider-line` 已消失，`title` 收敛为「只作截断兜底」。
 > 除特别注明外，路径相对 `packages/ui/src/`；行号取自盘点当时的代码。
 
 ## 一、现状
@@ -86,6 +87,8 @@ export function IconButton({ children, label, pressed, size = "icon-sm", ...prop
   压掉描边，**不加样式开关 prop**。
 - 另外两处是 `Input` + 绝对定位图标：`business/workbench/file/file-tree.tsx:190-198`（h-6 pl-7）、
   `business/settings/models/provider-add-dialog.tsx:47-56`（pl-8）。
+- 落地时：模型选择器的搜索行在另一处改动里被去掉，实际替换 4 处。放大镜固定在 `left-2 size-icon-sm`；
+  紧凑档要连窄屏那档一起覆盖（`text-xs md:text-xs`——`Input` 在窄屏固定 16px 是为了不让 iOS 聚焦时缩放页面）。
 
 ### 3.3 `base/empty.tsx`（新增，唯一净增文件）
 
@@ -110,7 +113,7 @@ type EmptyProps = {
 - 两个外壳：`apps/desktop/src/renderer/components/service-unavailable.tsx`（顺手补上缺失的下一步动作）、
   `apps/web/src/App.tsx:139`。
 
-### 3.4 复制反馈：`hooks/use-copy-feedback.ts`（新增）+ `copy-action` 改造
+### 3.4 复制反馈：`base/copy-action.tsx` 内聚 `useCopyFeedback` + `copy-action` 改造
 
 `COPIED_HINT_MS = 1500` + 定时器复位被抄了 4 份：`base/copy-action.tsx:12-25`、
 `business/chat/copy-transcript-action.tsx:14-31`、`business/markdown/table/markdown-table.tsx:28-66`、
@@ -119,6 +122,9 @@ type EmptyProps = {
 
 `base/copy-action.tsx` 随之改成纯展示：渲染换成 `IconButton`（补上现在缺的 `focus-visible` 焦点环、
 去掉手写的 `<button>`——`copy-action.tsx:28-40` 是原语里第三套手写图标按钮），剪贴板 IO 与状态机移出。
+
+> 落地时：hook 没单独进 `hooks/`，而是内聚在 `base/copy-action.tsx` 并从这里导出——它就是这个原语的内部状态，
+> 另 3 处只是要借这套反馈；放 `hooks/` 会让 `base/` 反向依赖状态层（分层表里没有那条边）。
 
 ### 3.5 `divider-line` 下沉 `business/chat/message/`
 
@@ -170,9 +176,9 @@ type EmptyProps = {
 | --- | --- |
 | 0 · 规范 | `docs/components.md`：① 「组合优先」补例外——包裹类关注点（Tooltip 等）可用 prop 内聚，内容组合仍走 children；② 纯图标按钮一律 `IconButton`（`label` 单源）；③ `title` 只用于截断兜底 |
 | 1 · 按钮族 | `base/button.tsx`（`tooltip` + `IconButton`）、删 `base/toolbar-icon-button.tsx`、§3.1 的调用点迁移、§四 的 `title` 收敛 |
-| 2 · Input 族 | `base/input.tsx`（底座 + `InputSearch`）、`base/textarea.tsx` 复用底座、5 处替换 |
+| 2 · Input 族 | `base/input.tsx`（底座 + `InputSearch`）、`base/textarea.tsx` 复用底座、4 处替换（模型选择器的搜索行已在另一处改动里去掉） |
 | 3 · 空态 | `base/empty.tsx` + §3.3 的替换（含两个外壳） |
-| 4 · 复制 | `hooks/use-copy-feedback.ts`、`base/copy-action.tsx` 改造、另 3 处收敛 |
+| 4 · 复制 | `base/copy-action.tsx`（内聚反馈 hook 并导出）、另 3 处收敛 |
 | 5 · 落位 | `divider-line` → `business/chat/message/` |
 | 6 · 清账 | §3.6 |
 
@@ -182,7 +188,7 @@ type EmptyProps = {
 - **合并成一次**浏览器走查：
   - workbench 悬停一个图标按钮停 1.5 秒，确认不再先后弹两次；
   - 键盘 Tab：`copy-action`、`divider-line` 这两处新补的焦点环可见（本次修的两个 a11y 缺陷）；
-  - 三个弹层内的 `InputSearch`（命令面板 / 项目选择 / 模型选择）与文件树搜索；
+  - `InputSearch`（命令面板 / 项目选择 / 供应商目录）与文件树搜索；模型选择器的那处已随搜索行一起去掉；
   - `Empty` 在明暗两主题下；`disabled` 的「重新读取文件」按钮确认不弹 tooltip（预期行为）。
 - `pnpm build` 会覆写生产产物，走查按 `AGENTS.md`「验证命令」的边界来（`pnpm dev` + `APP_HOME=.tmp/.ucode`）。
 

@@ -6,7 +6,7 @@
 import { ChevronDown, ZoomIn, ZoomOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../base/button";
+import { Button, IconButton } from "../../base/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../base/dropdown-menu";
-import { ToolbarIconButton } from "../../base/toolbar-icon-button";
 import { FullscreenDialog } from "./fullscreen-dialog";
 import { useZoomableViewport, type ZoomableViewport } from "./use-zoom-viewport";
 
@@ -27,9 +26,9 @@ function ZoomToolbar({ viewport }: { viewport: ZoomableViewport }) {
 
   return (
     <>
-      <ToolbarIconButton label={t("缩小")} onClick={() => viewport.zoomBy(0.85)}>
+      <IconButton label={t("缩小")} onClick={() => viewport.zoomBy(0.85)}>
         <ZoomOut />
-      </ToolbarIconButton>
+      </IconButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -54,9 +53,9 @@ function ZoomToolbar({ viewport }: { viewport: ZoomableViewport }) {
           <DropdownMenuItem onSelect={viewport.reset}>{t("重置缩放")}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ToolbarIconButton label={t("放大")} onClick={() => viewport.zoomBy(1.18)}>
+      <IconButton label={t("放大")} onClick={() => viewport.zoomBy(1.18)}>
         <ZoomIn />
-      </ToolbarIconButton>
+      </IconButton>
     </>
   );
 }

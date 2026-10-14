@@ -52,7 +52,11 @@ const renderShell = (content: ReactNode): void => {
 const unavailable = (reason: ServiceUnavailableReason, servicePath: string): ReactNode => (
   <>
     {isFramelessWindow() ? <WindowDragStrip /> : null}
-    <ServiceUnavailable reason={reason} servicePath={servicePath} />
+    <ServiceUnavailable
+      reason={reason}
+      servicePath={servicePath}
+      onRetry={() => void bootstrap()}
+    />
   </>
 );
 

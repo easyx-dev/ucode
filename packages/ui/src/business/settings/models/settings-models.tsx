@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { Spinner } from "../../../base/spinner";
 import type { DraftProvider } from "../config-draft";
 import { SETTINGS_CONTENT_COLUMN, SettingsPageHeader } from "../settings-page";
@@ -39,9 +40,10 @@ function DraftPlaceholder({ loading }: { loading: boolean }) {
     );
   }
   return (
-    <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
-      {t("还没有接入供应商，点右上角「添加供应商」。")}
-    </p>
+    <Empty
+      className="rounded-xl border border-dashed px-4 py-6"
+      title={t("还没有接入供应商，点右上角「添加供应商」。")}
+    />
   );
 }
 

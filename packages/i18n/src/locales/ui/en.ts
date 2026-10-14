@@ -215,8 +215,7 @@ export default {
   "{{n}} 输出": "{{n}} output",
   切换模型: "Switch model",
   选择模型: "Select model",
-  搜索模型: "Search models",
-  没有匹配的模型: "No matching model",
+  没有可选的模型: "No models available",
   视觉: "Vision",
 
   // Composer

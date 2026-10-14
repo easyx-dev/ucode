@@ -4,8 +4,9 @@ import { Pencil, Plug, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { useMcpServers } from "../../../hooks/store/use-mcp-servers";
-import { SettingsEmptyState, SettingsSectionHeader } from "../settings-page";
+import { SettingsSectionHeader } from "../settings-page";
 import { SettingsGroup } from "../settings-row";
 import { McpServerFormDialog } from "./mcp-server-form-dialog";
 
@@ -46,10 +47,11 @@ export function SettingsMcp() {
         />
 
         {data === null ? null : data.servers.length === 0 ? (
-          <SettingsEmptyState
-            icon={Plug}
+          <Empty
+            className="rounded-xl border border-dashed px-6 py-9"
+            icon={<Plug className="size-icon-lg" />}
             title={t("还没有配置 MCP 服务器")}
-            description={t("添加服务器后，它提供的工具会出现在新会话里。")}
+            hint={t("添加服务器后，它提供的工具会出现在新会话里。")}
             action={
               <Button size="sm" onClick={openAdd}>
                 <Plus className="size-icon-base" />

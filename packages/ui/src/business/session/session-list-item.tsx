@@ -13,7 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../base/button";
+import { IconButton } from "../../base/button";
 import { Spinner } from "../../base/spinner";
 import { relativeTimeLabel } from "../../utils/time";
 import { sessionTitle } from "./session";
@@ -113,24 +113,16 @@ export function SessionListItem({
 
       {hasActions ? (
         <div className="pointer-events-none absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6"
-            title={pinned ? t("取消置顶") : t("置顶")}
+          <IconButton
+            label={pinned ? t("取消置顶") : t("置顶")}
+            size="icon-xs"
             onClick={onTogglePin}
           >
             <Pin className={cn("size-icon-sm", pinned && "fill-current")} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6"
-            title={t("归档")}
-            onClick={onArchive}
-          >
+          </IconButton>
+          <IconButton label={t("归档")} size="icon-xs" onClick={onArchive}>
             <Archive className="size-icon-sm" />
-          </Button>
+          </IconButton>
         </div>
       ) : null}
     </div>

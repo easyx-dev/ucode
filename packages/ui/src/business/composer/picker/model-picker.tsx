@@ -1,10 +1,10 @@
-/** 模型选择器：弹出层里按 provider 分组，顶部可搜索，条目带上下文说明 */
+/** 模型选择器：弹出层里按 provider 分组，条目带上下文说明 */
 
 import { cn } from "cn";
 import type { TFunction } from "i18next";
-import { Check, Cpu, Search } from "lucide-react";
+import { Check, Cpu } from "lucide-react";
 import { Popover } from "radix-ui";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../base/badge";
 import { useModelNames } from "../../../hooks/store/use-model-names";
@@ -49,7 +49,6 @@ export function ModelPicker({
   const { t } = useTranslation();
   const names = useModelNames();
   const [internalOpen, setInternalOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const isControlled = open !== undefined;
   const visible = open ?? internalOpen;
   const closeFocus = usePickerCloseFocus(onRefocus);
@@ -57,25 +56,9 @@ export function ModelPicker({
   const setOpen = (next: boolean): void => {
     if (!isControlled) setInternalOpen(next);
     onOpenChange?.(next);
-    if (!next) setQuery("");
   };
 
-  /** 搜索按 provider 分组过滤；命中 provider 名或模型 id / 显示名都算匹配 */
-  const groups = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return providers
-      .map((provider) => ({
-        provider,
-        models: provider.models.filter(
-          (model) =>
-            !needle ||
-            `${provider.name} ${provider.id} ${model.name} ${model.id}`
-              .toLowerCase()
-              .includes(needle),
-        ),
-      }))
-      .filter((group) => group.models.length > 0);
-  }, [providers, query]);
+  const groups = providers.filter((provider) => provider.models.length > 0);
 
   return (
     <Popover.Root open={visible} onOpenChange={setOpen}>
@@ -100,29 +83,17 @@ export function ModelPicker({
             "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           )}
         >
-          <div className="relative p-1 pb-0">
-            <Search className="absolute top-1/2 left-3 size-icon-sm -translate-y-1/2 text-foreground-subtle" />
-            <input
-              // biome-ignore lint/a11y/noAutofocus: 弹出层里的搜索框，打开即输入是预期行为
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("搜索模型")}
-              className="h-7 w-full rounded-md bg-transparent pr-2 pl-7 text-xs outline-none placeholder:text-foreground-subtle"
-            />
-          </div>
-
           <div className="max-h-72 overflow-y-auto p-1">
             {groups.length === 0 ? (
               <p className="px-2 py-6 text-center text-xs text-foreground-subtle">
-                {t("没有匹配的模型")}
+                {t("没有可选的模型")}
               </p>
             ) : null}
 
-            {groups.map(({ provider, models }) => (
+            {groups.map((provider) => (
               <div key={provider.id} className="py-0.5">
                 <div className="px-2 py-1 text-xs text-foreground-subtle">{provider.name}</div>
-                {models.map((model) => {
+                {provider.models.map((model) => {
                   const ref = `${provider.id}/${model.id}`;
                   const selected = ref === value;
                   return (

@@ -15,7 +15,6 @@ import {
   MessageSquare,
   PanelLeft,
   PanelsTopLeft,
-  Search,
   Settings2,
   Sparkles,
   Terminal,
@@ -23,6 +22,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogTitle } from "../../base/dialog";
+import { InputSearch } from "../../base/input";
 import { useClient } from "../../provider";
 import { MOD_KEY_LABEL } from "../../utils/platform";
 import { relativeTimeLabel } from "../../utils/time";
@@ -298,15 +298,14 @@ export function CommandPalette({
       >
         <DialogTitle className="sr-only">{t("搜索")}</DialogTitle>
 
-        <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search className="size-icon-base shrink-0 text-foreground-subtle" />
-          <input
+        <div className="border-b border-border">
+          <InputSearch
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t("搜索操作、任务或文件")}
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-subtle"
+            className="h-11 border-0 bg-transparent pl-9 text-sm"
           />
         </div>
 

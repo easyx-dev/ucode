@@ -8,6 +8,7 @@
 import { sessionTokenStorageKey } from "@ucode/brand";
 import { errorMessageKey } from "@ucode/i18n";
 import { Button } from "@ucode/ui/base/button";
+import { Empty } from "@ucode/ui/base/empty";
 import { LoginPage } from "@ucode/ui/business/shell/login-page";
 import { useSessions } from "@ucode/ui/hooks/store/use-sessions";
 import { useAuth } from "@ucode/ui/hooks/use-auth";
@@ -15,6 +16,7 @@ import { useErrorText } from "@ucode/ui/hooks/use-error-text";
 import { WorkspaceLayout } from "@ucode/ui/presets/workspace";
 import { useClient } from "@ucode/ui/provider";
 import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/utils/settings-section";
+import { ServerOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -128,13 +130,17 @@ function ServiceUnreachable({ onRetry }: { onRetry: () => void }) {
   const reason = useErrorText(auth.error);
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-4 text-center">
-      <p className="text-sm text-foreground-subtle">{t("连接服务失败，请确认服务已启动。")}</p>
-      {reason ? <p className="text-xs text-foreground-subtle">{reason}</p> : null}
-      <Button size="sm" variant="outline" onClick={onRetry}>
-        {t("重试")}
-      </Button>
-    </div>
+    <Empty
+      className="min-h-dvh px-4"
+      icon={<ServerOff className="size-7" />}
+      title={t("连接服务失败，请确认服务已启动。")}
+      hint={reason ?? undefined}
+      action={
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          {t("重试")}
+        </Button>
+      }
+    />
   );
 }
 

@@ -6,9 +6,9 @@
  */
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { DividerLine } from "../../base/divider-line";
 import { durationLabel } from "../../utils/time";
 import { formatTokens } from "../../utils/usage";
+import { DividerLine } from "../chat/message/divider-line";
 import type { GoalTurn } from "../chat/message/goal-turns";
 import { goalCauseText, goalTurnLabel } from "./goal-text";
 

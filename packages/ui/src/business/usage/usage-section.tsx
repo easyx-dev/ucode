@@ -1,4 +1,4 @@
-/** 仪表盘区块容器：统一的卡片外观、标题行与空状态 */
+/** 仪表盘区块容器：统一的卡片外观、标题行与内容 */
 
 import type { ReactNode } from "react";
 
@@ -21,14 +21,5 @@ export function UsageSection({ title, hint, action, children }: UsageSectionProp
       </header>
       {children}
     </section>
-  );
-}
-
-/** 区块内的空状态：虚线框 + 一行说明 */
-export function UsageEmpty({ text }: { text: string }) {
-  return (
-    <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-foreground-subtle">
-      {text}
-    </p>
   );
 }

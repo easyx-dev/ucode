@@ -7,12 +7,12 @@
 import { FileQuestionMark } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Empty } from "../../base/empty";
 import { useWorkbench } from "../../provider/workbench";
 import { FileTree } from "./file/file-tree";
 import { buildGitMarks } from "./git/git-marks";
 import { ReviewTree } from "./git/review-tree";
 import type { GitReview } from "./git/use-git-review";
-import { PanelEmpty } from "./panel-empty";
 
 export function WorkbenchSidebar({
   review,
@@ -30,7 +30,11 @@ export function WorkbenchSidebar({
   if (!workbench) return null;
   if (!cwd) {
     return (
-      <PanelEmpty icon={<FileQuestionMark className="size-7" />} title={t("当前没有工作目录")} />
+      <Empty
+        className="h-full"
+        icon={<FileQuestionMark className="size-7" />}
+        title={t("当前没有工作目录")}
+      />
     );
   }
 

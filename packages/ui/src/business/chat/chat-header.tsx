@@ -15,7 +15,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../base/badge";
-import { Button } from "../../base/button";
+import { Button, IconButton } from "../../base/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../base/tooltip";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../../types";
 import { contextPercentLabel } from "../../utils/usage";
@@ -177,30 +177,18 @@ export function ChatHeader({
       ) : null}
       {windowControls}
       {onToggleSidebar ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0"
-          title={t("切换侧边栏")}
-          onClick={onToggleSidebar}
-        >
+        <IconButton label={t("切换侧边栏")} onClick={onToggleSidebar}>
           {sidebarCollapsed ? (
             <PanelLeftOpen className="size-icon-base" />
           ) : (
             <PanelLeftClose className="size-icon-base" />
           )}
-        </Button>
+        </IconButton>
       ) : null}
       {session?.parentSessionId && onBackToParent ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0"
-          title={t("返回父会话")}
-          onClick={onBackToParent}
-        >
+        <IconButton label={t("返回父会话")} onClick={onBackToParent}>
           <ChevronLeft className="size-icon-base" />
-        </Button>
+        </IconButton>
       ) : null}
 
       <SessionTitle
@@ -218,7 +206,6 @@ export function ChatHeader({
           variant="ghost"
           size="sm"
           className="h-6 shrink-0 gap-1 px-1.5 text-xs text-foreground-subtle hover:text-foreground"
-          title={t("打开源会话")}
           onClick={() => onOpenForkSource(session.forkedFromId as string)}
         >
           <GitFork className="size-icon-sm" />
@@ -229,23 +216,16 @@ export function ChatHeader({
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {onOpenUsage && (context || (usage && usage.totalTokens > 0)) ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 px-2 text-xs text-foreground-subtle tabular-nums hover:text-foreground"
-                title={t("使用统计")}
-                onClick={onOpenUsage}
-              >
-                <Gauge className="size-icon-sm" />
-                {context ? contextPercentLabel(context) : "—"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {context?.estimated ? t("压缩后为估算值，新一轮回答后回到实测") : t("使用统计")}
-            </TooltipContent>
-          </Tooltip>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 px-2 text-xs text-foreground-subtle tabular-nums hover:text-foreground"
+            tooltip={context?.estimated ? t("压缩后为估算值，新一轮回答后回到实测") : t("使用统计")}
+            onClick={onOpenUsage}
+          >
+            <Gauge className="size-icon-sm" />
+            {context ? contextPercentLabel(context) : "—"}
+          </Button>
         ) : null}
 
         {models && !models.configured ? (
@@ -260,41 +240,26 @@ export function ChatHeader({
 
         {onLoadTranscript ? <CopyTranscriptAction load={onLoadTranscript} /> : null}
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={onReloadModels}
-              title={t("重建运行时")}
-            >
-              <RefreshCw className="size-icon-sm" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("按当前配置重建运行时，正在生成的会话本轮结束后切换")}</TooltipContent>
-        </Tooltip>
+        <IconButton
+          label={t("重建运行时")}
+          tooltip={t("按当前配置重建运行时，正在生成的会话本轮结束后切换")}
+          onClick={onReloadModels}
+        >
+          <RefreshCw className="size-icon-sm" />
+        </IconButton>
 
         {/* 工作台开关放在最右，与侧栏开关（最左）对称 */}
         {onToggleWorkbench ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                title={workbenchOpen ? t("收起工作台") : t("打开工作台")}
-                onClick={onToggleWorkbench}
-              >
-                {workbenchOpen ? (
-                  <PanelRightClose className="size-icon-base" />
-                ) : (
-                  <PanelRightOpen className="size-icon-base" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{workbenchOpen ? t("收起工作台") : t("打开工作台")}</TooltipContent>
-          </Tooltip>
+          <IconButton
+            label={workbenchOpen ? t("收起工作台") : t("打开工作台")}
+            onClick={onToggleWorkbench}
+          >
+            {workbenchOpen ? (
+              <PanelRightClose className="size-icon-base" />
+            ) : (
+              <PanelRightOpen className="size-icon-base" />
+            )}
+          </IconButton>
         ) : null}
       </div>
     </header>

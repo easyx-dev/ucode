@@ -6,7 +6,7 @@ import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Button } from "../../base/button";
+import { IconButton } from "../../base/button";
 import type {
   CatalogProvider,
   PermissionMode,
@@ -414,13 +414,24 @@ export function Composer({
                 />
 
                 {streaming ? (
-                  <Button size="icon" variant="outline" onClick={handleStop} title={t("停止生成")}>
+                  <IconButton
+                    label={t("停止生成")}
+                    size="icon"
+                    variant="outline"
+                    onClick={handleStop}
+                  >
                     <Square className="size-icon-sm" />
-                  </Button>
+                  </IconButton>
                 ) : (
-                  <Button size="icon" onClick={submit} disabled={uploading} title={t("发送")}>
+                  <IconButton
+                    disabled={uploading}
+                    label={t("发送")}
+                    size="icon"
+                    variant="default"
+                    onClick={submit}
+                  >
                     <ArrowUp className="size-icon-base" />
-                  </Button>
+                  </IconButton>
                 )}
               </div>
             </div>

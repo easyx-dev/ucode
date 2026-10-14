@@ -6,7 +6,7 @@
  */
 import type { RetryRecord } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
-import { DividerLine } from "../../../base/divider-line";
+import { DividerLine } from "./divider-line";
 
 /** 错误文本的展示上限：上游偶尔会带整页 HTML 或堆栈 */
 const ERROR_MAX_LENGTH = 120;

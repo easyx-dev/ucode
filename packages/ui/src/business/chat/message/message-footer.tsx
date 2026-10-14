@@ -6,6 +6,7 @@
  */
 import { GitFork } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "../../../base/button";
 import { CopyAction } from "../../../base/copy-action";
 import { useModelNames } from "../../../hooks/store/use-model-names";
 import type { ChatItem } from "../../../types";
@@ -17,14 +18,14 @@ import { clockLabel, durationLabel } from "../../../utils/time";
 export function ForkAction({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
-    <button
-      type="button"
-      className="shrink-0 rounded-xs p-1 text-foreground-subtle hover:bg-state-hover hover:text-foreground"
-      title={t("从此分叉")}
+    <IconButton
+      className="text-foreground-subtle hover:text-foreground"
+      label={t("从此分叉")}
+      size="icon-xs"
       onClick={onClick}
     >
       <GitFork className="size-icon-sm" />
-    </button>
+    </IconButton>
   );
 }
 

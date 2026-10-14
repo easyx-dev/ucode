@@ -9,10 +9,11 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { useAssets } from "../../../hooks/store/use-assets";
 import { useWorkbench } from "../../../provider/workbench";
 import { confirm } from "../../dialog/queue";
-import { SettingsEmptyState, SettingsSectionHeader } from "../settings-page";
+import { SettingsSectionHeader } from "../settings-page";
 import { SettingsGroup } from "../settings-row";
 import { AssetFormDialog } from "./asset-form-dialog";
 import { AssetListItem } from "./asset-list-item";
@@ -35,7 +36,7 @@ type AssetSectionProps = {
 
 export function AssetSection({
   kind,
-  icon,
+  icon: Icon,
   createLabel,
   emptyTitle,
   emptyDescription,
@@ -95,10 +96,11 @@ export function AssetSection({
         />
 
         {data !== null && items.length === 0 ? (
-          <SettingsEmptyState
-            icon={icon}
+          <Empty
+            className="rounded-xl border border-dashed px-6 py-9"
+            icon={<Icon className="size-icon-lg" />}
             title={emptyTitle}
-            description={emptyDescription}
+            hint={emptyDescription}
             action={
               <Button size="sm" onClick={openCreate}>
                 <Plus className="size-icon-base" />

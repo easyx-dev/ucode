@@ -10,13 +10,12 @@ import { Braces, Eye, FileWarning, ImageOff, RotateCw } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../../base/button";
+import { IconButton } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { SegmentedControl, type SegmentedOption } from "../../../base/segmented-control";
 import { Spinner } from "../../../base/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../base/tooltip";
 import { baseName } from "../../../utils/path";
 import { formatBytes, imageMimeOf, isTextImage, previewKindOf } from "../../../utils/preview";
-import { PanelEmpty } from "../panel-empty";
 import { useFileContent } from "../use-workbench-data";
 import { MarkdownPreview } from "./markdown-preview";
 import { TextPreview } from "./text-preview";
@@ -61,21 +60,14 @@ function Toolbar({
       ) : null}
       <div className="ml-auto flex items-center gap-3 text-xs text-foreground-subtle">
         <span className="tabular-nums">{formatBytes(size)}</span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              title={t("重新读取文件")}
-              disabled={reloading}
-              onClick={onReload}
-            >
-              <RotateCw className="size-icon-sm" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("重新读取文件")}</TooltipContent>
-        </Tooltip>
+        <IconButton
+          disabled={reloading}
+          label={t("重新读取文件")}
+          size="icon-xs"
+          onClick={onReload}
+        >
+          <RotateCw className="size-icon-sm" />
+        </IconButton>
       </div>
     </div>
   );
@@ -99,7 +91,8 @@ function Content({
     // SVG 是文本图片：源码形态与 markdown 的「源码」一致，交给同一套文本渲染器（按 xml 高亮）
     if (isTextImage(path) && mode === "source") {
       return content.text === undefined ? (
-        <PanelEmpty
+        <Empty
+          className="h-full"
           icon={<FileWarning className="size-7" />}
           title={content.truncated ? t("文件太大，未内联内容") : t("二进制文件，无法预览")}
           hint={`${baseName(path)} · ${size}`}
@@ -127,7 +120,8 @@ function Content({
         <img src={src} alt={baseName(path)} className="max-h-full max-w-full object-contain" />
       </div>
     ) : (
-      <PanelEmpty
+      <Empty
+        className="h-full"
         icon={<ImageOff className="size-7" />}
         title={t("文件太大，未内联内容")}
         hint={`${baseName(path)} · ${size}`}
@@ -137,7 +131,8 @@ function Content({
 
   if (kind === "pdf" || kind === "document") {
     return (
-      <PanelEmpty
+      <Empty
+        className="h-full"
         icon={<FileWarning className="size-7" />}
         title={t("这类文件还看不了，后续会接入渲染器")}
         hint={`${baseName(path)} · ${size}`}
@@ -147,7 +142,8 @@ function Content({
 
   if (content.text === undefined) {
     return (
-      <PanelEmpty
+      <Empty
+        className="h-full"
         icon={
           content.kind === "binary" ? (
             <ImageOff className="size-7" />
@@ -195,7 +191,11 @@ export function FileContent({ path }: { path: string }) {
       />
       <div className="min-h-0 flex-1 overflow-auto">
         {error ? (
-          <PanelEmpty icon={<FileWarning className="size-7" />} title={error.message} />
+          <Empty
+            className="h-full"
+            icon={<FileWarning className="size-7" />}
+            title={error.message}
+          />
         ) : loading && !data ? (
           <div className="flex h-full items-center justify-center">
             <Spinner className="text-foreground-subtle" />

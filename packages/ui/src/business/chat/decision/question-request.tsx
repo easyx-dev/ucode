@@ -12,7 +12,7 @@ import { cn } from "cn";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../../base/button";
+import { Button, IconButton } from "../../../base/button";
 import type { QuestionInteraction } from "../../../types";
 
 type QuestionRequestProps = {
@@ -147,17 +147,18 @@ function QuestionPrompt({
             </button>
           ))}
         </span>
-        <button
-          type="button"
-          className="rounded-md p-0.5 text-foreground-subtle outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-          title={collapsed ? t("展开") : t("收起")}
+        <IconButton
           aria-expanded={!collapsed}
+          // ghost 变体自带 `aria-expanded:bg-state-selected`：展开是常态，这块底色会一直挂着
+          className="text-foreground-subtle hover:text-foreground aria-expanded:bg-transparent"
+          label={collapsed ? t("展开") : t("收起")}
+          size="icon-xs"
           onClick={() => setCollapsed((prev) => !prev)}
         >
           <ChevronDown
             className={cn("size-icon-base transition-transform", collapsed && "rotate-180")}
           />
-        </button>
+        </IconButton>
       </div>
 
       {!item ? null : (
@@ -241,12 +242,7 @@ function QuestionPrompt({
 
       {/* 底栏跟题目无关地常驻：题目为空或选项多到要滚动时，它都是唯一的出口 */}
       <div className="sticky bottom-0 mt-auto flex items-center gap-2 border-t border-border bg-popover px-3 py-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          title={t("放弃这组问题，本轮按没有答复继续")}
-          onClick={() => onSubmit(request.questions.map(() => []))}
-        >
+        <Button variant="ghost" size="sm" onClick={() => onSubmit(request.questions.map(() => []))}>
           {t("忽略")}
         </Button>
         {step > 0 ? (
@@ -254,18 +250,12 @@ function QuestionPrompt({
             variant="outline"
             size="sm"
             className="ml-auto"
-            title={t("回到上一个问题")}
             onClick={() => setStep((prev) => Math.max(prev - 1, 0))}
           >
             {t("返回")}
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          className={step > 0 ? undefined : "ml-auto"}
-          title={isLast ? t("提交全部作答") : t("看下一个问题")}
-          onClick={advance}
-        >
+        <Button size="sm" className={step > 0 ? undefined : "ml-auto"} onClick={advance}>
           {isLast ? t("提交") : t("下一步")}
           <span className="ml-1 text-xs opacity-70">⌘⏎</span>
         </Button>

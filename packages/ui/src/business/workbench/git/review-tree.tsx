@@ -8,12 +8,11 @@ import { GitBranch, Layers, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../../base/button";
+import { Button, IconButton } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { SegmentedControl } from "../../../base/segmented-control";
 import { Spinner } from "../../../base/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../base/tooltip";
 import { useWorkbench } from "../../../provider/workbench";
-import { PanelEmpty } from "../panel-empty";
 import { GitCounts } from "./git-change-marks";
 import { GitChangeTree } from "./git-change-tree";
 import { countChanges, groupChanges } from "./git-groups";
@@ -60,34 +59,16 @@ export function ReviewTree({
           </span>
         ) : null}
         <span className="ml-auto" />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0"
-              title={t("堆叠查看全部改动")}
-              onClick={() => workbench?.openChanges()}
-            >
-              <Layers className="size-icon-sm" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("堆叠查看全部改动")}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0"
-              title={t("刷新")}
-              onClick={review.reload}
-            >
-              <RefreshCw className="size-icon-sm" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("刷新")}</TooltipContent>
-        </Tooltip>
+        <IconButton
+          label={t("堆叠查看全部改动")}
+          size="icon-xs"
+          onClick={() => workbench?.openChanges()}
+        >
+          <Layers className="size-icon-sm" />
+        </IconButton>
+        <IconButton label={t("刷新")} size="icon-xs" onClick={review.reload}>
+          <RefreshCw className="size-icon-sm" />
+        </IconButton>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -104,7 +85,8 @@ export function ReviewTree({
         ) : status.error ? (
           <p className="px-3 py-3 text-xs text-foreground-subtle">{status.error.message}</p>
         ) : !status.data ? null : !status.data.isRepo ? (
-          <PanelEmpty
+          <Empty
+            className="h-full"
             icon={<GitBranch className="size-7" />}
             title={t("当前目录不在 git 仓库内，没有可查看的改动")}
             action={

@@ -3,11 +3,12 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "../../base/badge";
+import { Empty } from "../../base/empty";
 import { useModelNames } from "../../hooks/store/use-model-names";
 import type { ModelUsage, SessionUsageEntry } from "../../types";
 import { formatTokens, usageKindLabel } from "../../utils/usage";
 import { cacheHitRate, ratioLabel } from "../../utils/usage-series";
-import { UsageEmpty, UsageSection } from "./usage-section";
+import { UsageSection } from "./usage-section";
 
 type UsageModelUsageProps = {
   items: ModelUsage[];
@@ -21,7 +22,10 @@ export function UsageModelUsage({ items }: UsageModelUsageProps) {
   return (
     <UsageSection title={t("模型用量")}>
       {items.length === 0 ? (
-        <UsageEmpty text={t("当前区间暂无可用量数据")} />
+        <Empty
+          className="rounded-lg border border-dashed border-border px-3 py-6"
+          title={t("当前区间暂无可用量数据")}
+        />
       ) : (
         <ul className="space-y-2.5">
           {items.map((item) => {
@@ -74,7 +78,10 @@ export function UsageSessionList({ items, onOpen }: UsageSessionListProps) {
   return (
     <UsageSection title={t("按会话")}>
       {items.length === 0 ? (
-        <UsageEmpty text={t("当前区间暂无可用量数据")} />
+        <Empty
+          className="rounded-lg border border-dashed border-border px-3 py-6"
+          title={t("当前区间暂无可用量数据")}
+        />
       ) : (
         <ul className="space-y-1">
           {items.map((item) => (

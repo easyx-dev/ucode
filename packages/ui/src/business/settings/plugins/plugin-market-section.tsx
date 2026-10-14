@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../base/badge";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { Input } from "../../../base/input";
 import { SettingsSectionHeader } from "../settings-page";
 import { SettingsGroup } from "../settings-row";
@@ -98,9 +99,10 @@ export function PluginMarketSection({
       </p>
 
       {marketplaces === null ? null : marketplaces.marketplaces.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
-          {t("还没有登记市场。")}
-        </p>
+        <Empty
+          className="rounded-xl border border-dashed px-4 py-6"
+          title={t("还没有登记市场。")}
+        />
       ) : (
         <SettingsGroup>
           {marketplaces.marketplaces.map((market) => (

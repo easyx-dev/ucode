@@ -8,6 +8,7 @@ import { cn } from "cn";
 import type { TFunction } from "i18next";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Empty } from "../../base/empty";
 import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
 import type { UsageDayBucket, UsageWeekBucket } from "../../types";
 import { formatTokens } from "../../utils/usage";
@@ -18,7 +19,7 @@ import {
   type HeatCell,
   type HeatMode,
 } from "../../utils/usage-series";
-import { UsageEmpty, UsageSection } from "./usage-section";
+import { UsageSection } from "./usage-section";
 import { type HoverTip, UsageTip } from "./usage-tip";
 
 /** 一周七天的固定顺序，作为网格的行标识（只有周一 / 周三 / 周五在左侧标出） */
@@ -117,7 +118,10 @@ export function UsageHeatmap({ daily, weekly }: UsageHeatmapProps) {
       }
     >
       {empty ? (
-        <UsageEmpty text={t("当前区间暂无可用量数据")} />
+        <Empty
+          className="rounded-lg border border-dashed border-border px-3 py-6"
+          title={t("当前区间暂无可用量数据")}
+        />
       ) : (
         // biome-ignore lint/a11y/noStaticElementInteractions: 只作悬停命中区，真正的交互是格子本身
         <div className="relative w-fit" ref={gridRef} onMouseLeave={() => setTip(null)}>

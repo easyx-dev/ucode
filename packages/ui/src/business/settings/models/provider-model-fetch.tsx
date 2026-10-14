@@ -10,6 +10,7 @@ import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../base/badge";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { Spinner } from "../../../base/spinner";
 import type {
   ModelCapabilitySource,
@@ -141,9 +142,10 @@ export function ModelFetchResult({ result, onSelect, onDiscard }: ModelFetchResu
       ) : null}
 
       {count === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
-          {t("上游没有返回任何模型，请确认端点是否兼容 /models。")}
-        </p>
+        <Empty
+          className="rounded-xl border border-dashed px-4 py-6"
+          title={t("上游没有返回任何模型，请确认端点是否兼容 /models。")}
+        />
       ) : (
         <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg p-1 ring-1 ring-border-strong">
           {result.models.map((suggestion) => (

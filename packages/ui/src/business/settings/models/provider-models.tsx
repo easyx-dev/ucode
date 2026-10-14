@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import type { ProviderModelSuggestion } from "../../../types";
 import {
   type DraftModel,
@@ -65,9 +66,10 @@ export function ProviderModels({ provider, onPatch, onAdd, onRemove }: ProviderM
       ) : null}
 
       {provider.models.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-foreground-subtle">
-          {t("还没有模型：拉取上游列表，或手动添加一个。")}
-        </p>
+        <Empty
+          className="rounded-xl border border-dashed px-4 py-6"
+          title={t("还没有模型：拉取上游列表，或手动添加一个。")}
+        />
       ) : (
         <SettingsGroup>
           {provider.models.map((model) => (

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../base/dialog";
+import { Empty } from "../../base/empty";
 import { SegmentedControl, type SegmentedOption } from "../../base/segmented-control";
 import { Spinner } from "../../base/spinner";
 import { useUsage } from "../../hooks/store/use-usage";
@@ -15,7 +16,6 @@ import type { ContextUsage } from "../../types";
 import { UsageModelUsage, UsageSessionList } from "./usage-breakdown";
 import { UsageHeatmap } from "./usage-heatmap";
 import { UsageMetrics } from "./usage-metrics";
-import { UsageEmpty } from "./usage-section";
 import { UsageSteps } from "./usage-steps";
 import { UsageTrendChart } from "./usage-trend-chart";
 
@@ -98,7 +98,10 @@ export function UsagePanel({
 
               {data ? (
                 data.streak.activeDays === 0 ? (
-                  <UsageEmpty text={t("还没有可展示的数据")} />
+                  <Empty
+                    className="rounded-lg border border-dashed border-border px-3 py-6"
+                    title={t("还没有可展示的数据")}
+                  />
                 ) : (
                   <>
                     <UsageMetrics data={data} context={context ?? null} />

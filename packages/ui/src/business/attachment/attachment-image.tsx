@@ -8,7 +8,7 @@
 import { cn } from "cn";
 import { Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ToolbarIconButton } from "../../base/toolbar-icon-button";
+import { IconButton } from "../../base/button";
 import { openImagePreview } from "./image-preview-dialog";
 import { useAttachmentUrl } from "./use-attachment-url";
 
@@ -47,13 +47,13 @@ export function AttachmentImage({
           src={source}
         />
       </button>
-      <ToolbarIconButton
+      <IconButton
         className="absolute top-2 right-2 bg-card/80 opacity-0 backdrop-blur-sm transition group-hover/image:opacity-100 focus-visible:opacity-100"
         label={t("全屏查看")}
         onClick={open}
       >
         <Maximize2 />
-      </ToolbarIconButton>
+      </IconButton>
     </span>
   );
 }

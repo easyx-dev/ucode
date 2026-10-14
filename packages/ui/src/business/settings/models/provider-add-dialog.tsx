@@ -1,5 +1,5 @@
 /** 添加供应商：从 pi 内置目录里搜索选中一个，或新建自定义供应商 */
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
@@ -10,7 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../base/dialog";
-import { Input } from "../../../base/input";
+import { Empty } from "../../../base/empty";
+import { InputSearch } from "../../../base/input";
 import { Separator } from "../../../base/separator";
 import type { CatalogProvider } from "../../../types";
 
@@ -43,16 +44,12 @@ function CatalogSearch({ value, onChange }: { value: string; onChange: (value: s
   const { t } = useTranslation();
 
   return (
-    <div className="relative shrink-0">
-      <Search
-        className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 size-icon-sm text-foreground-subtle"
-        aria-hidden
-      />
-      <Input
-        className="pl-8"
+    <div className="shrink-0">
+      <InputSearch
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={t("搜索供应商，如 deepseek")}
+        className="pl-8"
       />
     </div>
   );
@@ -72,9 +69,10 @@ function CatalogList({
 
   if (providers.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed px-3 py-4 text-sm text-foreground-subtle">
-        {t("没有匹配的供应商。")}
-      </p>
+      <Empty
+        className="rounded-xl border border-dashed px-3 py-4"
+        title={t("没有匹配的供应商。")}
+      />
     );
   }
 

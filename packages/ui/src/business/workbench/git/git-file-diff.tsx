@@ -8,8 +8,7 @@ import { FoldVertical, UnfoldVertical } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "../../../base/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../base/tooltip";
+import { IconButton } from "../../../base/button";
 import type { GitDiffTarget } from "../use-workbench-data";
 import { DiffDisplayControls } from "./diff-controls";
 import { type DiffFileRef, DiffViewer } from "./diff-viewer";
@@ -63,24 +62,13 @@ export function GitFileDiff({
               onSelectMode={selectMode}
               onToggleWrap={toggleWrap}
             />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 shrink-0"
-                  title={allExpanded ? t("全部收起") : t("全部展开")}
-                  onClick={toggleAll}
-                >
-                  {allExpanded ? (
-                    <FoldVertical className="size-icon-base" />
-                  ) : (
-                    <UnfoldVertical className="size-icon-base" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{allExpanded ? t("全部收起") : t("全部展开")}</TooltipContent>
-            </Tooltip>
+            <IconButton label={allExpanded ? t("全部收起") : t("全部展开")} onClick={toggleAll}>
+              {allExpanded ? (
+                <FoldVertical className="size-icon-base" />
+              ) : (
+                <UnfoldVertical className="size-icon-base" />
+              )}
+            </IconButton>
           </>
         ) : null}
       </div>

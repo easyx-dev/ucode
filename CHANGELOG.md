@@ -421,6 +421,15 @@ delete,refresh}`（安装本轮只支持本地目录来源，其余来源回 `pl
   也收到同一档，分隔条用 `w-2 -ml-1` 保住 8px 命中区），
   这两张贴窗口的卡圆角由 `rounded-xl` 收到 `rounded-md`，与无标题栏窗口自身的圆角相称。
 
+- **`@ucode/ui` 原语层收口**：`base/button` 内聚 `tooltip` 并新增 `IconButton`（吸收原
+  `base/toolbar-icon-button`，`label` 单源同时作 `aria-label` 与悬停说明）；新增 `base/empty` 取代
+  `business/workbench/panel-empty` 与设置 / 用量两套域内空态（连同 6 处内联的虚线框）；`base/input` 抽出
+  底座类（`Textarea` 复用）并新增 `InputSearch`；复制反馈与剪贴板 IO 内聚在 `base/copy-action`（导出 `useCopyFeedback`）；
+  `base/divider-line` 下沉到 `business/chat/message/`（目标轮次线从那里借，`docs/components.md` 的域间依赖表相应加一条）。
+  `base/toolbar-icon-button` 与 `base/divider-line` 两条子路径随之消失；`title` 收敛为「只作截断兜底」，
+  讲操作一律走 Tooltip（Radix 不摘原生 `title`，两者并存会同颗按钮先后弹两次）。
+  `apps/web` 新增 `lucide-react` 依赖（外壳的空态要给图标）。
+
 ### 修复
 
 - **`pnpm start -- --restart` 这类参数透传一直不工作**：pnpm 会把 `--` 一并传给 node，CLI 遂报「未知参数」

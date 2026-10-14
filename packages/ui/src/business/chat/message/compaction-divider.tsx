@@ -6,9 +6,9 @@
  */
 import type { CompactionRecord } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
-import { DividerLine } from "../../../base/divider-line";
 import { MessageResponse } from "../../markdown/message-response";
 import { compactionLineDetail, compactionLineText } from "./compaction";
+import { DividerLine } from "./divider-line";
 
 export function CompactionDivider({
   summary,

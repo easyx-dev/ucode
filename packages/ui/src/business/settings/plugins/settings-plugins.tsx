@@ -8,9 +8,10 @@ import { Package, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { Empty } from "../../../base/empty";
 import { usePlugins } from "../../../hooks/store/use-plugins";
 import { useWorkbench } from "../../../provider/workbench";
-import { SettingsEmptyState, SettingsSectionHeader } from "../settings-page";
+import { SettingsSectionHeader } from "../settings-page";
 import { SettingsGroup } from "../settings-row";
 import { PluginInstallDialog } from "./plugin-install-dialog";
 import { PluginListItem } from "./plugin-list-item";
@@ -69,10 +70,11 @@ export function SettingsPlugins() {
         />
 
         {installed.length === 0 ? (
-          <SettingsEmptyState
-            icon={Package}
+          <Empty
+            className="rounded-xl border border-dashed px-6 py-9"
+            icon={<Package className="size-icon-lg" />}
             title={t("尚未安装插件")}
-            description={t(
+            hint={t(
               "插件把技能、命令、角色、钩子与 MCP 服务器打包在一起；可从本地目录、压缩包、npm 或 git 仓库安装。",
             )}
             action={installButton}

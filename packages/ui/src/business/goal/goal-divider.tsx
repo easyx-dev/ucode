@@ -5,8 +5,8 @@
  */
 import type { GoalRecord } from "@ucode/contracts";
 import { useTranslation } from "react-i18next";
-import { DividerLine } from "../../base/divider-line";
 import { formatTokens } from "../../utils/usage";
+import { DividerLine } from "../chat/message/divider-line";
 
 export function GoalDivider({ record }: { record: GoalRecord }) {
   const { t } = useTranslation();

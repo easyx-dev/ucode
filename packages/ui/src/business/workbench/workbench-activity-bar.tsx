@@ -5,11 +5,9 @@
  * 两个图标都在位，不随目录是不是 git 仓库变化：位置固定比省一个图标重要。
  */
 
-import { cn } from "cn";
 import { FolderTree, GitCompare, PanelRightClose } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../base/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../base/tooltip";
+import { IconButton } from "../../base/button";
 import { useWorkbench, WORKBENCH_VIEWS, type WorkbenchView } from "../../provider/workbench";
 
 const VIEW_ICON: Record<WorkbenchView, typeof FolderTree> = {
@@ -41,43 +39,29 @@ export function WorkbenchActivityBar() {
         const active = workbench.view === view && workbench.sidebarVisible;
         const label = translate(VIEW_LABEL[view]);
         return (
-          <Tooltip key={view}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-pressed={active}
-                className={cn(
-                  "size-8",
-                  active
-                    ? "bg-muted text-foreground"
-                    : "text-foreground-subtle hover:text-foreground",
-                )}
-                title={label}
-                onClick={() => workbench.selectView(view)}
-              >
-                <Icon className="size-icon-base" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{label}</TooltipContent>
-          </Tooltip>
+          <IconButton
+            key={view}
+            className={active ? undefined : "text-foreground-subtle hover:text-foreground"}
+            label={label}
+            pressed={active}
+            size="icon"
+            tooltipSide="right"
+            onClick={() => workbench.selectView(view)}
+          >
+            <Icon className="size-icon-base" />
+          </IconButton>
         );
       })}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mt-auto size-8 text-foreground-subtle hover:text-foreground"
-            title={t("收起面板")}
-            onClick={workbench.collapse}
-          >
-            <PanelRightClose className="size-icon-base" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">{t("收起面板")}</TooltipContent>
-      </Tooltip>
+      <IconButton
+        className="mt-auto text-foreground-subtle hover:text-foreground"
+        label={t("收起面板")}
+        size="icon"
+        tooltipSide="right"
+        onClick={workbench.collapse}
+      >
+        <PanelRightClose className="size-icon-base" />
+      </IconButton>
     </div>
   );
 }
