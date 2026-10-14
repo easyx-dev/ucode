@@ -175,7 +175,7 @@ export function useSessionActions({
     if (activeId) void sessions.setMode(activeId, mode);
     else composer.update(draftKey, { mode });
   };
-  /** 权限档位只作用于已有会话：空态不落草稿、选择器禁用，新建会话恒为默认档 */
+  /** 权限档位只作用于已有会话：空态的选择器可点，但选了不落草稿，新建会话恒为默认档 */
   const selectPermissionMode = (mode: PermissionMode): void => {
     if (activeId) void sessions.setPermissionMode(activeId, mode);
   };
