@@ -1,12 +1,5 @@
 /** 助手模式选择器：切换当前会话的能力三元组（工具 / 权限 / 提示词） */
-import {
-  ChevronDown,
-  ClipboardList,
-  Compass,
-  Hammer,
-  type LucideIcon,
-  MessageSquare,
-} from "lucide-react";
+import { ClipboardList, Compass, Hammer, type LucideIcon, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -18,7 +11,6 @@ import { SESSION_MODES } from "../../../types";
 import { modeDescription, modeLabel } from "./mode";
 import {
   PICKER_TRIGGER_CLASS,
-  PICKER_TRIGGER_LABEL_CLASS,
   type PickerOption,
   PickerOptions,
   usePickerCloseFocus,
@@ -63,10 +55,9 @@ export function ModePicker({
         onOpenChange?.(next);
       }}
     >
+      {/* 模式是工具栏里唯一的全局状态：不带图标与下拉箭头，文案在任何容器宽度下都留着 */}
       <DropdownMenuTrigger className={PICKER_TRIGGER_CLASS} title={t("模式")} disabled={disabled}>
-        <Compass />
-        <span className={PICKER_TRIGGER_LABEL_CLASS}>{modeLabel(value, t)}</span>
-        <ChevronDown />
+        <span>{modeLabel(value, t)}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-72" {...closeFocus}>
         <PickerOptions

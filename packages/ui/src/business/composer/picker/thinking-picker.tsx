@@ -1,5 +1,5 @@
 /** thinking 档位选择器：写入当前会话的档位偏好（`自动` 表示按模式推荐值） */
-import { Brain, ChevronDown } from "lucide-react";
+import { Brain } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -61,7 +61,6 @@ export function ThinkingPicker({
         <span className={PICKER_TRIGGER_LABEL_CLASS}>
           {thinkingPreferenceLabel(value, resolved, t)}
         </span>
-        <ChevronDown />
       </DropdownMenuTrigger>
       {/* 档位只有单字标签，比模式 / 权限那两栏窄：宽度跟着内容收，不留空半栏 */}
       <DropdownMenuContent side="top" align="start" className="w-40" {...closeFocus}>

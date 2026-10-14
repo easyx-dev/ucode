@@ -1,6 +1,6 @@
 /** 权限档位选择器：只决定命中 `ask` 时弹审批还是自动放行，不改变工具集与 `deny` */
 import { cn } from "cn";
-import { ChevronDown, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -70,7 +70,6 @@ export function PermissionPicker({
       >
         <Icon />
         <span className={PICKER_TRIGGER_LABEL_CLASS}>{permissionModeLabel(value, t)}</span>
-        <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-72" {...closeFocus}>
         <PickerOptions

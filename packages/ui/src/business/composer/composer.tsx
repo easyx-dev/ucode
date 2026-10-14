@@ -359,7 +359,7 @@ export function Composer({
 
             {/*
               左：添加 · 模式 · 权限；右：模型 · 思考 · 发送。
-              整行不换行也不横向滚动：容器窄于阈值时四个选择器只留图标（`@container` 供
+              整行不换行也不横向滚动：容器窄于阈值时带图标的选择器只留图标，模式没有图标、文案始终留着（`@container` 供
               PICKER_TRIGGER_LABEL_CLASS 的容器查询用），模型名按剩余宽度截断。
               五个弹层关掉后都把焦点交回输入区（`onRefocus`），见 `focusEditor`。
             */}

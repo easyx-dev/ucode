@@ -2,7 +2,7 @@
 
 import { cn } from "cn";
 import type { TFunction } from "i18next";
-import { Check, ChevronDown, Cpu, Search } from "lucide-react";
+import { Check, Cpu, Search } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -83,7 +83,6 @@ export function ModelPicker({
           <span className={cn(PICKER_TRIGGER_LABEL_CLASS, "max-w-48 truncate")}>
             {value || t("选择模型")}
           </span>
-          <ChevronDown />
         </button>
       </Popover.Trigger>
 
