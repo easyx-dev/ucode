@@ -11,7 +11,7 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 - **黑白单色品牌**：没有彩色品牌色。品牌感来自灰度分层、排版层级与克制的圆角，而不是色相。
 - **颜色只用于表达状态与数据**：功能色与图表色是惟一的彩色出口。
 - **外壳 / 面板 / 卡三层**：`background` 是外壳底色，`surface` 是对话区与工作台那层面板底，`card` /
-  `popover` 是卡片与浮层的面。浅色由外向内逐层变亮（灰壳 → 面板 → 卡），深色反向（外壳最亮、卡最暗，
+  `popover` 是卡片与浮层的面。浅色由外向内逐层变亮（玻璃面 → 面板 → 卡），深色反向（外壳最亮、卡最暗，
   面板底与卡同色）。这是整个视觉语言的基础。
 - **低装饰**：默认无阴影、无渐变、无彩色光晕；分隔靠留白与极浅描边。
 - 界面文字统一简体中文。
@@ -35,7 +35,8 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 4. **所有运行时可变 token 的值必须保持引用形式**，不能写成算好的字面量，否则设置改了不生效。
 5. **准入**：同一取值被 ≥3 处复用才立 token；新 token 必须同时进本文件、`tokens.css` 与校验白名单。
 6. 命名：颜色 `--<角色>`（映射成 `--color-<角色>`）、主题层 `--theme-*`、尺寸族 `--spacing-*`、高度层 `--elevation-*`、语法高亮 `--code-*`。
-7. **玻璃面（`--glass`）**：外壳与侧栏用「外壳色掺 84% 透明」的面 + `backdrop-blur`（映射成 `bg-glass`）。
+7. **玻璃面（`--glass`）**：外壳与侧栏用「外壳色朝叠加基准压一档、再掺 84% 透明」的面 + `backdrop-blur`
+   （映射成 `bg-glass`）——压的方向跟着叠加基准走（浅色变深、深色变浅），玻璃面因此比外壳更远离面板那一侧。
    它透出来的是什么取决于背后有没有东西——**桌面端窗口透明**（`transparent` + macOS `vibrancy`）时透出系统材质；
    **web 端用纯色**（2026-10 定：不铺背景图），因此那里的玻璃面与实色观感一致，留着是为了「同色掺透 + 模糊」
    这层结构本身，日后要加背景图不必再动样式。面板底与内容卡仍是实色（`bg-surface` / `bg-card`，那是「纸」层）。
@@ -65,9 +66,9 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 底料全部来自 Tailwind 内置调色板变量（`--color-neutral-*` 等），语义层用 `var()` 与 `color-mix(in oklab, …)` 组装；
 组件里禁止写调色板 utility 与调色板变量。深浅由主题层翻转，语义层不重复。
 深色外壳与内容卡那一对灰、浅色面板底与次级底那两档灰在 Tailwind 内置档位里都没有对应值
-（`neutral-900` 偏暗、`neutral-800` 偏亮；`neutral-50` 偏亮、`neutral-100` 与面板底几乎同色），
-因此在 `tokens.css` 里自建四个底料（`--palette-shell-dark` / `--palette-raised-dark` /
-`--palette-surface-light` / `--palette-muted-light`）——
+（`neutral-900` 偏暗、`neutral-800` 偏亮；`neutral-50` 与 `white` 之间没有档位，`neutral-100`
+与面板底只差 6/255、看不出底色），因此在 `tokens.css` 里自建四个底料（`--palette-shell-dark` /
+`--palette-raised-dark` / `--palette-surface-light` / `--palette-muted-light`）——
 **全仓库只有那一处允许写字面色值**，主题层与语义层一律引用它们。
 
 ### 表面与文本
@@ -75,7 +76,7 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
 | token | 用途 | 浅色 | 深色 |
 | --- | --- | --- | --- |
 | `background` | 外壳底色 | `neutral-50` | `#2b2b2b`（自建底料） |
-| `surface` | 对话区 / 工作台的面板底 | `#f8f8f8`（自建底料） | `#161616`（与 `card` 同色） |
+| `surface` | 对话区 / 工作台的面板底 | `#fbfbfb`（自建底料） | `#161616`（与 `card` 同色） |
 | `card` | 面板里的卡片与浮起面（用量卡、diff 面、浮起按钮、选中的分段） | `white` | `#161616`（自建底料） |
 | `popover` | 弹层、下拉、对话框、输入框 | `white` | `#161616`（自建底料） |
 | `muted` | 次级面板底、悬停与嵌入块（代码块、表格头） | `#f2f2f2`（自建底料） | `neutral-700` |
