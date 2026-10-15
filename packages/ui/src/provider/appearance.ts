@@ -1,5 +1,5 @@
 /**
- * 外观偏好：界面字号、界面密度、界面字体、代码字体与配色主题。
+ * 外观偏好：界面字号、界面密度、界面字体、终端字体与配色主题。
  *
  * 偏好属于设备本地（`localStorage`，键由品牌派生），web 与桌面端各存一份。
  * 应用只有一个出口 `applyAppearance`：把参数写到 `<html>` 的行内样式与 `data-theme`，
@@ -10,7 +10,13 @@
  */
 import { appearanceStorageKey } from "@ucode/brand";
 
-import { uiFontFamilyOf, uiFontOf } from "./fonts";
+import {
+  DEFAULT_TERMINAL_FONT_ID,
+  terminalFontFamilyOf,
+  terminalFontOf,
+  uiFontFamilyOf,
+  uiFontOf,
+} from "./fonts";
 import { type ColorThemeId, DEFAULT_COLOR_THEME_ID, isColorThemeId } from "./themes";
 
 /** 界面密度：只缩放空间（间距、控件高度、栏宽），不动文字 */
@@ -40,8 +46,10 @@ export type AppearancePrefs = {
   fontSizeBase: number;
   /** 界面密度 */
   density: DensityId;
-  /** 界面字体 id；等宽（代码 / diff / 终端）固定用系统栈，不进偏好 */
+  /** 界面字体 id；代码与 diff 固定用系统等宽栈，不进偏好 */
   uiFont: string;
+  /** 终端字体 id；默认档跟随等宽栈，其余档是「装了才生效」的 Nerd Font 族名 */
+  terminalFont: string;
 };
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
@@ -49,6 +57,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
   fontSizeBase: FONT_SIZE_MIN,
   density: "default",
   uiFont: "geist",
+  terminalFont: DEFAULT_TERMINAL_FONT_ID,
 };
 
 const densityScaleOf = (density: DensityId): number =>
@@ -70,6 +79,7 @@ export const normalizeAppearance = (value: unknown): AppearancePrefs => {
     fontSizeBase: clampFontSize(raw.fontSizeBase),
     density: isDensityId(raw.density) ? raw.density : DEFAULT_APPEARANCE.density,
     uiFont: uiFontOf(String(raw.uiFont ?? "")).id,
+    terminalFont: terminalFontOf(String(raw.terminalFont ?? "")).id,
   };
 };
 
@@ -97,6 +107,13 @@ export const applyAppearance = (prefs: AppearancePrefs): void => {
   root.style.setProperty("--font-size-base", `${prefs.fontSizeBase}px`);
   root.style.setProperty("--density", String(densityScaleOf(prefs.density)));
   root.style.setProperty("--font-ui-base", uiFontFamilyOf(prefs.uiFont));
+  const terminalFamily = terminalFontFamilyOf(prefs.terminalFont);
+  // 终端字体：默认档写回等宽栈本身（而不是清掉行内值）——这层值只有这里写，
+  // 不靠 CSS 里的初值，省得依赖样式产物的取舍。两个分支都留行内值，也免了「切档位时残留旧值」
+  root.style.setProperty(
+    "--font-terminal-base",
+    terminalFamily ? `${terminalFamily}, var(--font-mono-stack)` : "var(--font-mono-stack)",
+  );
   if (prefs.theme === DEFAULT_COLOR_THEME_ID) root.removeAttribute("data-theme");
   else root.dataset.theme = prefs.theme;
 };

@@ -15,7 +15,7 @@ import { Switch } from "../../../base/switch";
 import { useShowThinking } from "../../../hooks/use-show-thinking";
 import { type DensityId, FONT_SIZE_MAX, FONT_SIZE_MIN } from "../../../provider/appearance";
 import { useAppearance } from "../../../provider/appearance-provider";
-import { UI_FONTS } from "../../../provider/fonts";
+import { DEFAULT_TERMINAL_FONT_ID, TERMINAL_FONTS, UI_FONTS } from "../../../provider/fonts";
 import type { ColorThemeId } from "../../../provider/themes";
 import { useNoticeEnabled } from "../../notify/use-notice-enabled";
 import { useSoundEnabled } from "../../notify/use-sound-enabled";
@@ -24,27 +24,30 @@ import { useLocale } from "./use-locale";
 
 type ThemeValue = "light" | "dark" | "system";
 
-/** 界面字体选择器；等宽不走设置（系统栈固定），所以只有这一个旋钮 */
-function UiFontSelect({
+/** 字体选择器：界面字体与终端字体共用一份实现，候选与展示名由调用方给 */
+function FontSelect({
+  options,
   value,
   label,
+  nameOf = (option) => option.name,
   onChange,
 }: {
+  options: readonly { id: string; name: string }[];
   value: string;
   label: string;
+  /** 展示名；档位名不是专名时（如「系统默认」）由调用方翻译 */
+  nameOf?: (option: { id: string; name: string }) => string;
   onChange: (id: string) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger aria-label={label} className="w-40">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {UI_FONTS.map((option) => (
-          // 系统字体没有专属名字，文案与其他选项的专名一起放在这里
+        {options.map((option) => (
           <SelectItem key={option.id} value={option.id}>
-            {option.id === "system" ? t("系统默认") : option.name}
+            {nameOf(option)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -173,10 +176,28 @@ export function SettingsAppearance() {
         title={t("界面字体")}
         description={t("界面文字使用的字体，选中后按需加载并立即生效。")}
         control={
-          <UiFontSelect
+          <FontSelect
+            options={UI_FONTS}
             value={prefs.uiFont}
             label={t("界面字体")}
+            // 系统字体没有专属名字，文案与其他选项的专名一起放在这里
+            nameOf={(option) => (option.id === "system" ? t("系统默认") : option.name)}
             onChange={(id) => setPrefs({ uiFont: id })}
+          />
+        }
+      />
+      <SettingsRow
+        title={t("终端字体")}
+        description={t("终端的字体；提示符里的图标字形出自 Nerd Font，装了对应字体才生效。")}
+        control={
+          <FontSelect
+            options={TERMINAL_FONTS}
+            value={prefs.terminalFont}
+            label={t("终端字体")}
+            nameOf={(option) =>
+              option.id === DEFAULT_TERMINAL_FONT_ID ? t("跟随代码字体") : option.name
+            }
+            onChange={(id) => setPrefs({ terminalFont: id })}
           />
         }
       />

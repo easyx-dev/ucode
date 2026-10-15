@@ -279,6 +279,9 @@
   --font-sans: var(--font-ui);
   --font-heading: var(--font-ui);
   --font-mono: var(--font-mono-stack);
+  /* 终端字体：运行时（`applyAppearance`）会写行内值，默认档就是等宽栈本身；
+     这里给同一份初值，只为「运行时还没接管」的那一瞬兜底 */
+  --font-terminal-base: var(--font-mono-stack);
 
   /* 字号：六档，全部由基准派生（14px 基准下为 12 / 14 / 16 / 18 / 20 / 24）。
      行高用 em 表达相对比例，这样基准变化时行距比例不变 */

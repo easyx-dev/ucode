@@ -906,6 +906,10 @@ export default {
   "登录凭证已失效，重新登录后再试": "Your credentials expired — sign in again and retry",
   重新连接: "Reconnect",
   终端画面出错了: "The terminal view failed to render",
+  终端字体: "Terminal font",
+  跟随代码字体: "Match code font",
+  "终端的字体；提示符里的图标字形出自 Nerd Font，装了对应字体才生效。":
+    "Font used by the terminal. The icon glyphs in your prompt come from Nerd Font; they work only if that font is installed.",
   项目文件: "Project files",
   打开的标签: "Open tabs",
   关闭标签: "Close tab",

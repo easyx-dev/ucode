@@ -134,6 +134,9 @@
   前端用 `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-attach`（数据面交给官方 addon）+ `@xterm/addon-unicode11`，
   配色由语义 token 采样成 `ITheme`（不新增 ANSI 令牌）。
   终端不落库、不进会话记录、不套 agent 的命令拦截，服务退出时统一清理。
+- 外观新增**终端字体**（设置 → 外观）：默认与代码字体同源（`--font-mono-stack`），也可换成 Nerd Font 家族
+  ——提示符里的图标字形（私有区码位）只有这些字体才有，系统等宽栈里没有，缺字形会画成方框。
+  这些档都是「装了才生效」：选中只把族名接在等宽栈之前（`--font-terminal-base`），没装的人与默认档完全一致。
 
 ### 变更
 

@@ -15,14 +15,17 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useClient } from "../../../provider";
+import { useAppearance } from "../../../provider/appearance-provider";
 
 /** 回滚行数：够翻一段命令输出，又不至于长跑任务的输出把内存吃满 */
 const SCROLLBACK_LINES = 5000;
 
-/** xterm 只吃具体的字体栈；`--font-mono` 正是那份带中文回退的等宽栈 */
-const monoFontFamily = (): string => {
+/** xterm 只吃具体的字体栈；`--font-terminal-base` 是「用户选的字体 + 中文回退的等宽栈」那一份 */
+const terminalFontFamily = (): string => {
   if (typeof document === "undefined") return "monospace";
-  const value = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim();
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue("--font-terminal-base")
+    .trim();
   return value || "monospace";
 };
 
@@ -31,6 +34,7 @@ export function useTerminalInstance(input: {
   fontSize: number;
   theme: ITheme | null;
 }) {
+  const { prefs } = useAppearance();
   const client = useClient();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -44,7 +48,7 @@ export function useTerminalInstance(input: {
 
     const instance = new XTerm({
       fontSize: initial.current.fontSize,
-      fontFamily: monoFontFamily(),
+      fontFamily: terminalFontFamily(),
       cursorBlink: true,
       scrollback: SCROLLBACK_LINES,
       theme: initial.current.theme ?? undefined,
@@ -84,9 +88,12 @@ export function useTerminalInstance(input: {
     if (!terminal) return;
     terminal.options.fontSize = input.fontSize;
     terminal.options.theme = input.theme ?? undefined;
-    // 字号变了列数也跟着变，得重新量一次
+    // 字体在设置里换过要当场生效（已开的终端不会重建）；同值不重设，避免白白触发一次测量
+    const family = terminalFontFamily();
+    if (terminal.options.fontFamily !== family) terminal.options.fontFamily = family;
+    // 字号与字体都会改变列数，改完重新量一次
     fit();
-  }, [terminal, input.fontSize, input.theme, fit]);
+  }, [terminal, input.fontSize, input.theme, prefs.terminalFont, fit]);
 
   useEffect(() => {
     const element = containerRef.current;
