@@ -29,7 +29,18 @@
 - …
 
 ### 修复
-- …
+
+- **终端不再继承宿主的运行环境**：终端进程的环境原先是 `{...process.env}` 全盘继承。除了包管理器注入的标记
+  （`npm_execpath` 指向宿主那份 pnpm、`npm_lifecycle_event=start`、`INIT_CWD`）之外，最要命的是
+  `NODE_ENV`：生产实例是 `NODE_ENV=production` 起的，而 `vite dev` 拿它而非自己的命令决定模式
+  （`isProduction = process.env.NODE_ENV === "production"`），终端里的 `import.meta.env.DEV` 于是为
+  `false`，按构建模式选分支的代码（如 dev 态取 CJS interop 的 `default`）走错路，报出
+  `opentype.parse is not a function` 这类怪错——同样的命令在系统终端里跑却是好的。现在按前缀剔除
+  `npm_*` / `pnpm_config_*` / `APP_*` / `SPIKE_*`，逐个剔除 `PNPM_SCRIPT_SRC_DIR` / `INIT_CWD` /
+  `NODE_ENV` / `NODE_PATH` / `NODE_OPTIONS` / `SHLVL`（后三个是启动服务那个运行器给自身注入的
+  模块解析路径、选项与 shell 嵌套层级），以及宿主终端的外观标记（`TERM` / `TERMINFO` /
+  `TERM_PROGRAM`，TERM 由 node-pty 定为 `xterm-256color`）与 CI 标记；`PNPM_HOME` 这类用户级
+  配置保留，用户在 `.zshrc` 里自己 export 的东西由 `zsh -l` 照旧补回。
 
 ## [0.1.0] - 2026-09-29
 

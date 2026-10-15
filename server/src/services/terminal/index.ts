@@ -38,6 +38,7 @@ import type { SessionRepository } from "../../db/session-repository";
 import { env } from "../../env";
 import { resolveExistingPath, resolveTargetPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
+import { terminalEnvOf } from "./env";
 import { TerminalPool, type TerminalSpawnSpec } from "./terminals";
 import { TerminalTicketStore } from "./tickets";
 
@@ -76,10 +77,11 @@ const clamp = (value: number, min: number, max: number): number =>
 /**
  * 终端跑哪个 shell：POSIX 取用户的 `$SHELL`，Windows 取 `ComSpec`。
  * POSIX 传 `-l`（登录 shell）——本服务多从 GUI / 后台起，进程的 PATH 里常缺用户自己装的目录。
- * `COLORTERM` 交给 truecolor：xterm 6 认 24 位色，不给的话不少程序只肯出 8 色。
+ * 环境先过 `terminalEnvOf` 清洗（剔掉宿主被包管理器拉起时的痕迹），`COLORTERM` 交给 truecolor：
+ * xterm 6 认 24 位色，不给的话不少程序只肯出 8 色。
  */
 const shellSpecOf = (): TerminalSpawnSpec => {
-  const env_ = { ...process.env, COLORTERM: "truecolor" };
+  const env_ = { ...terminalEnvOf(process.env), COLORTERM: "truecolor" };
   if (process.platform === "win32") {
     const comspec = process.env.ComSpec?.trim();
     return { file: comspec && comspec.length > 0 ? comspec : "cmd.exe", args: [], env: env_ };
