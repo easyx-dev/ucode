@@ -1,18 +1,20 @@
 /**
  * 工作台（右侧第三栏）的状态注入：面板状态由预设持有，动作经这里下发给业务组件。
  *
- * 面板是 VSCode 那种「活动栏 + 侧栏 + 编辑器区」：活动栏切侧栏看什么（项目文件 / 代码管理），
+ * 面板是 VSCode 那种「活动栏 + 侧栏 + 编辑器区」：活动栏切侧栏看什么（源代码管理 / 项目文件 / 终端），
  * 侧栏可以整列收起，编辑器区按打开的文档出标签。对话区的引用与命令面板都要能打开某个文件，
  * 而它们与面板之间隔着多层组件，因此用 context 下发动作；状态本身仍由 `WorkspaceLayout` 持有。
  */
 
-import type { GitCommitSummary } from "@ucode/contracts";
+import type { GitCommitSummary, TerminalInfo } from "@ucode/contracts";
 import { createContext, type ReactNode, useContext } from "react";
 
 import type { WorkbenchDoc } from "../business/workbench/workbench-docs";
 
-/** 侧栏的两个视图（顺序即活动栏自上而下的排布：代码管理在前，它是最常看的） */
-export const WORKBENCH_VIEWS = ["changes", "files"] as const;
+/**
+ * 侧栏的视图。顺序即活动栏自上而下的排布：代码管理在最上（最常看），终端在文件之后。
+ */
+export const WORKBENCH_VIEWS = ["changes", "files", "terminal"] as const;
 
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
 
@@ -51,6 +53,18 @@ export type WorkbenchApi = {
   collapse: () => void;
   /** 相对路径的解析基准：当前会话工作目录；null 表示没有工作目录 */
   cwd: string | null;
+  /** 当前工作目录下的终端（服务端为唯一事实源，这里只是它的一份拉取结果） */
+  terminals: readonly TerminalInfo[];
+  /** 起一个终端并打开它的标签；失败写进 `terminalError` */
+  createTerminal: () => void;
+  /** 把已有终端重新挂上标签（列表里点开、或换目录后重新打开） */
+  openTerminal: (terminalId: string) => void;
+  /** 结束终端（杀进程）并从标签里摘掉 */
+  closeTerminal: (terminalId: string) => void;
+  /** 重新拉一份终端列表 */
+  reloadTerminals: () => void;
+  /** 最近一次「新建终端」的失败文案；没有失败时为 null */
+  terminalError: string | null;
 };
 
 const WorkbenchContext = createContext<WorkbenchApi | null>(null);

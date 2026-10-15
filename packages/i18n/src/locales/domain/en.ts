@@ -38,6 +38,8 @@ export default {
   "目录不在 git 仓库内：{{path}}": "Directory is not inside a git repository: {{path}}",
   "未找到 git 可执行文件": "No git executable found",
   "git 执行失败": "git command failed",
+  终端不存在或已结束: "The terminal does not exist or has already exited",
+  终端数量已达上限: "Terminal limit reached for this directory",
   "图片无效：{{reason}}": "Invalid image: {{reason}}",
   "附件超过大小上限（{{max}}）": "Attachment exceeds the size limit ({{max}})",
   "插件不存在：{{id}}": "No such plugin: {{id}}",

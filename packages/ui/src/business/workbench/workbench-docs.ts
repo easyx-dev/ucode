@@ -2,8 +2,8 @@
  * 编辑器区打开的文档：标签集合与激活项，以及打开 / 切换 / 关闭的纯逻辑。
  *
  * 一份文档一个标签；同一份内容重复打开只激活已有标签。标签数上限 8 个，超出丢最早的那个
- * （激活项不动，新开的仍在最右）。id 由内容与来源构成，因此同一文件的「预览」与
- * 「改动 diff」各占一个标签，互不覆盖。
+ * （激活项不动，新开的仍在最右）——但终端不参与丢弃，见 `dropEarliest`。id 由内容与来源构成，
+ * 因此同一文件的「预览」与「改动 diff」各占一个标签，互不覆盖。
  */
 import type { GitCommitSummary, GitDiffSource } from "@ucode/contracts";
 
@@ -22,7 +22,12 @@ export type WorkbenchDoc =
     }
   /** 全部改动堆叠在一份文档里（每块一个文件），与单文件标签并存 */
   | { id: string; kind: "changes"; path: string }
-  | { id: string; kind: "commit"; path: string; commit: GitCommitSummary };
+  | { id: string; kind: "commit"; path: string; commit: GitCommitSummary }
+  /**
+   * 终端。标签与进程一一对应：关标签即结束终端，所以它不参与「超限丢最早」。
+   * 进程活在服务端并活到被显式关掉，工作目录变了标签会清空、进程还在，从侧栏列表能重新打开。
+   */
+  | { id: string; kind: "terminal"; terminalId: string };
 
 /** 同时打开的标签数上限；超出丢最早的那个 */
 export const MAX_WORKBENCH_DOCS = 8;
@@ -63,12 +68,44 @@ export const changesDoc = (cwd: string): WorkbenchDoc => ({
   path: cwd,
 });
 
+export const terminalDocId = (terminalId: string): string => `terminal:${terminalId}`;
+
+/** 一个终端一个标签；标题由标签条按序给（服务端不下发名字） */
+export const terminalDoc = (terminalId: string): WorkbenchDoc => ({
+  id: terminalDocId(terminalId),
+  kind: "terminal",
+  terminalId,
+});
+
 export type WorkbenchDocsState = {
   docs: readonly WorkbenchDoc[];
   activeDocId: string | null;
 };
 
 export const emptyWorkbenchDocs: WorkbenchDocsState = { docs: [], activeDocId: null };
+
+const isEmpty = (state: WorkbenchDocsState): boolean =>
+  state.docs.length === 0 && state.activeDocId === null;
+
+/**
+ * 超出上限时丢最早的那几个，但跳过终端：终端标签与进程一一对应，被挤掉会留下一个看不见的进程。
+ * 极端情形（剩下的全是终端）还是得丢，此时进程仍在服务端，从侧栏列表能重新打开。
+ */
+const dropEarliest = (docs: readonly WorkbenchDoc[]): readonly WorkbenchDoc[] => {
+  if (docs.length <= MAX_WORKBENCH_DOCS) return docs;
+  const overflow = docs.length - MAX_WORKBENCH_DOCS;
+  const dropped = new Set<string>();
+  for (const doc of docs) {
+    if (dropped.size >= overflow) break;
+    if (doc.kind === "terminal") continue;
+    dropped.add(doc.id);
+  }
+  for (const doc of docs) {
+    if (dropped.size >= overflow) break;
+    dropped.add(doc.id);
+  }
+  return docs.filter((doc) => !dropped.has(doc.id));
+};
 
 export type WorkbenchDocsAction =
   | { type: "open"; doc: WorkbenchDoc }
@@ -89,12 +126,7 @@ export const workbenchDocsReducer = (
       if (state.docs.some((item) => item.id === doc.id)) {
         return { docs: state.docs, activeDocId: doc.id };
       }
-      const appended = [...state.docs, doc];
-      const docs =
-        appended.length > MAX_WORKBENCH_DOCS
-          ? appended.slice(appended.length - MAX_WORKBENCH_DOCS)
-          : appended;
-      return { docs, activeDocId: doc.id };
+      return { docs: dropEarliest([...state.docs, doc]), activeDocId: doc.id };
     }
     case "select":
       return state.activeDocId === action.id ? state : { ...state, activeDocId: action.id };
@@ -114,8 +146,8 @@ export const workbenchDocsReducer = (
       return { docs: kept, activeDocId: action.id };
     }
     case "closeAll":
-      return state.docs.length === 0 ? state : emptyWorkbenchDocs;
+      return isEmpty(state) ? state : emptyWorkbenchDocs;
     case "reset":
-      return state.docs.length === 0 && state.activeDocId === null ? state : emptyWorkbenchDocs;
+      return isEmpty(state) ? state : emptyWorkbenchDocs;
   }
 };

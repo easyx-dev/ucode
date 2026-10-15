@@ -1,4 +1,5 @@
 /** 接口层：按域组装 /api/v1 的调用方法，直接复用 @ucode/contracts 的请求 / 响应类型 */
+
 import type {
   AgentsListRequest,
   AgentsListResponse,
@@ -103,8 +104,19 @@ import type {
   StatsSummaryRequest,
   StatsSummaryResponse,
   StatusResponse,
+  TerminalCloseRequest,
+  TerminalCloseResponse,
+  TerminalCreateRequest,
+  TerminalCreateResponse,
+  TerminalListRequest,
+  TerminalListResponse,
+  TerminalResizeRequest,
+  TerminalResizeResponse,
+  TerminalTicketRequest,
+  TerminalTicketResponse,
   WhoamiResponse,
 } from "@ucode/contracts";
+import { API_BASE_PATH } from "@ucode/contracts";
 
 import { readSseStream } from "./sse";
 import { createTransport, type TransportOptions } from "./transport";
@@ -115,6 +127,20 @@ export type ApisOptions = TransportOptions & {
    * 存储形式由宿主决定（浏览器落 localStorage；原生端不设——它用 `serviceToken`）。
    */
   onToken?: (token: string | null) => void;
+  /**
+   * 终端输出流的 WebSocket 基址（`ws://host:port`，不带路径与查询）。
+   * 浏览器里由 `location.origin` 换算即可；桌面端生产形态的来源是 `app://`，推不出来，
+   * 所以由外壳显式给（见 `apps/desktop/src/renderer` 的装配）。
+   * 不传时回落「按 baseUrl 推导」——那只在 baseUrl 是 http(s) 时才成立。
+   */
+  websocketBaseUrl?: string;
+};
+
+/** `http(s)://host` → `ws(s)://host`；空串或非 http(s) 推不出来，返回空串由调用方报错 */
+const deriveWebsocketBase = (baseUrl?: string): string => {
+  const match = /^(https?):\/\/(.+)$/.exec(baseUrl ?? "");
+  if (!match) return "";
+  return `${match[1] === "https" ? "wss" : "ws"}://${match[2]}`.replace(/\/+$/, "");
 };
 
 /**
@@ -122,6 +148,7 @@ export type ApisOptions = TransportOptions & {
  * 需要「与 server 同步的状态」时用 `createClient`（在其上装配 events 与各域 store）。
  */
 export const createApis = (options: ApisOptions = {}) => {
+  const websocketBase = (options.websocketBaseUrl ?? "").replace(/\/+$/, "");
   const transport = createTransport({
     ...options,
     // 「凭证失效就清掉 token」在这一处收口，不必让每个调用方自己记着清
@@ -394,6 +421,32 @@ export const createApis = (options: ApisOptions = {}) => {
           signal,
           onActivity,
         );
+      },
+    },
+    terminal: {
+      create: (body: TerminalCreateRequest) =>
+        transport.post<TerminalCreateResponse>("terminal/create", body),
+      list: (body: TerminalListRequest) =>
+        transport.post<TerminalListResponse>("terminal/list", body),
+      resize: (body: TerminalResizeRequest) =>
+        transport.post<TerminalResizeResponse>("terminal/resize", body),
+      close: (body: TerminalCloseRequest) =>
+        transport.post<TerminalCloseResponse>("terminal/close", body),
+      /** 签一张输出流的握手票：一次性、短时、绑定该终端 */
+      ticket: (body: TerminalTicketRequest) =>
+        transport.post<TerminalTicketResponse>("terminal/ticket", body),
+      /**
+       * 输出流的 WebSocket 地址。基址必须由宿主给（`websocketBaseUrl`）：
+       * `baseUrl` 是空串时推不出来（桌面端与生产 web 走的都是同源相对路径），
+       * 而桌面生产形态的来源是 `app://`——浏览器不会对自定义协议做 WS 升级。
+       */
+      websocketUrl: (terminalId: string, ticket: string): string => {
+        const base = websocketBase || deriveWebsocketBase(options.baseUrl);
+        if (!base) {
+          throw new Error("终端输出流缺少 WebSocket 基址：请传 ApisOptions.websocketBaseUrl");
+        }
+        const query = new URLSearchParams({ terminalId, ticket });
+        return `${base}${API_BASE_PATH}/terminal/stream?${query.toString()}`;
       },
     },
   };

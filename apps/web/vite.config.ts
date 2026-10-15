@@ -52,7 +52,7 @@ export default defineConfig(({ command, mode }) => {
       port: 5173,
       strictPort: true,
       proxy: APP_PORT
-        ? { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true } }
+        ? { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true, ws: true } }
         : undefined,
     },
     build: {

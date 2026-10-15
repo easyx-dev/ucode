@@ -67,6 +67,14 @@
   版本段 4 个 / 全文 45KB）——超限即失败并指明该怎么归档。追加条目时「新开一节」会让同名小节重复，
   攒着不落版又会让主文件长到一次 `read` 读不完，两者都拦在结构上。
 - `pnpm verify -- --only <项名>`：只跑指定检查项（如 `--only changelog,i18n`），缺省仍全跑。
+- **工作台新增终端**：PTY 由服务进程持有（`node-pty`），工作台的编辑器区以标签形式打开，按**工作目录**归口
+  （同目录的会话共用同一批终端）；关标签即结束进程，切会话不结束（进程留在侧栏列表里，重挂会重放最近的输出）。
+  契约新增 `terminal` 域（创建 / 列举 / 改尺寸 / 关闭 + 签一次性握手票；输出流是 WebSocket 升级端点
+  `GET /terminal/stream`，上行文本=输入、下行二进制=输出，结束与拒绝用关闭码表达），
+  服务端新增 `routes/terminal`、`services/terminal`（池、编排、票据同域）与 `constants/terminal.ts`（每目录上限 4 个），
+  前端用 `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-attach`（数据面交给官方 addon）+ `@xterm/addon-unicode11`，
+  配色由语义 token 采样成 `ITheme`（不新增 ANSI 令牌）。
+  终端不落库、不进会话记录、不套 agent 的命令拦截，服务退出时统一清理。
 
 ### 变更
 
@@ -83,6 +91,24 @@
   改 `ghost` 的 `xs` 档按钮（悬停底色、焦点环、悬停说明走 Tooltip 而不是原生 `title`），暂停 / 恢复 / 清除同档同形；
   窄容器（36rem 以下）里主行只留目标 · 状态与暂停 / 恢复，`⋯` 往上展开一行放逐轮记录、用量与清除，动作文案收起只留图标（`aria-label` 保住可访问名）。
   影响：决策面板打开时它随输入区一起被底衬盖住（原先常驻可暂停），那段时间的目标状态由活动摘要条表达。
+- **终端输出流改用 WebSocket**（原 SSE + POST）：两个方向都高频的字节流更适合 WS，且 xterm 生态就长在它上面
+  ——数据面直接交给 `@xterm/addon-attach`，服务端只发二进制，客户端不再需要帧解析与 base64 解码。
+  握手鉴权用一次性票据（`POST /terminal/ticket` → `?ticket=`）：浏览器 WS 带不了 `Authorization`、凭证也不走
+  Cookie，票短时单次且绑定终端，长期凭证仍不进渲染层。判活改由服务端 ping/pong 负责，结束与拒绝走关闭码，
+  客户端按码分流（`1000` / `4401` / `4404` 为终态，其余退避重连；取票阶段的 `terminal_not_found` /
+  `unauthorized` 同样按终态收场，避免服务重启后残留标签一直重试）。
+  握手票在鉴权中间件里**预检**——无效票直接 401，连接不会建立；路由只做核销。
+  终端编号由服务端按目录下发（`TerminalInfo.sequence`），关掉中间一个不会让后面的编号前移。桌面端渲染层因此需直连服务端口取 WS
+  （`app://` 做不了协议升级），两边 dev 形态的 Vite 代理都开了 `ws` 转发。
+  依赖新增 `ws` + `@hono/node-ws`（服务端）与 `@xterm/addon-attach` + `@xterm/addon-unicode11`（前端）。
+- SDK 新增终端连接管理（`packages/sdk/src/terminal-socket.ts`）：取票、退避重连、按关闭码判定终态；
+  既有的 `reconnect.ts` 仍服务全局事件流（浏览器面板的帧流将来照它做），事件流对外行为不变；
+  `ui/utils/color.ts` 从 `business/markdown/mermaid` 上提并补上「探针元素求值含 `var()` / `color-mix()` 的表达式」，
+  终端主题与 mermaid 共用这一层。
+- **安装期补 `node-pty` 的 `spawn-helper` 执行位**：npm 包里的预编译 helper 是 `644`，直接起 PTY 会
+  `posix_spawnp failed`。根 `package.json` 新增 `postinstall` 脚本（`scripts/postinstall.mjs`）在安装后补上
+  （Windows 无此文件、Linux 自编译产物本来可执行，两者都跳过）；`pnpm-workspace.yaml` 的 `allowBuilds` 放行
+  `node-pty` 的安装脚本。依赖新增 `node-pty`（根与 server）与 `@xterm/xterm` / `@xterm/addon-fit`（ui）。
 
 ### 修复
 

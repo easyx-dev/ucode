@@ -72,3 +72,19 @@
 .dark .diff-tailwindcss-wrapper .diff-style-root .diff-line-syntax-raw [style*="--shiki-light"] {
   color: var(--shiki-dark);
 }
+
+/*
+ * 终端（@xterm/xterm）：库自带样式只管布局（滚动区与字符网格），字符与光标颜色全部由 `ITheme` 注入——
+ * 采样语义 token 后交给它的渲染器（见 `business/workbench/terminal/terminal-theme.ts`）。
+ * 因此这里只补库写死的那处兜底底色与原生滚动条。
+ */
+.xterm .xterm-viewport {
+  /*
+   * 库把滚动区底色写死成 #000：它自己只画画布那一层，这层是画布之外的兜底，
+   * 不映射的话浅色面板里会露出一块黑。取与终端底色同一个 token。
+   */
+  background-color: var(--surface);
+  /* 滚动条默认是系统原生样式，深色面板上会露出一条亮灰；按语义色重画并收细 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}

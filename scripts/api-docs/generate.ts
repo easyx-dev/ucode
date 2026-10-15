@@ -34,6 +34,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   marketplace: "插件市场",
   goals: "目标模式",
   stats: "使用统计",
+  terminal: "终端",
 };
 
 const schemas = contracts as unknown as Record<string, unknown>;
@@ -63,21 +64,43 @@ const renderEndpoint = (
     "",
   ];
 
-  blocks.push("**请求参数**", "");
+  if (!endpoint.upgrade) blocks.push("**请求参数**", "");
   const jsonSchema = endpoint.input ? jsonSchemaOf(endpoint.input) : null;
   const properties = jsonSchema?.properties;
   const hasParams =
     jsonSchema !== null &&
     (jsonSchema.type !== "object" || (properties && Object.keys(properties).length > 0));
-  if (hasParams && endpoint.requestType && jsonSchema) {
+  if (endpoint.upgrade) {
+    // 升级端点的参数在下面那一段里写，这里不再渲染空段
+  } else if (hasParams && endpoint.requestType && jsonSchema) {
     const docs = collectFieldDocs(ctx, endpoint.requestType);
     const node = jsonSchemaToDocNode(jsonSchema, docs);
     blocks.push(renderTables(renderNodeTables(node, refs), "request"), "");
   } else {
-    blocks.push(endpoint.method === "GET" ? "无参数" : "无参数（body 传 `{}`）", "");
+    blocks.push(
+      endpoint.upgrade
+        ? "无 body"
+        : endpoint.method === "GET"
+          ? "无参数"
+          : "无参数（body 传 `{}`）",
+      "",
+    );
   }
 
-  if (endpoint.binary) {
+  if (endpoint.upgrade) {
+    blocks.push(
+      "**握手参数**",
+      "",
+      "`terminalId`：终端 id；`ticket`：`POST /api/v1/terminal/ticket` 签发的一次性票据（30 秒内有效、只能用一次）。",
+      "",
+      "**协议**",
+      "",
+      "WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输出字节；",
+      "结束与拒绝由关闭码表达（`1000` 带 `exit:<code>`、`4401` 票据无效、`4404` 终端不存在、`4403` 客户端跟不上输出）。",
+      "详见 `docs/api.md` 的「终端」一节。",
+      "",
+    );
+  } else if (endpoint.binary) {
     blocks.push(
       "**响应**",
       "",

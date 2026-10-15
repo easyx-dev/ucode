@@ -104,6 +104,11 @@ export const ERROR_CODES = {
   /** git 命令执行失败 */
   gitFailed: "git_failed",
 
+  /** 终端不存在或已结束 */
+  terminalNotFound: "terminal_not_found",
+  /** 该工作目录下的终端数已达上限 */
+  terminalLimit: "terminal_limit",
+
   /** 图片无法归一化（格式不支持、超限且不可压缩等） */
   imageInvalid: "image_invalid",
   /** 上传体积超过上限 */

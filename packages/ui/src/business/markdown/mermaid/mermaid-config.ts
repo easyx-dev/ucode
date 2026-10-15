@@ -6,7 +6,7 @@
  * 不把半套颜色混着用。
  */
 import type { MermaidConfig } from "@streamdown/mermaid";
-import { cssColorToRgb } from "./mermaid-color";
+import { cssColorToRgb } from "../../../utils/color";
 
 /** 图表需要的颜色角色 → 语义 token；token 定义在 `theme.css` */
 const COLOR_TOKENS = {

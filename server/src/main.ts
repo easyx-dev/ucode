@@ -25,7 +25,7 @@ if (created) {
 }
 
 const services = await createServices(registration);
-const app = createApp(services);
+const { app, injectWebSocket } = createApp(services);
 
 /** 实际监听端口要等 listen 回调才确定（端口 0 时自选），供 CLI `--open` 等待后再打开 */
 let resolveListening: (port: number) => void = () => {};
@@ -58,6 +58,9 @@ const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (
 });
 
 // 没有这个监听时，端口占用会以 Unhandled 'error' event 崩掉，只留一段原始堆栈
+// WebSocket 的升级监听先挂上：它与 http server 共用同一个端口（终端输出流走 WS，见 routes/terminal）
+injectWebSocket(server);
+
 server.on("error", (error: NodeJS.ErrnoException) => {
   if (error.code === "EADDRINUSE") {
     logger.error(

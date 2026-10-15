@@ -34,6 +34,7 @@ import { createLifecycle } from "./lifecycle";
 import { createPluginService, type PluginService, PluginStateStore } from "./plugins";
 import { createMarketplaceService, type MarketplaceService } from "./plugins/marketplace";
 import { ProjectService } from "./projects";
+import { createTerminalService, type TerminalService } from "./terminal";
 
 export type Services = {
   config: ConfigStore;
@@ -72,6 +73,8 @@ export type Services = {
   plugins: PluginService;
   /** 插件市场来源：登记 / 移除 / 刷新 */
   marketplaces: MarketplaceService;
+  /** 终端：按工作目录归口的 PTY 池（只在进程内存，不落库） */
+  terminals: TerminalService;
   /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
   /** 关闭共享的 SQLite 连接 */
@@ -197,6 +200,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
     auth: { sessions: authSessions, pairing, loginLimiter },
   });
   const configService = createConfigService({ config, runtime, pool, events });
+  // 终端排在会话池之后：它只用到会话仓储（据此把 sessionId 解析成工作目录）
+  const terminals = createTerminalService({ sessions });
 
   await lifecycle.start();
 
@@ -215,6 +220,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     titles,
     plugins,
     marketplaces,
+    terminals,
     auth: {
       credentials,
       sessions: authSessions,
@@ -224,6 +230,10 @@ export const createServices = async (registration: ServiceRegistration): Promise
     },
     applyConfig: configService.applyConfig,
     reload: configService.reload,
-    close: lifecycle.stop,
+    close: () => {
+      // 终端进程不归会话池管（也不随会话回收），服务退出时在这里一并清掉
+      terminals.disposeAll();
+      lifecycle.stop();
+    },
   };
 };

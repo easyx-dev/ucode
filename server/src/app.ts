@@ -1,8 +1,8 @@
 /** HTTP 应用装配：全局中间件、鉴权、各域路由挂载、静态托管与错误封套 */
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-
 import { serveStatic } from "@hono/node-server/serve-static";
+import { createNodeWebSocket, type NodeWebSocket } from "@hono/node-ws";
 import { API_BASE_PATH, ERROR_CODES } from "@ucode/contracts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -34,6 +34,7 @@ import { createServiceRoute } from "./routes/service";
 import { createSessionsRoute } from "./routes/sessions";
 import { createStatsRoute } from "./routes/stats";
 import { createStatusRoute } from "./routes/status";
+import { createTerminalRoute } from "./routes/terminal";
 import type { Services } from "./services";
 import { type AuthVariables, createAuthMiddleware } from "./services/auth/middleware";
 
@@ -41,8 +42,13 @@ import { type AuthVariables, createAuthMiddleware } from "./services/auth/middle
 const webIndexPath = resolve(env.webDistDir, "index.html");
 export const webBuildExists = (): boolean => existsSync(webIndexPath);
 
-export const createApp = (services: Services): Hono<AuthVariables> => {
+export const createApp = (
+  services: Services,
+): { app: Hono<AuthVariables>; injectWebSocket: NodeWebSocket["injectWebSocket"] } => {
   const app = new Hono<AuthVariables>();
+  // WebSocket 适配器要在注册路由前拿到 app：升级请求交给同一套路由处理（鉴权中间件照跑），
+  // 而它返回的 `injectWebSocket` 要等 `serve()` 拿到 http server 之后再挂上去（见 main.ts）
+  const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
 
   // CORS 只对白名单来源开放；凭证走 `Authorization` 头而非 Cookie，故带凭证的跨域请求也不需要 Cookie 语义
   // 预检必须放行 `authorization`，否则桌面端渲染层（独立端口）连不上本机服务
@@ -57,6 +63,7 @@ export const createApp = (services: Services): Hono<AuthVariables> => {
     createAuthMiddleware({
       credentials: services.auth.credentials,
       sessions: services.auth.sessions,
+      peekTicket: (ticket, terminalId) => services.terminals.peekTicket(ticket, terminalId),
     }),
   );
 
@@ -84,6 +91,7 @@ export const createApp = (services: Services): Hono<AuthVariables> => {
   v1.route("/attachments", createAttachmentsRoute(services));
   v1.route("/agents", createAgentsRoute(services));
   v1.route("/assets", createAssetsRoute(services));
+  v1.route("/terminal", createTerminalRoute(services, upgradeWebSocket));
 
   app.route(API_BASE_PATH, v1);
 
@@ -118,5 +126,5 @@ export const createApp = (services: Services): Hono<AuthVariables> => {
     );
   });
 
-  return app;
+  return { app, injectWebSocket };
 };

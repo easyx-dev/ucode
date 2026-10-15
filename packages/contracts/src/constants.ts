@@ -73,6 +73,25 @@ export const GIT_DIFF_LINE_KINDS = ["ctx", "add", "del"] as const;
 
 export type GitDiffLineKind = (typeof GIT_DIFF_LINE_KINDS)[number];
 
+/** 终端尺寸的取值域：请求里的 cols / rows 必须落在这里面（xterm 的 fit 实测值远小于上限） */
+export const TERMINAL_COLS_MIN = 2;
+export const TERMINAL_COLS_MAX = 1000;
+export const TERMINAL_ROWS_MIN = 1;
+export const TERMINAL_ROWS_MAX = 500;
+
+/**
+ * 终端输出流的 WebSocket 关闭码（服务端主动关闭时用）。
+ * 客户端据此分流：「结束」态不再重连，只有其它码才退避重连。
+ */
+/** 进程结束；reason 形如 `exit:0`（含退出码） */
+export const TERMINAL_CLOSE_EXIT = 1000;
+/** 票据无效或已用过：重新取票也救不回来，客户端提示后停下 */
+export const TERMINAL_CLOSE_UNAUTHORIZED = 4401;
+/** 终端不存在或已结束 */
+export const TERMINAL_CLOSE_NOT_FOUND = 4404;
+/** 客户端跟不上输出（缓冲积压），可重连后靠重放收敛 */
+export const TERMINAL_CLOSE_OVERFLOW = 4403;
+
 /** 消息角色；响应用枚举，与 pi 的 AgentMessage 角色对齐（system 等内部角色不下发） */
 export const MESSAGE_ROLES = ["user", "assistant", "tool", "custom", "summary"] as const;
 

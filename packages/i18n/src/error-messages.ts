@@ -38,6 +38,8 @@ export const errorMessageKeys = {
   not_a_repository: "目录不在 git 仓库内：{{path}}",
   git_unavailable: "未找到 git 可执行文件",
   git_failed: "git 执行失败",
+  terminal_not_found: "终端不存在或已结束",
+  terminal_limit: "终端数量已达上限",
   image_invalid: "图片无效：{{reason}}",
   payload_too_large: "附件超过大小上限（{{max}}）",
   plugin_not_found: "插件不存在：{{id}}",

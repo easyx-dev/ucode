@@ -82,8 +82,14 @@ const bootstrap = async (): Promise<void> => {
   }
 
   // 同源：接口走渲染层自己的来源（开发由 Vite 代理、生产由 `app://` 协议处理器转给服务），
-  // 所以不需要知道服务的地址，baseUrl 是空串（相对路径）
-  const client = createClient({ baseUrl: "", translate });
+  // 所以不需要知道服务的地址，baseUrl 是空串（相对路径）。
+  // 终端输出流是唯一的例外——它要 WebSocket，而 `app://` 协议做不了升级，生产形态必须直连服务端口
+  // （凭证仍不出主进程：那条连接用一次性握手票，见 services/terminal）
+  const websocketBaseUrl =
+    window.location.protocol === "app:"
+      ? connection.websocketUrl
+      : window.location.origin.replace(/^http/, "ws");
+  const client = createClient({ baseUrl: "", websocketBaseUrl, translate });
 
   // 先用未认证的 info 探活：`auth.load` 会把网络错误也当成匿名，
   // 单看它会把「服务没起」误报成「凭证无效」

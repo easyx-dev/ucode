@@ -292,8 +292,10 @@ UCode 的视觉系统：token 定义在 [`packages/ui/src/styles/tokens.css`](./
    而不是写死常量——否则改字号时它会掉队。
 3. **颜色采样**：库自己解析颜色字符串时，不能直接读变量的 computed 值——语义层用 `color-mix()` 合成，
    读出来是未求值的表达式（如 `color-mix(in oklab, oklch(…), transparent)`）。要经浏览器求值：
-   本仓库走 `business/markdown/mermaid-color.ts` 的 1×1 canvas 采样（`CSS.supports` 先校验再采样，得 sRGB 四通道），
-    mermaid 的颜色引擎与语法高亮都吃这一层。
+   本仓库走 `utils/color.ts`（`cssVarColor` 读自定义属性、`resolveCssColor` 用隐藏探针元素把含
+   `var()` / `color-mix()` 的表达式算完，两者最后都经 1×1 canvas 采样成 sRGB 四通道）。
+   吃这一层的有 mermaid 的颜色引擎、语法高亮与终端的 `ITheme`（见
+   `business/workbench/terminal/terminal-theme.ts`）。
 
 ## 配色主题
 

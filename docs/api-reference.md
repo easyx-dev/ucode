@@ -92,6 +92,12 @@
 | POST | `/api/v1/goals/resume` | 恢复目标自动续跑 |
 | POST | `/api/v1/goals/clear` | 清除当前会话目标 |
 | POST | `/api/v1/stats/summary` | 全局 token 用量统计（按模型 / 会话聚合） |
+| POST | `/api/v1/terminal/create` | 起一个终端（按会话 id 或工作目录归口） |
+| POST | `/api/v1/terminal/list` | 列出某工作目录下的终端（客户端据此恢复标签） |
+| POST | `/api/v1/terminal/resize` | 改终端尺寸（前端按实测值上报） |
+| POST | `/api/v1/terminal/close` | 结束终端（杀进程并摘除条目） |
+| POST | `/api/v1/terminal/ticket` | 签一张输出流的一次性握手票 |
+| GET | `/api/v1/terminal/stream` | 单终端输出流（WebSocket：先重放最近输出，再实时） |
 
 ## 健康检查（`health`）
 
@@ -1829,6 +1835,119 @@
 | `longestSessionMs` | number | 是 | 区间内「单会话最长聊天时长」（毫秒）：会话内相邻调用间隔不超过 30 分钟算同一段， 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。 |
 | `steps` | [StatsStepSummary](#statsstepsummary) | 是 | 区间内的步级耗时画像；区间内没有任何步记录时各指标为空 |
 
+## 终端（`terminal`）
+
+### POST /api/v1/terminal/create
+
+起一个终端（按会话 id 或工作目录归口）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（长度≥1） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+| `cols` | integer（≥2，≤1000） | 是 | — | — |
+| `rows` | integer（≥1，≤500） | 是 | — | — |
+
+**响应类型**：`TerminalCreateResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 终端 id（进程内唯一） |
+| `sequence` | number | 是 | 该终端在所属目录里的创建序号（从 1 起，**不随关闭回收**）。 界面用它给用户区分多个终端：按列表下标编号会在关掉中间一个时整体前移。 |
+| `cwd` | string | 是 | 工作目录绝对路径；终端按它归口，同目录的会话共用同一批终端 |
+| `shell` | string | 是 | 服务端用的 shell 可执行文件 |
+| `cols` | number | 是 | — |
+| `rows` | number | 是 | — |
+| `running` | boolean | 是 | 是否仍在运行；已退出时为 false，`exitCode` 随之有值 |
+| `pid` | number | 是 | 进程 id |
+| `exitCode` | number \| null | 是 | 退出码；仍在运行时为 null |
+| `createdAt` | string | 是 | — |
+
+### POST /api/v1/terminal/list
+
+列出某工作目录下的终端（客户端据此恢复标签）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `sessionId` | string（长度≥1） | 否 | — | — |
+| `cwd` | string（长度≥1） | 否 | — | — |
+
+**响应类型**：`TerminalListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `terminals` | [TerminalInfo](#terminalinfo)[] | 是 | 该工作目录下的终端，按创建时间先后 |
+
+### POST /api/v1/terminal/resize
+
+改终端尺寸（前端按实测值上报）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `terminalId` | string（长度≥1） | 是 | — | — |
+| `cols` | integer（≥2，≤1000） | 是 | — | — |
+| `rows` | integer（≥1，≤500） | 是 | — | — |
+
+**响应类型**：`TerminalResizeResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `cols` | number | 是 | 实际生效的尺寸（服务端按取值域夹取后） |
+| `rows` | number | 是 | — |
+
+### POST /api/v1/terminal/close
+
+结束终端（杀进程并摘除条目）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `terminalId` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`TerminalCloseResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `closed` | boolean | 是 | 是否真的关掉了：终端不存在或已结束时为 false |
+
+### POST /api/v1/terminal/ticket
+
+签一张输出流的一次性握手票
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `terminalId` | string（长度≥1） | 是 | — | — |
+
+**响应类型**：`TerminalTicketResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `ticket` | string | 是 | — |
+| `expiresAt` | string | 是 | 过期时间（ISO）；客户端不必用，留给排障 |
+
+### GET /api/v1/terminal/stream
+
+单终端输出流（WebSocket：先重放最近输出，再实时）
+
+**握手参数**
+
+`terminalId`：终端 id；`ticket`：`POST /api/v1/terminal/ticket` 签发的一次性票据（30 秒内有效、只能用一次）。
+
+**协议**
+
+WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输出字节；
+结束与拒绝由关闭码表达（`1000` 带 `exit:<code>`、`4401` 票据无效、`4404` 终端不存在、`4403` 客户端跟不上输出）。
+详见 `docs/api.md` 的「终端」一节。
+
 ## 事件流
 
 `POST /api/v1/events` 返回 `text/event-stream`，**不套封套**：SSE 事件名固定 `message`，
@@ -2428,6 +2547,21 @@
 | `byModel` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按 `provider/model` 分桶，按步数降序 |
 | `byThinking` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按思考档位分桶；取不到档位的步归 `unknown` |
 | `daily` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按服务端本地日期分桶（`YYYY-MM-DD`，只出有步的日） |
+
+### TerminalInfo
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 终端 id（进程内唯一） |
+| `sequence` | number | 是 | 该终端在所属目录里的创建序号（从 1 起，**不随关闭回收**）。 界面用它给用户区分多个终端：按列表下标编号会在关掉中间一个时整体前移。 |
+| `cwd` | string | 是 | 工作目录绝对路径；终端按它归口，同目录的会话共用同一批终端 |
+| `shell` | string | 是 | 服务端用的 shell 可执行文件 |
+| `cols` | number | 是 | — |
+| `rows` | number | 是 | — |
+| `running` | boolean | 是 | 是否仍在运行；已退出时为 false，`exitCode` 随之有值 |
+| `pid` | number | 是 | 进程 id |
+| `exitCode` | number \| null | 是 | 退出码；仍在运行时为 null |
+| `createdAt` | string | 是 | — |
 
 ### ConfigSnapshot
 

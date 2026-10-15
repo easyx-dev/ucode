@@ -16,7 +16,8 @@ import { SessionService } from "../sessions";
 
 const created: string[] = [];
 
-const makeApp = () => {
+/** 票据预检：默认一律不认，个别用例再覆盖 */
+const makeApp = (peekTicket: (ticket: string, terminalId: string) => boolean = () => false) => {
   const root = mkdtempSync(join(tmpdir(), "auth-middleware-"));
   created.push(root);
   const db = openDatabase(join(root, "app.db"));
@@ -34,10 +35,11 @@ const makeApp = () => {
   const sessions = new SessionService(new AuthSessionRepository(db));
 
   const app = new Hono<AuthVariables>();
-  app.use(`${API_BASE_PATH}/*`, createAuthMiddleware({ credentials, sessions }));
+  app.use(`${API_BASE_PATH}/*`, createAuthMiddleware({ credentials, sessions, peekTicket }));
   app.get(`${API_BASE_PATH}/health`, (c) => c.json({ up: true }));
   app.post(`${API_BASE_PATH}/auth/pairing/redeem`, (c) => c.json({ redeemed: true }));
   app.get(`${API_BASE_PATH}/probe`, (c) => c.json({ sessionId: c.get("principal").sessionId }));
+  app.get(`${API_BASE_PATH}/terminal/stream`, (c) => c.json({ upgraded: true }));
 
   return { app, sessions, close: () => db.close() };
 };
@@ -49,6 +51,29 @@ afterEach(() => {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("createAuthMiddleware", () => {
+  it("终端握手：票有效且绑对上才放行", async () => {
+    const env = makeApp((ticket, terminalId) => ticket === "good" && terminalId === "term-1");
+    try {
+      const ok = await env.app.request(
+        `${API_BASE_PATH}/terminal/stream?terminalId=term-1&ticket=good`,
+      );
+      assert.equal(ok.status, 200);
+
+      // 没票 / 票不对 / 绑的不是这个终端：都在建连之前就拒掉
+      for (const query of [
+        "",
+        "?terminalId=term-1",
+        "?terminalId=term-1&ticket=bad",
+        "?terminalId=term-2&ticket=good",
+      ]) {
+        const denied = await env.app.request(`${API_BASE_PATH}/terminal/stream${query}`);
+        assert.equal(denied.status, 401, `query「${query}」应被拒`);
+      }
+    } finally {
+      env.close();
+    }
+  });
+
   it("放行清单内的接口不需要凭证", async () => {
     const env = makeApp();
     try {

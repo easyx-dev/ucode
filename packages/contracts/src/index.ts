@@ -49,3 +49,5 @@ export * from "./sessions/output";
 export * from "./stats/context";
 export * from "./stats/input";
 export * from "./stats/output";
+export * from "./terminal/input";
+export * from "./terminal/output";

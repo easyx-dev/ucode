@@ -15,12 +15,14 @@ export type ApiEndpoint = {
   input: string | null;
   /** 与请求 schema 对应的 `*Input` 类型名，用于取字段说明；`null` 表示无参数 */
   requestType: string | null;
-  /** 响应类型名；SSE 接口用 `stream` 标记，不看此字段 */
-  output: string;
+  /** 响应类型名；`stream` / `binary` / `upgrade` 三种端点不看此字段 */
+  output?: string;
   /** 是否 SSE 事件流（不套封套） */
   stream?: boolean;
   /** 是否二进制响应（非 JSON，不套封套）；仅 GET，`output` 留空 */
   binary?: boolean;
+  /** 是否 WebSocket 升级端点：握手参数与消息格式写在 `docs/api.md` 的对应域里 */
+  upgrade?: boolean;
   /** 一句话说明 */
   summary: string;
 };
@@ -750,5 +752,60 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     requestType: "StatsSummaryInput",
     output: "StatsSummaryResponse",
     summary: "全局 token 用量统计（按模型 / 会话聚合）",
+  },
+
+  {
+    domain: "terminal",
+    action: "create",
+    method: "POST",
+    input: "terminalCreateInputSchema",
+    requestType: "TerminalCreateRequest",
+    output: "TerminalCreateResponse",
+    summary: "起一个终端（按会话 id 或工作目录归口）",
+  },
+  {
+    domain: "terminal",
+    action: "list",
+    method: "POST",
+    input: "terminalListInputSchema",
+    requestType: "TerminalListRequest",
+    output: "TerminalListResponse",
+    summary: "列出某工作目录下的终端（客户端据此恢复标签）",
+  },
+  {
+    domain: "terminal",
+    action: "resize",
+    method: "POST",
+    input: "terminalResizeInputSchema",
+    requestType: "TerminalResizeRequest",
+    output: "TerminalResizeResponse",
+    summary: "改终端尺寸（前端按实测值上报）",
+  },
+  {
+    domain: "terminal",
+    action: "close",
+    method: "POST",
+    input: "terminalCloseInputSchema",
+    requestType: "TerminalCloseRequest",
+    output: "TerminalCloseResponse",
+    summary: "结束终端（杀进程并摘除条目）",
+  },
+  {
+    domain: "terminal",
+    action: "ticket",
+    method: "POST",
+    input: "terminalTicketInputSchema",
+    requestType: "TerminalTicketRequest",
+    output: "TerminalTicketResponse",
+    summary: "签一张输出流的一次性握手票",
+  },
+  {
+    domain: "terminal",
+    action: "stream",
+    method: "GET",
+    input: null,
+    requestType: null,
+    upgrade: true,
+    summary: "单终端输出流（WebSocket：先重放最近输出，再实时）",
   },
 ];

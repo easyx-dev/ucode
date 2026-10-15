@@ -3,6 +3,7 @@
  * 面板状态在这里受控，业务组件只经 `WorkbenchApi` 拿动作。
  */
 import type { GitCommitSummary } from "@ucode/contracts";
+import { asApiError } from "@ucode/sdk";
 import {
   type Dispatch,
   type SetStateAction,
@@ -11,11 +12,21 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 
+import { useTerminals } from "../../business/workbench/terminal/use-terminals";
 import { useWorkbenchDocs } from "../../business/workbench/use-workbench-docs";
-import { changeDoc, changesDoc, commitDoc, fileDoc } from "../../business/workbench/workbench-docs";
+import {
+  changeDoc,
+  changesDoc,
+  commitDoc,
+  fileDoc,
+  terminalDoc,
+  terminalDocId,
+} from "../../business/workbench/workbench-docs";
 import { readWorkbenchOpen, writeWorkbenchOpen } from "../../business/workbench/workbench-prefs";
 import type { ChangeTarget, WorkbenchApi, WorkbenchView } from "../../provider/workbench";
+import { errorText } from "../../utils/error-text";
 import {
   fitPanelDefault,
   type PanelSpec,
@@ -49,12 +60,15 @@ export function useWorkbenchController({
   setSheetOpen: Dispatch<SetStateAction<boolean>>;
 }): WorkbenchController {
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
+  const { t } = useTranslation();
   const [open, setOpen] = useState(() => readWorkbenchOpen(projectId));
   // 侧栏视图与是否展开：都不落盘——面板收起后再打开回到默认视图（代码管理，最常看）
   const [view, setView] = useState<WorkbenchView>("changes");
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const docs = useWorkbenchDocs(cwd);
+  const terminals = useTerminals(cwd);
+  const [terminalError, setTerminalError] = useState<string | null>(null);
 
   /** 展开工作台时的默认宽度按窗口夹取：窄窗口下 640 会把对话区压破（记忆值优先） */
   const panelSpec = useMemo<PanelSpec>(
@@ -124,6 +138,72 @@ export function useWorkbenchController({
     show();
   }, [cwd, docs.open, show]);
 
+  const { open: openDoc, close: closeDocOf, closeOthers, closeAll } = docs;
+  const { create: createTerminalOf, close: closeTerminalOf, reload: reloadTerminals } = terminals;
+
+  /** 把已有终端重新挂上标签时用的动作（列表里点开、或换目录后重新打开） */
+  const openTerminal = useCallback(
+    (terminalId: string) => {
+      openDoc(terminalDoc(terminalId));
+      show();
+    },
+    [openDoc, show],
+  );
+
+  /** 起一个终端：成功即挂标签，失败把文案贴在侧栏（错误就发生在点击处，不另弹一层遮罩） */
+  const createTerminal = useCallback(() => {
+    if (!cwd) return;
+    setTerminalError(null);
+    createTerminalOf(cwd)
+      .then((info) => {
+        openDoc(terminalDoc(info.id));
+        show();
+      })
+      .catch((error: unknown) => {
+        setTerminalError(errorText(t, asApiError(error)));
+      });
+  }, [cwd, createTerminalOf, openDoc, show, t]);
+
+  /**
+   * 关标签即结束终端：终端标签与进程一一对应，留着进程却看不到它才是真麻烦。
+   * 右键的「关闭其他 / 关闭全部」同样要带上这一步，否则会留下一批看不见的进程。
+   */
+  const closeTerminal = useCallback(
+    (terminalId: string) => {
+      void closeTerminalOf(terminalId);
+      closeDocOf(terminalDocId(terminalId));
+    },
+    [closeDocOf, closeTerminalOf],
+  );
+
+  const closeDoc = useCallback(
+    (id: string) => {
+      const doc = docs.docs.find((item) => item.id === id);
+      if (doc?.kind === "terminal") {
+        void closeTerminalOf(doc.terminalId);
+      }
+      closeDocOf(id);
+    },
+    [closeDocOf, closeTerminalOf, docs.docs],
+  );
+
+  const closeOtherDocs = useCallback(
+    (id: string) => {
+      for (const doc of docs.docs) {
+        if (doc.id !== id && doc.kind === "terminal") void closeTerminalOf(doc.terminalId);
+      }
+      closeOthers(id);
+    },
+    [closeOthers, closeTerminalOf, docs.docs],
+  );
+
+  const closeAllDocs = useCallback(() => {
+    for (const doc of docs.docs) {
+      if (doc.kind === "terminal") void closeTerminalOf(doc.terminalId);
+    }
+    closeAll();
+  }, [closeAll, closeTerminalOf, docs.docs]);
+
   /**
    * 切换工作台。
    * 窄屏下工作台是抽屉，开关由 `setSheetOpen` 管，同一个按钮就应当开关它——
@@ -159,13 +239,19 @@ export function useWorkbenchController({
       docs: docs.docs,
       activeDocId: docs.activeDocId,
       selectDoc: docs.select,
-      closeDoc: docs.close,
-      closeOtherDocs: docs.closeOthers,
-      closeAllDocs: docs.closeAll,
+      closeDoc,
+      closeOtherDocs,
+      closeAllDocs,
       openFile,
       openChange,
       openCommit,
       openChanges,
+      terminals: terminals.items,
+      createTerminal,
+      openTerminal,
+      closeTerminal,
+      reloadTerminals,
+      terminalError,
       /**
        * 收起整个面板。
        * 窄屏下工作台是抽屉，开关由 `setSheetOpen` 单独管——只改 `open` 是看不见效果的，
@@ -179,11 +265,12 @@ export function useWorkbenchController({
     }),
     [
       applyOpen,
+      closeAllDocs,
+      closeDoc,
+      closeOtherDocs,
+      createTerminal,
       cwd,
       docs.activeDocId,
-      docs.close,
-      docs.closeAll,
-      docs.closeOthers,
       docs.docs,
       docs.select,
       isDesktop,
@@ -191,9 +278,14 @@ export function useWorkbenchController({
       openChanges,
       openCommit,
       openFile,
+      openTerminal,
+      closeTerminal,
+      reloadTerminals,
       selectView,
       setSheetOpen,
       sidebarVisible,
+      terminalError,
+      terminals.items,
       view,
     ],
   );

@@ -137,9 +137,12 @@ const createWindow = (): void => {
 ipcMain.handle("desktop:connection", () => {
   // 渲染层的首个请求就是取连接，在这之前先按最新注册文件装好开发形态的注入
   refreshDevAuthInjection();
+  const service = readServiceConnection();
   return {
-    registered: readServiceConnection() !== null,
+    registered: service !== null,
     servicePath: serviceFilePath(),
+    // 同一份注册既能拼 HTTP 也能拼 WS，渲染层生产形态要靠它直连服务
+    websocketUrl: service ? service.baseUrl.replace(/^http/, "ws") : "",
   };
 });
 

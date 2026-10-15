@@ -8,7 +8,14 @@
 
 import { cn } from "cn";
 import type { TFunction } from "i18next";
-import { ChevronLeft, FileDiff, GitCommitHorizontal, Layers, X } from "lucide-react";
+import {
+  ChevronLeft,
+  FileDiff,
+  GitCommitHorizontal,
+  Layers,
+  SquareTerminal,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   ContextMenu,
@@ -22,21 +29,33 @@ import { fileIconOf } from "../../../utils/file-icons";
 import { baseName } from "../../../utils/path";
 import type { WorkbenchDoc } from "../workbench-docs";
 
-/** 标签标题：文件取文件名，diff 取文件名（提交里的 diff 带上短 hash），提交取 hash + 标题 */
-const titleOf = (doc: WorkbenchDoc, t: TFunction): string => {
+/**
+ * 标签标题：文件取文件名，diff 取文件名（提交里的 diff 带上短 hash），提交取 hash + 标题，
+ * 终端按它在侧栏列表里的序号（服务端不下发名字）。
+ */
+const titleOf = (
+  doc: WorkbenchDoc,
+  t: TFunction,
+  /** 终端的创建序号（服务端下发，关掉别的终端也不会变）；不是终端文档时为 null */
+  terminalSequence: number | null,
+): string => {
   if (doc.kind === "file") return baseName(doc.path) || doc.path;
   if (doc.kind === "diff") {
     const name = baseName(doc.file) || doc.file;
     return doc.shortHash ? `${doc.shortHash} ${name}` : name;
   }
   if (doc.kind === "changes") return t("全部改动");
+  if (doc.kind === "terminal") {
+    return t("终端 {{index}}", { index: String(terminalSequence ?? 1) });
+  }
   return `${doc.commit.shortHash} ${doc.commit.subject}`.trim();
 };
 
-/** 标签图标：文件按类型，diff 用对比图标，提交用提交图标 */
+/** 标签图标：文件按类型，diff 用对比图标，提交用提交图标，终端用终端图标 */
 const iconOf = (doc: WorkbenchDoc) => {
   if (doc.kind === "file") return fileIconOf(doc.path);
   if (doc.kind === "changes") return Layers;
+  if (doc.kind === "terminal") return SquareTerminal;
   return doc.kind === "diff" ? FileDiff : GitCommitHorizontal;
 };
 
@@ -44,6 +63,11 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   if (!workbench) return null;
+
+  // 终端标题用服务端给的创建序号：按列表下标编号的话，关掉中间一个会让后面的整体前移
+  const terminalSequences = new Map(
+    workbench.terminals.map((terminal) => [terminal.id, terminal.sequence]),
+  );
 
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-border">
@@ -66,6 +90,11 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
         {workbench.docs.map((doc) => {
           const Icon = iconOf(doc);
           const active = doc.id === workbench.activeDocId;
+          const title = titleOf(
+            doc,
+            t,
+            doc.kind === "terminal" ? (terminalSequences.get(doc.terminalId) ?? null) : null,
+          );
           return (
             <ContextMenu key={doc.id}>
               <ContextMenuTrigger asChild>
@@ -84,11 +113,11 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
                     role="tab"
                     aria-selected={active}
                     className="flex min-w-0 max-w-40 items-center gap-1.5 py-2"
-                    title={titleOf(doc, t)}
+                    title={title}
                     onClick={() => workbench.selectDoc(doc.id)}
                   >
                     <Icon className="size-icon-sm shrink-0" />
-                    <span className="truncate">{titleOf(doc, t)}</span>
+                    <span className="truncate">{title}</span>
                   </button>
                   <button
                     type="button"

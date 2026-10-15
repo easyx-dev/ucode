@@ -16,6 +16,8 @@ const readToken = (): string | null => window.localStorage.getItem(sessionTokenS
 
 export const client = createClient({
   translate,
+  // 接口与页面同源（开发走 Vite、生产由服务托管）；终端输出流要 WebSocket，按同一来源换算即可
+  websocketBaseUrl: window.location.origin.replace(/^http/, "ws"),
   getToken: readToken,
   onToken: (token) => {
     if (token) window.localStorage.setItem(sessionTokenStorageKey, token);

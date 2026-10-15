@@ -12,6 +12,7 @@ import { ChangesStack } from "../git/changes-stack";
 import { GitFileDiff } from "../git/git-file-diff";
 import { CommitDetail } from "../git/git-history";
 import type { GitReview } from "../git/use-git-review";
+import { TerminalView } from "../terminal/terminal-view";
 import { EditorTabs } from "./editor-tabs";
 import { FileContent } from "./file-content";
 
@@ -48,8 +49,10 @@ export function EditorArea({ review, onBack }: { review: GitReview; onBack?: () 
             />
           ) : doc.kind === "changes" ? (
             <ChangesStack path={doc.path} reloadToken={review.reloadToken} />
-          ) : (
+          ) : doc.kind === "commit" ? (
             <CommitDetail path={doc.path} commit={doc.commit} reloadToken={review.reloadToken} />
+          ) : (
+            <TerminalView terminalId={doc.terminalId} />
           )}
         </div>
       )}

@@ -6,6 +6,7 @@
  *   第三方库样式 → token 与主题 → 基础层 → markdown → 第三方映射（映射必须排在库样式之后）
  */
 @import "@git-diff-view/react/styles/diff-view.css";
+@import "@xterm/xterm/css/xterm.css";
 
 @import "./tokens.css";
 @import "./themes/zinc.css";

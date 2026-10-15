@@ -19,6 +19,12 @@ export {
   toApiError,
 } from "./error";
 export { createEventStream, type EventConnect, type EventStream } from "./events";
+export {
+  createReconnectingStream,
+  type ReconnectingStream,
+  type ReconnectingStreamOptions,
+  type StreamConnect,
+} from "./reconnect";
 export { readSseStream } from "./sse";
 export { createStore, type Store } from "./store";
 export { type AssetsState, type AssetsStore, createAssetsStore } from "./stores/assets";
@@ -46,6 +52,12 @@ export {
 export { createSessionsStore, type SessionsState, type SessionsStore } from "./stores/sessions";
 export { createStatusStore, type StatusStore } from "./stores/status";
 export { createUsageStore, type UsageState, type UsageStore } from "./stores/usage";
+export {
+  createTerminalSocket,
+  type TerminalSocket,
+  type TerminalSocketLike,
+  type TerminalSocketOptions,
+} from "./terminal-socket";
 export {
   createTransport,
   type FetchLike,

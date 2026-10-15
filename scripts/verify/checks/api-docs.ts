@@ -94,7 +94,13 @@ export const run = (root: string): string[] => {
         `endpoints.ts 的请求类型 ${endpoint.requestType} 在契约里不存在（${keyOf(endpoint)}）`,
       );
     }
-    if (!endpoint.stream && !endpoint.binary && !contract.types.has(endpoint.output)) {
+    if (
+      !endpoint.stream &&
+      !endpoint.binary &&
+      !endpoint.upgrade &&
+      endpoint.output &&
+      !contract.types.has(endpoint.output)
+    ) {
       problems.push(
         `endpoints.ts 的响应类型 ${endpoint.output} 在契约里不存在（${keyOf(endpoint)}）`,
       );

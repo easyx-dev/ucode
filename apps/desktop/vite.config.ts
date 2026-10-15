@@ -37,7 +37,7 @@ export default defineConfig(({ command, mode }) => {
       port: RENDERER_DEV_PORT,
       strictPort: true,
       // 与会话同源：页面发出的 `/api/*` 由这里转给本机服务（令牌由主进程加在请求头上，见 src/main/index.ts）
-      proxy: { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true } },
+      proxy: { "/api": { target: `http://127.0.0.1:${APP_PORT}`, changeOrigin: true, ws: true } },
     },
     build: {
       // 与 web 同口径：编辑器内核与 Markdown 渲染链各自成 chunk

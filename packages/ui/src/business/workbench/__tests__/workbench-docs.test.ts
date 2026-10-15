@@ -14,6 +14,8 @@ import {
   fileDoc,
   fileDocId,
   MAX_WORKBENCH_DOCS,
+  terminalDoc,
+  terminalDocId,
   workbenchDocsReducer,
 } from "../workbench-docs";
 
@@ -152,5 +154,42 @@ describe("workbenchDocsReducer", () => {
       doc: commitDoc("/repo", commit("abc1234def")),
     });
     assert.deepEqual(workbenchDocsReducer(opened, { type: "reset" }), emptyWorkbenchDocs);
+  });
+});
+
+describe("终端标签", () => {
+  it("一个终端一个标签，重复打开只激活", () => {
+    const first = workbenchDocsReducer(emptyWorkbenchDocs, {
+      type: "open",
+      doc: terminalDoc("t1"),
+    });
+    const second = workbenchDocsReducer(first, { type: "open", doc: fileDoc("/a.ts") });
+    const third = workbenchDocsReducer(second, { type: "open", doc: terminalDoc("t1") });
+
+    assert.deepEqual(
+      third.docs.map((doc) => doc.id),
+      [terminalDocId("t1"), fileDocId("/a.ts")],
+    );
+    assert.equal(third.activeDocId, terminalDocId("t1"));
+  });
+
+  it("超出上限时先丢非终端标签，终端留着", () => {
+    let state = emptyWorkbenchDocs;
+    state = workbenchDocsReducer(state, { type: "open", doc: terminalDoc("t1") });
+    for (let index = 0; index <= MAX_WORKBENCH_DOCS; index += 1) {
+      state = workbenchDocsReducer(state, { type: "open", doc: fileDoc(`/f${index}.ts`) });
+    }
+    assert.equal(state.docs.length, MAX_WORKBENCH_DOCS);
+    assert.ok(state.docs.some((doc) => doc.id === terminalDocId("t1")));
+    assert.ok(!state.docs.some((doc) => doc.id === fileDocId("/f0.ts")));
+  });
+
+  it("标签全是终端时也得丢最老的（进程仍在服务端，列表里能重新打开）", () => {
+    let state = emptyWorkbenchDocs;
+    for (let index = 0; index <= MAX_WORKBENCH_DOCS; index += 1) {
+      state = workbenchDocsReducer(state, { type: "open", doc: terminalDoc(`t${index}`) });
+    }
+    assert.equal(state.docs.length, MAX_WORKBENCH_DOCS);
+    assert.ok(!state.docs.some((doc) => doc.id === terminalDocId("t0")));
   });
 });
