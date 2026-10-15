@@ -1,4 +1,4 @@
-/** session-tone：头部状态底色的优先级（待审批 > 待填表单 > 生成中）与乐观信号 */
+/** session-tone：头部状态条的优先级（待审批 > 待填表单 > 生成中）与乐观信号 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 

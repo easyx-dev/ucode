@@ -25,7 +25,7 @@ packages/ui/src/
   hooks/              # 跨域复用的 React 绑定 + 无域语义的通用 hook
     store/            # SDK store 的订阅与派生（薄绑定不论消费者多少都在这层）
   business/<域>/      # 业务组件：一级一律是域文件夹，域内自含组件 + 私有逻辑 + 私有 hook + 用例
-    chat/             # 对话区骨架（面板、头部、空态、头部动作、会话状态底色）
+    chat/             # 对话区骨架（面板、头部、空态、头部动作、会话状态条）
       message/        # 消息流：条目投影（nodes / rows / plan / goal-turns）、行渲染、目录条
       tool/           # 工具与子智能体在消息流里的呈现（聚合行、工具卡、处理中指示、工具卡的 diff）
       activity/       # 运行态浮层（子智能体 / 目标 / 后台服务）与子会话小窗
