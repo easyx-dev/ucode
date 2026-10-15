@@ -15,6 +15,9 @@ import { chmodSync } from "node:fs";
 /** 仅属主可读写 */
 export const OWNER_ONLY_MODE = 0o600;
 
+/** 仅属主可进入 / 读写：目录用（浏览器 profile 里是 cookie 与 localStorage） */
+export const OWNER_ONLY_DIR_MODE = 0o700;
+
 /** Windows 上给属主的 ACL 权限项：完全控制 */
 const ACL_OWNER_GRANT = "F";
 
@@ -50,15 +53,21 @@ const hardenOnWindows = (path: string): void => {
   }
 };
 
-/** 把文件权限收紧到「仅属主可读写」；两个平台各自实现，失败只告警 */
-export const hardenOwnerOnly = (path: string): void => {
+/** 把路径权限收紧到给定模式；两个平台各自实现，失败只告警 */
+const harden = (path: string, mode: number): void => {
   if (process.platform === "win32") {
     hardenOnWindows(path);
     return;
   }
   try {
-    chmodSync(path, OWNER_ONLY_MODE);
+    chmodSync(path, mode);
   } catch (error) {
     warn(`收紧 ${path} 的权限失败：${error instanceof Error ? error.message : String(error)}`);
   }
 };
+
+/** 把文件权限收紧到「仅属主可读写」 */
+export const hardenOwnerOnly = (path: string): void => harden(path, OWNER_ONLY_MODE);
+
+/** 把目录权限收紧到「仅属主可进入 / 读写」 */
+export const hardenOwnerOnlyDir = (path: string): void => harden(path, OWNER_ONLY_DIR_MODE);

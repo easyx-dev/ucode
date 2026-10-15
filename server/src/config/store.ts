@@ -22,6 +22,7 @@ export const emptyConfig = (): AppConfig => ({
   defaultModel: null,
   websearch: { provider: DEFAULT_SEARCH_PROVIDER, apiKey: "", baseUrl: "" },
   memory: { enabled: false },
+  browser: { mode: "isolated", endpoint: "", profile: "" },
 });
 
 /** defaultModel 指向的 provider 已被替换掉时返回 null，让它回落到「第一个可用模型」 */
@@ -112,11 +113,19 @@ export class ConfigStore {
       enabled: patch.memory?.enabled ?? this.config.memory.enabled,
     };
 
+    // 端点与 profile 是普通文本：留空即清空（与 provider 的 apiKey 不同，那里留空是沿用）
+    const browser = {
+      mode: patch.browser?.mode ?? this.config.browser.mode,
+      endpoint: patch.browser?.endpoint?.trim() ?? this.config.browser.endpoint,
+      profile: patch.browser?.profile?.trim() ?? this.config.browser.profile,
+    };
+
     return appConfigSchema.parse({
       providers: providers ?? this.config.providers,
       defaultModel,
       websearch,
       memory,
+      browser,
     });
   }
 }
@@ -142,6 +151,11 @@ export const publicConfig = (config: AppConfig): ConfigView => ({
     configured: isWebsearchConfigured(config.websearch),
   },
   memory: { enabled: config.memory.enabled },
+  browser: {
+    mode: config.browser.mode,
+    endpoint: config.browser.endpoint,
+    profile: config.browser.profile,
+  },
 });
 
 /** 搜索的前置条件按 provider 不同：自建实例要地址，其余要 key */

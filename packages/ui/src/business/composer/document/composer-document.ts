@@ -57,6 +57,35 @@ export const commandNode = (name: string, kind: MentionKind): ComposerNode => ({
   attrs: { kind, name, label: kind === "skill" ? `/skill:${name}` : `/${name}` },
 });
 
+/** 页面元素上下文节点名；编辑器节点视图与载荷生成都按它找（见 `pageElementNode`） */
+export const PAGE_ELEMENT_NODE = "pageElementMention";
+
+/** 桌面端面板「元素选择」插进来的那份上下文 */
+export type PageElementContext = {
+  /** 芯片上的短名（元素的可访问名，没有就退标签） */
+  label: string;
+  /** 进消息正文的完整摘要（多行）；采摘口径在宿主那边，这里只负责带过去 */
+  summary: string;
+  url?: string;
+  title?: string;
+  selector?: string;
+};
+
+/**
+ * 页面元素节点：编辑器里是**一枚芯片**（整段摘要塞进输入框会很难看），进消息正文的仍是完整摘要
+ * ——模型要的是字段，人要的是不挡视线的地方。
+ */
+export const pageElementNode = (context: PageElementContext): ComposerNode => ({
+  type: PAGE_ELEMENT_NODE,
+  attrs: {
+    label: context.label,
+    summary: context.summary,
+    url: context.url ?? null,
+    title: context.title ?? null,
+    selector: context.selector ?? null,
+  },
+});
+
 /** 附件节点；`tempId` 只在上传中非空，拿到 id 后清掉（见编辑器的 `resolveAttachment`） */
 export const attachmentNode = (
   attachment: Pick<AttachmentView, "id" | "name" | "kind">,
@@ -108,6 +137,11 @@ const inlineTextOf = (nodes: readonly ComposerNode[], sink: PayloadSink): string
     if (node.type === "commandMention") {
       const name = asString(node.attrs?.name);
       if (name) text += node.attrs?.kind === "skill" ? `/skill:${name}` : `/${name}`;
+      continue;
+    }
+    if (node.type === PAGE_ELEMENT_NODE) {
+      // 芯片在正文里落成完整摘要：模型看字段，芯片只是给人看的
+      text += asString(node.attrs?.summary);
       continue;
     }
     if (node.type === "attachmentMention") {
@@ -272,6 +306,24 @@ const listDocOf = (
   }
   return [list, index];
 };
+
+/**
+ * 往现有文档尾部追加一段文本（保留已有内容与结构）。
+ *
+ * 用于「外部把一段内容加进输入框」这类插入（选中的页面元素、引用等）：与「编辑重发」「/命令填充」
+ * 同一条路——改草稿的 doc，输入框自己会同步；空文档时直接用要追加的内容当正文。
+ */
+export const appendNodesToDoc = (
+  doc: ComposerNode | null | undefined,
+  nodes: readonly ComposerNode[],
+): ComposerNode => {
+  const base: ComposerNode = doc && !isDocEmpty(doc) ? doc : { type: "doc", content: [] };
+  return { ...base, content: [...(base.content ?? []), ...nodes] };
+};
+
+/** 文本次之：追加一段文本（按 Markdown 还原成段落与列表） */
+export const appendTextToDoc = (doc: ComposerNode | null | undefined, text: string): ComposerNode =>
+  appendNodesToDoc(doc, textToDoc(text).content ?? []);
 
 /** 纯文本 → 文档（建议 chips、失败回填、命令填充用）；`- ` / `1. ` 行还原成列表，缩进还原嵌套 */
 export const textToDoc = (text: string): ComposerNode => {

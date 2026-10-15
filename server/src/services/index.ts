@@ -29,6 +29,7 @@ import { CredentialStore } from "./auth/credentials";
 import { PairingStore } from "./auth/pairing";
 import { RateLimiter } from "./auth/rate-limit";
 import { SessionService } from "./auth/sessions";
+import { type BrowserService, createBrowserService } from "./browser";
 import { createConfigService } from "./config";
 import { createLifecycle } from "./lifecycle";
 import { createPluginService, type PluginService, PluginStateStore } from "./plugins";
@@ -75,6 +76,8 @@ export type Services = {
   marketplaces: MarketplaceService;
   /** 终端：按工作目录归口的 PTY 池（只在进程内存，不落库） */
   terminals: TerminalService;
+  /** 浏览器：实例注册表与 profile 数据面（数据落在 `$APP_HOME/app/browser`） */
+  browsers: BrowserService;
   /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
   /** 关闭共享的 SQLite 连接 */
@@ -160,6 +163,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     onCatalogRefreshed: () => plugins.checkUpdates(),
     pluginList: () => plugins.list(),
   });
+  const browsers = createBrowserService();
   const pool = new SessionPool(
     runtime,
     sessions,
@@ -172,6 +176,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
     memory,
     goals,
     usage,
+    browsers.hooks,
+    () => config.get().browser,
     {
       commandAssets: (cwd) => plugins.commandAssets(cwd),
       agents: (cwd) => plugins.agentProfiles(cwd),
@@ -221,6 +227,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     plugins,
     marketplaces,
     terminals,
+    browsers,
     auth: {
       credentials,
       sessions: authSessions,
@@ -231,8 +238,9 @@ export const createServices = async (registration: ServiceRegistration): Promise
     applyConfig: configService.applyConfig,
     reload: configService.reload,
     close: () => {
-      // 终端进程不归会话池管（也不随会话回收），服务退出时在这里一并清掉
+      // 终端与浏览器进程都不归会话池管（也不随会话回收），服务退出时在这里一并清掉
       terminals.disposeAll();
+      browsers.disposeAll();
       lifecycle.stop();
     },
   };

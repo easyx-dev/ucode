@@ -35,7 +35,23 @@ const makeApp = (peekTicket: (ticket: string, terminalId: string) => boolean = (
   const sessions = new SessionService(new AuthSessionRepository(db));
 
   const app = new Hono<AuthVariables>();
-  app.use(`${API_BASE_PATH}/*`, createAuthMiddleware({ credentials, sessions, peekTicket }));
+  app.use(
+    `${API_BASE_PATH}/*`,
+    createAuthMiddleware({
+      credentials,
+      sessions,
+      upgradeTickets: {
+        [`${API_BASE_PATH}/terminal/stream`]: {
+          message: "未认证：终端握手票无效",
+          peek: (query) => {
+            const ticket = query("ticket");
+            const terminalId = query("terminalId");
+            return Boolean(ticket && terminalId && peekTicket(ticket, terminalId));
+          },
+        },
+      },
+    }),
+  );
   app.get(`${API_BASE_PATH}/health`, (c) => c.json({ up: true }));
   app.post(`${API_BASE_PATH}/auth/pairing/redeem`, (c) => c.json({ redeemed: true }));
   app.get(`${API_BASE_PATH}/probe`, (c) => c.json({ sessionId: c.get("principal").sessionId }));

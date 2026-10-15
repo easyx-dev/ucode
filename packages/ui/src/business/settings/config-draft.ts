@@ -3,6 +3,7 @@
 import type { TFunction } from "i18next";
 import type {
   ApiType,
+  BrowserView,
   CatalogProvider,
   ProviderConfigView,
   ProviderModelSuggestion,
@@ -54,6 +55,20 @@ export type DraftWebsearch = {
   baseUrl: string;
   configured: boolean;
 };
+
+/** 浏览器草稿：连接方式、attach 的调试端点与默认 profile 名 */
+export type DraftBrowser = {
+  mode: "isolated" | "attach";
+  endpoint: string;
+  profile: string;
+};
+
+/** 已保存的浏览器设置 → 草稿（字段一一对应，没有脱敏项） */
+export const toDraftBrowser = (view: BrowserView): DraftBrowser => ({
+  mode: view.mode,
+  endpoint: view.endpoint,
+  profile: view.profile,
+});
 
 export type DraftProvider = {
   key: string;
@@ -287,6 +302,7 @@ export const toUpdatePayload = (
   defaultModel: string | null,
   websearch: DraftWebsearch,
   memoryEnabled: boolean,
+  browser: DraftBrowser,
 ) => ({
   providers: drafts.map((provider) => {
     const apiKey = provider.apiKey.trim() ? { apiKey: provider.apiKey.trim() } : {};
@@ -314,6 +330,12 @@ export const toUpdatePayload = (
     baseUrl: websearch.baseUrl.trim(),
   },
   memory: { enabled: memoryEnabled },
+  // 端点与 profile 是普通文本：留空即清空（与 apiKey 的「留空沿用」不同）
+  browser: {
+    mode: browser.mode,
+    endpoint: browser.endpoint.trim(),
+    profile: browser.profile.trim(),
+  },
 });
 
 /** 「provider/model」选项：只列实际生效的模型（内置取目录，自定义取表单） */

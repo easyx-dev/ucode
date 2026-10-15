@@ -4,6 +4,8 @@
  * 一份文档一个标签；同一份内容重复打开只激活已有标签。标签数上限 8 个，超出丢最早的那个
  * （激活项不动，新开的仍在最右）——但终端不参与丢弃，见 `dropEarliest`。id 由内容与来源构成，
  * 因此同一文件的「预览」与「改动 diff」各占一个标签，互不覆盖。
+ * 浏览器标签还有一处不同：换工作目录时它留下来（见 `reset`），因为它的载体是宿主的 webview，
+ * 卸载即销毁页面。它不豁免「超限丢最早」——被挤掉时那一个页面同样会消失（终端才豁免：进程还在服务端）。
  */
 import type { GitCommitSummary, GitDiffSource } from "@ucode/contracts";
 
@@ -27,7 +29,12 @@ export type WorkbenchDoc =
    * 终端。标签与进程一一对应：关标签即结束终端，所以它不参与「超限丢最早」。
    * 进程活在服务端并活到被显式关掉，工作目录变了标签会清空、进程还在，从侧栏列表能重新打开。
    */
-  | { id: string; kind: "terminal"; terminalId: string };
+  | { id: string; kind: "terminal"; terminalId: string }
+  /**
+   * 浏览器标签（仅桌面端有）。`tabId` 对 `@ucode/ui` 是不透明标识，由宿主拿去对应自己的 webview
+   * （见 `WorkbenchBrowserSurface.renderTab`）；web 端不注入浏览器面，开不出这种标签。
+   */
+  | { id: string; kind: "browser"; tabId: string };
 
 /** 同时打开的标签数上限；超出丢最早的那个 */
 export const MAX_WORKBENCH_DOCS = 8;
@@ -75,6 +82,15 @@ export const terminalDoc = (terminalId: string): WorkbenchDoc => ({
   id: terminalDocId(terminalId),
   kind: "terminal",
   terminalId,
+});
+
+export const browserDocId = (tabId: string): string => `browser:${tabId}`;
+
+/** 一个浏览器标签一份文档；重复打开只激活已有的那个 */
+export const browserDoc = (tabId: string): WorkbenchDoc => ({
+  id: browserDocId(tabId),
+  kind: "browser",
+  tabId,
 });
 
 export type WorkbenchDocsState = {
@@ -147,7 +163,15 @@ export const workbenchDocsReducer = (
     }
     case "closeAll":
       return isEmpty(state) ? state : emptyWorkbenchDocs;
-    case "reset":
-      return isEmpty(state) ? state : emptyWorkbenchDocs;
+    case "reset": {
+      // 浏览器标签跟工作目录无关（它连的是外部站点，还可能是 agent 正在驱动的那个页面），
+      // 所以换目录 / 换会话时留着；其余标签都绑在旧目录上，一并清掉
+      const kept = state.docs.filter((doc) => doc.kind === "browser");
+      if (kept.length === 0) return isEmpty(state) ? state : emptyWorkbenchDocs;
+      const active = kept.some((doc) => doc.id === state.activeDocId)
+        ? state.activeDocId
+        : (kept[kept.length - 1]?.id ?? null);
+      return { docs: kept, activeDocId: active };
+    }
   }
 };

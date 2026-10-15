@@ -36,6 +36,7 @@ export function useConfigSave(draft: ConfigDraft, onSaved: () => void): ConfigSa
           draft.defaultModel || null,
           draft.websearch,
           draft.memoryEnabled,
+          draft.browser,
         ),
       );
       // 失败原因由 ErrorToaster 统一提示，这里只报成功

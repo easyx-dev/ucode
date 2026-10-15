@@ -10,6 +10,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useTerminals } from "../../business/workbench/terminal/use-terminals";
 import { useWorkbenchDocs } from "../../business/workbench/use-workbench-docs";
 import {
+  browserDoc,
   changeDoc,
   changesDoc,
   commitDoc,
@@ -25,7 +27,12 @@ import {
   terminalDocId,
 } from "../../business/workbench/workbench-docs";
 import { readWorkbenchOpen, writeWorkbenchOpen } from "../../business/workbench/workbench-prefs";
-import type { ChangeTarget, WorkbenchApi, WorkbenchView } from "../../provider/workbench";
+import type {
+  ChangeTarget,
+  WorkbenchApi,
+  WorkbenchBrowserSurface,
+  WorkbenchView,
+} from "../../provider/workbench";
 import { errorText } from "../../utils/error-text";
 import {
   fitPanelDefault,
@@ -50,6 +57,7 @@ export function useWorkbenchController({
   projectId,
   isDesktop,
   setSheetOpen,
+  browser = null,
 }: {
   /** 相对路径的解析基准：当前会话工作目录（草稿态取草稿里选的目录） */
   cwd: string | null;
@@ -58,6 +66,8 @@ export function useWorkbenchController({
   isDesktop: boolean;
   /** 窄屏下的抽屉开关：打开工作台时一并唤出 */
   setSheetOpen: Dispatch<SetStateAction<boolean>>;
+  /** 宿主注入的浏览器面（仅桌面端）；不传即没有这个视图 */
+  browser?: WorkbenchBrowserSurface | null;
 }): WorkbenchController {
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
   const { t } = useTranslation();
@@ -139,6 +149,17 @@ export function useWorkbenchController({
   }, [cwd, docs.open, show]);
 
   const { open: openDoc, close: closeDocOf, closeOthers, closeAll } = docs;
+
+  /** 浏览器标签的编号：宿主只当它是不透明标识；换目录清标签后不回退，避免重复编号 */
+  const browserTabSeq = useRef(0);
+
+  /** 新开一个浏览器标签：编号在这里生成，宿主按编号对应自己的 webview */
+  const openBrowserTab = useCallback(() => {
+    browserTabSeq.current += 1;
+    openDoc(browserDoc(`t${browserTabSeq.current}`));
+    show();
+  }, [openDoc, show]);
+
   const { create: createTerminalOf, close: closeTerminalOf, reload: reloadTerminals } = terminals;
 
   /** 把已有终端重新挂上标签时用的动作（列表里点开、或换目录后重新打开） */
@@ -176,6 +197,10 @@ export function useWorkbenchController({
     [closeDocOf, closeTerminalOf],
   );
 
+  /**
+   * 关标签：终端标签连着进程，得一并结束；浏览器画面标签只停止观看（实例归 agent 管），
+   * 直接关掉即可——但它会让「谁还在用某个 profile」变化，所以顺手刷一次列表。
+   */
   const closeDoc = useCallback(
     (id: string) => {
       const doc = docs.docs.find((item) => item.id === id);
@@ -252,6 +277,8 @@ export function useWorkbenchController({
       closeTerminal,
       reloadTerminals,
       terminalError,
+      browser,
+      openBrowserTab,
       /**
        * 收起整个面板。
        * 窄屏下工作台是抽屉，开关由 `setSheetOpen` 单独管——只改 `open` 是看不见效果的，
@@ -265,6 +292,7 @@ export function useWorkbenchController({
     }),
     [
       applyOpen,
+      browser,
       closeAllDocs,
       closeDoc,
       closeOtherDocs,
@@ -274,6 +302,7 @@ export function useWorkbenchController({
       docs.docs,
       docs.select,
       isDesktop,
+      openBrowserTab,
       openChange,
       openChanges,
       openCommit,

@@ -15,6 +15,7 @@ import { createAgentsRoute } from "./routes/agents";
 import { createAssetsRoute } from "./routes/assets";
 import { createAttachmentsRoute } from "./routes/attachments";
 import { createAuthRoute } from "./routes/auth";
+import { createBrowserRoute } from "./routes/browser";
 import { createCommandsRoute } from "./routes/commands";
 import { createConfigRoute } from "./routes/config";
 import { createEventsRoute } from "./routes/events";
@@ -63,7 +64,25 @@ export const createApp = (
     createAuthMiddleware({
       credentials: services.auth.credentials,
       sessions: services.auth.sessions,
-      peekTicket: (ticket, terminalId) => services.terminals.peekTicket(ticket, terminalId),
+      upgradeTickets: {
+        [`${API_BASE_PATH}/browser/desktop`]: {
+          message: "未认证：浏览器通道握手票无效",
+          peek: (query) => {
+            const ticket = query("ticket");
+            return Boolean(ticket && services.browsers.desktop.peekTicket(ticket));
+          },
+        },
+        [`${API_BASE_PATH}/terminal/stream`]: {
+          message: "未认证：终端握手票无效",
+          peek: (query) => {
+            const ticket = query("ticket");
+            const terminalId = query("terminalId");
+            return Boolean(
+              ticket && terminalId && services.terminals.peekTicket(ticket, terminalId),
+            );
+          },
+        },
+      },
     }),
   );
 
@@ -91,6 +110,7 @@ export const createApp = (
   v1.route("/attachments", createAttachmentsRoute(services));
   v1.route("/agents", createAgentsRoute(services));
   v1.route("/assets", createAssetsRoute(services));
+  v1.route("/browser", createBrowserRoute(services, upgradeWebSocket));
   v1.route("/terminal", createTerminalRoute(services, upgradeWebSocket));
 
   app.route(API_BASE_PATH, v1);

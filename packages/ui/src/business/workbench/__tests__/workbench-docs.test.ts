@@ -5,6 +5,8 @@ import { describe, it } from "node:test";
 import type { GitCommitSummary } from "@ucode/contracts";
 
 import {
+  browserDoc,
+  browserDocId,
   changeDoc,
   changesDoc,
   changesDocId,
@@ -191,5 +193,28 @@ describe("终端标签", () => {
     }
     assert.equal(state.docs.length, MAX_WORKBENCH_DOCS);
     assert.ok(!state.docs.some((doc) => doc.id === terminalDocId("t0")));
+  });
+});
+
+describe("浏览器标签的留存", () => {
+  it("换工作目录时留着（它跟工作目录无关），激活项落在留下的那个上", () => {
+    let state = workbenchDocsReducer(emptyWorkbenchDocs, {
+      type: "open",
+      doc: fileDoc("/a.ts"),
+    });
+    state = workbenchDocsReducer(state, { type: "open", doc: browserDoc("t1") });
+    state = workbenchDocsReducer(state, { type: "reset" });
+
+    assert.deepEqual(
+      state.docs.map((doc) => doc.id),
+      [browserDocId("t1")],
+    );
+    assert.equal(state.activeDocId, browserDocId("t1"));
+  });
+
+  it("没有浏览器标签时 reset 清空（与原行为一致）", () => {
+    let state = workbenchDocsReducer(emptyWorkbenchDocs, { type: "open", doc: fileDoc("/a.ts") });
+    state = workbenchDocsReducer(state, { type: "reset" });
+    assert.deepEqual(state, emptyWorkbenchDocs);
   });
 });

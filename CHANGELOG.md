@@ -10,8 +10,52 @@
 
 ### 新增
 
+- **桌面端内置浏览器面板**：工作台多一个「浏览器」视图（活动栏入口 + 侧栏标签列表），编辑器区里每个标签是
+  一个 Electron `<webview>`（主进程开 `webviewTag`，并用 `will-attach-webview` 摘掉 guest 的 preload 与
+  node 集成），带地址栏、前进 / 后退、刷新与开发者工具；多个标签共用一份持久 partition
+  （`persist:<slug>-browser`），站点 cookie 与外壳页分开。web 端不注入这一面，工作台里就没有浏览器视图与标签。
+  `<webview>` 的页面**常驻**：切标签只切可见性、换工作目录也留着（卸载即销毁页面）。
+  新增 `pnpm -F @ucode/desktop browser:smoke`（真 Electron + 真界面驱动的端到端冒烟，见 `docs/browser.md`）。
+- **桌面端浏览器通道**：桌面端把工作台里开了哪些浏览器标签、当前在看哪一个经
+  `GET /api/v1/browser/desktop`（WebSocket）报给服务端——先带凭证换一次性票
+  （`POST /api/v1/browser/desktop/ticket`），再接通道；另有只读的 `POST /api/v1/browser/desktop` 看当前状态
+  （`connected` + 标签集合，每个标签带 `webContentsId`）。服务端据此知道该驱动哪一个（当前激活的那个），
+  CDP 命令转发见下一条。桌面端新增依赖 `@ucode/contracts`（复用跨端的标签形状）。
+- **桌面端浏览器驱动**：agent 现在能驱动桌面端面板里的那个页面——服务端把 CDP 命令经通道发给桌面端主进程，
+  再由它转给目标 webview 的 `webContents.debugger`（桌面端只驱动自己创建的标签，其余 `webContentsId` 一律拒绝）。
+  目标是**当前激活的标签**：`browser_open` 导航它、`browser_close` 只断开、切标签即换目标（编号表跟着作废）；
+  想强制用受管实例就在 `browser_open` 里传 `profile` / `cdpEndpoint`。两条传输共用同一套语义
+  （编号、遮挡判定、快照文本抽到 `page-ops`）。新增 `pnpm -F @ucode/server browser:desktop-smoke` 端到端冒烟。
+- **页面元素选成上下文**：桌面端浏览器面板的工具条多一个「元素选择」——进点选模式后在页面上点一个元素，
+  它的摘要会追加到当前会话的输入框末尾、随消息一起发给模型（`Esc` 取消）。字段按同类产品的共识取
+  （Trae / Cursor Design Mode / ZCode 的网页元素上下文）：页面标题与地址、role 与可访问名、选择器（优先
+  测试 id / id / name，退回带 class 的结构路径）、盒子坐标、颜色背景字体字重 display、属性（剔除内联事件）、
+  元素文本、附近文本（父元素里除它以外的文本）、以及截断到 1500 字符并剔除内联事件的 `outerHTML` 片段；
+  空值整行不写。**输入框里显示的是一枚芯片**（元素名 + 悬停给选择器），整段摘要只在发送时落进消息正文
+  ——新增编辑器节点 `pageElementMention`，与附件 token 同一套做法。采集走 `<webview>.executeJavaScript`，
+  与 agent 驱动那条 CDP 通道不相干。
+- **浏览器画面帧流移除**：agent 看的画面改由桌面端 webview 承载，因此删掉了 CDP screencast 推流、握手票与
+  `GET /api/v1/browser/stream`、`POST /api/v1/browser/ticket` 两个接口，以及 SDK 的 `createBrowserSocket`
+  与工作台里的 canvas 面板；`browser/list` / `browser/delete`（profile 数据面）与服务端受管实例保留。
 - …
-
+- **内置浏览器工具集（能力层）**：服务进程内的 Playwright（headless）给 agent 提供
+  `browser_open` / `browser_snapshot` / `browser_act` / `browser_screenshot` / `browser_close` 五个工具。
+  元素带 `@eN` 编号（按可访问名哈希生成，导航后整体失效），被遮挡或编号失效时**立即失败**并给出下一步，
+  不做自动等待与自动重试。快照含 `h1`–`h3` 标题、可交互元素与 `[role]` 语义节点，支持 `diff`（只回传变化，默认关）与
+  `compact`（丢掉无名容器与视口外元素，默认关）。实例按 profile 名共享（引用计数 + 空闲回收），`browser_open` 默认走审批
+  （匹配对象是目标站点），只读模式（plan / ask）对整组工具阻断、与 `bash` 同档。
+  新增依赖 `playwright-core`（不下载内核，探测系统浏览器；探测失败给出试过的路径）。
+- **浏览器 profile 的数据面与持久化**：`browser_open` 给了 `profile` 名就把数据长期保留在
+  `$APP_HOME/app/browser/profiles/<name>`（目录 0700，里面有 cookie 与 localStorage），不传则用临时目录、
+  实例关掉即删；实例按 profile 名共享（引用计数 + 空闲回收），同一份 profile 不能被两种数据目录同时打开。
+  接口新增 `POST /api/v1/browser/list`（占用 / 最后使用时间 / 是否使用中 + 根目录与上限）与
+  `POST /api/v1/browser/delete`（使用中与名字不合法的进 `skipped`，传全集即清空）。
+- **浏览器工具的默认设置**：`config.json` 新增 `browser` 块——`mode`（自己启动受管实例 / attach 用户已有的调试实例）、
+  `endpoint`、默认 `profile` 名，经 `config/update` 修改；`browser_open` 的工具入参仍可覆盖单次行为。
+  这三项在调用工具时读取，改它不重建会话（与联网搜索同属惰性字段）。
+- **设置页新增「浏览器」分节**：连接方式（自己启动 / 连接已有调试实例）、attach 的调试端点与默认 profile 名
+  （进配置草稿，随「保存并生效」提交）；下面是已保留 profile 的实时列表——占用、最后使用时间、使用中标记，
+  可单份删除或清空，删除前走确认弹层，使用中的由服务端跳过。
 ### 变更
 
 - **桌面端窗口透明 + macOS 系统材质**：`BrowserWindow` 补 `transparent` 与
@@ -98,7 +142,7 @@
   「操作」与「测量」分两段发，不用 `&&` 绑死。
 - `docs/design-surfaces.md` 去掉对组件内部实现的复述（编辑器列表的类名串、`InputSearch` 的内部控制、
   目录条与表格重复的档位）；判据与档位规格保留。
-- `plans/browser-tools.md` 把「不做自动等待」的操作口径写进工具描述的要求里：`wait` 只用在与已确认
+- 浏览器工具集把「不做自动等待」的操作口径写进工具描述里（现在的持久文档见 [`docs/browser.md`](./docs/browser.md)）：`wait` 只用在与已确认
   存在的元素上，操作与测量不串成一条命令。
 - **目标栏改成输入卡的上沿一条**：原先它是面板底部通栏的一条带（`border-t` + `bg-muted/40` + 按消息列宽居中的内层），
   现在挂进输入卡、做它的第一个子节点（`rounded-t-lg bg-muted/50` + 下沿分隔线），宽度、居中与圆角都随卡走，
@@ -117,7 +161,7 @@
   （`app://` 做不了协议升级），两边 dev 形态的 Vite 代理都开了 `ws` 转发。
   依赖新增 `ws` + `@hono/node-ws`（服务端）与 `@xterm/addon-attach` + `@xterm/addon-unicode11`（前端）。
 - SDK 新增终端连接管理（`packages/sdk/src/terminal-socket.ts`）：取票、退避重连、按关闭码判定终态；
-  既有的 `reconnect.ts` 仍服务全局事件流（浏览器面板的帧流将来照它做），事件流对外行为不变；
+  既有的 `reconnect.ts` 仍服务全局事件流，事件流对外行为不变；
   `ui/utils/color.ts` 从 `business/markdown/mermaid` 上提并补上「探针元素求值含 `var()` / `color-mix()` 的表达式」，
   终端主题与 mermaid 共用这一层。
 - **安装期补 `node-pty` 的 `spawn-helper` 执行位**：npm 包里的预编译 helper 是 `644`，直接起 PTY 会

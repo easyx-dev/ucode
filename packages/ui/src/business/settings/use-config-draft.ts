@@ -11,13 +11,18 @@ import { DEFAULT_SEARCH_PROVIDER } from "../../types";
 import {
   catalogToDraftProvider,
   createDraftProvider,
+  type DraftBrowser,
   type DraftProvider,
   type DraftWebsearch,
   modelOptions,
+  toDraftBrowser,
   toDraftProvider,
   toDraftWebsearch,
 } from "./config-draft";
 import { useConfigModels } from "./use-config-models";
+
+/** 浏览器草稿的初值：与契约的默认值保持一致（自己启动 + 临时数据目录） */
+const emptyBrowser = (): DraftBrowser => ({ mode: "isolated", endpoint: "", profile: "" });
 
 /** 联网搜索草稿的初值：与契约的默认值保持一致 */
 const emptyWebsearch = (): DraftWebsearch => ({
@@ -40,6 +45,7 @@ export function useConfigDraft(open: boolean) {
   const [defaultModel, setDefaultModel] = useState("");
   const [websearch, setWebsearch] = useState<DraftWebsearch>(emptyWebsearch);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [browser, setBrowser] = useState<DraftBrowser>(emptyBrowser);
   /** 本次打开是否已用服务端配置填充过草稿 */
   const seeded = useRef(false);
 
@@ -74,6 +80,7 @@ export function useConfigDraft(open: boolean) {
     setDefaultModel(config.defaultModel ?? "");
     setWebsearch(toDraftWebsearch(config.websearch));
     setMemoryEnabled(config.memory.enabled);
+    setBrowser(toDraftBrowser(config.browser));
   }, [configState.data, modelsState.data, modelsState.error, open]);
 
   const patchProvider = useCallback((key: string, patch: Partial<DraftProvider>) => {
@@ -110,6 +117,10 @@ export function useConfigDraft(open: boolean) {
     setWebsearch((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const patchBrowser = useCallback((patch: Partial<DraftBrowser>) => {
+    setBrowser((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   const models = useConfigModels(setProviders);
   const options = useMemo(() => modelOptions(providers), [providers]);
   /** 已接入（配置里已有）的目录条目 id，用于在目录里做标记 */
@@ -124,6 +135,7 @@ export function useConfigDraft(open: boolean) {
     configuredIds,
     defaultModel,
     websearch,
+    browser,
     memoryEnabled,
     loading: configState.loading,
     options,
@@ -133,6 +145,7 @@ export function useConfigDraft(open: boolean) {
     addFromCatalog,
     removeProvider,
     patchWebsearch,
+    patchBrowser,
     setMemoryEnabled,
     ...models,
   };

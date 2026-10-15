@@ -47,6 +47,8 @@ export const errorMessageKeys = {
   plugin_component_invalid: "插件组件路径无效：{{path}}",
   plugin_source_invalid: "插件来源不受支持：{{source}}",
   marketplace_invalid: "市场配置无效：{{reason}}",
+  browser_profile_invalid: "浏览器 profile 名不合法：{{reason}}",
+  browser_profile_in_use: "该 profile 正在使用中，请先关掉对应实例",
 } as const satisfies Record<ErrorCode, string>;
 
 /** key 的联合，供客户端 `t()` 的类型收窄 */

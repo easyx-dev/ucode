@@ -1,6 +1,6 @@
 /**
  * 终端用例编排：定工作目录、定 shell、守上限，把 PTY 池（同目录的 `terminals.ts`）接给路由，
- * 并保管输出流的握手票（同目录的 `tickets.ts`）。
+ * 并保管输出流的握手票（通用实现见 `services/handshake-tickets.ts`）。
  *
  * 终端按**工作目录**归口（同目录的会话共用同一批终端，与工作台的文件树 / git 同口径），
  * 所以每次请求都先把「会话 id 或目录」解析成那个目录：会话走它的工作目录（未绑定目录的会话
@@ -38,9 +38,9 @@ import type { SessionRepository } from "../../db/session-repository";
 import { env } from "../../env";
 import { resolveExistingPath, resolveTargetPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
+import { createHandshakeTickets } from "../handshake-tickets";
 import { terminalEnvOf } from "./env";
 import { TerminalPool, type TerminalSpawnSpec } from "./terminals";
-import { TerminalTicketStore } from "./tickets";
 
 /** 输出流那侧要用的接缝：订阅者拿字节与结束信号，不关心它是 HTTP 还是 WS */
 export type TerminalSubscriber = {
@@ -123,7 +123,7 @@ export const createTerminalService = (deps: { sessions: SessionRepository }): Te
     scrollbackBytes: TERMINAL_SCROLLBACK_BYTES,
     flushMs: TERMINAL_OUTPUT_FLUSH_MS,
   });
-  const tickets = new TerminalTicketStore();
+  const tickets = createHandshakeTickets<string>();
 
   /** 创建时要落在一个真目录上：工作区目录（服务自己分配的）缺了就建，用户目录缺了就是错误 */
   const createDirOf = (input: TerminalCreateInput): string => {

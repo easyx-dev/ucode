@@ -33,11 +33,19 @@ export type MemoryView = {
   enabled: boolean;
 };
 
+/** 浏览器工具的默认设置视图（与 browserConfigSchema 同形） */
+export type BrowserView = {
+  mode: "isolated" | "attach";
+  endpoint: string;
+  profile: string;
+};
+
 export type ConfigView = {
   defaultModel: string | null;
   providers: ProviderConfigView[];
   websearch: WebsearchView;
   memory: MemoryView;
+  browser: BrowserView;
 };
 
 /** config/info 与 config/update 的返回：配置视图 + 运行时状态 */

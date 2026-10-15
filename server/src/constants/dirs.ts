@@ -90,6 +90,12 @@ export const PLUGIN_MARKETPLACE_FILENAME = "marketplace.json";
 /** 内置资产物化目录名（位于 app 目录下）：`skills/` 与 `manifest.json` */
 export const BUILTIN_DIRNAME = "builtin";
 
+/** 浏览器数据目录名（位于 app 目录下）：`profiles/<name>` 是各份持久化 profile */
+export const BROWSER_DIRNAME = "browser";
+
+/** 浏览器 profile 目录名（位于浏览器数据目录下） */
+export const BROWSER_PROFILES_DIRNAME = "profiles";
+
 /** 本品牌清单目录名（位于插件包内）：`.<slug>-plugin` */
 export const PLUGIN_MANIFEST_DIRNAME = `.${brand.slug}-plugin`;
 

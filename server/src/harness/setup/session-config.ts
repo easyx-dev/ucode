@@ -13,6 +13,7 @@ import {
   type SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import type { BrowserConfig } from "@ucode/contracts";
 import {
   DEFAULT_PERMISSION_MODE,
   DEFAULT_THINKING_PREFERENCE,
@@ -22,6 +23,8 @@ import type { PromptSource } from "../../constants/env";
 import { RETRY_MAX_ATTEMPTS } from "../../constants/session";
 import { overrideOf, type SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
+
+import { type BrowserHooks, createBrowserExtension } from "../features/browser";
 import type { MemoryService } from "../features/memory";
 import { createShellExtension } from "../features/shell";
 import type { ServiceWatchHooks } from "../features/shell/services";
@@ -125,6 +128,13 @@ export type SessionAssemblyInput = {
    * 装配层不读运行态，只把它转给 shell 那层。
    */
   services?: ServiceWatchHooks;
+  /**
+   * 浏览器工具集入口。由调用方从服务层注入：装配层只注入，不读进程级状态。
+   * 白名单会话（explore / 只读自定义角色）不注册这组工具，见 `createSessionLoader`。
+   */
+  browser?: BrowserHooks;
+  /** 浏览器工具的默认设置（配置里的 mode / endpoint / profile）；调用时读取，改它不必重装会话 */
+  browserSettings?: () => BrowserConfig;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
@@ -240,6 +250,16 @@ const createSessionLoader = async (
         pluginBinDirs: input.pluginBinDirs,
         ...(input.services ? { services: input.services } : {}),
       }),
+      // 浏览器：只在默认工具集会话注册。只读模式（plan / ask）照样注册，阻断交给 WRITE_TOOLS 派生的
+      // deny 规则（切工具表会被 pi 回放成工具表突变）；白名单会话的工具表本就是显式的，注册只会混进去
+      ...(input.browser && capability.toolSelection.kind === "defaultTools"
+        ? [
+            createBrowserExtension({
+              browser: input.browser,
+              ...(input.browserSettings ? { settings: input.browserSettings } : {}),
+            }),
+          ]
+        : []),
       createCodemodeExtension({ mode: "on" }),
       ...discoveryExtension,
       ...(mcp ? [mcp] : []),

@@ -86,6 +86,15 @@ export type ToolTarget = {
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
+/** browser_open 的匹配对象是目标站点：审批按 host 记账，用户看得见自己批了哪个站 */
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+};
+
 /**
  * 解析工具调用的匹配对象。路径类工具统一归一到 posix 绝对路径，规则不必关心
  * 会话工作目录在哪（`*.env` 里的 `*` 跨分隔符，仍能命中任意层级的 `.env`）。
@@ -109,6 +118,10 @@ export const toolTarget = (
       return { subject: text(input.url) };
     case "websearch":
       return { subject: text(input.query) };
+    // 浏览器的审批对象是目标站点：用户看得见自己批了哪个站（其余 browser_* 作用于已批准的页面，
+    // 因此不在这里给 subject，默认放行——见 plans/browser-tools.md 第六章）
+    case "browser_open":
+      return { subject: hostOf(text(input.url)) };
     default:
       return { subject: "" };
   }

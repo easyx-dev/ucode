@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  appendNodesToDoc,
   attachmentOrdinalInDoc,
   type ComposerNode,
   docToPayload,
+  isDocEmpty,
+  pageElementNode,
   textToDoc,
 } from "../composer-document";
 
@@ -193,6 +196,78 @@ describe("docToPayload 的列表", () => {
       ),
     );
     assert.equal(payload.text, "开头\n- 项\n结尾");
+  });
+});
+
+describe("页面元素节点（编辑器里的芯片）", () => {
+  it("进正文的是完整摘要，节点自己不产生任何字符", () => {
+    const summary = "【页面元素】示例页（http://x/）\n- 选择器：#greet";
+    const doc: ComposerNode = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "改一下这个" }] },
+        {
+          type: "paragraph",
+          content: [
+            pageElementNode({
+              label: "问候",
+              summary,
+              url: "http://x/",
+              title: "示例页",
+              selector: "#greet",
+            }),
+          ],
+        },
+      ],
+    };
+
+    // 段落之间隔一个换行：摘要落在用户那句话的下一行
+    assert.equal(docToPayload(doc).text, `改一下这个\n${summary}`);
+  });
+
+  it("只有芯片的文档不算空（否则发送按钮会一直是禁用的）", () => {
+    const doc: ComposerNode = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [pageElementNode({ label: "问候", summary: "摘要" })] },
+      ],
+    };
+    assert.equal(isDocEmpty(doc), false);
+  });
+
+  it("追加节点时保留已有内容（外部插入走的就是这条路）", () => {
+    const base: ComposerNode = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "先写的" }] }],
+    };
+    const doc = appendNodesToDoc(base, [
+      { type: "paragraph", content: [pageElementNode({ label: "问候", summary: "摘要" })] },
+    ]);
+    assert.equal(docToPayload(doc).text, "先写的\n摘要");
+  });
+});
+
+describe("外部插入的一段上下文（页面元素摘要）", () => {
+  it("往返后原文不变（字段行会渲染成列表，但发出去的还是原样）", () => {
+    const summary = [
+      "【页面元素】订单列表（http://localhost:5173/orders）",
+      '- 元素：button "导出"（<button>）',
+      '- 选择器：[data-testid="export"]',
+      "- 位置：x=1024, y=64, 72 × 32",
+      "- 样式：颜色 foreground-value；背景 background-value；字体 14px Inter",
+      '- 属性：id="export" class="btn primary"',
+      "- 文本：导出",
+      "- 附近：已选 12 条 · 共 38 条",
+      "",
+      "```html",
+      '<button id="export">导出</button>',
+      "```",
+    ].join("\n");
+
+    const doc = textToDoc(summary);
+    // 字段行被解析成无序列表（渲染好看），这是有意的
+    assert.equal(doc.content?.[1]?.type, "bulletList");
+    assert.equal(docToPayload(doc).text, summary);
   });
 });
 

@@ -124,6 +124,12 @@ export const ERROR_CODES = {
   pluginSourceInvalid: "plugin_source_invalid",
   /** 市场未登记、来源不受支持或清单读不出来 */
   marketplaceInvalid: "marketplace_invalid",
+
+  /** 浏览器 profile 名不合法（拼接目录前必须挡住路径穿越） */
+  browserProfileInvalid: "browser_profile_invalid",
+  /** 该 profile 正被浏览器实例持有，不能删 */
+  browserProfileInUse: "browser_profile_in_use",
+  /** 该 profile 当前没有在跑的浏览器实例（帧流要先打开页面） */
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

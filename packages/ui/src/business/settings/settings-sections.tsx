@@ -1,5 +1,6 @@
 /** 设置分区的展示元数据：导航标题与图标，导航栏与各页页头共用同一份 */
 import {
+  AppWindow,
   BookOpen,
   Bot,
   Brain,
@@ -30,6 +31,7 @@ export const useSettingsSectionMeta = (): Record<SettingsSectionId, SettingsSect
     commands: { label: t("命令"), icon: Terminal },
     memory: { label: t("记忆"), icon: Brain },
     websearch: { label: t("联网搜索"), icon: Globe },
+    browser: { label: t("浏览器"), icon: AppWindow },
     mcp: { label: t("MCP 服务器"), icon: Plug },
     plugins: { label: t("插件"), icon: Package },
     remote: { label: t("远程访问"), icon: Network },

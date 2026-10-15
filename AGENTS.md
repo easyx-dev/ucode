@@ -103,6 +103,7 @@
 | [`docs/database.md`](./docs/database.md) | 数据库：迁移、命名、类型映射、SQL 约束、删除语义 |
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
 | [`docs/session-entries.md`](./docs/session-entries.md) | 会话条目（JSONL）：条目类型、payload、进不进模型上下文、界面是否展示 |
+| [`docs/browser.md`](./docs/browser.md) | 浏览器工具集：工具与快照语义、profile 与数据、桌面端内置浏览器面板、安全边界、已知限制、与 agent-browser 的对拍结论 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
@@ -121,6 +122,10 @@
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
 | `pnpm start` | `node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
+| `pnpm -F @ucode/server browser:desktop-smoke` | 桌面端驱动的端到端冒烟（`server/scripts/browser-desktop-smoke.ts`）：**就地**起服务与本地页、起桌面端（构建产物）并让面板打开该页，然后直接调服务端的动作面跑 snapshot / click / screenshot / open 与元素选择，断言「点击改掉了页面标题」（从桌面端读回）。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test` |
+| `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟（`apps/desktop/scripts/browser-panel-smoke.mjs`）：起隔离服务与本地页，Electron 开调试端口，用 Playwright 连渲染层驱动界面——活动栏入口 / 新标签开出 webview / 地址栏导航 / 多标签常驻 / 切标签不丢页面。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test` |
+| `pnpm -F @ucode/server browser:parity` | 与真 agent-browser 的对拍（`server/scripts/browser-parity.ts`）：同一批本地页面比元素覆盖与动作语义，报告写 `.tmp/browser-parity-report.md`。**依赖本机装了 agent-browser**，差异是信息不是失败 |
+| `pnpm -F @ucode/server browser:smoke` | 浏览器工具集端到端冒烟（`server/scripts/browser-smoke.ts`）：本地起静态页跑 open / snapshot / act / 截图 / 遮挡失败 / 导航失效 / close。**需要本机有浏览器**，因此不进 `pnpm test` |
 | `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`，`APP_HOME` 由脚本固定为 `.tmp/.ucode`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层固定 `:5174`，`strictPort`；`/api/*` 由 Vite 代理转给 `.env` 里的 `APP_PORT`）。服务需另行启动，不需要为桌面端配 `APP_CORS_ORIGIN`。开发形态会独立开一窗 DevTools，`⌘⌥I` / `F12` 切换（生产不自动开）。端口被占时渲染层直接报错、electron 随之退出（`concurrently -k`），不会再连上别的 dev server |
 | `pnpm start:desktop` | 构建桌面端后由 Electron 以应用内协议 `app://desktop` 加载产物（不起渲染层服务、与接口同源；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
@@ -131,6 +136,11 @@
 
 `~/.ucode`（以及任何非 `.tmp/` 的 `APP_HOME`）一律当作生产数据目录：不手工改、不拿来跑 dev / 验证；
 要试就换一个 `APP_HOME`。
+
+**起隔离的 dev 一对外加一个 `APP_PORT`**：`.env` 里的 `APP_PORT` 往往就是生产实例的端口，而 web 开发代理
+解析它的方式是 vite 的 `loadEnv`（本项目按空前缀调用，因此 `process.env` **压过** `.env` / `.env.local`）。
+所以想换端口要同时给两边：`APP_PORT=19691 APP_HOME=.tmp/<dir> pnpm -F @ucode/server dev` 与
+`APP_PORT=19691 pnpm -F @ucode/web dev --port 5175`；只改 `.env.local` 不起作用，只改 server 会让界面打到生产。
 
 **生产实例不可触碰**：`APP_HOME` 是 `~/.ucode`、从 `dist/ucode.js` 跑起来的那个实例就是生产服务，
 它的监听端口写在 `~/.ucode/app/service.json`。除非用户明确要求，否则：
@@ -255,7 +265,8 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   `platform/` 下一级一律是文件夹（域目录里只放 `index.ts` 与 `__tests__`，不直接放 `.ts`）；
   `core/`、`utils/` 保持单文件，`constants/` 按域拆文件。
 - `constants/` 按域拆文件：`dirs`（目录名与文件名）、`session`（事件、重试、上下文预算、旧输出清理）、
-  `tools`（联网 / shell / `@` 引用 / fs / git）、`agents`（角色与子智能体）、`attachments`、
+  `tools`（联网 / shell / `@` 引用 / fs / git）、`browser`（浏览器工具集）、`terminal`（工作台终端）、
+  `agents`（角色与子智能体）、`assets`、`plugins`、`attachments`、
   `memory` / `title` / `goal`（三个功能域）、`auth`、`env`（环境白名单）。
   消费方**按域引入**（`from "../constants/session"`），不设汇总再导出的桶文件；
   默认值与固定目录名都放这里。
@@ -271,7 +282,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   - `setup/`：一次装配所需的全部（`session-config` / `agents` / `permissions` / `tools` / `prompt` / `mcp` /
     `assets` / `budget`）；
   - `features/`：会话跑起来之后的能力（`goal` / `memory` / `prune` / `telemetry` / `title` / `usage` /
-    `subagents` / `shell` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
+    `subagents` / `shell` / `browser` / `context` / `attachment` / `image` / `edit` / `fork` 以及 `transcript.ts`）。
     这批是「内置功能」，随包实现、随版本演进；它们**不是插件**（插件平台只承载资源与受信任的代码扩展，
     见 [`docs/plugins.md`](./docs/plugins.md)）；
   - `plugins/`：插件宿主（`manifest` 清单发现与解析 / `components` 组件解析与路径校验 /

@@ -8,6 +8,10 @@ import { createContext, type ReactNode, useContext, useEffect } from "react";
 
 import { AppearanceProvider } from "./appearance-provider";
 
+// 外壳要用工作台的动作面，以及浏览器注入位的类型（桌面端的面板/侧栏在应用层里）
+export { type PickedPageContext, useComposerInsert } from "./composer-insert";
+export { useWorkbench, type WorkbenchBrowserSurface } from "./workbench";
+
 const ClientContext = createContext<Client | null>(null);
 
 export type UiProviderProps = {

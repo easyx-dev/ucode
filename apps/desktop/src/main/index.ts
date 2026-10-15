@@ -12,6 +12,11 @@ import { app, BrowserWindow, ipcMain, session } from "electron";
 
 import { isFrameless } from "../shared/chrome.ts";
 import { isDevLaunch, RENDERER_DEV_URL } from "../shared/renderer.ts";
+import {
+  registerBrowserChannelIpc,
+  registerBrowserGuest,
+  unregisterBrowserGuest,
+} from "./browser-channel.ts";
 import { readServiceConnection, serviceFilePath } from "./connection.ts";
 import { registerNotificationIpc } from "./notification.ts";
 import { installRendererProtocol, RENDERER_ORIGIN, registerRendererScheme } from "./proxy.ts";
@@ -116,7 +121,27 @@ const createWindow = (): void => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // 工作台里的浏览器面板用 `<webview>` 承载（agent 驱动的也是它，见 docs/browser.md）
+      webviewTag: true,
     },
+  });
+
+  /*
+    嵌入的网页是**外部内容**：给它留出最小权限。guest 会继承宿主更严的安全档（sandbox / contextIsolation
+    之类改不松），这里只确保没人从渲染层塞进 preload 或 node 集成——那等于把任意站点当本机代码跑。
+  */
+  // 浏览器标签登记给 CDP 转发用：只有这里登记的 webContents 才会接受服务端发来的命令
+  window.webContents.on("did-attach-webview", (_event, guest) => {
+    registerBrowserGuest(guest.id);
+    guest.once("destroyed", () => unregisterBrowserGuest(guest.id));
+  });
+
+  window.webContents.on("will-attach-webview", (_event, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
   });
   window.once("ready-to-show", () => window.show());
   // 系统红绿灯收起后，关窗 / 最小化 / 全屏由界面上的三颗点经 IPC 触发
@@ -149,6 +174,8 @@ ipcMain.handle("desktop:connection", () => {
 registerRendererScheme();
 registerNotificationIpc();
 registerWindowControlsIpc();
+// 浏览器通道自己重试连接（服务可能晚于桌面端启动），这里只启动它
+registerBrowserChannelIpc();
 
 app.whenReady().then(() => {
   installRendererProtocol(rendererDist, readServiceConnection);

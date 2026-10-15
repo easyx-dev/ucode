@@ -1,4 +1,5 @@
 /** preload 注入的桌面桥（见 src/preload/index.ts） */
+import type { DesktopBrowserTab } from "@ucode/contracts";
 import type { DesktopConnection } from "../../shared/connection.ts";
 import type { DesktopNotificationRequest } from "../../shared/notification.ts";
 import type { WindowControlAction, WindowState } from "../../shared/window-controls.ts";
@@ -12,6 +13,8 @@ declare global {
       windowControl: (action: WindowControlAction) => void;
       /** 取服务连接；服务未注册时 `registered` 为 false */
       connection: () => Promise<DesktopConnection>;
+      /** 上报工作台里的浏览器标签（整份列表） */
+      reportBrowserTabs: (tabs: DesktopBrowserTab[]) => void;
       /** 弹一条系统通知；返回是否真的显示出来 */
       notify: (request: DesktopNotificationRequest) => Promise<boolean>;
       /** 订阅通知点击，返回退订函数 */

@@ -92,6 +92,11 @@
 | POST | `/api/v1/goals/resume` | 恢复目标自动续跑 |
 | POST | `/api/v1/goals/clear` | 清除当前会话目标 |
 | POST | `/api/v1/stats/summary` | 全局 token 用量统计（按模型 / 会话聚合） |
+| POST | `/api/v1/browser/list` | 列出浏览器 profile（占用、最后使用时间、是否使用中） |
+| POST | `/api/v1/browser/delete` | 删除浏览器 profile（使用中的跳过，传全集即清空） |
+| POST | `/api/v1/browser/desktop` | 桌面端浏览器通道的当前状态（有哪些标签、当前在看哪一个） |
+| POST | `/api/v1/browser/desktop/ticket` | 签一张桌面端浏览器通道的一次性握手票 |
+| GET | `/api/v1/browser/desktop` | 桌面端浏览器通道（WebSocket：上报标签集合与激活项，agent 驱动当前激活的那个） |
 | POST | `/api/v1/terminal/create` | 起一个终端（按会话 id 或工作目录归口） |
 | POST | `/api/v1/terminal/list` | 列出某工作目录下的终端（客户端据此恢复标签） |
 | POST | `/api/v1/terminal/resize` | 改终端尺寸（前端按实测值上报） |
@@ -443,6 +448,10 @@
 | `websearch.baseUrl` | string | 否 | — | — |
 | `memory` | object | 否 | — | — |
 | `memory.enabled` | boolean | 否 | — | — |
+| `browser` | object | 否 | — | — |
+| `browser.mode` | "isolated" \| "attach" | 否 | — | — |
+| `browser.endpoint` | string | 否 | — | — |
+| `browser.profile` | string | 否 | — | — |
 
 **响应类型**：`ConfigSnapshot`
 
@@ -1835,6 +1844,90 @@
 | `longestSessionMs` | number | 是 | 区间内「单会话最长聊天时长」（毫秒）：会话内相邻调用间隔不超过 30 分钟算同一段， 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。 |
 | `steps` | [StatsStepSummary](#statsstepsummary) | 是 | 区间内的步级耗时画像；区间内没有任何步记录时各指标为空 |
 
+## browser（`browser`）
+
+### POST /api/v1/browser/list
+
+列出浏览器 profile（占用、最后使用时间、是否使用中）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`BrowserListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `profiles` | [BrowserProfileView](#browserprofileview)[] | 是 | — |
+| `root` | string | 是 | profile 存放根目录（设置页用它说明数据落在哪） |
+| `limits` | object | 是 | — |
+| `limits.maxProfiles` | number | 是 | 持久化 profile 份数上限 |
+| `limits.maxBytes` | number | 是 | 单份占用上限 |
+
+### POST /api/v1/browser/delete
+
+删除浏览器 profile（使用中的跳过，传全集即清空）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `names` | string（长度≥1）[]（≤64 项） | 是 | — | — |
+
+**响应类型**：`BrowserDeleteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `deleted` | string[] | 是 | — |
+| `missing` | string[] | 是 | — |
+| `skipped` | object[] | 是 | — |
+| `skipped[].name` | string | 是 | — |
+| `skipped[].reason` | string | 是 | — |
+
+### POST /api/v1/browser/desktop
+
+桌面端浏览器通道的当前状态（有哪些标签、当前在看哪一个）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`DesktopChannelState`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `connected` | boolean | 是 | 桌面端是否接着（接上但还没报过标签也算接上） |
+| `tabs` | [DesktopBrowserTab](#desktopbrowsertab)[] | 是 | — |
+
+### POST /api/v1/browser/desktop/ticket
+
+签一张桌面端浏览器通道的一次性握手票
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`DesktopTicketResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `ticket` | string | 是 | — |
+| `expiresAt` | string | 是 | — |
+
+### GET /api/v1/browser/desktop
+
+桌面端浏览器通道（WebSocket：上报标签集合与激活项，agent 驱动当前激活的那个）
+
+**握手参数**
+
+`terminalId`：终端 id；`ticket`：`POST /api/v1/terminal/ticket` 签发的一次性票据（30 秒内有效、只能用一次）。
+
+**协议**
+
+WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输出字节；
+结束与拒绝由关闭码表达（`1000` 带 `exit:<code>`、`4401` 票据无效、`4404` 终端不存在、`4403` 客户端跟不上输出）。
+详见 `docs/api.md` 的「终端」一节。
+
 ## 终端（`terminal`）
 
 ### POST /api/v1/terminal/create
@@ -2081,6 +2174,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `providers` | [ProviderConfigView](#providerconfigview)[] | 是 | — |
 | `websearch` | [WebsearchView](#websearchview) | 是 | — |
 | `memory` | [MemoryView](#memoryview) | 是 | — |
+| `browser` | [BrowserView](#browserview) | 是 | — |
 
 ### RuntimeStatus
 
@@ -2154,7 +2248,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `objective` | string | 是 | — |
 | `status` | "active" \| "paused" \| "completed" | 是 | — |
-| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
+| `cause` | "error" \| "mode" \| "limit" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
 | `turns` | number | 是 | 已自动续跑的轮数（不含用户触发的那轮） |
 | `tokenBudget` | number \| null | 是 | token 预算；为空表示不限 |
 | `tokensUsed` | number | 是 | 目标开始后本会话累计消耗的 token（含校验调用） |
@@ -2548,6 +2642,26 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `byThinking` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按思考档位分桶；取不到档位的步归 `unknown` |
 | `daily` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按服务端本地日期分桶（`YYYY-MM-DD`，只出有步的日） |
 
+### BrowserProfileView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 目录名，也是 `browser_open` 的 `profile` 入参取值 |
+| `bytes` | number | 是 | 占用字节数；`exact` 为 false 时只是个下界 |
+| `exact` | boolean | 是 | 是否数完了整个目录（文件数或体积超过遍历上限即为 false） |
+| `lastUsedAt` | string \| null | 是 | 最后一次改动时间（ISO）；取不到为 null |
+| `inUse` | boolean | 是 | 是否正被某个浏览器实例持有（此时不能删） |
+
+### DesktopBrowserTab
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | — |
+| `title` | string | 是 | — |
+| `url` | string | 是 | — |
+| `webContentsId` | number \| null | 是 | — |
+| `active` | boolean | 是 | 用户当前看的是这一个 |
+
 ### TerminalInfo
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -2630,6 +2744,14 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `enabled` | boolean | 是 | — |
+
+### BrowserView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `mode` | "isolated" \| "attach" | 是 | — |
+| `endpoint` | string | 是 | — |
+| `profile` | string | 是 | — |
 
 ### GoalVerification
 
@@ -2715,7 +2837,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `event` | "set" \| "completed" \| "budget" \| "pause" \| "resume" \| "clear" \| "verdict" | 是 | — |
 | `status` | "active" \| "paused" \| "completed" | 否 | 本次事件后的状态（`clear` 时缺省） |
-| `cause` | "error" \| "limit" \| "mode" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" | 否 | `pause` 专用：暂停原因 |
+| `cause` | "error" \| "mode" \| "limit" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" | 否 | `pause` 专用：暂停原因 |
 | `turns` | number | 否 | 目标激活后累计的轮数 |
 | `turnTokens` | number | 否 | 本轮的用量增量（token），含本轮校验开销；`verdict` 与 `completed` 都带 |
 | `turnToolCalls` | number | 否 | 本轮的工具调用次数；`verdict` 与 `completed` 都带 |

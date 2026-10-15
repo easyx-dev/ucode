@@ -19,7 +19,9 @@ import type { EditorState } from "@tiptap/pm/state";
 import type { EditorProps } from "@tiptap/pm/view";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import type { RefObject } from "react";
+import { PAGE_ELEMENT_NODE } from "../document/composer-document";
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
+import { PageElementChipView } from "./page-element-chip";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
 
@@ -121,6 +123,31 @@ const AttachmentMention = Mention.extend({
   renderText: () => "",
 });
 
+const PageElementMention = Mention.extend({
+  name: PAGE_ELEMENT_NODE,
+  addAttributes() {
+    return {
+      label: { default: null },
+      summary: { default: null },
+      url: { default: null },
+      title: { default: null },
+      selector: { default: null },
+    };
+  },
+  /** 同附件：不是从键盘打出来的，因此没有触发符，也就没有建议弹层 */
+  addProseMirrorPlugins() {
+    return [];
+  },
+  addKeyboardShortcuts() {
+    return {};
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(PageElementChipView);
+  },
+  /** 正文里的完整摘要由 \`docToPayload\` 生成，序列化到剪贴板时不再夹带一份 */
+  renderText: () => "",
+});
+
 /**
  * `@`：任意位置，候选由 `contextItems` 给（异步检索文件）；`enabled` 为假则整个菜单停用
  */
@@ -215,6 +242,7 @@ export const createComposerExtensions = (
   createContextMention(callbacks, flags.context),
   createCommandMention(callbacks, flags.command),
   AttachmentMention,
+  PageElementMention,
   Placeholder.configure({ placeholder: flags.placeholder }),
 ];
 

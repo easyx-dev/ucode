@@ -3,6 +3,8 @@
  *
  * 模式与角色声明、装配层、提示词共用同一份名字，避免「声明与注册成对维护」的隐性耦合。
  */
+
+import { BROWSER_TOOL_NAMES } from "../../features/browser/tools";
 import { MEMORY_TOOL_NAMES } from "../../features/memory/tools";
 import { GOAL_BLOCKED_TOOL, GOAL_COMPLETE_TOOL } from "./goal";
 
@@ -62,8 +64,11 @@ export const EXEC_TOOL_NAMES = ["bash", POWERSHELL_TOOL_NAME] as const;
 export const isExecTool = (name: string): boolean =>
   (EXEC_TOOL_NAMES as readonly string[]).includes(name);
 
-/** 会写盘 / 执行命令的工具名：只读角色用规则把它们整批断掉（见 `harness/setup/agents/profiles`） */
-export const WRITE_TOOLS = ["edit", "write", ...EXEC_TOOL_NAMES] as const;
+/**
+ * 会写盘 / 执行命令 / 操作浏览器的工具名：只读角色用规则把它们整批断掉
+ * （见 `harness/setup/agents/profiles`）。浏览器能起进程、能出网、能读本地文件，与执行命令同档。
+ */
+export const WRITE_TOOLS = ["edit", "write", ...EXEC_TOOL_NAMES, ...BROWSER_TOOL_NAMES] as const;
 
 /** 子会话永远拿不到的工具：递归、计划提交、记忆写入与目标结算（子会话不该结算父目标） */
 export const SUBAGENT_EXCLUDED_TOOLS = [
@@ -85,6 +90,7 @@ export const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...READ_ONLY_TOOLS,
   PRESENT_PLAN_TOOL_NAME,
   "tool_search",
+  ...BROWSER_TOOL_NAMES,
   ...MEMORY_TOOL_NAMES,
   ...GOAL_TOOL_NAMES,
 ]);

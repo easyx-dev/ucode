@@ -255,6 +255,29 @@
 - **进程只存在于服务进程内存**：不落库、不进会话记录、不随会话回收；服务退出时全部杀掉。
   多个客户端可同时订阅同一终端（同一个 PTY，都能输入）。
 
+## 浏览器（browser）
+
+agent 用的那组浏览器工具（`browser_open` / `browser_snapshot` / `browser_act` / `browser_screenshot` /
+`browser_close`）是**会话内的工具调用**，不走 HTTP，所以这里只有 **profile 数据面**：
+
+- `POST /api/v1/browser/list`：列出磁盘上的 profile——`name` / `bytes` / `exact` / `lastUsedAt` / `inUse`，
+  外加存放根目录与两个上限（份数、单份占用）。`exact: false` 表示目录太大、只数了个下界。
+- `POST /api/v1/browser/delete`：`{ names: string[] }` → `{ deleted, missing, skipped }`。
+  **使用中的 profile 跳过**（`skipped[].reason`）——删到一半会把实例正打开着的文件抽走；
+  动作表里没有 `clear`，「清空」由调用方先 `list` 再把全集传进来表达。
+
+- `POST /api/v1/browser/desktop`：桌面端浏览器通道的当前状态——`{ connected, tabs }`，每个标签带
+  `id` / `title` / `url` / `webContentsId` / `active`。没有桌面端（或一个标签都没开）时 `connected` 为
+  false 或 `tabs` 为空。排障与冒烟看它。
+- `POST /api/v1/browser/desktop/ticket`：给那条通道签一张一次性握手票（与终端同一个实现）。
+- `GET /api/v1/browser/desktop`：通道本体（WebSocket 升级端点，鉴权照终端那套：`?ticket=`）。上行三种消息：
+  整份标签集合 `{ type: "tabs", tabs: [...] }`（有变更就重发）、CDP 结果 `{ type: "cdp-result", id, result | error }`、
+  CDP 事件 `{ type: "cdp-event", webContentsId, method, params }`；下行一种：`{ type: "cdp", id, webContentsId, method, params }`
+  ——服务端按它驱动当前激活的那个标签（见 docs/browser.md）。
+
+数据落在 `$APP_HOME/app/browser/profiles/<name>`，权限 `0700`（里面有 cookie 与 localStorage，属凭证面）。
+名字是**单段**、小写字母或数字开头（`^[a-z0-9][a-z0-9._-]{0,63}`），拼路径前校验，挡路径穿越。
+
 ## 文件系统（fs）与应用目录
 
 `fs` 域是通用的文件系统浏览入口（会话侧栏的项目目录选择器、输入区的 `@` 检索与工作台的文件预览共用）：

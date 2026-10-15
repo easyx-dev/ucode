@@ -27,9 +27,9 @@
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
 | --- | --- | --- | --- | --- | --- |
-| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）；Windows 上另有 `powershell` | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
-| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write` / `bash` / `powershell` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
-| `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | `deny` `edit` / `write` / `bash` / `powershell` | `medium` | 只读分析与回答 |
+| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）+ 浏览器工具（`browser_*`，只在默认集会话注册）；Windows 上另有 `powershell` | 无（只受全局默认规则约束，其中 `browser_open` 默认 `ask`） | `xhigh` | 正常编码与执行 |
+| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write` / `bash` / `powershell` / `browser_*` | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
+| `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | `deny` `edit` / `write` / `bash` / `powershell` / `browser_*` | `medium` | 只读分析与回答 |
 
 ### 只读为什么不收窄工具集
 
@@ -60,7 +60,8 @@
 新建会话时请求里没给档位的话，取所属项目**最近一次选择**的档位（没记住即 `auto`）——项目按 cwd 归口，
 见 [`docs/api.md`](./api.md)「项目」。
 
-- 只读模式**直接 `deny` 每一个写盘 / 执行工具**（`edit` / `write` / `bash`，Windows 上另有 `powershell`），
+- 只读模式**直接 `deny` 每一个写盘 / 执行 / 操作浏览器的工具**（`edit` / `write` / `bash`，Windows 上另有
+  `powershell`，以及整组 `browser_*`——浏览器能起进程、能出网、能读本地文件，与执行命令同档），
   不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
   它落在规则层（不是从工具表里去掉），所以连同 `codemode` 的嵌套调用与子会话一起拦住。
 - 自定义 primary agent 可覆盖同名内置项或另取新名；`mode` 是字符串 slug，服务端按角色注册表校验。

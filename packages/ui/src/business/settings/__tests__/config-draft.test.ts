@@ -8,7 +8,13 @@ import { describe, it } from "node:test";
 
 import type { TFunction } from "i18next";
 
-import { createDraftProvider, type DraftProvider, validateDrafts } from "../config-draft";
+import {
+  createDraftProvider,
+  type DraftProvider,
+  toDraftBrowser,
+  toUpdatePayload,
+  validateDrafts,
+} from "../config-draft";
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -48,5 +54,52 @@ describe("供应商 / 模型草稿校验", () => {
       apiKey: "sk-test",
     };
     assert.equal(validateDrafts([builtin], t), null);
+  });
+});
+
+describe("浏览器设置", () => {
+  it("视图 → 草稿：字段一一对应", () => {
+    assert.deepEqual(
+      toDraftBrowser({ mode: "attach", endpoint: "http://127.0.0.1:9222", profile: "work" }),
+      {
+        mode: "attach",
+        endpoint: "http://127.0.0.1:9222",
+        profile: "work",
+      },
+    );
+  });
+
+  it("提交时端点与 profile 去空白，留空即清空（不是沿用）", () => {
+    const payload = toUpdatePayload(
+      [],
+      null,
+      {
+        provider: "tavily",
+        apiKey: "",
+        apiKeyMasked: "",
+        baseUrl: "",
+        configured: false,
+      },
+      false,
+      { mode: "isolated", endpoint: "  ", profile: " work " },
+    );
+    assert.deepEqual(payload.browser, { mode: "isolated", endpoint: "", profile: "work" });
+  });
+
+  it("连接方式原样提交（两个取值都合法）", () => {
+    const payload = toUpdatePayload(
+      [],
+      null,
+      {
+        provider: "tavily",
+        apiKey: "",
+        apiKeyMasked: "",
+        baseUrl: "",
+        configured: false,
+      },
+      false,
+      { mode: "attach", endpoint: "http://127.0.0.1:9222", profile: "" },
+    );
+    assert.equal(payload.browser.mode, "attach");
   });
 });

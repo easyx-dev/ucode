@@ -5,6 +5,7 @@ export type {
   AgentView,
   ApiType,
   AttachmentView,
+  BrowserView,
   CatalogModel,
   CatalogProvider,
   CommandAssetSource,

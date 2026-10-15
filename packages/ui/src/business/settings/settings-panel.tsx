@@ -13,6 +13,7 @@ import type { SettingsSectionId } from "../../utils/settings-section";
 import { SettingsAgents } from "./assets/settings-agents";
 import { SettingsCommands } from "./assets/settings-commands";
 import { SettingsSkills } from "./assets/settings-skills";
+import { SettingsBrowser } from "./browser/settings-browser";
 import { SettingsMcp } from "./mcp/settings-mcp";
 import { SettingsModels } from "./models/settings-models";
 import { SettingsAppearance } from "./pages/settings-appearance";
@@ -71,6 +72,29 @@ function DraftWebsearchPage({
   return (
     <SettingsPage title={title} trailing={saveActions}>
       <SettingsWebsearch websearch={draft.websearch} onPatch={draft.patchWebsearch} />
+    </SettingsPage>
+  );
+}
+
+function DraftBrowserPage({
+  title,
+  draft,
+  saveActions,
+}: {
+  title: string;
+  draft: ConfigDraft;
+  saveActions: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <SettingsPage
+      title={title}
+      description={t(
+        "本地自测用的浏览器由服务进程启动：agent 打开页面、点按钮、填表单、截图，用来自证改动的效果。",
+      )}
+      trailing={saveActions}
+    >
+      <SettingsBrowser browser={draft.browser} onPatch={draft.patchBrowser} />
     </SettingsPage>
   );
 }
@@ -159,6 +183,10 @@ function SectionContent({
       );
     case "memory":
       return <DraftMemoryPage title={meta.memory.label} draft={draft} saveActions={saveActions} />;
+    case "browser":
+      return (
+        <DraftBrowserPage title={meta.browser.label} draft={draft} saveActions={saveActions} />
+      );
     case "appearance":
       return (
         <SettingsPage title={meta.appearance.label} trailing={saveActions}>

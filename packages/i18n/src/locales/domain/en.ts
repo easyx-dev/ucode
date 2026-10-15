@@ -47,4 +47,8 @@ export default {
   "插件组件路径无效：{{path}}": "Invalid plugin component path: {{path}}",
   "插件来源不受支持：{{source}}": "Unsupported plugin source: {{source}}",
   "市场配置无效：{{reason}}": "Invalid marketplace: {{reason}}",
+  "浏览器 profile 名不合法：{{reason}}": "Invalid browser profile name: {{reason}}",
+  "该 profile 正在使用中，请先关掉对应实例":
+    "This profile is in use; close the browser instance first",
+  "该 profile 还没有在跑的浏览器实例": "No running browser instance for this profile yet",
 };

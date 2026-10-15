@@ -133,6 +133,25 @@ export const memorySchema = z.object({
   enabled: z.boolean().default(false),
 });
 
+/**
+ * 浏览器工具的默认连接方式与默认 profile。
+ * 两者都在**调用工具时**读取（改它不必重建会话装配），所以 config/classify 把它列进 lazy 字段。
+ */
+export const browserConfigSchema = z.object({
+  /** 默认连接方式：自己启动受管实例（isolated），或连用户已有的调试实例（attach） */
+  mode: z.enum(["isolated", "attach"]).default("isolated"),
+  /** attach 的 CDP 端点，如 http://127.0.0.1:9222 */
+  endpoint: z.string().default(""),
+  /** 默认 profile 名；留空表示默认用临时数据目录（不长期保留登录态） */
+  profile: z.string().default(""),
+});
+
+export const browserPatchSchema = z.object({
+  mode: z.enum(["isolated", "attach"]).optional(),
+  endpoint: z.string().optional(),
+  profile: z.string().optional(),
+});
+
 export const appConfigSchema = z.object({
   providers: z.array(providerSchema).default([]),
   /** "provider/model"，null 表示使用第一个可用模型 */
@@ -143,6 +162,7 @@ export const appConfigSchema = z.object({
     baseUrl: "",
   }),
   memory: memorySchema.default({ enabled: false }),
+  browser: browserConfigSchema.default({ mode: "isolated", endpoint: "", profile: "" }),
 });
 
 /** 更新时 apiKey 可省略：省略则沿用该 provider 已保存的 key */
@@ -164,6 +184,7 @@ export const appConfigPatchSchema = z.object({
   defaultModel: z.string().min(1).nullable().optional(),
   websearch: websearchPatchSchema.optional(),
   memory: memoryPatchSchema.optional(),
+  browser: browserPatchSchema.optional(),
 });
 
 export const configTestSchema = z.object({
@@ -197,6 +218,7 @@ export type ProviderConfig = z.infer<typeof providerSchema>;
 export type ProviderModel = z.infer<typeof providerModelSchema>;
 export type WebsearchConfig = z.infer<typeof websearchSchema>;
 export type MemoryConfig = z.infer<typeof memorySchema>;
+export type BrowserConfig = z.infer<typeof browserConfigSchema>;
 export type ConfigTestInput = z.infer<typeof configTestSchema>;
 /** 客户端发送的连通性测试载荷（api 默认 openai-completions，可省） */
 export type ConfigTestRequest = z.input<typeof configTestSchema>;

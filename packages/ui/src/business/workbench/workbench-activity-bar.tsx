@@ -5,7 +5,7 @@
  * 两个图标都在位，不随目录是不是 git 仓库变化：位置固定比省一个图标重要。
  */
 
-import { FolderTree, GitCompare, PanelRightClose, SquareTerminal } from "lucide-react";
+import { AppWindow, FolderTree, GitCompare, PanelRightClose, SquareTerminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "../../base/button";
 import { useWorkbench, WORKBENCH_VIEWS, type WorkbenchView } from "../../provider/workbench";
@@ -14,12 +14,14 @@ const VIEW_ICON: Record<WorkbenchView, typeof FolderTree> = {
   files: FolderTree,
   changes: GitCompare,
   terminal: SquareTerminal,
+  browser: AppWindow,
 };
 
 const VIEW_LABEL: Record<WorkbenchView, string> = {
   files: "文件浏览", // i18n-ignore
   changes: "源代码管理", // i18n-ignore
   terminal: "终端", // i18n-ignore
+  browser: "浏览器", // i18n-ignore
 };
 
 export function WorkbenchActivityBar() {
@@ -28,6 +30,10 @@ export function WorkbenchActivityBar() {
   const translate = t as (key: string) => string;
   const workbench = useWorkbench();
   if (!workbench) return null;
+  // 浏览器入口只在宿主注入了那一面时出现（web 端没有内置浏览器）
+  const views: WorkbenchView[] = workbench.browser
+    ? [...WORKBENCH_VIEWS, "browser"]
+    : [...WORKBENCH_VIEWS];
 
   return (
     <div
@@ -36,7 +42,7 @@ export function WorkbenchActivityBar() {
       aria-orientation="vertical"
       className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-border py-2"
     >
-      {WORKBENCH_VIEWS.map((view) => {
+      {views.map((view) => {
         const Icon = VIEW_ICON[view];
         const active = workbench.view === view && workbench.sidebarVisible;
         const label = translate(VIEW_LABEL[view]);

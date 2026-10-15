@@ -5,6 +5,7 @@ import {
   getLatestCompactionEntry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import type { BrowserConfig } from "@ucode/contracts";
 import {
   type BackgroundService,
   COMPACTION_RECORD_CUSTOM_TYPE,
@@ -35,6 +36,11 @@ import type { SessionRecord, SessionRepository } from "../db/session-repository"
 import { overrideOf } from "../db/session-repository";
 
 import { env } from "../env";
+import {
+  type BrowserHooks,
+  DEFAULT_BROWSER_SETTINGS,
+  NOOP_BROWSER_HOOKS,
+} from "../harness/features/browser/hooks";
 import type { GoalService } from "../harness/features/goal";
 import { parseGoalState } from "../harness/features/goal/state";
 import type { PromptImage } from "../harness/features/image";
@@ -164,6 +170,13 @@ export class SessionPool {
      * 启用插件贡献的资产目录与子角色（装配期注入）。由 services 从插件注册表算出后传入：
      * harness/setup 与 core 都不反向依赖插件宿主。
      */
+    /**
+     * 浏览器工具集入口：由 services 构造后注入。内核不认识浏览器实现，只把它转给装配层；
+     * 会话离池时释放引用（实例留给空闲回收，别的会话可能还在用）。
+     */
+    private readonly browser: BrowserHooks = NOOP_BROWSER_HOOKS,
+    /** 浏览器工具的默认设置；与联网搜索同理，运行期读取 */
+    private readonly browserSettings: () => BrowserConfig = () => DEFAULT_BROWSER_SETTINGS,
     private readonly plugin: PluginContributions = {
       commandAssets: () => ({ skills: [], prompts: [] }),
       agents: () => [],
@@ -736,6 +749,8 @@ export class SessionPool {
       ...(isSubagent ? {} : { goal: this.goalHooks(record) }),
       // 服务观测只给主会话：面板只服务主会话，子会话起的服务不进清单
       ...(isSubagent ? {} : { services: this.serviceWatchHooks(record) }),
+      browser: this.browser,
+      browserSettings: this.browserSettings,
       agentRegistry: registry,
       pluginAssets: this.plugin.commandAssets(cwd),
       pluginExtensionPaths: this.plugin.extensionPaths(cwd),
@@ -1145,6 +1160,8 @@ export class SessionPool {
     this.telemetry.detach(sessionId);
     this.memory.discardReview(sessionId);
     this.goals.forget(sessionId);
+    // 浏览器实例按 profile 共享：离池只放掉引用，真正关掉交给空闲回收或最后一个引用者
+    this.browser.release(sessionId);
     // 挂起审批 / 提问按失败结算，避免回答打到已释放的实例：子会话的请求挂在父会话下
     // 并带 source 标注，主会话的请求就挂在自己名下
     const parentSessionId = this.repository.find(sessionId)?.parentSessionId ?? null;

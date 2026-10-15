@@ -1,7 +1,8 @@
 /**
  * 工作台（右侧第三栏）的状态注入：面板状态由预设持有，动作经这里下发给业务组件。
  *
- * 面板是 VSCode 那种「活动栏 + 侧栏 + 编辑器区」：活动栏切侧栏看什么（源代码管理 / 项目文件 / 终端），
+ * 面板是 VSCode 那种「活动栏 + 侧栏 + 编辑器区」：活动栏切侧栏看什么（源代码管理 / 项目文件 / 终端，
+ * 桌面端另有浏览器），
  * 侧栏可以整列收起，编辑器区按打开的文档出标签。对话区的引用与命令面板都要能打开某个文件，
  * 而它们与面板之间隔着多层组件，因此用 context 下发动作；状态本身仍由 `WorkspaceLayout` 持有。
  */
@@ -13,10 +14,29 @@ import type { WorkbenchDoc } from "../business/workbench/workbench-docs";
 
 /**
  * 侧栏的视图。顺序即活动栏自上而下的排布：代码管理在最上（最常看），终端在文件之后。
+ * `browser` 只在宿主注入了浏览器面时出现（见 `WorkbenchApi.browser`）。
  */
 export const WORKBENCH_VIEWS = ["changes", "files", "terminal"] as const;
 
-export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
+export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number] | "browser";
+
+/**
+ * 宿主提供的浏览器面（**仅桌面端**）：web 端没有内置浏览器，不传就没有这个视图、也开不出浏览器标签。
+ *
+ * 载体与驱动都在宿主里（桌面端是 Electron 的 `<webview>` + `webContents.debugger`），
+ * 界面这一层只认「有几个标签、当前激活哪个」，以及合成的那一块画面。
+ */
+export type WorkbenchBrowserSurface = {
+  /** 侧栏内容（标签列表与新建入口）；用 `useWorkbench()` 取标签与动作 */
+  sidebar: ReactNode;
+  /**
+   * 编辑器区里渲染某个浏览器标签；`tabId` 由宿主对应到自己的 webview。
+   *
+   * `active` 是「用户正在看这一个」：未激活的标签也得留着（卸载即销毁页面），但宿主需要知道哪个是当前
+   * 在看的——服务端按它决定 agent 驱动哪一个（见 docs/browser.md）。
+   */
+  renderTab: (tabId: string, options: { /** 用户正在看这一个 */ active: boolean }) => ReactNode;
+};
 
 /** 打开某个工作区变更时要看的对比对象 */
 export type ChangeTarget = { file: string; staged: boolean };
@@ -65,6 +85,10 @@ export type WorkbenchApi = {
   reloadTerminals: () => void;
   /** 最近一次「新建终端」的失败文案；没有失败时为 null */
   terminalError: string | null;
+  /** 宿主注入的浏览器面；null 表示这一端没有内置浏览器（web 端） */
+  browser: WorkbenchBrowserSurface | null;
+  /** 新开一个浏览器标签并切过去（`tabId` 由这里生成） */
+  openBrowserTab: () => void;
 };
 
 const WorkbenchContext = createContext<WorkbenchApi | null>(null);

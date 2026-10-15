@@ -89,6 +89,13 @@ export const zhCN: PromptCatalog = {
           "一次读十几个文件、批量检索后只回传命中片段，都是它的典型用法。",
       );
     }
+    if (has("browser_open")) {
+      rules.push(
+        "在浏览器里自证前端改动：browser_open 打开地址 → browser_snapshot 拿元素编号 → browser_act 操作 → " +
+          "browser_screenshot 看画面。编号按元素的可访问名生成，页面跳转后整体失效，必须重新快照；" +
+          "动作被遮挡或编号失效会立即失败，失败信息里有下一步，不要重试同一个编号。",
+      );
+    }
     if (has("remember") || has("forget")) {
       rules.push(
         "用户明确要求「记住」或「忘掉」某条长期信息时，用 remember / forget 直接增删项目记忆，不要写进代码文件。",

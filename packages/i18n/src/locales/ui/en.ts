@@ -896,6 +896,7 @@ export default {
   "点上面的加号新建一个，就在当前目录里":
     "Use the plus button above; it starts in the current folder",
   "终端 {{index}}": "Terminal {{index}}",
+  "浏览器 {{index}}": "Browser {{index}}",
   已结束: "Exited",
   结束终端: "Kill terminal",
   "终端已结束（退出码 {{code}}）": "Terminal exited (code {{code}})",
@@ -1028,4 +1029,59 @@ export default {
     "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to bundled and locally registered plugins.",
   "市场是一份插件清单（marketplace.json），可来自本地目录、url 直链或 git 仓库；刷新后点「查看插件」看目录内容。内置的 Claude 官方市场是 git 源。":
     "A marketplace is a plugin catalog (marketplace.json) served from a local folder, a direct URL or a git repository. Refresh, then browse it with View plugins. The built-in Claude marketplace is a git source.",
+  浏览器: "Browser",
+  新标签: "New tab",
+  选择页面元素: "Pick element",
+  "页面元素：{{label}}": "Page element: {{label}}",
+  未命名元素: "Unnamed element",
+  选择器: "Selector",
+  "在页面上点一个元素（Esc 取消）": "Click an element on the page (Esc to cancel)",
+  还没有浏览器标签: "No browser tab yet",
+  "点上面的加号新开一个；agent 也能驱动它，你在这里直接看着它操作。":
+    "Use the plus button above to open one; the agent can drive it too, and you watch it work right here.",
+  地址栏: "Address bar",
+  输入网址: "Enter a URL",
+  后退: "Back",
+  前进: "Forward",
+  开发者工具: "DevTools",
+  "本地自测用的浏览器由服务进程启动：agent 打开页面、点按钮、填表单、截图，用来自证改动的效果。":
+    "The browser used for local verification is started by the server process: the agent opens pages, clicks, fills forms and takes screenshots to prove its own changes work.",
+  连接方式: "Connection",
+  "自己启动：由服务进程拉起一个受管浏览器，关掉即回收。连接已有实例：只连你启动的调试实例，不会动你已打开的页面。":
+    "Launch our own: the server starts a managed browser and reclaims it on close. Attach: connect to the debug instance you started; tabs you already have open are left alone.",
+  自己启动: "Launch our own",
+  连接已有实例: "Attach to existing",
+  调试端点: "Debug endpoint",
+  "agent 将能操作该实例里已登录的站点，请只连你愿意交给它的实例。实例要用 --remote-debugging-port 启动，Chrome 136 起还必须配一个非默认的 --user-data-dir。":
+    "The agent will be able to act on sites you are signed in to in that instance, so only connect one you are willing to hand over. Start it with --remote-debugging-port; since Chrome 136 it also needs a non-default --user-data-dir.",
+  "如 http://127.0.0.1:9222": "e.g. http://127.0.0.1:9222",
+  "默认 profile": "Default profile",
+  "填了名字就把这份数据长期保留（cookie 与登录态跨会话仍在，同名 profile 的会话共用）；留空则每次都用临时目录，实例关掉即删。":
+    "Naming a profile keeps its data (cookies and sign-ins survive across sessions, and sessions sharing the name share it); leave it empty to use a throwaway directory that is deleted when the instance closes.",
+  留空即不保留: "Empty means no retention",
+  数据: "Data",
+  "{{count}} 份": "{{count}}",
+  "占用 {{size}}": "{{size}} used",
+  "至少占用 {{size}}": "at least {{size}}",
+  还没有保留任何浏览器数据: "No browser data retained yet",
+  "用 profile 名打开过页面后，数据会落在这里，可以随用随清。":
+    "Once a page is opened with a profile name, its data lands here and can be cleared at any time.",
+  使用中: "In use",
+  "存放位置：{{path}}": "Location: {{path}}",
+  清空全部: "Clear all",
+  "删除 profile「{{name}}」？": 'Delete profile "{{name}}"?',
+  "里面的 cookie 与站点数据会一并删除，且不可恢复。":
+    "Its cookies and site data are deleted too, and this cannot be undone.",
+  "已删除 {{count}} 份浏览器数据": "Deleted {{count}} browser data",
+  "清空所有浏览器 profile？": "Clear all browser profiles?",
+  "共 {{count}} 份数据会被删除，正在使用中的会跳过。":
+    "{{count}} profiles will be deleted; ones in use are skipped.",
+  "有 {{count}} 份正在使用中，未删除": "{{count}} are in use and were not deleted",
+  "agent 用 browser_open 打开页面时带上 profile 名，它就会出现在这里。":
+    "When the agent opens a page with browser_open and a profile name, that profile shows up here.",
+  实时: "Live",
+  连接中: "Connecting",
+  已断开: "Disconnected",
+  "profile「{{profile}}」：{{reason}}；让它重新打开页面后再试。":
+    'profile "{{profile}}": {{reason}}. Ask it to open a page again, then retry.',
 };

@@ -5,7 +5,7 @@
  * 模式约束文案不放这里（按语言存放在 `harness/setup/prompt/locales`），这里只管能力。
  */
 import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
-
+import { isBrowserTool } from "../../features/browser/tools";
 import { DEFAULT_PERMISSION_RULES, type PermissionRule } from "../permissions";
 import {
   DEFAULT_BUILTIN_TOOLS,
@@ -24,17 +24,23 @@ export const SUBAGENT_SLUGS = ["general", "explore"] as const;
 export type SubagentSlug = (typeof SUBAGENT_SLUGS)[number];
 
 /**
- * 只读角色的闸门规则：写盘与执行一律阻断。
+ * 只读角色的闸门规则：写盘、执行命令与操作浏览器一律阻断。
  *
  * 计划 / 问答的**工具声明与编码一致**（见下面的 PRIMARY_PROFILES），只读性完全由这几条规则在
  * `tool_call` 上落地：切模式不改模型的工具表，也就不会出现「模型照上一轮的旧工具表回答」；
  * 阻断不受权限档位影响（`deny` 永不放宽，见 permissions/engine 的 applyApprovalMode）。
  */
+/** 只读角色的规则文案：浏览器、执行命令与写盘要分开说，排障时一眼看出被拦的是哪一类 */
+const readOnlyNote = (tool: string): string => {
+  if (isBrowserTool(tool)) return "只读角色不允许操作浏览器";
+  return isExecTool(tool) ? "只读角色不允许执行命令" : "只读角色不允许改文件";
+};
+
 const READ_ONLY_PERMISSIONS: readonly PermissionRule[] = WRITE_TOOLS.map((tool) => ({
   tool,
   pattern: "*",
   action: "deny" as const,
-  note: isExecTool(tool) ? "只读角色不允许执行命令" : "只读角色不允许改文件",
+  note: readOnlyNote(tool),
 }));
 
 /** 默认集的内置部分：内置工具 + 内置扩展（自研工具经 customTools 注册，不列在这里） */

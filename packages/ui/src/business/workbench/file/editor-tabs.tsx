@@ -9,6 +9,7 @@
 import { cn } from "cn";
 import type { TFunction } from "i18next";
 import {
+  AppWindow,
   ChevronLeft,
   FileDiff,
   GitCommitHorizontal,
@@ -31,7 +32,7 @@ import type { WorkbenchDoc } from "../workbench-docs";
 
 /**
  * 标签标题：文件取文件名，diff 取文件名（提交里的 diff 带上短 hash），提交取 hash + 标题，
- * 终端按它在侧栏列表里的序号（服务端不下发名字）。
+ * 终端按它在侧栏列表里的序号（服务端不下发名字），浏览器标签按它在浏览器标签里的序号。
  */
 const titleOf = (
   doc: WorkbenchDoc,
@@ -48,14 +49,16 @@ const titleOf = (
   if (doc.kind === "terminal") {
     return t("终端 {{index}}", { index: String(terminalSequence ?? 1) });
   }
+  if (doc.kind === "browser") return t("浏览器 {{index}}", { index: doc.tabId.replace(/^t/, "") });
   return `${doc.commit.shortHash} ${doc.commit.subject}`.trim();
 };
 
-/** 标签图标：文件按类型，diff 用对比图标，提交用提交图标，终端用终端图标 */
+/** 标签图标：文件按类型，diff 用对比图标，提交用提交图标，终端与浏览器各用各的 */
 const iconOf = (doc: WorkbenchDoc) => {
   if (doc.kind === "file") return fileIconOf(doc.path);
   if (doc.kind === "changes") return Layers;
   if (doc.kind === "terminal") return SquareTerminal;
+  if (doc.kind === "browser") return AppWindow;
   return doc.kind === "diff" ? FileDiff : GitCommitHorizontal;
 };
 

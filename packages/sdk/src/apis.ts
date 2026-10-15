@@ -21,6 +21,10 @@ import type {
   AuthPasswordResponse,
   AuthSessionListResponse,
   AuthSessionRevokeResponse,
+  BrowserDeleteRequest,
+  BrowserDeleteResponse,
+  BrowserListInput,
+  BrowserListResponse,
   CommandsListRequest,
   CommandsListResponse,
   ConfigSnapshot,
@@ -422,6 +426,14 @@ export const createApis = (options: ApisOptions = {}) => {
           onActivity,
         );
       },
+    },
+    browser: {
+      /** 列出磁盘上的浏览器 profile（占用 / 最后使用时间 / 是否使用中） */
+      list: (body: BrowserListInput = {}) =>
+        transport.post<BrowserListResponse>("browser/list", body),
+      /** 删除 profile：使用中的会被跳过，传全集即清空 */
+      delete: (body: BrowserDeleteRequest) =>
+        transport.post<BrowserDeleteResponse>("browser/delete", body),
     },
     terminal: {
       create: (body: TerminalCreateRequest) =>

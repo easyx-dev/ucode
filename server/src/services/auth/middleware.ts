@@ -7,7 +7,8 @@
  * 同 host 上并存的两个实例会互相顶掉会话。
  * 解析出的 principal 带 `scopes`（当前恒为 `["*"]`），为以后的角色 / 权限分级留口子。
  *
- * 唯一的例外是终端输出流的握手（见 `TERMINAL_STREAM_PATH`）：它拿的不是长期凭证而是一次性票。
+ * 例外是 WebSocket 升级端点的握手（终端输出流、浏览器帧流）：它们拿的不是长期凭证而是一次性票，
+ * 走 `upgradeTickets` 那张表按路径分派（见 `createAuthMiddleware`）。
  */
 import { API_BASE_PATH, ERROR_CODES } from "@ucode/contracts";
 import type { Context, MiddlewareHandler } from "hono";
@@ -29,11 +30,16 @@ export type AuthVariables = { Variables: { principal: Principal } };
 const ALLOWED_GET = new Set([`${API_BASE_PATH}/health`, `${API_BASE_PATH}/info`]);
 
 /**
- * 终端输出流的 WebSocket 握手。它不走 `Authorization`（浏览器的 WS API 带不了自定义头、
- * 凭证也不走 Cookie），改用一次性握手票；票在这里**预检**（不消耗），核销留给路由。
+ * 升级端点的握手票：它不走 `Authorization`（浏览器的 WS API 带不了自定义头、凭证也不走 Cookie），
+ * 改用客户端先用带鉴权请求换来的一次性票；票在这里**预检**（不消耗），核销留给路由。
  * 预检而不是放行整条路径：无效票（或没票）压根不该让它建起连接。
  */
-const TERMINAL_STREAM_PATH = `${API_BASE_PATH}/terminal/stream`;
+export type UpgradeTicketGate = {
+  /** 取 query 参数做预检；返回票是否有效（不消耗票） */
+  peek: (query: (name: string) => string | undefined) => boolean;
+  /** 拒绝时的中文兜底（客户端按 code 渲染，看不到这句） */
+  message: string;
+};
 // 配对码本身就是凭证，兑换接口与登录同级放行
 const ALLOWED_POST = new Set([
   `${API_BASE_PATH}/auth/login`,
@@ -68,8 +74,8 @@ const resolvePrincipal = (
 export const createAuthMiddleware = (deps: {
   credentials: CredentialStore;
   sessions: SessionService;
-  /** 握手票预检：返回票是否有效且绑在这个终端上（见 `TERMINAL_STREAM_PATH`） */
-  peekTicket: (ticket: string, terminalId: string) => boolean;
+  /** 需要一次性握手票的升级路径（完整路径 → 准入判定）；缺省即没有这类端点 */
+  upgradeTickets?: Record<string, UpgradeTicketGate>;
 }): MiddlewareHandler<AuthVariables> => {
   return async (c, next) => {
     if (isAllowed(c.req.method, c.req.path)) {
@@ -77,14 +83,13 @@ export const createAuthMiddleware = (deps: {
       return;
     }
 
-    if (c.req.method === "GET" && c.req.path === TERMINAL_STREAM_PATH) {
-      const ticket = c.req.query("ticket");
-      const terminalId = c.req.query("terminalId");
-      if (ticket && terminalId && deps.peekTicket(ticket, terminalId)) {
+    const gate = c.req.method === "GET" ? deps.upgradeTickets?.[c.req.path] : undefined;
+    if (gate) {
+      if (gate.peek((name) => c.req.query(name))) {
         await next();
         return;
       }
-      return c.json(fail(ERROR_CODES.unauthorized, "未认证：终端握手票无效"), 401);
+      return c.json(fail(ERROR_CODES.unauthorized, gate.message), 401);
     }
 
     const principal = resolvePrincipal(c, deps);
