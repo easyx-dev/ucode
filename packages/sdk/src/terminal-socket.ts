@@ -37,9 +37,19 @@ export type TerminalSocket = {
   onOpen: (listener: (socket: TerminalSocketLike) => void) => () => void;
   /** 非首次连接成功：服务端会重放整段历史，调用方据此先清屏 */
   onReconnect: (listener: () => void) => () => void;
-  /** 终态：进程结束（带退出码）或票据 / 终端失效（null）。触发后不再重连 */
-  onExit: (listener: (exitCode: number | null) => void) => () => void;
+  /** 终态：进程结束（带退出码）、终端已不存在、凭证失效。触发后不再重连，重新开始要再调 `start` */
+  onExit: (listener: (exit: TerminalExit) => void) => () => void;
 };
+
+/**
+ * 输出流的终态。分三种是为了让界面能说清「为什么停在这」：进程结束能报退出码，
+ * 终端不存在（被关掉、服务重启后终端是内存态）与凭证失效是完全不同的两回事，
+ * 提示与能否自行恢复都不一样。
+ */
+export type TerminalExit =
+  | { kind: "exit"; exitCode: number }
+  | { kind: "gone" }
+  | { kind: "unauthorized" };
 
 /** 退避上限：断网时不必无限拉长，恢复后要能立刻重连 */
 const RECONNECT_MAX_DELAY_MS = 10_000;
@@ -48,25 +58,21 @@ const RECONNECT_MAX_DELAY_MS = 10_000;
  * 取票阶段就能判定「再试也没用」的错误码：终端已不存在（服务重启后终端是内存态，全没了）、
  * 或凭证失效。把 404 当网络抖动来重连，就是页面挂着一个早已消失的终端每 10 秒敲一次服务端。
  */
-const FATAL_TICKET_CODES = new Set<string>([
-  ERROR_CODES.terminalNotFound,
-  ERROR_CODES.unauthorized,
-]);
+const FATAL_TICKET_EXITS: Record<string, TerminalExit> = {
+  [ERROR_CODES.terminalNotFound]: { kind: "gone" },
+  [ERROR_CODES.unauthorized]: { kind: "unauthorized" },
+};
 
-/** 关闭码 → 是否终态、退出码是多少；`exit:<code>` 那条 reason 是服务端约定的 */
-const outcomeOf = (
-  code: number,
-  reason: string,
-): { permanent: boolean; exitCode: number | null } => {
+/** 关闭码 → 终态；网络抖动、服务端因客户端跟不上而踢连接时返回 null（可重连） */
+const outcomeOf = (code: number, reason: string): TerminalExit | null => {
   if (code === TERMINAL_CLOSE_EXIT) {
     const matched = /^exit:(-?\d+)$/.exec(reason);
-    return { permanent: true, exitCode: matched?.[1] ? Number(matched[1]) : 0 };
+    return { kind: "exit", exitCode: matched?.[1] ? Number(matched[1]) : 0 };
   }
-  if (code === TERMINAL_CLOSE_UNAUTHORIZED || code === TERMINAL_CLOSE_NOT_FOUND) {
-    // 票据废了或终端没了：重连多少次都一样，停在这
-    return { permanent: true, exitCode: null };
-  }
-  return { permanent: false, exitCode: null };
+  if (code === TERMINAL_CLOSE_UNAUTHORIZED) return { kind: "unauthorized" };
+  // 终端没了：重连多少次都一样，停在这
+  if (code === TERMINAL_CLOSE_NOT_FOUND) return { kind: "gone" };
+  return null;
 };
 
 export type TerminalSocketOptions = {
@@ -79,7 +85,7 @@ export type TerminalSocketOptions = {
 export const createTerminalSocket = (options: TerminalSocketOptions): TerminalSocket => {
   const openListeners = new Set<(socket: TerminalSocketLike) => void>();
   const reconnectListeners = new Set<() => void>();
-  const exitListeners = new Set<(exitCode: number | null) => void>();
+  const exitListeners = new Set<(exit: TerminalExit) => void>();
   const makeSocket =
     options.createSocket ?? ((url: string) => new WebSocket(url) as unknown as TerminalSocketLike);
 
@@ -89,10 +95,10 @@ export const createTerminalSocket = (options: TerminalSocketOptions): TerminalSo
   let socket: TerminalSocketLike | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const notifyExit = (exitCode: number | null): void => {
+  const notifyExit = (exit: TerminalExit): void => {
     running = false;
     socket = null;
-    for (const listener of exitListeners) listener(exitCode);
+    for (const listener of exitListeners) listener(exit);
   };
 
   const scheduleReconnect = (): void => {
@@ -114,8 +120,9 @@ export const createTerminalSocket = (options: TerminalSocketOptions): TerminalSo
     } catch (error) {
       if (!running) return;
       // 取不到票：终态错误直接收场，其余（服务刚重启、网络断）退避重连
-      if (isApiError(error) && FATAL_TICKET_CODES.has(error.code)) {
-        notifyExit(null);
+      const fatal = isApiError(error) ? FATAL_TICKET_EXITS[error.code] : undefined;
+      if (fatal) {
+        notifyExit(fatal);
         return;
       }
       scheduleReconnect();
@@ -144,8 +151,8 @@ export const createTerminalSocket = (options: TerminalSocketOptions): TerminalSo
       socket = null;
       if (!running) return;
       const outcome = outcomeOf(event.code, event.reason);
-      if (outcome.permanent) {
-        notifyExit(outcome.exitCode);
+      if (outcome) {
+        notifyExit(outcome);
         return;
       }
       scheduleReconnect();

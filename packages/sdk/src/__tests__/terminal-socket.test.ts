@@ -6,7 +6,11 @@ import { ERROR_CODES } from "@ucode/contracts";
 
 import type { Apis } from "../apis";
 import { ApiError } from "../error";
-import { createTerminalSocket, type TerminalSocketLike } from "../terminal-socket";
+import {
+  createTerminalSocket,
+  type TerminalExit,
+  type TerminalSocketLike,
+} from "../terminal-socket";
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -111,8 +115,8 @@ describe("终端输出流的连接管理", () => {
 
   it("进程结束的关闭码带出退出码，且不再重连", async () => {
     const { sockets, stream } = harness();
-    const exits: (number | null)[] = [];
-    stream.onExit((exitCode) => exits.push(exitCode));
+    const exits: TerminalExit[] = [];
+    stream.onExit((exit) => exits.push(exit));
 
     stream.start();
     await delay(10);
@@ -120,15 +124,19 @@ describe("终端输出流的连接管理", () => {
     sockets[0]?.closeWith(1000, "exit:3");
 
     await delay(RECONNECT_WAIT_MS);
-    assert.deepEqual(exits, [3]);
+    assert.deepEqual(exits, [{ kind: "exit", exitCode: 3 }]);
     assert.equal(sockets.length, 1);
   });
 
-  it("票据失效 / 终端不存在都按终态收场，不重连", async () => {
-    for (const code of [4401, 4404]) {
+  it("票据失效 / 终端不存在都按终态收场，且带出是哪一种", async () => {
+    const cases = [
+      { code: 4401, kind: "unauthorized" },
+      { code: 4404, kind: "gone" },
+    ] as const;
+    for (const { code, kind } of cases) {
       const { sockets, stream } = harness();
-      const exits: (number | null)[] = [];
-      stream.onExit((exitCode) => exits.push(exitCode));
+      const exits: TerminalExit[] = [];
+      stream.onExit((exit) => exits.push(exit));
 
       stream.start();
       await delay(10);
@@ -136,16 +144,20 @@ describe("终端输出流的连接管理", () => {
       sockets[0]?.closeWith(code);
 
       await delay(RECONNECT_WAIT_MS);
-      assert.deepEqual(exits, [null], `码 ${code} 应判终态`);
+      assert.deepEqual(exits, [{ kind }], `码 ${code} 应判终态`);
       assert.equal(sockets.length, 1, `码 ${code} 不该重连`);
       stream.stop();
     }
   });
 
   it("取票被判终态（终端已不存在 / 凭证失效）时不再重连", async () => {
-    for (const code of [ERROR_CODES.terminalNotFound, ERROR_CODES.unauthorized]) {
+    const cases = [
+      { code: ERROR_CODES.terminalNotFound, kind: "gone" },
+      { code: ERROR_CODES.unauthorized, kind: "unauthorized" },
+    ] as const;
+    for (const { code, kind } of cases) {
       const sockets: FakeSocket[] = [];
-      const exits: (number | null)[] = [];
+      const exits: TerminalExit[] = [];
       const stream = createTerminalSocket({
         terminals: {
           ticket: async () => {
@@ -160,11 +172,11 @@ describe("终端输出流的连接管理", () => {
           return socket;
         },
       });
-      stream.onExit((exitCode) => exits.push(exitCode));
+      stream.onExit((exit) => exits.push(exit));
 
       stream.start();
       await delay(RECONNECT_WAIT_MS);
-      assert.deepEqual(exits, [null], `码 ${code} 应判终态`);
+      assert.deepEqual(exits, [{ kind }], `码 ${code} 应判终态`);
       assert.equal(sockets.length, 0, `码 ${code} 不该建连`);
     }
   });

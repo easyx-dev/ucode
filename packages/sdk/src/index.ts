@@ -54,6 +54,7 @@ export { createStatusStore, type StatusStore } from "./stores/status";
 export { createUsageStore, type UsageState, type UsageStore } from "./stores/usage";
 export {
   createTerminalSocket,
+  type TerminalExit,
   type TerminalSocket,
   type TerminalSocketLike,
   type TerminalSocketOptions,
