@@ -171,6 +171,16 @@
   `posix_spawnp failed`。根 `package.json` 新增 `postinstall` 脚本（`scripts/postinstall.mjs`）在安装后补上
   （Windows 无此文件、Linux 自编译产物本来可执行，两者都跳过）；`pnpm-workspace.yaml` 的 `allowBuilds` 放行
   `node-pty` 的安装脚本。依赖新增 `node-pty`（根与 server）与 `@xterm/xterm` / `@xterm/addon-fit`（ui）。
+- **只读模式（plan / ask）的 bash 不再一刀切断掉**：执行类工具（`bash`，Windows 上另有 `powershell`）改成
+  「先兜底 `deny`、再放行被判定为只读的命令」——`ls` / `cat` / `rg` / `find` / `git log` / `git diff` 这类可以直接跑，
+  写盘、构建、测试与装依赖仍然阻断。判定在 `server/src/harness/setup/permissions/read-only-command.ts`：
+  按**各自的词法**（bash 与 PowerShell 的引号、转义规则不同，`\` 只在 bash 里是转义）拆成简单命令逐段对照白名单，
+  重定向、命令替换、变量展开、子 shell 与写盘参数（`--output` / `-delete` / `-exec` / `sort -o`）一律判为不可判定并阻断；
+  规则上用一个上下文条件
+  （`when: "readOnlyCommand"`）表达这条放行。浏览器工具改成「观察面放行、页面操作看实例」：
+  `browser_open` / `snapshot` / `screenshot` / `close` 在只读模式下可用（打开页面沿用按站点审批），
+  `browser_act` 只在受管实例（我们自启的 Chromium）里放行，默认只看得到观察面与临时实例。
+  模式提示词与文档同步改写。
 
 ### 修复
 

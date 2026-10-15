@@ -4,6 +4,9 @@
  * 规则按工具名分键、`*` 通配匹配，**最后命中者胜**（与 opencode / Claude Code 一致），
  * 未命中任何规则时默认放行。`external_directory` 不是真实工具，是「工作目录之外的路径」
  * 这一独立检查项，与工具自身规则的判定取更严的一档。
+ *
+ * 另有一个上下文条件（规则上的 `when`）：只读角色用它放行「只读命令」与「受管实例里的页面操作」——
+ * 这两件事都不是命令 / 参数文本能表达的（见 `PermissionContext`）。
  */
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 
@@ -11,6 +14,19 @@ import type { PermissionAction, PermissionMode } from "@ucode/contracts";
 
 import { toPosixPath } from "../../../platform/paths";
 import { POWERSHELL_TOOL_NAME } from "../tools/names";
+import { isReadOnlyCommand } from "./read-only-command";
+
+/**
+ * 判定上下文的条件键：值来自工具入参（`readOnlyCommand`，在 `toolTarget` 里算）或装配层给的会话状态
+ * （`managedBrowser`，见 `PermissionGate.conditions`），规则用 `when` 选中它们。
+ * 两者都不是文本能表达的条件，所以不走 `pattern`。
+ */
+export const PERMISSION_CONDITIONS = ["readOnlyCommand", "managedBrowser"] as const;
+
+export type PermissionContextKey = (typeof PERMISSION_CONDITIONS)[number];
+
+/** 一次判定可用的上下文条件；没给或为假都当不成立 */
+export type PermissionContext = Partial<Record<PermissionContextKey, boolean>>;
 
 export type PermissionRule = {
   /** 工具名；`external_directory` 表示工作目录之外的路径检查 */
@@ -20,13 +36,18 @@ export type PermissionRule = {
   action: PermissionAction;
   /** 规则用途说明，展示与排障用 */
   note?: string;
+  /**
+   * 第二道门：给出时，只有判定上下文里的同名条件为真才命中。
+   * 只读角色的两处放行（只读命令、受管实例里的页面操作）都不是命令 / 参数文本能表达的，故走这里。
+   */
+  when?: PermissionContextKey;
 };
 
-/** 一次待判定的工具调用：工具名 + 匹配对象 */
+/** 一次待判定的工具调用：工具名 + 匹配对象 + 上下文条件 */
 export type PermissionRequest = {
   tool: string;
   subject: string;
-};
+} & PermissionContext;
 
 /** 审批请求：交给用户确认时携带的上下文 */
 export type PermissionAsk = {
@@ -60,6 +81,12 @@ const toRegExp = (pattern: string): RegExp => {
 export const matchPattern = (pattern: string, subject: string): boolean =>
   pattern === "*" || toRegExp(pattern).test(subject);
 
+/** 规则是否命中：文本按 glob 匹配，`when` 按判定上下文匹配 */
+const matchesRule = (rule: PermissionRule, request: PermissionRequest): boolean => {
+  if (rule.when !== undefined && request[rule.when] !== true) return false;
+  return matchPattern(rule.pattern, request.subject);
+};
+
 /** 依次匹配，保留最后一个命中的规则（最后命中者胜） */
 export const evaluateRules = (
   rules: readonly PermissionRule[],
@@ -68,7 +95,7 @@ export const evaluateRules = (
   let matched: PermissionRule | undefined;
   for (const rule of rules) {
     if (rule.tool !== request.tool && rule.tool !== "*") continue;
-    if (!matchPattern(rule.pattern, request.subject)) continue;
+    if (!matchesRule(rule, request)) continue;
     matched = rule;
   }
   return matched ? { action: matched.action, rule: matched } : { action: "allow" };
@@ -82,6 +109,8 @@ export type ToolTarget = {
   subject: string;
   /** 路径类工具的绝对路径，供工作目录之外的判断；非路径类为 undefined */
   absolutePath?: string;
+  /** 执行类工具的只读判定结果；非执行类为 undefined */
+  readOnlyCommand?: boolean;
 };
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -110,10 +139,20 @@ export const toolTarget = (
     return { subject: toPosixPath(absolutePath), absolutePath };
   }
   switch (tool) {
-    // PowerShell 与 bash 复用同一套入参（`command`）：不并列在这里，规则匹配到的对象就是空串
+    // PowerShell 与 bash 复用同一套入参（`command`），共用这一支；两者只有只读判定的方言不同
     case "bash":
-    case POWERSHELL_TOOL_NAME:
-      return { subject: text(input.command) };
+    case POWERSHELL_TOOL_NAME: {
+      const command = text(input.command);
+      return {
+        // 匹配对象仍是命令原文（弹窗、阻断文案显示的就是它）
+        subject: command,
+        // 判定结果只经 `readOnlyCommand` 上下文条件（`when`）进入规则
+        readOnlyCommand: isReadOnlyCommand(
+          command,
+          tool === POWERSHELL_TOOL_NAME ? "powershell" : "posix",
+        ),
+      };
+    }
     case "webfetch":
       return { subject: text(input.url) };
     case "websearch":
@@ -151,15 +190,24 @@ export const severityOf = (action: PermissionAction): number => SEVERITY[action]
 const strongest = (a: PermissionAction, b: PermissionAction): PermissionAction =>
   SEVERITY[a] >= SEVERITY[b] ? a : b;
 
-/** 判定一次工具调用：先按工具规则，再看是否越界并取更严的一档 */
+/**
+ * 判定一次工具调用：先按工具规则（文本 + `when` 条件），再看是否越界并取更严的一档。
+ * `context` 是装配层给的会话状态条件；工具入参能算出的条件（只读命令）由 `toolTarget` 补上。
+ */
 export const decidePermission = (
   rules: readonly PermissionRule[],
   tool: string,
   input: Record<string, unknown>,
   cwd: string,
+  context?: PermissionContext,
 ): PermissionVerdict => {
   const target = toolTarget(tool, input, cwd);
-  const verdict = evaluateRules(rules, { tool, subject: target.subject });
+  const verdict = evaluateRules(rules, {
+    tool,
+    subject: target.subject,
+    ...context,
+    ...(target.readOnlyCommand === undefined ? {} : { readOnlyCommand: target.readOnlyCommand }),
+  });
 
   // 已阻断或非路径类工具无需再做越界检查
   if (verdict.action === "deny" || !target.absolutePath || !isExternal(cwd, target.absolutePath)) {

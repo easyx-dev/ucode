@@ -62,8 +62,8 @@ describe("语言目录", () => {
       // 列举的工具名必须与实际工具表一致：Windows 上另有 powershell，非 Windows 上不该提到它
       assert.match(
         prompt,
-        /edit \/ write \/ bash( \/ powershell)? 的调用会被直接阻断/,
-        `${mode} 模式约束应声明写盘 / 执行被阻断`,
+        /edit \/ write \/ bash( \/ powershell)? 里写盘一律阻断，执行类工具只放行被判定为只读的命令/,
+        `${mode} 模式约束应声明写盘阻断、执行收窄到只读命令`,
       );
     }
   });

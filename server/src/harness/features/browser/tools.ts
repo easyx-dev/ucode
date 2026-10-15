@@ -29,6 +29,26 @@ export type BrowserToolName = (typeof BROWSER_TOOL_NAMES)[number];
 export const isBrowserTool = (name: string): boolean =>
   (BROWSER_TOOL_NAMES as readonly string[]).includes(name);
 
+/**
+ * 浏览器工具里的**观察面**：打开页面、看元素、截图、断开。只读角色放行这几个
+ * （打开页面落回默认规则的按站点审批），其余（`browser_act`：点击 / 输入 / 滚动）会改变页面状态，仍阻断。
+ *
+ * 写成白名单而不是列出要禁的：以后新增的浏览器工具默认落在阻断侧。
+ */
+export const BROWSER_OBSERVE_TOOL_NAMES = [
+  "browser_open",
+  "browser_snapshot",
+  "browser_screenshot",
+  "browser_close",
+] as const;
+
+/** 会改变页面状态的浏览器工具：只在**受管实例**（自启的 Chromium）里对只读角色放行 */
+export const BROWSER_ACT_TOOL_NAME = "browser_act";
+
+/** 是否是只读角色也放行的浏览器工具（观察面） */
+export const isObservingBrowserTool = (name: string): boolean =>
+  (BROWSER_OBSERVE_TOOL_NAMES as readonly string[]).includes(name);
+
 /** 只有 http(s) 能开：`file://` 等于把本机文件读面交给模型，要读文件用 read 工具 */
 const assertAllowedUrl = (url: string): void => {
   let parsed: URL;
@@ -45,9 +65,6 @@ const assertAllowedUrl = (url: string): void => {
     });
   }
 };
-
-const profileOf = (profile: string | undefined): string =>
-  (profile ?? "").trim() || BROWSER_DEFAULT_PROFILE;
 
 /** 工具调用期间标记实例为「在用」：空闲回收不会把正在跑的动作关掉 */
 const useSession = async <T>(session: BrowserSession, run: () => Promise<T>): Promise<T> => {

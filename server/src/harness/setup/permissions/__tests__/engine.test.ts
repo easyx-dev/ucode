@@ -58,6 +58,28 @@ describe("decidePermission", () => {
     assert.equal(example.action, "allow");
   });
 
+  it("执行类工具按方言判只读：PowerShell 里反斜杠不是转义", () => {
+    const rules = agentRules(PRIMARY_PROFILES.plan);
+    // 同一串文本，在 bash 与 PowerShell 下的含义不同：bash 里 `\;` 是字面量，PowerShell 里它是第二条命令前的分隔符
+    assert.equal(
+      decidePermission(rules, "bash", { command: "cat a\\; rm -rf ." }, CWD).action,
+      "allow",
+    );
+    assert.equal(
+      decidePermission(
+        rules,
+        "powershell",
+        { command: "Get-ChildItem C:\\; Remove-Item -Recurse -Force C:\\data" },
+        CWD,
+      ).action,
+      "deny",
+    );
+    assert.equal(
+      decidePermission(rules, "powershell", { command: "Get-Content README.md" }, CWD).action,
+      "allow",
+    );
+  });
+
   it("P-03 越界路径触发 external_directory，授权范围是父目录", () => {
     const verdict = decidePermission(
       DEFAULT_PERMISSION_RULES,
@@ -70,13 +92,61 @@ describe("decidePermission", () => {
     assert.equal(verdict.scope, "/etc/**");
   });
 
-  it("P-01 / P-06 plan / ask 模式阻断写盘与执行", () => {
+  it("P-01 / P-06 plan / ask 模式阻断写盘，执行只放行只读命令", () => {
     for (const mode of ["plan", "ask"] as const) {
       const rules = agentRules(PRIMARY_PROFILES[mode]);
       assert.equal(decidePermission(rules, "edit", { path: "src/a.ts" }, CWD).action, "deny");
       assert.equal(decidePermission(rules, "write", { path: "src/a.ts" }, CWD).action, "deny");
-      assert.equal(decidePermission(rules, "bash", { command: "ls" }, CWD).action, "deny");
+      for (const command of ["ls -la", "git log --oneline", "cat a.md | head -3", "cd src && ls"]) {
+        assert.equal(
+          decidePermission(rules, "bash", { command }, CWD).action,
+          "allow",
+          `${mode} 应放行只读命令：${command}`,
+        );
+      }
+      for (const command of [
+        "rm -rf .",
+        "pnpm check",
+        "ls > out",
+        "git commit -m x",
+        "echo $HOME",
+      ]) {
+        assert.equal(
+          decidePermission(rules, "bash", { command }, CWD).action,
+          "deny",
+          `${mode} 应阻断：${command}`,
+        );
+      }
+      // 兜底规则的文案要说清「只放行只读命令」，模型据此知道还能跑什么
+      const verdict = decidePermission(rules, "bash", { command: "pnpm check" }, CWD);
+      assert.match(verdict.rule?.note ?? "", /只允许只读命令/);
     }
+  });
+
+  it("上下文条件（when）：条件为真才命中，缺省与为假都不命中", () => {
+    const rules: PermissionRule[] = [
+      { tool: "bash", pattern: "*", action: "deny" },
+      { tool: "bash", pattern: "*", action: "allow", when: "readOnlyCommand" },
+    ];
+    assert.equal(
+      evaluateRules(rules, { tool: "bash", subject: "ls", readOnlyCommand: true }).action,
+      "allow",
+    );
+    assert.equal(
+      evaluateRules(rules, { tool: "bash", subject: "ls", readOnlyCommand: false }).action,
+      "deny",
+    );
+    // 不带条件的探测（`isReadOnlyCapability` 就是这么问的）命不中放行那条
+    assert.equal(evaluateRules(rules, { tool: "bash", subject: "ls" }).action, "deny");
+  });
+
+  it("会话状态条件经 decidePermission 传进来：受管实例才放行页面操作", () => {
+    const rules = agentRules(PRIMARY_PROFILES.plan);
+    assert.equal(decidePermission(rules, "browser_act", {}, CWD).action, "deny");
+    assert.equal(
+      decidePermission(rules, "browser_act", {}, CWD, { managedBrowser: true }).action,
+      "allow",
+    );
   });
 
   it("未知工具没有匹配规则时默认放行", () => {

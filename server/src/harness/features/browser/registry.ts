@@ -203,6 +203,12 @@ export const createBrowserRegistry = (options: BrowserRegistryOptions = {}): Bro
     /** 本会话正用着哪个 profile 的实例；没有就用 null（`current` 的非抛版本） */
     holderOf: (sessionId) => usedBySession.get(sessionId) ?? null,
 
+    /** 本会话当前的实例是不是受管实例（我们自启的 Chromium）；没有实例时为 false */
+    isManaged: (sessionId) => {
+      const profile = usedBySession.get(sessionId);
+      return profile ? entries.get(profile)?.session.mode === "isolated" : false;
+    },
+
     /** 该 profile 是否正被某个实例持有（设置页删除前的保护） */
     isInUse(profile) {
       return (entries.get(profile)?.holders.size ?? 0) > 0;

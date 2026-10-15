@@ -9,6 +9,7 @@ import { describe, it } from "node:test";
 import { SESSION_MODES } from "@ucode/contracts";
 
 import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../../../constants/session";
+import { isObservingBrowserTool } from "../../../features/browser/tools";
 import { DEFAULT_PERMISSION_RULES, decidePermission } from "../../permissions";
 import {
   DEFAULT_BUILTIN_TOOLS,
@@ -59,14 +60,35 @@ describe("角色注册表", () => {
     }
   });
 
-  it("只读模式靠规则断掉写盘 / 执行，不靠收窄工具集", () => {
+  it("只读模式靠规则收窄能力，不靠收窄工具集", () => {
     const rules = parentModeRules("plan");
     for (const name of WRITE_TOOLS) {
+      // 浏览器的观察面（打开 / 快照 / 截图 / 断开）在只读模式下照常可用，不该被任何模式规则拦住
+      if (isObservingBrowserTool(name)) {
+        assert.equal(
+          rules.some((rule) => rule.tool === name),
+          false,
+          `${name} 不该出现在只读模式规则里`,
+        );
+        continue;
+      }
       assert.ok(
         rules.some((rule) => rule.tool === name && rule.action === "deny" && rule.pattern === "*"),
         `plan 应 deny ${name}`,
       );
+      // 只有执行类工具多一条只读放行；写盘与页面操作没有「只读」这回事
+      assert.equal(
+        rules.some(
+          (rule) =>
+            rule.tool === name && rule.action === "allow" && rule.when === "readOnlyCommand",
+        ),
+        isExecTool(name),
+        `${name} 的只读放行规则应${isExecTool(name) ? "存在" : "不存在"}`,
+      );
     }
+    // 顺序要紧：「最后命中者胜」，放行必须排在兜底之后
+    const bash = rules.filter((rule) => rule.tool === "bash");
+    assert.equal(bash.at(-1)?.when, "readOnlyCommand");
     // 判断「能不能落盘」看规则：两个只读模式为真，编码为假
     assert.equal(isReadOnlyCapability(primaryCapability("plan")), true);
     assert.equal(isReadOnlyCapability(primaryCapability("ask")), true);
@@ -190,7 +212,7 @@ describe("能力交集", () => {
     }
     // 真正的闸门：装配层把父会话模式的规则一并交给子会话，判定取较严者
     // （端到端行为见 permissions/__tests__/extension.test 的「父会话模式的 deny 仍然拦住子会话」）
-    for (const tool of WRITE_TOOLS) {
+    for (const tool of WRITE_TOOLS.filter((name) => !isObservingBrowserTool(name))) {
       const verdict = decidePermission(
         parentModeRules("plan"),
         tool,
@@ -241,7 +263,7 @@ describe("能力交集", () => {
     }
 
     const plan = parentModeRules("plan");
-    for (const tool of WRITE_TOOLS) {
+    for (const tool of WRITE_TOOLS.filter((name) => !isObservingBrowserTool(name))) {
       assert.ok(plan.some((rule) => rule.tool === tool && rule.action === "deny"));
     }
   });

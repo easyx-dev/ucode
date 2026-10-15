@@ -13,7 +13,7 @@ import type {
   ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 
-import { agentRules, parentModeRules, subagentProfile } from "../../agents";
+import { agentRules, PRIMARY_PROFILES, parentModeRules, subagentProfile } from "../../agents";
 import { skillDirectoryRules } from "../defaults";
 import type { PermissionRule } from "../engine";
 import { createPermissionExtension, type PermissionGate } from "../extension";
@@ -76,6 +76,45 @@ describe("createPermissionExtension", () => {
     const result = await call(handler, callEvent("edit", { path: "src/a.ts" }));
     assert.equal(result?.block, true);
     assert.match(result?.reason ?? "", /只读模式/);
+  });
+
+  it("只读模式（plan）下只读命令放行，写盘与构建命令阻断", async () => {
+    const handler = mount({
+      ...baseGate([]),
+      rules: () => agentRules(PRIMARY_PROFILES.plan),
+    });
+    for (const command of ["ls -la", "git log --oneline -3", "cat a.md | head -3"]) {
+      assert.equal(
+        await call(handler, callEvent("bash", { command })),
+        undefined,
+        `plan 应放行：${command}`,
+      );
+    }
+    for (const command of ["pnpm check", "ls > out", "rm -rf ."]) {
+      const blocked = await call(handler, callEvent("bash", { command }));
+      assert.equal(blocked?.block, true, `plan 应阻断：${command}`);
+      // 阻断理由要说清还能跑什么（模型据此换写成只读命令）
+      assert.match(blocked?.reason ?? "", /只允许只读命令/);
+    }
+    // 写盘工具照旧整批阻断
+    assert.equal((await call(handler, callEvent("write", { path: "src/a.ts" })))?.block, true);
+  });
+
+  it("浏览器的页面操作看实例：受管实例放行，attach / 桌面端面板阻断", async () => {
+    const mountWith = (managed: boolean) =>
+      mount({
+        ...baseGate([]),
+        rules: () => agentRules(PRIMARY_PROFILES.plan),
+        conditions: () => ({ managedBrowser: managed }),
+      });
+    const event = callEvent("browser_act", { action: "click", ref: "@e1" });
+    assert.equal(await call(mountWith(true), event), undefined);
+
+    const blocked = await call(mountWith(false), event);
+    assert.equal(blocked?.block, true);
+    assert.match(blocked?.reason ?? "", /受管实例里的页面操作/);
+    // 观察面与实例无关
+    assert.equal(await call(mountWith(false), callEvent("browser_snapshot", {})), undefined);
   });
 
   it("ask 经用户放行后继续，并把授权范围交给审批", async () => {
@@ -332,5 +371,21 @@ describe("子会话与父会话的规则交集", () => {
       parentRules: () => parentModeRules("plan"),
     });
     assert.equal((await call(blocked, event))?.block, true);
+  });
+
+  it("只读父会话下子会话仍能跑只读命令（取较严者不会把它打回阻断）", async () => {
+    const handler = mount({
+      ...childGate([], async () => "allow_once"),
+      rules: () => agentRules(subagentProfile("general")),
+      parentRules: () => parentModeRules("plan"),
+    });
+    assert.equal(
+      await call(handler, callEvent("bash", { command: "git diff --stat src/a.ts" })),
+      undefined,
+    );
+    assert.equal(
+      (await call(handler, callEvent("bash", { command: "git commit -m x" })))?.block,
+      true,
+    );
   });
 });

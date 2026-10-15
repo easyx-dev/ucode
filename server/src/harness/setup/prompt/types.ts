@@ -38,7 +38,7 @@ export type PromptCatalog = {
   codeReferences: string;
   /** 当前模式分节的标题 */
   modeHeading: string;
-  /** 各主会话模式的约束文案；入参是本次会话会写盘 / 执行命令的工具名，只读模式要按它列举 */
+  /** 各主会话模式的约束文案；入参是本次会话会写盘 / 执行命令的工具名，只读模式要按它列举并说清「执行类只放行只读命令」 */
   modeConstraints: (blockedTools: readonly string[]) => Record<SessionMode, string>;
   /** 各子角色的约束文案，键为子角色 slug */
   subagentConstraints: Record<SubagentSlug, string>;

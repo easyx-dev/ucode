@@ -16,6 +16,7 @@ import {
   applyApprovalMode,
   decidePermission,
   type PermissionAsk,
+  type PermissionContext,
   type PermissionRule,
   severityOf,
 } from "./engine";
@@ -30,6 +31,11 @@ export type PermissionGate = {
   approvalMode: PermissionMode;
   /** 子会话的父会话模式规则（能力上限）；提供时与 `rules` 的判定取较严者，保证能力只可收窄 */
   parentRules?: () => readonly PermissionRule[];
+  /**
+   * 判定上下文条件（供规则的 `when` 选中）：目前只有「浏览器是不是受管实例」。
+   * 每次判定现取——会话中途可能换实例；不给时条件一律不成立。
+   */
+  conditions?: () => PermissionContext;
   /** 记下本会话恒允：追加一条 allow 规则 */
   grant: (rule: PermissionRule) => void;
   /** 发起审批；返回用户答复，本轮中断 / 会话清理按 `deny` */
@@ -57,12 +63,20 @@ export const createPermissionExtension =
   (pi) => {
     pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult | undefined> => {
       const input = event.input as Record<string, unknown>;
-      let verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd);
+      // 条件现取：只读模式放行「受管实例里的页面操作」靠它，会话中途换实例也要按当下的算
+      const conditions = gate.conditions?.();
+      let verdict = decidePermission(gate.rules(), event.toolName, input, gate.cwd, conditions);
       // 子会话再算一遍父会话模式规则的判定，取较严者，保证角色权限放宽不了父的限制；
       // 默认规则与用户授权在两边一致地生效（都在子会话自己的 `rules` 里），不在这里重复施加
       const parentRules = gate.parentRules?.();
       if (parentRules) {
-        const parentVerdict = decidePermission(parentRules, event.toolName, input, gate.cwd);
+        const parentVerdict = decidePermission(
+          parentRules,
+          event.toolName,
+          input,
+          gate.cwd,
+          conditions,
+        );
         if (severityOf(parentVerdict.action) > severityOf(verdict.action)) verdict = parentVerdict;
       }
       // MCP 工具没有显式规则时按服务器声明的 annotations 兜底：只读放行，其余审批

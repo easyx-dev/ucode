@@ -57,7 +57,7 @@ export const SUBAGENT_TOOL_NAME = "subagent";
 /** 计划模式的收尾工具名：只在计划模式注册，调用即提交方案、本轮结束 */
 export const PRESENT_PLAN_TOOL_NAME = "present_plan";
 
-/** 执行命令的工具名：与写盘同属「改变机器状态」，只读角色一并断掉 */
+/** 执行命令的工具名：与写盘同属「改变机器状态」；只读角色对它只放行被判定为只读的命令 */
 export const EXEC_TOOL_NAMES = ["bash", POWERSHELL_TOOL_NAME] as const;
 
 /** 是否属于执行命令的工具：只读角色的规则文案要把它与写盘分开说 */
@@ -65,8 +65,9 @@ export const isExecTool = (name: string): boolean =>
   (EXEC_TOOL_NAMES as readonly string[]).includes(name);
 
 /**
- * 会写盘 / 执行命令 / 操作浏览器的工具名：只读角色用规则把它们整批断掉
- * （见 `harness/setup/agents/profiles`）。浏览器能起进程、能出网、能读本地文件，与执行命令同档。
+ * 会写盘 / 执行命令 / 操作浏览器的工具名：只读角色用规则把写盘与页面操作整批断掉、把执行收窄到
+ * 只读命令（见 `harness/setup/agents/profiles`）；浏览器的观察面（`BROWSER_OBSERVE_TOOL_NAMES`）
+ * 另行放行。浏览器能起进程、能出网、能读本地文件，与执行命令同档。
  */
 export const WRITE_TOOLS = ["edit", "write", ...EXEC_TOOL_NAMES, ...BROWSER_TOOL_NAMES] as const;
 

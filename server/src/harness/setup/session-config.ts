@@ -191,6 +191,12 @@ const createSessionLoader = async (
     appHome: env.homeDir,
     ...(input.pluginAssets ? { plugin: input.pluginAssets } : {}),
   });
+  // 判定上下文条件：只读模式的 `browser_act` 只在受管实例（我们自启的 Chromium）里放行，
+  // 每次判定现取——会话中途可能换成 attach，或转去驱动桌面端面板的那个标签
+  const browser = input.browser;
+  const conditions = browser
+    ? () => ({ managedBrowser: browser.isManaged(input.sessionManager.getSessionId()) })
+    : undefined;
   const gate = {
     cwd: input.cwd,
     // 现取规则：本会话恒允是追加的 allow 规则，下一次判定就要生效
@@ -203,6 +209,7 @@ const createSessionLoader = async (
     // 会话级权限档位：在规则判定之后放宽 ask（见 permissions/engine 的 applyApprovalMode）
     approvalMode: overrideOf(input.record).permissionMode ?? DEFAULT_PERMISSION_MODE,
     parentRules: input.parentRules,
+    ...(conditions ? { conditions } : {}),
     grant: input.permission.grant,
     request: input.permission.request,
   };
@@ -251,11 +258,11 @@ const createSessionLoader = async (
         ...(input.services ? { services: input.services } : {}),
       }),
       // 浏览器：只在默认工具集会话注册。只读模式（plan / ask）照样注册，阻断交给 WRITE_TOOLS 派生的
-      // deny 规则（切工具表会被 pi 回放成工具表突变）；白名单会话的工具表本就是显式的，注册只会混进去
-      ...(input.browser && capability.toolSelection.kind === "defaultTools"
+      // deny 规则（观察面除外，见 features/browser/tools）；白名单会话的工具表本就是显式的，注册只会混进去
+      ...(browser && capability.toolSelection.kind === "defaultTools"
         ? [
             createBrowserExtension({
-              browser: input.browser,
+              browser,
               ...(input.browserSettings ? { settings: input.browserSettings } : {}),
             }),
           ]

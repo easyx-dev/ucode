@@ -6,7 +6,10 @@ export {
   evaluateRules,
   isExternal,
   matchPattern,
+  PERMISSION_CONDITIONS,
   type PermissionAsk,
+  type PermissionContext,
+  type PermissionContextKey,
   type PermissionRequest,
   type PermissionRule,
   type PermissionVerdict,
@@ -18,4 +21,5 @@ export {
   type PermissionGate,
   type PermissionHooks,
 } from "./extension";
+export { isReadOnlyCommand } from "./read-only-command";
 export { SessionAllowStore } from "./session-allow";

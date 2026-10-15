@@ -360,7 +360,7 @@ describe("buildSessionOptions 系统提示词", () => {
     // 列举的工具名跟着实际工具表走：Windows 上多一个 powershell
     assert.match(
       ask,
-      /edit \/ write \/ bash( \/ powershell)? 的调用会被直接阻断/,
+      /edit \/ write \/ bash( \/ powershell)? 里写盘一律阻断，执行类工具只放行被判定为只读的命令/,
       "只读模式的约束文案随模式拼入，与声明的工具表不矛盾",
     );
   });

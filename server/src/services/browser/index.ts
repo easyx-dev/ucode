@@ -144,6 +144,13 @@ export const createBrowserService = (options: { appHome?: string } = {}): Browse
       const result = registry.release(sessionId, releaseOptions);
       return dropped ? { closed: false, remainingHolders: 0 } : result;
     },
+
+    isManaged(sessionId) {
+      // 桌面端那个会话由本文件管（不在注册表里），先把它排除：它不是受管实例，
+      // 只读模式得据此把它留在阻断侧
+      if (desktopSessions.has(sessionId)) return false;
+      return registry.isManaged(sessionId);
+    },
   };
 
   return {

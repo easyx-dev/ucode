@@ -56,6 +56,7 @@ export const NOOP_BROWSER_HOOKS: BrowserHooks = {
     throw new Error("浏览器服务未接入");
   },
   release: () => ({ closed: false, remainingHolders: 0 }),
+  isManaged: () => false,
 };
 
 export type BrowserHooks = {
@@ -68,4 +69,10 @@ export type BrowserHooks = {
    * 在最后一个引用者离开后立即关掉实例，否则留给空闲回收。
    */
   release: (sessionId: string, options?: { closeWhenUnused?: boolean }) => BrowserReleaseResult;
+  /**
+   * 本会话当前的实例是不是**受管实例**（`mode === "isolated"`，我们自启的 Chromium）。
+   * 只读模式拿它放行 `browser_act`：attach 连的是你自己的调试实例、desktop 驱动的是桌面端面板里
+   * 你正看着的标签，那两者下点什么都会真的落在你的浏览器里，因此仍阻断。没有实例时为 false。
+   */
+  isManaged: (sessionId: string) => boolean;
 };

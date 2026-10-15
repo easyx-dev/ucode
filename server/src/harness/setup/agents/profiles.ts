@@ -5,7 +5,11 @@
  * 模式约束文案不放这里（按语言存放在 `harness/setup/prompt/locales`），这里只管能力。
  */
 import type { SessionMode, ThinkingLevel } from "@ucode/contracts";
-import { isBrowserTool } from "../../features/browser/tools";
+import {
+  BROWSER_ACT_TOOL_NAME,
+  isBrowserTool,
+  isObservingBrowserTool,
+} from "../../features/browser/tools";
 import { DEFAULT_PERMISSION_RULES, type PermissionRule } from "../permissions";
 import {
   DEFAULT_BUILTIN_TOOLS,
@@ -24,24 +28,61 @@ export const SUBAGENT_SLUGS = ["general", "explore"] as const;
 export type SubagentSlug = (typeof SUBAGENT_SLUGS)[number];
 
 /**
- * 只读角色的闸门规则：写盘、执行命令与操作浏览器一律阻断。
+ * 只读角色的闸门规则：写盘与页面操作一律阻断，命令只放行**被判定为只读**的那些。
  *
  * 计划 / 问答的**工具声明与编码一致**（见下面的 PRIMARY_PROFILES），只读性完全由这几条规则在
  * `tool_call` 上落地：切模式不改模型的工具表，也就不会出现「模型照上一轮的旧工具表回答」；
  * 阻断不受权限档位影响（`deny` 永不放宽，见 permissions/engine 的 applyApprovalMode）。
  */
-/** 只读角色的规则文案：浏览器、执行命令与写盘要分开说，排障时一眼看出被拦的是哪一类 */
+/** 只读角色的规则文案：页面操作、执行命令与写盘要分开说，排障时一眼看出被拦的是哪一类 */
 const readOnlyNote = (tool: string): string => {
-  if (isBrowserTool(tool)) return "只读角色不允许操作浏览器";
-  return isExecTool(tool) ? "只读角色不允许执行命令" : "只读角色不允许改文件";
+  if (isBrowserTool(tool)) return "只读角色只放行受管实例里的页面操作";
+  if (isExecTool(tool)) return "只读角色只允许只读命令（ls / cat / rg / git log 这类）";
+  return "只读角色不允许改文件";
 };
 
-const READ_ONLY_PERMISSIONS: readonly PermissionRule[] = WRITE_TOOLS.map((tool) => ({
-  tool,
-  pattern: "*",
-  action: "deny" as const,
-  note: readOnlyNote(tool),
-}));
+/**
+ * 页面操作（`browser_act`）：只在**受管实例**（我们自启的 Chromium）里放行。
+ * attach 连的是你自己的调试实例、desktop 驱动的是桌面端面板里你正看着的标签——
+ * 那两种下点一下就是真的点在你的浏览器与登录态上，因此仍走兜底的 `deny`。
+ */
+const browserActPermissions = (): PermissionRule[] => [
+  {
+    tool: BROWSER_ACT_TOOL_NAME,
+    pattern: "*",
+    action: "deny",
+    note: readOnlyNote(BROWSER_ACT_TOOL_NAME),
+  },
+  {
+    tool: BROWSER_ACT_TOOL_NAME,
+    pattern: "*",
+    action: "allow",
+    when: "managedBrowser",
+    note: "受管实例里的页面操作",
+  },
+];
+
+/**
+ * 执行类工具的两条规则：先兜底阻断，再放行被判定为只读的命令。
+ * 顺序不能反——「最后命中者胜」，放行必须排在兜底之后；只读判定（`isReadOnlyCapability`）
+ * 用空对象探测、不带上下文条件，命不中放行那条，因此不受影响。
+ */
+const execPermissions = (tool: string): PermissionRule[] => [
+  { tool, pattern: "*", action: "deny", note: readOnlyNote(tool) },
+  { tool, pattern: "*", action: "allow", when: "readOnlyCommand", note: "只读命令可以直接执行" },
+];
+
+/**
+ * 浏览器的观察面（打开 / 快照 / 截图 / 断开）在只读模式下照常可用：这里不给它规则，
+ * 于是 `browser_open` 落回默认规则的按站点审批、其余按默认放行；会改变页面状态的 `browser_act`
+ * 另按受管实例判定。
+ */
+const READ_ONLY_PERMISSIONS: readonly PermissionRule[] = WRITE_TOOLS.flatMap((tool) => {
+  if (isExecTool(tool)) return execPermissions(tool);
+  if (tool === BROWSER_ACT_TOOL_NAME) return browserActPermissions();
+  if (isObservingBrowserTool(tool)) return [];
+  return [{ tool, pattern: "*", action: "deny" as const, note: readOnlyNote(tool) }];
+});
 
 /** 默认集的内置部分：内置工具 + 内置扩展（自研工具经 customTools 注册，不列在这里） */
 const DEFAULT_TOOL_NAMES = [...DEFAULT_BUILTIN_TOOLS, ...DEFAULT_EXTENSION_TOOLS];
@@ -81,7 +122,8 @@ export const PRIMARY_PROFILES: Record<SessionMode, AgentProfile> = {
   // 会话里显式选过档位就以会话的为准（见 harness/setup/session-config）
   build: primary("build", "编码", BUILD_TOOLS, [], "xhigh"),
   // 计划只比编码多一个 present_plan（提交计划的信号）；调研要出方案，推荐取最高档。
-  // 工具声明刻意不收窄：它由 READ_ONLY_PERMISSIONS 在调用时阻断（连同子会话与 codemode 的嵌套调用）
+  // 工具声明刻意不收窄：它由 READ_ONLY_PERMISSIONS 在调用时收窄到只读命令
+  // （连同子会话与 codemode 的嵌套调用）
   plan: primary("plan", "计划", PLAN_TOOLS, READ_ONLY_PERMISSIONS, "max"),
   ask: primary("ask", "问答", BUILD_TOOLS, READ_ONLY_PERMISSIONS, "medium"),
 };
@@ -101,8 +143,8 @@ export const SUBAGENT_PROFILES: Record<SubagentSlug, AgentProfile> = {
     kind: "subagent",
     label: "只读侦察",
     description:
-      "只读子智能体。适合代码库侦察、影响面分析、方案评审与资料查找，不改文件、不执行命令，" +
-      "只把结论带回来；看不到当前对话，任务要写完整。",
+      "只读子智能体。适合代码库侦察、影响面分析、方案评审与资料查找，不改文件，" +
+      "命令只放行只读的那些（ls / cat / rg / git log 这类），只把结论带回来；看不到当前对话，任务要写完整。",
     capability: { toolSelection: readOnlySelection(), permissions: READ_ONLY_PERMISSIONS },
   },
 };

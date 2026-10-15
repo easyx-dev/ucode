@@ -11,6 +11,7 @@ import {
 } from "@ucode/contracts";
 
 import { DEFAULT_RECOMMENDED_THINKING_LEVEL } from "../../../constants/session";
+import { isObservingBrowserTool } from "../../features/browser/tools";
 import type { PermissionRule } from "../permissions";
 import { evaluateRules } from "../permissions";
 import { CUSTOM_TOOL_NAMES, SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS } from "../tools/names";
@@ -81,16 +82,21 @@ export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
   capability.toolSelection.kind === "defaultTools";
 
 /**
- * 写盘 / 执行是否被规则**整批**断掉（只读角色：plan / ask / explore）。
+ * 是否为只读能力（只读角色：plan / ask / explore）：写盘、执行与页面操作都被收窄。
  *
  * 只读与工具选择是两件事：plan / ask 与 build 共用同一套工具声明，只读性完全落在规则上
  * （`deny` 不受权限档位影响），所以判断「能不能落盘」要看规则，不能看 `toolSelection`。
  *
- * 「整批」是写盘与执行的工具都要被断掉（用空对象判定，即不限目标的全量 deny）：只断 `bash` 而留着
- * `edit` / `write` 的能力不是只读，不该因此拿不到扩展与目标结算工具。
+ * 判定用空对象探测：只读命令的放行规则（`when: "readOnlyCommand"` 的规则）命不中它，
+ * 执行类工具只剩兜底的 `deny`。「会改变机器状态」指写盘（`edit` / `write`）、执行（`bash` /
+ * `powershell`，只放行只读命令）与会改页面状态的 `browser_act` 都要被断掉；浏览器的观察面
+ * （打开 / 快照 / 截图 / 断开）不算在内。只断 `bash` 而留着 `edit` / `write` 的能力不是只读，
+ * 不该因此拿不到扩展与目标结算工具。
  */
+const READ_ONLY_FORBIDDEN_TOOLS = WRITE_TOOLS.filter((tool) => !isObservingBrowserTool(tool));
+
 export const isReadOnlyCapability = (capability: ResolvedCapability): boolean =>
-  WRITE_TOOLS.every(
+  READ_ONLY_FORBIDDEN_TOOLS.every(
     (tool) => evaluateRules(capability.permissions, { tool, subject: "" }).action === "deny",
   );
 

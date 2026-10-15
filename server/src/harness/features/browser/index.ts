@@ -19,6 +19,10 @@ export { BROWSER_TOOL_NAMES } from "./tools";
  * 工具照旧注册、**不按模式裁剪**：只读模式（plan / ask）的阻断由 `WRITE_TOOLS` 派生的
  * `deny` 规则在调用时落地——切模式换工具表会被 pi 回放成工具表突变（见 `docs/modes-and-permissions.md`）。
  * 白名单会话（explore 之类）另在装配层按 `excludeTools` 排除。
+ *
+ * 只读模式给这一组留的是观察面（`BROWSER_OBSERVE_TOOL_NAMES`：打开 / 快照 / 截图 / 断开，
+ * 打开页面沿用按站点审批）；`browser_act` 会改页面状态，只在受管实例里放行（`when: "managedBrowser"`，
+ * 见 `agents/profiles`）——attach 与桌面端面板都驱动你自己的浏览器，仍阻断。
  */
 export const createBrowserExtension =
   (input: {

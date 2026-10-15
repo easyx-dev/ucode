@@ -89,8 +89,17 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 
 ## 安全边界
 
-- **只读模式（plan / ask）整组阻断**：浏览器能起进程、能出网、能读本地文件，与 `bash` 同档；
-  规则由 `WRITE_TOOLS` 派生，档位调高也不放宽。白名单会话（explore 之类）干脆不注册这组工具。
+- **只读模式（plan / ask）放行观察面、页面操作看实例**：`browser_open` / `browser_snapshot` /
+  `browser_screenshot` / `browser_close` 是观察面（打开页面、看元素、截图、断开），只读模式下照常可用——
+  `browser_open` 沿用默认规则的按站点审批，其余三个按默认放行。`browser_act`（点击 / 输入 / 滚动）只在
+  **受管实例**（我们自启的 Chromium，`mode === "isolated"`）里放行：attach 连的是你自己的调试实例、
+  desktop 驱动的是桌面端面板里你正看着的标签，那两种下仍阻断。哪几个算观察面写在
+  `harness/features/browser/tools.ts` 的 `BROWSER_OBSERVE_TOOL_NAMES`，新增的浏览器工具默认落在阻断侧。
+  白名单会话（explore 之类）干脆不注册这组工具。
+- **只有受管实例算隔离，但「受管」不等于「数据隔离」**：不传 `profile` 时它用临时数据目录，与你的浏览器完全分开；
+  传了 `profile`（或设置页里配了默认 profile——`browser_open` 每次都会把它带上去）就是长期保留的那一份数据
+  （含登录态），在它上面点按钮等于以你的身份操作该站点。计划 / 问答模式对 `browser_act` 的放行只看
+  「实例是我们起的」，所以介意这点就别给这些会话留默认 profile，或切到编码模式动手。
 - **`browser_open` 默认审批**，匹配对象是目标站点（host），可「本会话恒允许该站点」；其余工具作用于已批准的页面。
 - **回环与私网允许**（本地自测是主要用途），**`file://` 与 `data:` 一律拒绝**——要读本地文件用 `read` 工具。
 - **不主动打开你默认 profile 的浏览器**：attach 只连你自己启动的调试实例；Chrome 136 起默认 user-data-dir 上
