@@ -15,6 +15,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { DialectDiagnostic, DocNode, InvocationCandidates } from "@ucode/markdown";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 
+import { canHoverPointer } from "../../../utils/platform";
 import { type ComposerEditorHandle, createEditorHandle } from "./editor-handle";
 import { type ComposerCallbacks, createComposerExtensions, createEditorProps } from "./extensions";
 import type { SuggestionItem } from "./suggestion";
@@ -47,8 +48,8 @@ export type ComposerEditorProps = {
 
 type EditorProps = ComposerEditorProps & { ref?: Ref<ComposerEditorHandle> };
 
-/** 只在桌面指针环境下自动聚焦：触屏上抢焦点等于凭空唤起键盘 */
-const canAutoFocus = (): boolean => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+/** 只在有可悬停精确指针的环境自动聚焦：触屏上抢焦点等于凭空唤起键盘 */
+const canAutoFocus = canHoverPointer;
 
 /**
  * 创建编辑器实例并把句柄交给外层。

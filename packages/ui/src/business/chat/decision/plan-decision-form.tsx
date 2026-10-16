@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../../base/button";
+import { isTouchInput } from "../../../utils/platform";
 import { DecisionHeader } from "./decision-panel";
 
 type PlanDecisionFormProps = {
@@ -46,7 +47,9 @@ export function PlanDecisionForm({
         disabled={disabled}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
+          // 触屏上回车是换行（软键盘没有 Shift），提交交给按钮
+          if (isTouchInput()) return;
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             submitFeedback();
           }

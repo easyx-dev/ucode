@@ -29,9 +29,11 @@ import {
 } from "@ucode/markdown";
 import type { RefObject } from "react";
 
+import { isTouchInput } from "../../../utils/platform";
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
 import { createDialectMarks } from "./dialect-marks";
 import { createDialectSuggestion } from "./dialect-suggestion";
+import { composerKeyIntentOf } from "./key-intent";
 import { PageElementChipView } from "./page-element-chip";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
@@ -314,26 +316,28 @@ export const createEditorProps = (callbacks: ComposerCallbacks): EditorProps => 
     onFiles(files);
     return true;
   },
-  handleKeyDown: (_view, event) => {
-    // 弹层有候选时，导航键让给弹层：Enter 选中当前项，而不是把消息发出去
-    if (
-      callbacks.suggestionOpen.current &&
-      ["Enter", "ArrowDown", "ArrowUp", "Escape", "Tab"].includes(event.key)
+  handleKeyDown: (view, event) => {
+    switch (
+      composerKeyIntentOf(event, {
+        suggestionOpen: callbacks.suggestionOpen.current,
+        inList: isInsideListItem(view.state),
+        escape: callbacks.onEscape.current !== undefined,
+        touch: isTouchInput(),
+      })
     ) {
-      return false;
+      // 弹层有候选时导航键让给弹层：Enter 选中当前项，而不是把消息发出去
+      case "suggestion":
+        return false;
+      case "escape":
+        event.preventDefault();
+        callbacks.onEscape.current?.();
+        return true;
+      case "send":
+        event.preventDefault();
+        callbacks.onSend.current();
+        return true;
+      default:
+        return false;
     }
-    if (event.key === "Escape" && callbacks.onEscape.current) {
-      event.preventDefault();
-      callbacks.onEscape.current();
-      return true;
-    }
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-      // 列表里 Enter 是续行 / 退出列表（空项回车即退出），交给列表扩展；退出后再按一次才发送
-      if (isInsideListItem(_view.state)) return false;
-      event.preventDefault();
-      callbacks.onSend.current();
-      return true;
-    }
-    return false;
   },
 });
