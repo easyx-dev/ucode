@@ -13,6 +13,7 @@ import { AuthSessionRepository } from "../db/auth-session-repository";
 import { ProjectRepository } from "../db/project-repository";
 import { SessionRepository } from "../db/session-repository";
 import { env } from "../env";
+import { materializeAttachment } from "../harness/features/attachment";
 import { GoalService } from "../harness/features/goal";
 import { MemoryService } from "../harness/features/memory";
 import { TitleService } from "../harness/features/title";
@@ -100,7 +101,11 @@ export const createServices = async (registration: ServiceRegistration): Promise
   for (const message of builtin.diagnostics) {
     logger.warn({ message, module: "plugins.builtin" }, "内置资产物化有诊断");
   }
-  const events = new SessionEventBus();
+  const events = new SessionEventBus({
+    // 实时帧里的图片当场落库：工具刚截的图不落，界面在刷新前一直取不到字节
+    writeImage: (bytes, mimeType) =>
+      materializeAttachment(bytes, mimeType, { repo: attachments }).id,
+  });
   const projects = new ProjectService({
     repository: new ProjectRepository(db),
     isModelUsable: (ref) => Boolean(runtime.resolveModelRef(ref)),

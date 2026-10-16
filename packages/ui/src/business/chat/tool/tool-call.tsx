@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../ba
 import { Spinner } from "../../../base/spinner";
 import { useWorkbench } from "../../../provider/workbench";
 import { resolveFromCwd } from "../../../utils/path";
+import { AttachmentImage } from "../../attachment/attachment-image";
 import { type DiffRow, type DiffRowType, DiffView } from "../../markdown/diff-view";
 import type { ToolEntry } from "../message/chat-nodes";
 import { type ToolInput, type ToolKind, toolDiff, toolInputOf, toolKindOf } from "./tool-view";
@@ -231,7 +232,7 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
   // 一律默认折叠：失败与执行中由状态图标提示，要不要看细节由用户决定
   const [open, setOpen] = useState(false);
 
-  const hasBody = diff !== null || showArgs || output !== "";
+  const hasBody = diff !== null || showArgs || output !== "" || (entry.images?.length ?? 0) > 0;
   const statusLabel = entry.running ? t("执行中") : entry.isError ? t("失败") : t("完成");
 
   return (
@@ -280,6 +281,17 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
 
       <CollapsibleContent>
         <div className="space-y-2 py-1 pr-1.5 pl-6">
+          {entry.images?.map((image) => (
+            <div key={image.id} className="space-y-1">
+              <AttachmentImage alt={t("工具产出的图片")} className="my-1 block" url={image.url} />
+              {/* 清理过正文的卡片里，模型与用户看到的东西不一致，说明一句免得「它明明看得见」 */}
+              {entry.pruned ? (
+                <p className="text-xs text-foreground-subtle">
+                  {t("这段输出已从模型上下文清理，图片仍保留")}
+                </p>
+              ) : null}
+            </div>
+          ))}
           {diff !== null ? (
             <DiffView rows={toDiffRows(diff)} className="max-h-96 overflow-y-auto" />
           ) : null}

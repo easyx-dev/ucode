@@ -2295,6 +2295,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `toolCallId` | string | 否 | tool 专用：与 toolCall block 的 id 对应，便于前端精确合并 |
 | `toolName` | string | 否 | tool 专用 |
 | `questionAnswers` | string[][] | 否 | tool 专用：`question` 的结构化答复，与调用入参里的 `questions` 同序（每项可多值） |
+| `pruned` | boolean | 否 | tool 专用：该结果的正文已被旧输出清理（`[旧工具输出已清理…]`）替换——模型不再看到它， 但里头产出的图片仍在 `blocks` 里（投影会从原始条目补回来），界面据此说明这个差别。 |
 | `customType` | string | 否 | custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 |
 | `permissionDecision` | [PermissionRecord](#permissionrecord) | 否 | custom 专用：权限审批记录；只有该类型的扩展条目会带上 |
 | `compactionRecord` | [CompactionRecord](#compactionrecord) | 否 | custom 专用：压缩记录；只有该类型的扩展条目会带上 |

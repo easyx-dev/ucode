@@ -28,6 +28,14 @@
 | `custom_message` | 是（转 user 文本） | 合成输入，见下表 | 按 `customType` 决定 |
 | `custom` | 否 | 本项目的观测与状态记录，见下表 | 白名单放行 |
 | `context_edit` | 是（改写目标条目的内容） | 旧工具输出清理（prune）写它 | 不展示 |
+
+**旧输出清理与图片**：清理只换正文，图片仍从原始条目里取（`serialize.ts` 的 `transcriptExtrasOf` 扫
+`getBranch()`，按条目 id 把 image 块补回投影）。图片本体在列表里只下发 `{ id, mimeType, url }`，
+字节走 `/api/v1/attachments/<sha256>`；工具产出的图（截图、`read` 到的图）原只以 base64 躺在会话文件里，
+投影时按需落进附件库（内容寻址、幂等，并标记为已引用）。被清理过的工具结果带 `pruned`，
+界面据此说明「模型已不再看到它」——清理的是给模型看的上下文，不是用户的历史。
+附件与引用者的关系就记在这两份地方（用户消息里的标记与工具结果的图片块），
+**附件表不记引用者**：将来的手动清理从会话条目反查。
 | `usage` | 否 | pi 记的每轮用量，含目标校验调用记的 `goal_verify` 一条 | 不展示（用量面板另走统计） |
 | `model_change` / `thinking_level_change` | 是（作为边界） | 模型 / 思考档位切换 | 不展示 |
 | `label` / `session_info` / `branch_summary` | 否 / 视情况 | 暂未使用 | 不展示 |

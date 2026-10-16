@@ -20,8 +20,9 @@ import {
 import { Hono } from "hono";
 import { resolveSessionCwd } from "../../core/session-paths";
 import { env } from "../../env";
+import { materializeAttachment } from "../../harness/features/attachment";
 import { projectMessages } from "../../harness/pi/projection";
-import { transcriptStates } from "../../harness/pi/serialize";
+import { transcriptExtrasOf, transcriptStates } from "../../harness/pi/serialize";
 import { AppError, ok } from "../../platform/response";
 import { jsonBody } from "../../platform/validate";
 import type { Services } from "../../services";
@@ -47,13 +48,20 @@ export const createMessagesRoute = (services: Services) => {
         ? SessionManager.open(record.sourcePath, env.sessionsDir, resolveSessionCwd(record))
         : null);
     const entries = manager ? manager.buildContextEntries() : [];
+    const branch = manager ? manager.getBranch() : [];
     // 会话级设置沿完整路径推进：压缩只裁剪展示条目，看裁剪后的列表会让压缩点之后丢档位
-    const states = transcriptStates(manager ? manager.getBranch() : []);
+    const states = transcriptStates(branch);
 
     // 序号与投影必须在同一同步块内取：中间一旦插入事件，
     // 客户端按 seq 切分实时帧时就会重复渲染或漏掉一段增量
     const seq = services.events.latestSeq(sessionId);
-    const projection = projectMessages(sessionId, live, entries, states);
+    const projection = projectMessages(sessionId, live, entries, states, {
+      // 历史里的图片按需落进附件库（幂等）：界面按附件路由取字节，而它们原本只以 base64 在会话记录里；
+      // `extras` 把「原始条目里的图片」与「哪些条目被旧输出清理过」一并带进来（见 TranscriptExtras）
+      writeImage: (bytes, mimeType) =>
+        materializeAttachment(bytes, mimeType, { repo: services.attachments }).id,
+      extras: transcriptExtrasOf(branch),
+    });
 
     return c.json(
       ok({

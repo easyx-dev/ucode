@@ -45,6 +45,10 @@ export type ToolEntry = {
   args?: unknown;
   /** 工具输出文本 */
   result?: string;
+  /** 工具产出的图片（如截图、读到的图片）；界面按附件路由取字节后内联展示 */
+  images?: Extract<MessageBlock, { type: "image" }>[];
+  /** 结果正文已被旧输出清理替换：模型不再看到它，但图片仍带在上面 */
+  pruned?: boolean;
   /** 是否执行失败 */
   isError?: boolean;
   /** 是否仍在执行 */
@@ -284,12 +288,17 @@ const toolEntryOf = (
 ): ToolEntry => {
   const result = results.get(block.id);
   const skill = skillHits.get(block.id);
+  const images = (result?.blocks ?? []).filter(
+    (part): part is Extract<MessageBlock, { type: "image" }> => part.type === "image",
+  );
   return {
     id: block.id,
     name: block.name,
     args: block.args,
     ...(skill ? { skill: { name: skill } } : {}),
     ...(result ? { result: itemText(result) } : {}),
+    ...(images.length > 0 ? { images } : {}),
+    ...(result?.pruned ? { pruned: true } : {}),
     isError: result?.isError === true,
     running: result ? Boolean(result.live) : Boolean(item.live),
   };

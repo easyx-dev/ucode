@@ -61,7 +61,7 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 | `browser_open` | 打开 http/https 地址（或 attach 到你已启动的调试实例）；带 `profile` 名即长期保留这份数据 |
 | `browser_snapshot` | 当前页面的元素列表，每行 `@e1a2 button "登录"`；可选 `diff`（只回传变化）与 `compact`（取噪） |
 | `browser_act` | 对 `@e` 编号元素执行 click / fill / type / press / select / scroll，或用 `eval` 求值一段表达式 |
-| `browser_screenshot` | 整页或某个元素的 jpeg（作为 image 结果交回模型） |
+| `browser_screenshot` | 整页或某个元素的 jpeg（作为 image 结果交回模型）；截图不落磁盘路径，本体在会话记录里，投影时按需收进附件库供界面预览（见 [`session-entries.md`](./session-entries.md)） |
 | `browser_close` | 关掉自己启动的实例；attach 模式只断开，不动你的浏览器 |
 
 三条刻意的「不智能」：**不做自动重试、不做自动等待、失败立刻返回原因与下一步**。元素被遮挡或编号失效时

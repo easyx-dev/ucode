@@ -17,6 +17,7 @@ import type {
   UsageTotals,
 } from "@ucode/contracts";
 
+import type { ProjectionDeps } from "../harness/pi/serialize";
 import { type SseEvent, toSseEvents } from "./events";
 
 export type EventSubscriber = (frame: ServerEvent) => void;
@@ -39,6 +40,9 @@ export class SessionEventBus {
   private readonly attached = new Map<string, () => void>();
   private readonly sequences = new Map<string, number>();
 
+  /** `deps` 是投影依赖（图片落库）；由 services 构造时注入，总线自己不认识附件库 */
+  constructor(private readonly deps: ProjectionDeps = {}) {}
+
   attach(sessionId: string, session: AgentSession): void {
     if (this.attached.has(sessionId)) return;
     const unsubscribe = session.subscribe((event) => {
@@ -60,12 +64,17 @@ export class SessionEventBus {
         const message = event.message;
         queueMicrotask(() => {
           const entryId = entryIdOfMessage(session, message);
-          publish(toSseEvents(event, state, entryId ? { messageEntryId: entryId } : {}));
+          publish(
+            toSseEvents(event, state, {
+              ...(entryId ? { messageEntryId: entryId } : {}),
+              deps: this.deps,
+            }),
+          );
         });
         return;
       }
 
-      publish(toSseEvents(event, state));
+      publish(toSseEvents(event, state, { deps: this.deps }));
     });
     this.attached.set(sessionId, unsubscribe);
   }

@@ -45,10 +45,81 @@ import {
   THINKING_LEVELS,
   type ThinkingLevel,
 } from "@ucode/contracts";
+import { MATERIALIZE_IMAGE_MAX_BYTES } from "../../constants/attachments";
 import type { SessionOverride } from "../../db/session-repository";
 import { isRecord } from "../../utils/object";
 
-export const blocksOf = (content: unknown): MessageBlock[] => {
+/** 把一份图片字节收进附件库，返回附件 id（内容寻址，重复调用无副作用） */
+export type ImageWriter = (bytes: Uint8Array, mimeType: string) => string;
+
+/**
+ * 从**原始条目**（`getBranch()`，未经 `context_edit`）读出来的两份东西，供投影补齐正文之外的信息。
+ */
+export type TranscriptExtras = {
+  /** 条目 id → 该条目里的 image 块 */
+  images: ReadonlyMap<string, Record<string, unknown>[]>;
+  /** 正文已被旧输出清理替换掉的条目 id */
+  pruned: ReadonlySet<string>;
+};
+
+/**
+ * 投影的外部依赖。
+ *
+ * `writeImage` 的真实落点是 services 里的 `materializeAttachment`；**不给就只算 id 与 url、不落盘**——
+ * 投影本身是纯函数，测试与只读导出走这条。`extras` 只在与会话历史一起投影时才有意义。
+ */
+export type ProjectionDeps = {
+  writeImage?: ImageWriter;
+  extras?: TranscriptExtras;
+};
+
+/**
+ * 扫原始分支，取出「条目里的图片」与「哪些条目的正文被旧输出清理换过」。
+ *
+ * 不能只看投影用的 `buildContextEntries()`：旧工具输出清理（`harness/features/prune`）是追加一条
+ * `context_edit` 把工具结果的正文换成一行占位，压缩视图里那张图就不在了——而图片本就落在会话记录里，
+ * 按条目 id 从原始分支补回来即可。清理过的条目一并记下，界面据此说明「模型已不再看到它」。
+ */
+export const transcriptExtrasOf = (branch: readonly SessionEntry[]): TranscriptExtras => {
+  const images = new Map<string, Record<string, unknown>[]>();
+  const pruned = new Set<string>();
+  for (const entry of branch) {
+    if (entry.type === "context_edit") {
+      pruned.add(entry.targetId);
+      continue;
+    }
+    if (entry.type !== "message") continue;
+    const message = entry.message as { role?: unknown; content?: unknown };
+    if (message.role !== "toolResult" || !Array.isArray(message.content)) continue;
+    const parts = message.content.filter(
+      (part): part is Record<string, unknown> => isRecord(part) && part.type === "image",
+    );
+    if (parts.length > 0) images.set(entry.id, parts);
+  }
+  return { images, pruned };
+};
+
+/**
+ * 会话记录里的一个 image 块 → 给界面的块。
+ *
+ * `writeImage` 给了才落库：工具产出的图只以 base64 躺在会话记录里，附件库里没有记录时界面按 url 取不到
+ * 字节。数据不合法或超出单张上限（见 `MATERIALIZE_IMAGE_MAX_BYTES`）时返回 null，由调用方降级成文本。
+ */
+const imageBlockOf = (
+  part: Record<string, unknown>,
+  deps?: ProjectionDeps,
+): Extract<MessageBlock, { type: "image" }> | null => {
+  const { data, mimeType } = part;
+  if (typeof data !== "string" || typeof mimeType !== "string") return null;
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.length > MATERIALIZE_IMAGE_MAX_BYTES) return null;
+  // 图片落库时按归一化后的字节算 sha256，与这里重算的一致，故 url 能直接命中附件路由
+  deps?.writeImage?.(bytes, mimeType);
+  const id = createHash("sha256").update(bytes).digest("hex");
+  return { type: "image", id, mimeType, url: `${API_BASE_PATH}/attachments/${id}` };
+};
+
+export const blocksOf = (content: unknown, deps?: ProjectionDeps): MessageBlock[] => {
   if (typeof content === "string") {
     return content.length > 0 ? [{ type: "text", text: content }] : [];
   }
@@ -76,18 +147,7 @@ export const blocksOf = (content: unknown): MessageBlock[] => {
         }
         break;
       case "image":
-        // 图片落库时按归一化后的字节算 sha256，与这里重算的一致，故 url 能直接命中附件路由
-        if (typeof part.data === "string" && typeof part.mimeType === "string") {
-          const id = createHash("sha256").update(Buffer.from(part.data, "base64")).digest("hex");
-          blocks.push({
-            type: "image",
-            id,
-            mimeType: part.mimeType,
-            url: `${API_BASE_PATH}/attachments/${id}`,
-          });
-        } else {
-          blocks.push({ type: "text", text: "[图片]" });
-        }
+        blocks.push(imageBlockOf(part, deps) ?? { type: "text", text: "[图片]" });
         break;
       default:
         break;
@@ -192,6 +252,7 @@ export const messageToDTO = (
   id: string,
   fallbackCreatedAt?: string,
   state: TranscriptState = {},
+  deps: ProjectionDeps = {},
 ): MessageDTO | null => {
   if (!isRecord(message)) return null;
   const role = message.role;
@@ -199,30 +260,40 @@ export const messageToDTO = (
 
   switch (role) {
     case "user":
-      return { id, role: "user", blocks: blocksOf(message.content), createdAt };
+      return { id, role: "user", blocks: blocksOf(message.content, deps), createdAt };
     case "assistant":
       return {
         id,
         role: "assistant",
-        blocks: blocksOf(message.content),
+        blocks: blocksOf(message.content, deps),
         model: typeof message.model === "string" ? message.model : undefined,
         provider: typeof message.provider === "string" ? message.provider : state.provider,
         ...(state.thinkingLevel ? { thinkingLevel: state.thinkingLevel } : {}),
         createdAt,
       };
-    case "toolResult":
+    case "toolResult": {
+      const blocks = blocksOf(message.content, deps);
+      // 正文被旧输出清理换掉之后，图片仍从原始条目补回来：清理的是给模型看的上下文，不是用户的历史
+      for (const part of deps.extras?.images.get(id) ?? []) {
+        const block = imageBlockOf(part, deps);
+        if (block && !blocks.some((item) => item.type === "image" && item.id === block.id)) {
+          blocks.push(block);
+        }
+      }
       return {
         id,
         role: "tool",
-        blocks: blocksOf(message.content),
+        blocks,
         toolCallId: typeof message.toolCallId === "string" ? message.toolCallId : undefined,
         toolName: typeof message.toolName === "string" ? message.toolName : undefined,
         isError: message.isError === true,
+        ...(deps.extras?.pruned.has(id) ? { pruned: true } : {}),
         ...questionAnswersOf(message),
         createdAt,
       };
+    }
     case "custom":
-      return { id, role: "custom", blocks: blocksOf(message.content), createdAt };
+      return { id, role: "custom", blocks: blocksOf(message.content, deps), createdAt };
     default:
       // system / bashExecution / 其他内部消息不展示
       return null;
@@ -397,12 +468,16 @@ const goalPromptOf = (entry: {
 };
 
 /** 把会话条目转成前端 DTO；system 提示、usage、label 等内部条目会被过滤掉 */
-export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): MessageDTO | null => {
+export const entryToDTO = (
+  entry: SessionEntry,
+  state: TranscriptState = {},
+  deps: ProjectionDeps = {},
+): MessageDTO | null => {
   const fallbackCreatedAt = isoOf(Date.parse(entry.timestamp));
 
   switch (entry.type) {
     case "message": {
-      const dto = messageToDTO(entry.message, entry.id, fallbackCreatedAt, state);
+      const dto = messageToDTO(entry.message, entry.id, fallbackCreatedAt, state, deps);
       // assistant 的 message.timestamp 是开始生成的时刻，entry.timestamp 才是写完的时刻；
       // 回复耗时（见 MessageDTO.completedAt）需要后者，故一并带上
       if (dto?.role === "assistant" && fallbackCreatedAt) dto.completedAt = fallbackCreatedAt;
@@ -412,7 +487,7 @@ export const entryToDTO = (entry: SessionEntry, state: TranscriptState = {}): Me
       return {
         id: entry.id,
         role: "custom",
-        blocks: blocksOf(entry.content),
+        blocks: blocksOf(entry.content, deps),
         customType: entry.customType,
         ...goalPromptOf(entry),
         createdAt: fallbackCreatedAt,
@@ -523,12 +598,13 @@ const newestCompactionIdOf = (entries: SessionEntry[]): string | undefined =>
 export const entriesToDTO = (
   entries: SessionEntry[],
   states: ReadonlyMap<string, TranscriptState>,
+  deps: ProjectionDeps = {},
 ): MessageDTO[] => {
   const newestCompactionId = newestCompactionIdOf(entries);
   const messages: MessageDTO[] = [];
   for (const entry of entries) {
     if (entry.type === "compaction" && entry.id !== newestCompactionId) continue;
-    const dto = entryToDTO(entry, states.get(entry.id) ?? {});
+    const dto = entryToDTO(entry, states.get(entry.id) ?? {}, deps);
     if (dto) messages.push(dto);
   }
   return messages;

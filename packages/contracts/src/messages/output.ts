@@ -53,6 +53,11 @@ export type MessageDTO = {
   toolName?: string;
   /** tool 专用：`question` 的结构化答复，与调用入参里的 `questions` 同序（每项可多值） */
   questionAnswers?: string[][];
+  /**
+   * tool 专用：该结果的正文已被旧输出清理（`[旧工具输出已清理…]`）替换——模型不再看到它，
+   * 但里头产出的图片仍在 `blocks` 里（投影会从原始条目补回来），界面据此说明这个差别。
+   */
+  pruned?: boolean;
   /** custom 专用：扩展条目的来源标识，界面据此区分界面标记（如忽略计划的标记）与普通扩展消息 */
   customType?: string;
   /** custom 专用：权限审批记录；只有该类型的扩展条目会带上 */

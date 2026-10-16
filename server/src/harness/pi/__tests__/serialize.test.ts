@@ -15,7 +15,8 @@ import {
   SKILL_RECORD_CUSTOM_TYPE,
 } from "@ucode/contracts";
 
-import { blocksOf, entriesToDTO, entryToDTO } from "../serialize";
+import { MATERIALIZE_IMAGE_MAX_BYTES } from "../../../constants/attachments";
+import { blocksOf, entriesToDTO, entryToDTO, transcriptExtrasOf } from "../serialize";
 
 describe("blocksOf 的 image 分支", () => {
   it("投影为 { id, mimeType, url }，id 与附件库的 sha256 一致", () => {
@@ -395,5 +396,103 @@ describe("entriesToDTO 的压缩条目", () => {
       (dto) => `${dto.role}:${dto.id}`,
     );
     assert.deepEqual(ids, ["summary:c1", "user:u1"]);
+  });
+});
+
+describe("历史里的图片落库与旧输出清理", () => {
+  const DATA = Buffer.from("jpg-bytes").toString("base64");
+  const ID = createHash("sha256").update(Buffer.from(DATA, "base64")).digest("hex");
+
+  const toolEntry = (id: string, content: unknown[]): SessionEntry =>
+    ({
+      type: "message",
+      id,
+      parentId: null,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      message: { role: "toolResult", toolName: "browser_screenshot", toolCallId: "c1", content },
+    }) as unknown as SessionEntry;
+
+  /** 清理记录的形状：`context_edit` 指向被换掉正文的那条工具结果 */
+  const contextEdit = (targetId: string): SessionEntry =>
+    ({
+      type: "context_edit",
+      id: `edit-${targetId}`,
+      parentId: null,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      targetId,
+    }) as unknown as SessionEntry;
+
+  it("工具产出的图片落库：writeImage 拿到字节，块里的 id 与附件库一致", () => {
+    const written: Array<{ size: number; mimeType: string }> = [];
+    const imageEntry = toolEntry("t1", [{ type: "image", data: DATA, mimeType: "image/jpeg" }]);
+
+    const dto = entryToDTO(
+      imageEntry,
+      {},
+      {
+        writeImage: (bytes, mimeType) => {
+          written.push({ size: bytes.length, mimeType });
+          return ID;
+        },
+      },
+    );
+
+    assert.deepEqual(written, [
+      { size: Buffer.from(DATA, "base64").length, mimeType: "image/jpeg" },
+    ]);
+    assert.deepEqual(dto?.blocks, [
+      { type: "image", id: ID, mimeType: "image/jpeg", url: `${API_BASE_PATH}/attachments/${ID}` },
+    ]);
+  });
+
+  it("不注入 writeImage 时保持纯投影（只算 id 与 url）", () => {
+    const dto = entryToDTO(
+      toolEntry("t1", [{ type: "image", data: DATA, mimeType: "image/jpeg" }]),
+    );
+    assert.deepEqual(dto?.blocks, [
+      { type: "image", id: ID, mimeType: "image/jpeg", url: `${API_BASE_PATH}/attachments/${ID}` },
+    ]);
+  });
+
+  it("正文被清理换成占位后，图片仍从原始条目补回来，并标上 pruned", () => {
+    const raw = toolEntry("t1", [{ type: "image", data: DATA, mimeType: "image/jpeg" }]);
+    const pruned = toolEntry("t1", [{ type: "text", text: "[旧工具输出已清理。]" }]);
+    const extras = transcriptExtrasOf([raw, contextEdit("t1")]);
+
+    assert.deepEqual([...extras.pruned], ["t1"]);
+    assert.deepEqual([...extras.images.keys()], ["t1"]);
+
+    const dto = entryToDTO(pruned, {}, { extras });
+    assert.deepEqual(dto?.blocks, [
+      { type: "text", text: "[旧工具输出已清理。]" },
+      { type: "image", id: ID, mimeType: "image/jpeg", url: `${API_BASE_PATH}/attachments/${ID}` },
+    ]);
+    assert.equal(dto?.pruned, true);
+  });
+
+  it("正文没被清理时不重复下发同一张图，也不带 pruned", () => {
+    const raw = toolEntry("t1", [{ type: "image", data: DATA, mimeType: "image/jpeg" }]);
+    const dto = entryToDTO(raw, {}, { extras: transcriptExtrasOf([raw]) });
+
+    assert.equal(dto?.blocks.length, 1);
+    assert.equal(dto?.pruned, undefined);
+  });
+
+  it("单张超过上限时不落库，降级成文字占位", () => {
+    const huge = Buffer.alloc(MATERIALIZE_IMAGE_MAX_BYTES + 1, 1).toString("base64");
+    let called = false;
+    const dto = entryToDTO(
+      toolEntry("t1", [{ type: "image", data: huge, mimeType: "image/png" }]),
+      {},
+      {
+        writeImage: () => {
+          called = true;
+          return ID;
+        },
+      },
+    );
+
+    assert.equal(called, false);
+    assert.deepEqual(dto?.blocks, [{ type: "text", text: "[图片]" }]);
   });
 });

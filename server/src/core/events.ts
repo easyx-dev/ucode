@@ -2,7 +2,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { EventName } from "@ucode/contracts";
 
-import { messageToDTO, type TranscriptState } from "../harness/pi/serialize";
+import { messageToDTO, type ProjectionDeps, type TranscriptState } from "../harness/pi/serialize";
 
 /** 事件名与数据的组合；总线负责补 sessionId 与 seq */
 export type SseEvent = { event: EventName; data: Record<string, unknown> };
@@ -16,6 +16,8 @@ export type SseEventOptions = {
    * 条目 id 做编辑与分叉）；调用方通常在下一微任务里按消息对象身份把它查出来补上，见 `SessionEventBus`。
    */
   messageEntryId?: string;
+  /** 投影依赖（图片落库）：实时帧的图片也要当场落，否则界面要等下一次刷新才取得到字节 */
+  deps?: ProjectionDeps;
 };
 
 type MessageUpdateEvent = Extract<AgentSessionEvent, { type: "message_update" }>;
@@ -93,6 +95,7 @@ const toMessageEvents = (
         options.messageEntryId ?? `live-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         undefined,
         state,
+        options.deps,
       );
       // 实时帧拿不到会话条目，用服务端当前时刻作为回复完成时间
       if (dto?.role === "assistant") dto.completedAt = new Date().toISOString();

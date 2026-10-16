@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { openDatabase } from "../../../../db";
 import { AttachmentRepository } from "../../../../db/attachment-repository";
-import { expireTempAttachments, putAttachment, resolveAttachment } from "..";
+import { expireTempAttachments, materializeAttachment, putAttachment, resolveAttachment } from "..";
 
 const created: string[] = [];
 
@@ -112,5 +112,27 @@ describe("附件库", () => {
     } finally {
       env.close();
     }
+  });
+});
+
+describe("materializeAttachment", () => {
+  it("入库并标记为已引用（躲开草稿 TTL），重复调用不重复写", () => {
+    const env = makeEnv();
+    const bytes = new TextEncoder().encode("截图字节");
+
+    const first = materializeAttachment(bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
+    const referencedAt = env.repo.find(first.id)?.referencedAt;
+    assert.notEqual(referencedAt, null);
+
+    const again = materializeAttachment(bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
+    assert.equal(again.id, first.id);
+    // 已经标记过的引用时间不回退
+    assert.equal(env.repo.find(first.id)?.referencedAt, referencedAt);
+    // 被引用过的附件不参与草稿清理，哪怕 TTL 早就过了
+    const expired = expireTempAttachments(
+      { repo: env.repo, dir: env.dir },
+      new Date(Date.now() + 60_000).toISOString(),
+    );
+    assert.equal(expired, 0);
   });
 });

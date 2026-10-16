@@ -369,6 +369,32 @@ describe("buildChatRows 的页脚归位", () => {
   });
 });
 
+describe("buildChatRows 的工具产出图片", () => {
+  it("工具结果里的图片进到那一次调用的 entry 上，并带上 pruned", () => {
+    const imageBlock = {
+      type: "image" as const,
+      id: "i1",
+      mimeType: "image/jpeg",
+      url: "/api/v1/attachments/i1",
+    };
+    const rows = buildChatRows([
+      userItem("u1", "看看页面"),
+      assistantItem("a1", [call("c1", "browser_screenshot")]),
+      {
+        ...toolItem("t1", "c1", "browser_screenshot", "截图地址：http://x"),
+        blocks: [text("截图地址：http://x"), imageBlock],
+        pruned: true,
+      },
+    ]);
+
+    const leg = rowsOfKind(rows, "activity")[0]?.node.legs[0];
+    assert.equal(leg?.kind, "tool");
+    if (leg?.kind !== "tool") return;
+    assert.deepEqual(leg.entry.images, [imageBlock]);
+    assert.equal(leg.entry.pruned, true);
+  });
+});
+
 describe("buildChatRows 的改动卡片", () => {
   it("编辑独立成卡片：两侧聚合被切开，自己带上入参", () => {
     const rows = buildChatRows([

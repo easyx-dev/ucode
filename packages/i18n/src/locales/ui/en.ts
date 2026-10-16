@@ -399,6 +399,9 @@ export default {
   页面快照: "Page snapshot",
   页面操作: "Page action",
   截图: "Screenshot",
+  工具产出的图片: "Image produced by a tool",
+  "这段输出已从模型上下文清理，图片仍保留":
+    "This output was pruned from the model context; the image is still kept here.",
   关闭浏览器: "Close browser",
   整页: "Full page",
   视口: "Viewport",
