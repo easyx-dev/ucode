@@ -1,7 +1,7 @@
 /** 消息接口的请求 zod 模型；`*Request` 为客户端载荷（z.input），`*Input` 为服务端解析后（z.infer） */
 import { z } from "zod";
 
-import { PROMPT_MAX_ATTACHMENTS, PROMPT_MAX_CONTEXTS } from "../constants";
+import { PROMPT_MAX_ATTACHMENTS, PROMPT_MAX_CONTEXTS, PROMPT_MAX_SKILLS } from "../constants";
 import { sessionIdSchema } from "../sessions/input";
 
 export const messageListInputSchema = z.object({ sessionId: sessionIdSchema });
@@ -25,19 +25,42 @@ export const contextRefSchema = z.object({
 });
 
 /**
+ * 提示词命令调用（最多一条）：名字 + 参数。参数是**标记形态**的正文（`@路径` / `图片 N` /
+ * `附件 N.ext`），模板里的 `$ARGUMENTS` 等占位按它替换；`text` 是容器外的用户正文。
+ *
+ * 名字与参数的边界由客户端在发送前定形（方言的 `:::command[name]` 容器，见
+ * `@ucode/markdown`），服务端只按名字查模板——它不再从正文里切 `/name`，所以参数里的标点、
+ * 空白原样属于用户那句话（见 docs/api.md「输入载荷」）。
+ */
+export const commandRefSchema = z.object({
+  /** 命令模板文件名（不含 `.md`） */
+  name: z.string().min(1),
+  args: z.string().default(""),
+});
+
+/** 技能调用（可多条，按出现顺序注入）：名字 + 该技能自己的参数，同样是标记形态 */
+export const skillRefSchema = z.object({
+  /** 技能名（目录名或 `SKILL.md` 所在目录） */
+  name: z.string().min(1),
+  args: z.string().default(""),
+});
+
+/**
  * 编辑一条已发送的用户消息并重发：`entryId` 是消息 DTO 的 id（即 pi 条目 id），
  * 服务端对着活动分支校验（不在活动分支 / 非用户消息一律 400）；旧分支保留在会话文件里。
  *
- * `contexts` / `attachments` 与 `promptInputSchema` 同形：原消息里的 `@` 引用与附件由编辑器还原后
- * 一并回传，重发时才不会丢掉它们（附件只需 id——引用按内容寻址，重建不需要其余视图信息）。
- * `text` 必填：编辑的意义就是改正文，原样重发没有意义。
+ * `contexts` / `attachments` / `command` / `skills` 与 `promptInputSchema` 同形：原消息里的引用、附件与
+ * 命令由编辑器还原后一并回传，重发时才不会丢掉它们（附件只需 id——引用按内容寻址，重建不需要其余
+ * 视图信息）。四项至少一项非空（空输入在服务端拒掉）：命令调用可以只有 `command`（如无参数的 `/review`）。
  */
 export const messageEditInputSchema = z.object({
   sessionId: sessionIdSchema,
   entryId: z.string().min(1),
-  text: z.string().min(1),
+  text: z.string().default(""),
   contexts: z.array(contextRefSchema).max(PROMPT_MAX_CONTEXTS).optional(),
   attachments: z.array(attachmentRefSchema).max(PROMPT_MAX_ATTACHMENTS).optional(),
+  command: commandRefSchema.optional(),
+  skills: z.array(skillRefSchema).max(PROMPT_MAX_SKILLS).optional(),
 });
 
 /**
@@ -50,9 +73,14 @@ export const messageEditInputSchema = z.object({
  */
 export const promptInputSchema = z.object({
   sessionId: sessionIdSchema,
+  /** 用户写的正文（`@` 引用与附件的位置标记都在里面）；命令与技能不在这里，见 `command` / `skills` */
   text: z.string().default(""),
   contexts: z.array(contextRefSchema).max(PROMPT_MAX_CONTEXTS).optional(),
   attachments: z.array(attachmentRefSchema).max(PROMPT_MAX_ATTACHMENTS).optional(),
+  /** 这条输入是一条命令调用时带上（最多一条）；缺省即普通消息 */
+  command: commandRefSchema.optional(),
+  /** 这条输入用到的技能（可多条，按顺序注入）；与 `command` 可以并存 */
+  skills: z.array(skillRefSchema).max(PROMPT_MAX_SKILLS).optional(),
   /** 生成中再发消息时的投递方式 */
   behavior: z.enum(["follow-up", "steer"]).default("follow-up"),
 });
@@ -83,6 +111,12 @@ export const messageApprovePlanInputSchema = z.object({ sessionId: sessionIdSche
 
 export type MessageApprovePlanRequest = z.input<typeof messageApprovePlanInputSchema>;
 export type MessageApprovePlanInput = z.infer<typeof messageApprovePlanInputSchema>;
+export type CommandRefInput = z.infer<typeof commandRefSchema>;
+export type CommandRefRequest = z.input<typeof commandRefSchema>;
+export type CommandRef = CommandRefInput;
+export type SkillRefInput = z.infer<typeof skillRefSchema>;
+export type SkillRefRequest = z.input<typeof skillRefSchema>;
+export type SkillRef = SkillRefInput;
 export type AttachmentRefInput = z.infer<typeof attachmentRefSchema>;
 export type AttachmentRefRequest = z.input<typeof attachmentRefSchema>;
 export type AttachmentRef = AttachmentRefInput;

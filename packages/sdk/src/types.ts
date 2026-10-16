@@ -1,5 +1,5 @@
 /** 会话流在界面上消费的类型：消息条目与子智能体进度（供各端复用） */
-import type { AttachmentRef, ContextRef, MessageDTO } from "@ucode/contracts";
+import type { AttachmentRef, CommandRef, ContextRef, MessageDTO, SkillRef } from "@ucode/contracts";
 
 /** 单条 assistant 消息的思考耗时；由客户端按事件到达时间测得，不落盘、快照重建后不再有 */
 export type ChatItemTiming = {
@@ -43,17 +43,22 @@ export type SubagentStream = {
 export type SubagentStreams = Record<string, SubagentStream>;
 
 /**
- * 一条 prompt 的结构化载荷：正文 + `@` 上下文引用 + 附件引用。
+ * 一条 prompt 的结构化载荷：命令 / 技能 + 正文 + `@` 上下文引用 + 附件引用。
+ * 命令名不进正文（`command` 单独带，它的 `args` 就是用户写的那段参数），`text` 是容器外的正文；
  * 附件只带 id：引用按内容寻址，正文里的位置由 `图片 N` / `附件 N.<ext>` 标记表达。
  */
 export type PromptPayload = {
   text: string;
   contexts: ContextRef[];
   attachments: AttachmentRef[];
+  /** 这条输入是一条命令调用时带上（最多一条） */
+  command?: CommandRef;
+  /** 这条输入用到的技能，按顺序注入；与 `command` 可以并存 */
+  skills?: SkillRef[];
 };
 
 /**
- * 编辑重发的载荷：正文 + 原消息里的 `@` 引用与附件。
+ * 编辑重发的载荷：命令 / 技能 + 正文 + 原消息里的 `@` 引用与附件。
  * 附件只带 id —— 引用按内容寻址，重建时不需要名称 / 大小这些视图信息。
  */
 export type EditMessagePayload = {
@@ -61,4 +66,8 @@ export type EditMessagePayload = {
   contexts?: ContextRef[];
   /** 只带 id 的附件引用 */
   attachments?: AttachmentRef[];
+  /** 原消息是一条命令调用时带上 */
+  command?: CommandRef;
+  /** 原消息用到的技能 */
+  skills?: SkillRef[];
 };

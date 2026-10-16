@@ -2,11 +2,10 @@
  * 内置命令（`/` 菜单第一组）：执行界面动作，不进消息流。
  */
 
+import { textToDoc } from "@ucode/markdown";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-
 import { BUILTIN_COMMANDS, type BuiltinCommandId } from "../../business/composer/builtin-commands";
-import { textToDoc } from "../../business/composer/document/composer-document";
 import { composerKeyOf } from "../../business/composer/document/composer-draft";
 import type { useComposerDrafts } from "../../business/composer/use-composer-drafts";
 import type { useChat } from "../../hooks/store/use-chat";

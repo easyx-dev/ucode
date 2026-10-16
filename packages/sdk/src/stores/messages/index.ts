@@ -254,6 +254,8 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
         await deps.apis.messages.prompt({
           sessionId,
           text: payload.text,
+          ...(payload.command ? { command: payload.command } : {}),
+          ...(payload.skills && payload.skills.length > 0 ? { skills: payload.skills } : {}),
           ...(payload.contexts.length > 0 ? { contexts: payload.contexts } : {}),
           ...(payload.attachments.length > 0
             ? { attachments: payload.attachments.map((attachment) => ({ id: attachment.id })) }

@@ -2,7 +2,7 @@
  * 编辑器里的页面元素节点视图：整段摘要塞进输入框会很难看，这里只显示**一枚芯片**——
  * 「一枚鼠标指针图标 + 元素的可访问名」，悬停给出选择器与所在页面，Backspace 整枚删除。
  *
- * 进消息正文的仍是完整摘要（由 `docToPayload` 从节点 attrs 里取，见 `pageElementNode`）：
+ * 进消息正文的仍是完整摘要（由方言投影从节点 attrs 里取，见 `pageElementNode`）：
  * 芯片只是给人看的那一面。
  */
 import type { NodeViewProps } from "@tiptap/react";

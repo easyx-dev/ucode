@@ -9,10 +9,12 @@
  *
  * 扩展与 editorProps 在 `./extensions`，命令式句柄在 `./editor-handle`。
  */
+
 import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
+import type { DialectDiagnostic, DocNode, InvocationCandidates } from "@ucode/markdown";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
-import type { ComposerNode } from "../document/composer-document";
+
 import { type ComposerEditorHandle, createEditorHandle } from "./editor-handle";
 import { type ComposerCallbacks, createComposerExtensions, createEditorProps } from "./extensions";
 import type { SuggestionItem } from "./suggestion";
@@ -21,14 +23,20 @@ export type { ComposerEditorHandle };
 
 export type ComposerEditorProps = {
   /** 初始文档（挂载时读取一次；切换草稿 / 切换编辑对象由外层用 `key` 重挂载） */
-  initialDoc?: ComposerNode;
+  initialDoc?: DocNode;
   placeholder: string;
-  onChange: (doc: ComposerNode) => void;
+  onChange: (doc: DocNode) => void;
   onSend: () => void;
   /** `@` 的文件候选（异步）；不传则 `@` 菜单停用 */
   contextItems?: (query: string) => Promise<SuggestionItem[]>;
   /** `/` 的内置动作 + 命令 + 技能候选；不传则 `/` 菜单停用 */
   commandItems?: (query: string) => SuggestionItem[];
+  /** 行首 `:::` 的候选（命令与技能容器）；不传则该菜单停用 */
+  dialectItems?: (query: string) => SuggestionItem[];
+  /** 方言围栏里的名字清单（判定名字写没写对）；不传则只做形状判定 */
+  dialectCandidates?: InvocationCandidates;
+  /** 围栏写错时的行内提示文案 */
+  dialectMessage?: (diagnostic: DialectDiagnostic) => string;
   /** 选中内置动作时触发（不落节点） */
   onBuiltin?: (id: string) => void;
   /** 粘贴 / 拖拽进来的文件（附件），由外层上传入库 */
@@ -54,6 +62,9 @@ const useComposerEditor = ({ ref, initialDoc, placeholder, ...props }: EditorPro
   const callbacks: ComposerCallbacks = {
     contextItems: useRef(props.contextItems),
     commandItems: useRef(props.commandItems),
+    dialectItems: useRef(props.dialectItems),
+    dialectCandidates: useRef(props.dialectCandidates),
+    dialectMessage: useRef(props.dialectMessage),
     onBuiltin: useRef(props.onBuiltin),
     onFiles: useRef(props.onFiles),
     onEscape: useRef(props.onEscape),
@@ -62,6 +73,9 @@ const useComposerEditor = ({ ref, initialDoc, placeholder, ...props }: EditorPro
   };
   callbacks.contextItems.current = props.contextItems;
   callbacks.commandItems.current = props.commandItems;
+  callbacks.dialectItems.current = props.dialectItems;
+  callbacks.dialectCandidates.current = props.dialectCandidates;
+  callbacks.dialectMessage.current = props.dialectMessage;
   callbacks.onBuiltin.current = props.onBuiltin;
   callbacks.onFiles.current = props.onFiles;
   callbacks.onEscape.current = props.onEscape;
@@ -75,6 +89,7 @@ const useComposerEditor = ({ ref, initialDoc, placeholder, ...props }: EditorPro
     extensions: createComposerExtensions(callbacks, {
       context: props.contextItems !== undefined,
       command: props.commandItems !== undefined,
+      dialect: props.dialectItems !== undefined,
       placeholder,
     }),
     content: (initialDoc ?? { type: "doc", content: [{ type: "paragraph" }] }) as JSONContent,
@@ -84,7 +99,7 @@ const useComposerEditor = ({ ref, initialDoc, placeholder, ...props }: EditorPro
   const editor = useEditor({
     ...options,
     onUpdate: ({ editor: target }) => {
-      onChangeRef.current(target.getJSON() as ComposerNode);
+      onChangeRef.current(target.getJSON() as DocNode);
     },
     // 进入 / 切换会话都以新的 key 重挂载，这里等于「开启或切换会话后把光标放回输入区」
     onCreate: ({ editor: target }) => {

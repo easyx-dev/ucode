@@ -1,6 +1,7 @@
 /** 输入区：白卡容器（可带一条上沿条）+ Tiptap 编辑器 + 底部工具栏（添加 · 模式 · 权限 · 模型 · 思考 · 发送） */
 
 import { brand } from "@ucode/brand";
+import { type DocNode, isDocEmpty, textToDoc } from "@ucode/markdown";
 import { cn } from "cn";
 import { ArrowUp, Square } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -13,15 +14,11 @@ import type {
   ThinkingLevel,
   ThinkingPreference,
 } from "../../types";
+import { formatBytes } from "../../utils/preview";
 import { AddMenu } from "./add-menu";
 import { BUILTIN_COMMANDS, type BuiltinCommandId, builtinCommandIdOf } from "./builtin-commands";
-import {
-  type ComposerNode,
-  docToPayload,
-  isDocEmpty,
-  textToDoc,
-} from "./document/composer-document";
 import type { ComposerPayload } from "./document/composer-payload";
+import { diagnosticMessage, payloadOfDoc } from "./document/dialect";
 import { useContextItems } from "./editor/context-items";
 import { ComposerEditor, type ComposerEditorHandle } from "./editor/editor";
 import type { SuggestionItem } from "./editor/suggestion";
@@ -39,17 +36,17 @@ type ComposerProps = {
   /** 真实工作目录：`@` 检索、技能清单与分支 chip 都用它 */
   cwdPath?: string;
   /** 草稿里恢复的初始文档（附件与引用都在文档的节点里） */
-  initialDoc?: ComposerNode;
+  initialDoc?: DocNode;
   /** 编辑器重挂载键：上下文 + 外部填充版本 */
   editorKey: string;
-  onDocChange: (doc: ComposerNode) => void;
+  onDocChange: (doc: DocNode) => void;
   /**
    * 卡内最上方的一条（当前是目标栏）：宽度、居中与圆角都由卡给，它自己只画下沿分划线。
    * 不传时卡与以前一致。
    */
   topBar?: ReactNode;
   /** 发送：带上当时那份文档，投递被拒时外层用它原样填回输入框 */
-  onSend: (payload: ComposerPayload, doc: ComposerNode) => void;
+  onSend: (payload: ComposerPayload, doc: DocNode) => void;
   onStop: () => void;
   streaming: boolean;
   /** 空态（还没有消息）：占位符与卡下建议行只在这个状态下出现 */
@@ -75,7 +72,7 @@ type ComposerProps = {
 };
 
 /** 空文档常量：多处重置编辑器共用，保持引用稳定 */
-const EMPTY_DOC: ComposerNode = { type: "doc", content: [{ type: "paragraph" }] };
+const EMPTY_DOC: DocNode = { type: "doc", content: [{ type: "paragraph" }] };
 
 export function Composer({
   sessionId,
@@ -115,12 +112,12 @@ export function Composer({
     addFiles,
   } = useComposerAttachments({ editor: editorHandle });
 
-  const docRef = useRef<ComposerNode>(initialDoc ?? EMPTY_DOC);
+  const docRef = useRef<DocNode>(initialDoc ?? EMPTY_DOC);
   /**
    * 外部填充（发送后清空 / 失败回填 / 建议 chips）：改初始文档并让编辑器重挂载。
    * 记下写入时的 `editorKey`——切换会话时不把上一个会话的文档喂给新挂载的编辑器。
    */
-  const [externalDoc, setExternalDoc] = useState<{ key: string; doc: ComposerNode } | null>(
+  const [externalDoc, setExternalDoc] = useState<{ key: string; doc: DocNode } | null>(
     initialDoc ? { key: editorKey, doc: initialDoc } : null,
   );
   const versionRef = useRef(0);
@@ -144,7 +141,7 @@ export function Composer({
 
   /** 把编辑器切到给定文档：重挂载并记下已同步内容 */
   const resetEditor = useCallback(
-    (doc: ComposerNode) => {
+    (doc: DocNode) => {
       syncedRef.current = JSON.stringify(doc);
       docRef.current = doc;
       setExternalDoc({ key: editorKey, doc });
@@ -155,7 +152,7 @@ export function Composer({
   );
 
   const handleDocChange = useCallback(
-    (doc: ComposerNode) => {
+    (doc: DocNode) => {
       docRef.current = doc;
       syncedRef.current = JSON.stringify(doc);
       onDocChange(doc);
@@ -206,9 +203,24 @@ export function Composer({
     if (streaming || hasPendingUploads()) return;
     const doc = docRef.current;
     if (isDocEmpty(doc)) return;
-    const payload = docToPayload(doc);
-    // 手动输入的整条内置命令（如 `/new`）：直接执行，不当作消息发出去
-    if (payload.contexts.length === 0 && payload.attachments.length === 0) {
+
+    // 文档 → 方言 → 载荷：发送路径与服务端都只认结构化字段（命令名不再进正文）
+    const { payload, blocking, warnings, skillCost } = payloadOfDoc(doc, commands);
+    // 阻断项（名字不在清单、多条命令、容器未闭合）宁可拦住发送，也不把用户写的字当普通消息发出去
+    const firstBlocking = blocking[0];
+    if (firstBlocking) {
+      toast.error(diagnosticMessage(t, firstBlocking));
+      return;
+    }
+
+    // 手动输入的整条内置命令（如 `/new`）：直接执行，不当作消息发出去。
+    // 只在「整条就是一条命令名」时成立：带引用、附件、命令容器或不在清单里的 `/名字` 都不算。
+    const isLoneCommand =
+      !payload.command &&
+      (payload.skills ?? []).length === 0 &&
+      payload.contexts.length === 0 &&
+      payload.attachments.length === 0;
+    if (isLoneCommand) {
       const builtin = builtinCommandIdOf(payload.text);
       if (builtin) {
         resetEditor(EMPTY_DOC);
@@ -217,9 +229,20 @@ export function Composer({
         return;
       }
     }
+
+    for (const warning of warnings) toast.warning(diagnosticMessage(t, warning));
+    // 技能不限条数：多条时先说清这段正文要占多少上下文，别让用户糊里糊涂塞进去
+    if (skillCost.count > 1) {
+      toast.info(
+        t("本条会注入 {{count}} 个技能，正文约 {{size}}", {
+          count: skillCost.count,
+          size: formatBytes(skillCost.bytes),
+        }),
+      );
+    }
     onSend(payload, doc);
     focusEditor();
-  }, [focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming]);
+  }, [commands, focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming, t]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -288,6 +311,46 @@ export function Composer({
       return [...builtin, ...prompts, ...skills];
     },
     [commands.prompts, commands.skills, sessionId, t],
+  );
+
+  /**
+   * 行首 `:::` 的候选：给的是容器写法（`:::command[name]` / `:::skill[name]`），选中即插入骨架。
+   * 只列命令与技能——内置动作不是容器，`/` 菜单里才有。
+   */
+  const dialectItems = useCallback(
+    (query: string): SuggestionItem[] => {
+      // 触发符是第一个冒号，查询串里还带着剩下的冒号与可能的 `command[` 前缀
+      const needle = query
+        .replace(/^:+/, "")
+        .replace(/^(command|skill)/, "")
+        .replace(/^\[/, "")
+        .trim()
+        .toLowerCase();
+      const match = (value: string): boolean =>
+        needle === "" || value.toLowerCase().includes(needle);
+      const prompts: SuggestionItem[] = commands.prompts
+        .filter((item) => match(`command:${item.name}`))
+        .map((item) => ({
+          id: `dialect-prompt:${item.name}`,
+          label: `:::command[${item.name}]`,
+          hint: item.description,
+          group: t("命令"),
+          kind: "prompt",
+          name: item.name,
+        }));
+      const skills: SuggestionItem[] = commands.skills
+        .filter((item) => match(`skill:${item.name}`))
+        .map((item) => ({
+          id: `dialect-skill:${item.name}`,
+          label: `:::skill[${item.name}]`,
+          hint: item.description,
+          group: t("技能"),
+          kind: "skill",
+          name: item.name,
+        }));
+      return [...prompts, ...skills];
+    },
+    [commands.prompts, commands.skills, t],
   );
 
   return (
@@ -361,6 +424,9 @@ export function Composer({
               onSend={submit}
               contextItems={contextItems}
               commandItems={commandItems}
+              dialectItems={dialectItems}
+              dialectCandidates={commands}
+              dialectMessage={(diagnostic) => diagnosticMessage(t, diagnostic)}
               onBuiltin={(id) => handleBuiltin(id as BuiltinCommandId)}
               onFiles={handleFiles}
             />

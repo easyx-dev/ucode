@@ -5,7 +5,7 @@
  * 会话装配（`harness/setup/session-config.ts`）用同一份目录与同一个 `promptsOverride`，
  * 保证「界面列出的」与「pi 实际能展开 / 广告的」是同一集合。
  */
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve, sep } from "node:path";
 
@@ -84,18 +84,36 @@ export const sourceOf = (filePath: string, paths: CommandAssetPath[]): CommandAs
 };
 
 const toPromptView = (
-  template: { name: string; description: string; argumentHint?: string; filePath: string },
+  template: {
+    name: string;
+    description: string;
+    argumentHint?: string;
+    filePath: string;
+    content: string;
+  },
   paths: CommandAssetPath[],
 ): PromptCommandView => ({
   name: template.name,
   description: template.description,
   ...(template.argumentHint ? { argumentHint: template.argumentHint } : {}),
+  // 注入的是模板正文（占位已替换），按它算体积
+  bytes: Buffer.byteLength(template.content, "utf8"),
   source: sourceOf(template.filePath, paths),
 });
+
+/** 技能正文的体积：读不到（文件已被删 / 权限不足）时给 0，界面据此只做量级提示 */
+const fileBytesOf = (path: string): number => {
+  try {
+    return statSync(path).size;
+  } catch {
+    return 0;
+  }
+};
 
 const toSkillView = (skill: Skill, paths: CommandAssetPath[]): SkillCommandView => ({
   name: skill.name,
   description: skill.description,
+  bytes: fileBytesOf(skill.filePath),
   source: sourceOf(skill.filePath, paths),
 });
 

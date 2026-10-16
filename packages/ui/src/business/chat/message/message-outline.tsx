@@ -8,12 +8,13 @@
  * 落在刻度上的滚动量由调用方转交（`onWheelScroll`）。
  * 预览只在 tooltip 打开时解析——Radix 挂载内容才渲染，长会话里不为每条消息白付解析开销。
  */
+
+import { parseEntryText, userMessageText } from "@ucode/markdown";
 import { cn } from "cn";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../base/tooltip";
 import type { MessageBlock } from "../../../types";
-import { parseUserMessage, userMessageText } from "../../composer/document/message-chips";
 
 /** 预览的长度上限：够认出是哪一句，又不至于把浮层撑成一段正文 */
 const PREVIEW_MAX_LENGTH = 80;
@@ -126,7 +127,7 @@ export function MessageOutline({
  */
 function OutlinePreview({ blocks }: { blocks: MessageBlock[] }) {
   const { t } = useTranslation();
-  const parsed = parseUserMessage(
+  const parsed = parseEntryText(
     blocks.map((block) => (block.type === "text" ? block.text : "")).join(""),
   );
   const text = userMessageText(parsed).replace(/\s+/g, " ").trim();

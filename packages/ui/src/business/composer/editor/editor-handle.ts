@@ -7,7 +7,7 @@
 import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { AttachmentView } from "@ucode/contracts";
-import { commandNode, type MentionKind } from "../document/composer-document";
+import { commandNode, type MentionKind } from "@ucode/markdown";
 import { ATTACHMENT_NODE } from "./attachment-chip";
 
 /** 命令 / 技能节点名；与 `extensions.ts` 的节点定义同名 */

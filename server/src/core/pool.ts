@@ -75,7 +75,7 @@ import {
   usesDefaultToolSet,
 } from "../harness/setup/agents";
 import type { PluginCommandAssets, SkillIndex } from "../harness/setup/assets";
-import { matchSkillHit, matchSkillInvoke } from "../harness/setup/assets/skill-hit";
+import { findSkillInvoke, matchSkillHit } from "../harness/setup/assets/skill-hit";
 import type { PermissionRule, SessionAllowStore } from "../harness/setup/permissions";
 import { assembleSession, contextBudgetFor } from "../harness/setup/session-config";
 import type { GoalToolHooks } from "../harness/setup/tools/goal";
@@ -1037,12 +1037,13 @@ export class SessionPool {
 
   /**
    * 显式 `/skill:name` 的记录：只落文件、不下发界面——用户消息上的 chip 已经表达过这件事。
-   * 判定与写入都关在池里，调用方不接触资源装载。
+   * 名字由客户端定形后给过来，池里只对索引；不是技能调用（`null`）就什么都不记。
    */
-  noteSkillInvoke(sessionId: string, text: string): void {
+  noteSkillInvoke(sessionId: string, skillName: string | null): void {
+    if (!skillName) return;
     const entry = this.entries.get(sessionId);
     if (!entry) return;
-    const skill = matchSkillInvoke(text, entry.skills);
+    const skill = findSkillInvoke(skillName, entry.skills);
     if (!skill) return;
     this.appendMarker(sessionId, entry.session.sessionManager, {
       customType: SKILL_RECORD_CUSTOM_TYPE,

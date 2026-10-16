@@ -1,4 +1,6 @@
 /** 对话区：头部 + 错误提示 + 消息列表 + 输入区（等用户决策时换成决策区） */
+
+import { type DocNode, docToDialect, relativizeContextRefs, textToDoc } from "@ucode/markdown";
 import { cn } from "cn";
 import { Bot } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -23,10 +25,8 @@ import {
 } from "../../types";
 import type { BuiltinCommandId } from "../composer/builtin-commands";
 import { Composer } from "../composer/composer";
-import { type ComposerNode, docToPayload, textToDoc } from "../composer/document/composer-document";
 import { composerKeyOf, emptyDraft } from "../composer/document/composer-draft";
 import type { ComposerPayload } from "../composer/document/composer-payload";
-import { relativizeContextRefs } from "../composer/document/message-chips";
 import { draftSeedOf, projectLabel, projectOf } from "../composer/project/project";
 import type { ComposerDraftsController } from "../composer/use-composer-drafts";
 import { GoalBar } from "../goal/goal-bar";
@@ -208,8 +208,8 @@ export function ChatPanel({
    * 草稿里的编辑器文档：优先用存下来的 doc；只有旧 `text` 的按单段落还原。
    * 切换会话 / 失败回填会让编辑器重挂载，因此这里作为「初始文档」传入。
    */
-  const initialDoc: ComposerNode | undefined =
-    (draft.doc as ComposerNode | undefined) ?? (draft.text ? textToDoc(draft.text) : undefined);
+  const initialDoc: DocNode | undefined =
+    (draft.doc as DocNode | undefined) ?? (draft.text ? textToDoc(draft.text) : undefined);
 
   /**
    * 发送：清空草稿（即时反馈 + 挡重复提交），把初始设置交给 useChat——还没有会话时先建会话；
@@ -218,7 +218,7 @@ export function ChatPanel({
    * `/goal` 只在纯文本时才当命令解析，带引用 / 图片的消息按普通消息发。
    */
   const submit = useCallback(
-    (payload: ComposerPayload, doc: ComposerNode) => {
+    (payload: ComposerPayload, doc: DocNode) => {
       const seed = {
         cwd: draft.cwd,
         model: draft.model,
@@ -247,7 +247,7 @@ export function ChatPanel({
         // 回填原样用发送时那份文档：附件节点与引用都在里面，再次发送时重新换算标记
         composer.update(composerKeyOf(target), {
           doc,
-          text: docToPayload(doc).text,
+          text: docToDialect(doc, {}),
           ...seed,
         });
       });
@@ -409,9 +409,7 @@ export function ChatPanel({
                   />
                 ) : null
               }
-              onDocChange={(doc) =>
-                composer.update(draftKey, { doc, text: docToPayload(doc).text })
-              }
+              onDocChange={(doc) => composer.update(draftKey, { doc, text: docToDialect(doc, {}) })}
               onSend={submit}
               streaming={chat.streaming}
               onStop={() => void chat.stop()}

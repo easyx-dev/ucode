@@ -3,12 +3,6 @@ import type { PromptPayload } from "@ucode/sdk";
 
 export type ComposerPayload = PromptPayload;
 
-export const emptyPayload = (): ComposerPayload => ({
-  text: "",
-  contexts: [],
-  attachments: [],
-});
-
 /** 纯文本载荷（计划批准、plan 反馈、失败回填等场景） */
 export const textPayload = (text: string): ComposerPayload => ({
   text,
@@ -17,4 +11,8 @@ export const textPayload = (text: string): ComposerPayload => ({
 });
 
 export const isPayloadEmpty = (payload: ComposerPayload): boolean =>
-  payload.text.trim() === "" && payload.contexts.length === 0 && payload.attachments.length === 0;
+  payload.text.trim() === "" &&
+  payload.contexts.length === 0 &&
+  payload.attachments.length === 0 &&
+  !payload.command &&
+  (payload.skills ?? []).length === 0;

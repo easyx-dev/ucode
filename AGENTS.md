@@ -103,6 +103,7 @@
 | [`docs/database.md`](./docs/database.md) | 数据库：迁移、命名、类型映射、SQL 约束、删除语义 |
 | [`docs/api.md`](./docs/api.md) | 接口：传输约定、封套与错误码、字段命名、通用参数与响应结构 |
 | [`docs/session-entries.md`](./docs/session-entries.md) | 会话条目（JSONL）：条目类型、payload、进不进模型上下文、界面是否展示 |
+| [`docs/markdown-dialect.md`](./docs/markdown-dialect.md) | 输入方言（UCode Markdown）：容器围栏、`@` 引用、附件 scheme、转义与写错时的表现 |
 | [`docs/browser.md`](./docs/browser.md) | 浏览器工具集：工具与快照语义、profile 与数据、桌面端内置浏览器面板、安全边界、已知限制、与 agent-browser 的对拍结论 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
@@ -314,6 +315,11 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   要复用就先上提到 `hooks/*` / `utils/*`。落位判据、域间依赖方向与公开面边界见
   [`docs/components.md`](./docs/components.md)，由 `pnpm verify` 的 ui-exports 项兜底。
   组合式：应用层拼装基础 / 业务组件，或直接用预设；当前会话等导航状态由应用层以受控 props 传入。
+- `packages/markdown/`（`@ucode/markdown`）是输入方言（UCode Markdown）、编辑器文档与会话条目之间的
+  文本协议单一事实源：方言文本的解析 / 渲染 / 转义（`parseDialect` / `renderDialect` / `escapeDialect`）、
+  编辑器文档的节点构造与还原（`doc-nodes` / `docToDialect` / `entryToDoc`）、条目解析与引用换算（`entry`）。
+  纯函数、不依赖 React / DOM / IO，web / 桌面 / TUI 与服务端共用；语法与写错时的表现见
+  [`docs/markdown-dialect.md`](./docs/markdown-dialect.md)。
 - `apps/web/`（Vite + React）与 `apps/desktop/`（Electron）都是薄外壳：界面与逻辑在 `@ucode/ui` /
   `@ucode/sdk`，外壳只做入口、i18n 接线（`@ucode/ui/utils/app-i18n`）、client 装配与导航状态。
   桌面端主进程从 `$APP_HOME/app/service.json` 取端点与 `serviceToken`：渲染层与接口同源

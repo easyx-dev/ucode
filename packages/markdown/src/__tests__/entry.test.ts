@@ -2,15 +2,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { ComposerPayload } from "../composer-payload";
 import {
   contextMarker,
-  parseUserMessage,
+  type MarkedPayload,
+  parseEntryText as parseUserMessage,
   relativizeContextRefs,
   userMessageText,
-} from "../message-chips";
+} from "../entry.ts";
 
-const payloadOf = (text: string, contexts: string[]): ComposerPayload => ({
+const payloadOf = (text: string, contexts: string[]): MarkedPayload => ({
   text,
   contexts: contexts.map((path) => ({ path })),
   attachments: [],
@@ -25,36 +25,37 @@ describe("parseUserMessage", () => {
     const parsed = parseUserMessage(raw);
 
     assert.equal(parsed.text, "把这个计划落到 @plans/a.md 中，然后记个 todo");
-    assert.equal(parsed.skill, undefined);
+    assert.deepEqual(parsed.skills, []);
   });
 
   it("技能名里的转义字符能还原（服务端会转义属性值）", () => {
-    const raw = '<skill name="a&amp;b" location="/skills/a&amp;b.md">\n正文\n</skill>\n\n看看这个';
+    const raw =
+      '<skill name="a&amp;b" location="/skills/a&amp;b.md" args="">\n正文\n</skill>\n\n看看这个';
 
     const parsed = parseUserMessage(raw);
 
-    assert.deepEqual(parsed.skill, { name: "a&b" });
+    assert.deepEqual(parsed.skills, [{ name: "a&b", args: "" }]);
     assert.equal(parsed.text, "看看这个");
   });
 
   it("技能自成 chip，附件引用行留在句子里", () => {
     const raw =
-      '<skill name="review" location="/skills/review.md">\n技能正文\n</skill>\n\n' +
+      '<skill name="review" location="/skills/review.md" args="">\n技能正文\n</skill>\n\n' +
       '<context path="a.ts">\n内容\n</context>\n\n' +
       `[附件: 报告.pdf (id: ${"a".repeat(64)})]\n\n` +
       "看看 @a.ts";
 
     const parsed = parseUserMessage(raw);
 
-    assert.deepEqual(parsed.skill, { name: "review" });
+    assert.deepEqual(parsed.skills, [{ name: "review", args: "" }]);
     // 引用行在头部（早期写法）时连同其后换行一起剥，气泡里不会多出空行
     assert.deepEqual(parsed.segments, [
       { type: "attachment", name: "报告.pdf", id: "a".repeat(64) },
       { type: "text", text: "看看 " },
       { type: "context", path: "a.ts" },
     ]);
-    // 复制出去的是用户写的那句，不带引用行里的 id
-    assert.equal(userMessageText(parsed), "/skill:review 看看 @a.ts");
+    // 复制出去的是方言写法（与服务端的展开块一一对应），不带引用行里的 id
+    assert.equal(userMessageText(parsed), ":::skill[review]\n:::\n\n看看 @a.ts");
   });
 
   it("没有前置块的消息原样返回", () => {
@@ -68,7 +69,7 @@ describe("parseUserMessage", () => {
 
     assert.deepEqual(parsed.command, { name: "review", args: "改动 a.ts" });
     assert.equal(parsed.text, "");
-    assert.equal(userMessageText(parsed), "/review 改动 a.ts");
+    assert.equal(userMessageText(parsed), ":::command[review]\n改动 a.ts\n:::");
   });
 
   it("命令参数在属性里转义后能还原", () => {
@@ -78,26 +79,36 @@ describe("parseUserMessage", () => {
     assert.equal(parsed.command?.args, '说 "hi" & 结束');
   });
 
-  it("无参数的命令还原时不留尾部空格", () => {
+  it("无参数的命令还原时不写多余换行", () => {
     const parsed = parseUserMessage('<command name="review" args="">\n正文\n</command>\n\n');
-    assert.equal(userMessageText(parsed), "/review");
+    assert.equal(userMessageText(parsed), ":::command[review]\n:::");
   });
 
-  it("技能还原成 `/skill:name 参数`，正文就是块后的参数", () => {
+  it("技能参数在属性里，与命令同一套还原", () => {
     const parsed = parseUserMessage(
-      '<skill name="tiny" location="/x/SKILL.md">\nReferences are relative to /x.\n\n技能正文\n</skill>\n\n看看这个',
+      '<skill name="tiny" location="/x/SKILL.md" args="看看这个">\nReferences are relative to /x.\n\n技能正文\n</skill>\n\n',
     );
 
-    assert.deepEqual(parsed.skill, { name: "tiny" });
-    assert.equal(parsed.text, "看看这个");
-    assert.equal(userMessageText(parsed), "/skill:tiny 看看这个");
+    assert.deepEqual(parsed.skills, [{ name: "tiny", args: "看看这个" }]);
+    assert.equal(parsed.text, "");
+    assert.equal(userMessageText(parsed), ":::skill[tiny]\n看看这个\n:::");
   });
 
-  it("无参数的技能还原时不带尾部空格", () => {
+  it("多条技能各自带参数，界面上是多个 chip", () => {
     const parsed = parseUserMessage(
-      '<skill name="tiny" location="/x/SKILL.md">\nReferences are relative to /x.\n\n技能正文\n</skill>',
+      '<skill name="pdf" location="/s/pdf/SKILL.md" args="生成报告">\n技能正文\n</skill>\n\n' +
+        '<skill name="ts" location="/s/ts/SKILL.md" args="只审查类型">\n技能正文\n</skill>\n\n结尾',
     );
-    assert.equal(userMessageText(parsed), "/skill:tiny");
+
+    assert.deepEqual(parsed.skills, [
+      { name: "pdf", args: "生成报告" },
+      { name: "ts", args: "只审查类型" },
+    ]);
+    assert.equal(parsed.text, "结尾");
+    assert.equal(
+      userMessageText(parsed),
+      ":::skill[pdf]\n生成报告\n:::\n\n:::skill[ts]\n只审查类型\n:::\n\n结尾",
+    );
   });
 });
 
@@ -211,11 +222,28 @@ describe("正文里的附件与图片标记", () => {
 
   it("引用行残留的 id 不进复制文本，图片标记也不进", () => {
     const parsed = parseUserMessage(`前 [附件: a.pdf (id: ${"c".repeat(64)})] 后 图片 1`);
-    assert.equal(userMessageText(parsed), "前  后 ");
+    // 复制出来的是方言写法：附件与图片的位置标记只对模型有意义，不进这段话（首尾空白也收敛掉）
+    assert.equal(userMessageText(parsed), "前  后");
   });
 });
 
 describe("relativizeContextRefs", () => {
+  it("命令与技能的参数里的引用也一并换算", () => {
+    const payload: MarkedPayload = {
+      text: "收尾 @/repo/docs/api.md",
+      contexts: [{ path: "/repo/docs/api.md" }],
+      attachments: [],
+      command: { name: "review", args: "看下 @/repo/docs/api.md" },
+      skills: [{ name: "pdf", args: "生成报告，参考 @/repo/docs/api.md" }],
+    };
+
+    const sent = relativizeContextRefs(payload, "/repo");
+
+    assert.equal(sent.text, "收尾 @docs/api.md");
+    assert.equal(sent.command?.args, "看下 @docs/api.md");
+    assert.equal(sent.skills?.[0]?.args, "生成报告，参考 @docs/api.md");
+  });
+
   it("标记换成相对工作目录的写法，句子其余部分不动", () => {
     const payload = payloadOf(
       "修一下 @/repo/packages/ui/src/app.ts，再补 @/repo/docs/api.md 的说明",

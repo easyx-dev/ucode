@@ -572,6 +572,12 @@ export const PROMPT_MAX_ATTACHMENTS = 8;
 export const PROMPT_MAX_CONTEXTS = 32;
 
 /**
+ * 单轮 prompt 的技能条数上限。产品上不限条数（几条就够用），这里只是一条健全性上限：
+ * 服务端要按条读技能正文，不能让它跟着请求里的数组一起无界增长。
+ */
+export const PROMPT_MAX_SKILLS = 32;
+
+/**
  * 命令与技能的来源，**数组顺序即同名优先级**（前者胜）：
  * 项目 `.ucode` → 项目 `.agents` → 全局 `$APP_HOME` → 用户 `~/.agents` → 插件 → 内置。
  * 提示词命令与技能还可能来自插件（`plugin`）与内置资产。

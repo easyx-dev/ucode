@@ -4,24 +4,24 @@
  * 只接收受控的导航状态；产品行为（内置命令、计划批准、目标命令、会话动作）拆在同目录的几个 hook 里，
  * 应用层只需提供导航 props。需要更细的组合时自行用 `@ucode/ui/business/*` 拼装。
  */
+
+import {
+  appendNodesToDoc,
+  type DocNode,
+  docToDialect,
+  pageElementNode,
+  textToDoc,
+} from "@ucode/markdown";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../base/resizable";
 import { Sheet, SheetContent } from "../../base/sheet";
 import { Toaster } from "../../base/sonner";
 import { TooltipProvider } from "../../base/tooltip";
 import { ChatPanel } from "../../business/chat/chat-panel";
 import { compactionNoticeMessage } from "../../business/chat/message/compaction";
-import {
-  appendNodesToDoc,
-  type ComposerNode,
-  docToPayload,
-  pageElementNode,
-  textToDoc,
-} from "../../business/composer/document/composer-document";
 import { composerKeyOf, NEW_SESSION_KEY } from "../../business/composer/document/composer-draft";
 import { textPayload } from "../../business/composer/document/composer-payload";
 import { projectOf } from "../../business/composer/project/project";
@@ -152,7 +152,7 @@ export function WorkspaceLayout({
       const key = composerKeyOf(activeId);
       const current = composer.drafts[key];
       const base =
-        (current?.doc as ComposerNode | undefined) ??
+        (current?.doc as DocNode | undefined) ??
         (current?.text ? textToDoc(current.text) : undefined);
       // 芯片是行内节点，得自己裹一个段落：直接落进 doc 顶层会被 schema 拒掉
       const doc = appendNodesToDoc(base, [
@@ -167,7 +167,7 @@ export function WorkspaceLayout({
           ],
         },
       ]);
-      composer.update(key, { doc, text: docToPayload(doc).text });
+      composer.update(key, { doc, text: docToDialect(doc, {}) });
     },
     [activeId, composer],
   );

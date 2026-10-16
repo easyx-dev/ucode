@@ -1,7 +1,10 @@
 /** 会话运行：把一条输入投递给会话，生成在服务端后台推进，结果走事件总线 */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
+  type AttachmentRef,
   attachmentRefLine,
+  type CommandRef,
+  type ContextRef,
   ERROR_CODES,
   GOAL_PROMPT_CUSTOM_TYPE,
   type GoalPromptKind,
@@ -9,6 +12,7 @@ import {
   type MessageEditInput,
   PLAN_APPROVED_CUSTOM_TYPE,
   type PromptInput,
+  type SkillRef,
 } from "@ucode/contracts";
 import { resolveSessionCwd } from "../../core/session-paths";
 import { resolveAttachment } from "../../harness/features/attachment";
@@ -17,7 +21,7 @@ import { expandContexts } from "../../harness/features/context";
 import { resolveEditableUserEntry } from "../../harness/features/edit";
 import { buildPlanApproval } from "../../harness/features/goal/prompt";
 import { type PromptImage, toPromptImage } from "../../harness/features/image";
-import { expandCommand, expandSkillCommand } from "../../harness/setup/assets/expand";
+import { expandPromptInvocation, expandSkillInvocation } from "../../harness/setup/assets/expand";
 import { AppError } from "../../platform/response";
 import { sleep } from "../../utils/time";
 import type { Services } from "..";
@@ -59,17 +63,35 @@ type PreparedPrompt = {
   /** 用户正文：附件内联成功时已把非图片标记换成引用行，否则原样 */
   text: string;
   images: PromptImage[];
+  /** 这条输入是一条命令调用时带上：模型看到的模板正文由它决定 */
+  command?: CommandRef;
+  /** 这条输入用到的技能：模型看到的技能正文由它们决定，按顺序注入 */
+  skills: readonly SkillRef[];
 };
 
+/** 输入是否有内容：正文、引用、附件、命令与技能至少一项（纯附件、纯引用、无参命令都算） */
+const isEmptyInput = (input: {
+  text: string;
+  contexts: readonly ContextRef[];
+  attachments: readonly AttachmentRef[];
+  command?: CommandRef;
+  skills: readonly SkillRef[];
+}): boolean =>
+  input.text.length === 0 &&
+  input.contexts.length === 0 &&
+  input.attachments.length === 0 &&
+  !input.command &&
+  input.skills.length === 0;
+
 /**
- * 展开引用、按附件 id 取回内容。`prompt` 与 `edit` 都以这三项为投递内容，故按最小结构接收。
+ * 展开引用、按附件 id 取回内容。`prompt` 与 `edit` 都以这四项为投递内容，故按最小结构接收。
  * 越界路径与查不到的附件在这里就报错，不必先把会话实例建出来；
  * 命令与技能的展开要等会话装配好（模板来自 `session`），见 `assemblePrompt`。
  */
 const preparePrompt = (
   repo: Services["attachments"],
   cwd: string,
-  input: Pick<PromptInput, "text" | "contexts" | "attachments">,
+  input: Pick<PromptInput, "text" | "contexts" | "attachments" | "command" | "skills">,
 ): PreparedPrompt => {
   const expanded = expandContexts(cwd, input.contexts ?? []);
   const resolved = (input.attachments ?? []).map((ref) => {
@@ -94,6 +116,8 @@ const preparePrompt = (
     prefix: [expanded, refLines.join("\n")].filter((part) => part.length > 0).join("\n\n"),
     text: inline ?? input.text,
     images: images.map(toPromptImage),
+    ...(input.command ? { command: input.command } : {}),
+    skills: input.skills ?? [],
   };
 };
 
@@ -101,22 +125,50 @@ const preparePrompt = (
 const composeText = (prefix: string, text: string): string =>
   [prefix, text].filter((part) => part.length > 0).join("\n\n");
 
+/** 名字对不上清单（模板被删、技能文件读不出来）时报错，理由见 `assemblePrompt` */
+const unknownInvocation = (kind: "命令" | "技能", name: string): AppError =>
+  new AppError(ERROR_CODES.invalidRequest, `${kind}不存在或不可用：${name}`, 400, undefined, {
+    path: name,
+  });
+
 /**
- * 拼装模型要读的正文：`/name args`（提示词命令）与 `/skill:name args`（技能）在这里换成边界块。
- * 两种展开都由服务端做——边界块同时是客户端认出「这是一条命令 / 技能」的依据，必须落在会话条目里。
- * 展开后的块以 `<` 开头，pi 侧的技能与模板展开不会重复触发（见 `assets/expand.ts`）。
+ * 拼装模型要读的正文：`command` 与 `skills` 在这里换成边界块（模板正文 / 技能正文 + 各自参数），
+ * 顺序固定为「命令块 → 技能块（按出现顺序）→ 用户正文」，前面还拼着引用块。
+ *
+ * 展开只能由服务端做——模板与技能正文都在会话装配里，客户端手里只有名字（见 `assets/expand.ts`）。
+ * 名字对不上清单时报错而不是按普通消息投递：客户端是按清单把它定形成命令的，静默降级只会让
+ * 用户写的参数变成发给模型的字面文本。
  */
 const assemblePrompt = (
   prepared: PreparedPrompt,
   session: AgentSession,
 ): { body: string; images: PromptImage[] } => {
-  const invocation =
-    expandSkillCommand(prepared.text, session.resourceLoader.getSkills().skills) ??
-    expandCommand(prepared.text, session.promptTemplates);
-  return {
-    body: composeText(prepared.prefix, invocation?.block ?? prepared.text),
-    images: prepared.images,
-  };
+  const blocks: string[] = [];
+
+  if (prepared.command) {
+    const expanded = expandPromptInvocation(
+      prepared.command.name,
+      prepared.command.args,
+      session.promptTemplates,
+    );
+    if (!expanded) throw unknownInvocation("命令", prepared.command.name);
+    blocks.push(expanded.block);
+  }
+
+  for (const skill of prepared.skills) {
+    const expanded = expandSkillInvocation(
+      skill.name,
+      skill.args,
+      session.resourceLoader.getSkills().skills,
+    );
+    if (!expanded) throw unknownInvocation("技能", skill.name);
+    blocks.push(expanded.block);
+  }
+
+  const body = [prepared.prefix, ...blocks, prepared.text]
+    .filter((part) => part.length > 0)
+    .join("\n\n");
+  return { body, images: prepared.images };
 };
 
 /**
@@ -124,9 +176,10 @@ const assemblePrompt = (
  * 只 await「取会话」与「入队」这类短操作，不 await 整轮生成。
  */
 export const admitPrompt = async (services: Services, input: PromptInput): Promise<void> => {
-  const { sessionId, text, behavior } = input;
+  const { sessionId, text, behavior, command } = input;
   const contexts = input.contexts ?? [];
   const attachments = input.attachments ?? [];
+  const skills = input.skills ?? [];
 
   // 会话必须先存在：查不到的 id 会一路走到「以会话工作目录当 cwd」的推导上，
   // 而那一步现在只认已有记录（见 `resolveSessionCwd`），这里提前给出明确的 404
@@ -136,7 +189,7 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
       path: sessionId,
     });
   }
-  if (text.length === 0 && contexts.length === 0 && attachments.length === 0) {
+  if (isEmptyInput({ text, contexts, attachments, command, skills })) {
     throw new AppError(ERROR_CODES.invalidRequest, "消息不能为空", 400);
   }
 
@@ -147,8 +200,8 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
   const session = await services.pool.withLock(sessionId, () => services.pool.ensure(sessionId));
 
   const { body, images: content } = assemblePrompt(prepared, session);
-  // 显式 `/skill:name` 的记录：只落文件，界面上用户消息的 chip 已经表达过这件事
-  services.pool.noteSkillInvoke(sessionId, prepared.text);
+  // 显式技能调用逐个留记录：界面上用户消息的 chip 已经表达过这件事，这里只落文件供后续统计
+  for (const skill of prepared.skills) services.pool.noteSkillInvoke(sessionId, skill.name);
 
   // 装配成功后再把附件转为永久：ensure 失败（如未配模型）时不留下永不清理的附件
   services.attachments.markReferenced(
@@ -162,10 +215,14 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
    * 标题取用户那句：命令展开出来的模板正文会把标题带偏。
    */
   const beginTurn = (): void => {
+    // 标题取用户那句：命令的参数 + 正文（模板正文会把标题带偏）
+    const titleMaterial = [prepared.command?.args, prepared.text]
+      .filter((part) => Boolean(part))
+      .join("\n\n");
     services.titles.generateForPrompt(
       sessionId,
       session,
-      composeText(prepared.prefix, prepared.text),
+      composeText(prepared.prefix, titleMaterial),
     );
     startRun(services, sessionId, session, body, content);
   };
@@ -196,7 +253,10 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
  * 与 prompt 不同，编辑不能在忙碌时排队——它改变的是本轮起点，必须等会话彻底空闲。
  */
 export const admitEdit = async (services: Services, input: MessageEditInput): Promise<void> => {
-  const { sessionId, entryId } = input;
+  const { sessionId, entryId, text, command } = input;
+  const contexts = input.contexts ?? [];
+  const attachments = input.attachments ?? [];
+  const skills = input.skills ?? [];
 
   const record = services.sessions.find(sessionId);
   if (!record || record.deletedAt) {
@@ -204,12 +264,15 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
       path: sessionId,
     });
   }
+  if (isEmptyInput({ text, contexts, attachments, command, skills })) {
+    throw new AppError(ERROR_CODES.invalidRequest, "消息不能为空", 400);
+  }
   // 子智能体会话只读、没有独立的重发语义
   if (record.parentSessionId || record.agent) {
     throw new AppError(ERROR_CODES.invalidRequest, "子智能体会话不支持编辑", 400);
   }
 
-  // 与会话无关的展开先做：越界路径 / 查不到的附件在排队等锁之前就报错
+  // 与会话无关的展开先做：越界路径 / 查不到的附件 / 空输入在排队等锁之前就报错
   const prepared = preparePrompt(services.attachments, resolveSessionCwd(record), input);
 
   // 编辑先改活动分支再开生成，整段决策必须在同一把锁内完成：
@@ -231,11 +294,11 @@ export const admitEdit = async (services: Services, input: MessageEditInput): Pr
     }
 
     const { body, images } = assemblePrompt(prepared, session);
-    // 编辑重发同样可能是一条 `/skill:name`，与 admitPrompt 一样先记下来
-    services.pool.noteSkillInvoke(sessionId, prepared.text);
+    // 编辑重发同样可能带技能，与 admitPrompt 一样逐个记下来
+    for (const skill of prepared.skills) services.pool.noteSkillInvoke(sessionId, skill.name);
     // 与 admitPrompt 一致：装配成功后再把附件转为永久，避免失败时留下永不清理的附件
     services.attachments.markReferenced(
-      (input.attachments ?? []).map((ref) => ref.id),
+      attachments.map((ref) => ref.id),
       new Date().toISOString(),
     );
     // 活动分支已改变：让所有在线客户端丢弃本地历史、重新取快照

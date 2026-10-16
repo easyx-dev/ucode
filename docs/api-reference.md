@@ -842,13 +842,19 @@
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `text` | string | 否 | `` | — |
+| `text` | string | 否 | `` | 用户写的正文（`@` 引用与附件的位置标记都在里面）；命令与技能不在这里，见 `command` / `skills` |
 | `contexts` | object[]（≤32 项） | 否 | — | — |
 | `contexts[].path` | string（长度≥1） | 是 | — | — |
 | `contexts[].startLine` | integer（>0） | 否 | — | — |
 | `contexts[].endLine` | integer（>0） | 否 | — | — |
 | `attachments` | object[]（≤8 项） | 否 | — | — |
 | `attachments[].id` | string（格式 `^[0-9a-f]{64}$`） | 是 | — | — |
+| `command` | object | 否 | — | 这条输入是一条命令调用时带上（最多一条）；缺省即普通消息 |
+| `command.name` | string（长度≥1） | 是 | — | 命令模板文件名（不含 `.md`） |
+| `command.args` | string | 否 | `` | — |
+| `skills` | object[]（≤32 项） | 否 | — | 这条输入用到的技能（可多条，按顺序注入）；与 `command` 可以并存 |
+| `skills[].name` | string（长度≥1） | 是 | — | 技能名（目录名或 `SKILL.md` 所在目录） |
+| `skills[].args` | string | 否 | `` | — |
 | `behavior` | "follow-up" \| "steer" | 否 | `follow-up` | 生成中再发消息时的投递方式 |
 
 **响应类型**：`PromptAdmittedResponse`
@@ -868,13 +874,19 @@
 | --- | --- | --- | --- | --- |
 | `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
 | `entryId` | string（长度≥1） | 是 | — | — |
-| `text` | string（长度≥1） | 是 | — | — |
+| `text` | string | 否 | `` | — |
 | `contexts` | object[]（≤32 项） | 否 | — | — |
 | `contexts[].path` | string（长度≥1） | 是 | — | — |
 | `contexts[].startLine` | integer（>0） | 否 | — | — |
 | `contexts[].endLine` | integer（>0） | 否 | — | — |
 | `attachments` | object[]（≤8 项） | 否 | — | — |
 | `attachments[].id` | string（格式 `^[0-9a-f]{64}$`） | 是 | — | — |
+| `command` | object | 否 | — | — |
+| `command.name` | string（长度≥1） | 是 | — | 命令模板文件名（不含 `.md`） |
+| `command.args` | string | 否 | `` | — |
+| `skills` | object[]（≤32 项） | 否 | — | — |
+| `skills[].name` | string（长度≥1） | 是 | — | 技能名（目录名或 `SKILL.md` 所在目录） |
+| `skills[].args` | string | 否 | `` | — |
 
 **响应类型**：`PromptAdmittedResponse`
 
@@ -2447,7 +2459,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `componentRefs` | [PluginComponentRefView](#plugincomponentrefview)[] | 是 | 组件逐个列出：列表只给计数，详情页要名字 |
 | `userConfig` | [PluginUserConfigFieldView](#pluginuserconfigfieldview)[] | 是 | userConfig 的声明；没有配置项时为空数组 |
 | `config` | Record<string, string \| number \| boolean> | 是 | userConfig 的已存值；敏感项不在其中（只体现 `configured` 语义） |
-| `blockedComponents` | ("manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
+| `blockedComponents` | ("skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
 | `updateAvailable` | boolean | 是 | 来源内容是否已变（目录来源按内容哈希、git 按 ls-remote 的 commit、npm 按 registry 版本、 url 按条件请求判定）。由「刷新市场」这类显式动作重算，列表接口本身不打网络、不扫盘， 只回显上次结论。 |
 | `latestVersion` | string | 否 | 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 |
 | `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
@@ -2529,7 +2541,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `level` | "error" \| "warning" \| "info" | 是 | — |
-| `component` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
+| `component` | "skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
 | `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
 
 ### AgentView
@@ -2574,6 +2586,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `name` | string | 是 | 命令名；调用时序列化为 `/name` |
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
+| `bytes` | number | 是 | 模板正文的 UTF-8 字节数：界面据此估计这条输入会往上下文里塞多少 |
 | `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
@@ -2582,6 +2595,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
+| `bytes` | number | 是 | 技能正文（SKILL.md）的 UTF-8 字节数：一条消息可以带多条技能，界面据此提示上下文占用 |
 | `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | — |
 
 ### ModelUsage
@@ -2911,7 +2925,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `group` | "manifest" \| "skills" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | — |
+| `group` | "skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | — |
 | `name` | string | 是 | — |
 
 ### PluginUserConfigFieldView

@@ -6,10 +6,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { BackgroundService, MessageListResponse, ServerEventPayload } from "@ucode/contracts";
-
 import type { Apis } from "../../../apis";
 import type { EventStream } from "../../../events";
-import { applyFrame, createEngine } from "../engine";
+import type { PromptPayload } from "../../../types";
+import { applyFrame, createEngine, optimisticBlocks } from "../engine";
 import { createMessagesStore } from "../index";
 
 const serviceOf = (port: number): BackgroundService => ({
@@ -142,5 +142,40 @@ describe("会话流 · 后台服务清单", () => {
         .services.map((service) => service.port),
       [4000],
     );
+  });
+});
+
+/** 乐观区块：命令与技能的参数都是用户写的那段，发送瞬间就该显示出来 */
+describe("乐观区块", () => {
+  const payloadOf = (parts: Partial<PromptPayload>): PromptPayload => ({
+    text: "",
+    contexts: [],
+    attachments: [],
+    ...parts,
+  });
+
+  it("命令的参数与正文合起来显示", () => {
+    assert.deepEqual(
+      optimisticBlocks(payloadOf({ command: { name: "todo", args: "记一条" }, text: "收尾" })),
+      [{ type: "text", text: "记一条\n\n收尾" }],
+    );
+  });
+
+  it("技能消息同样有正文（此前只有命令参数被拼进去）", () => {
+    assert.deepEqual(
+      optimisticBlocks(
+        payloadOf({
+          skills: [
+            { name: "pdf", args: "一" },
+            { name: "ts", args: "二" },
+          ],
+        }),
+      ),
+      [{ type: "text", text: "一\n\n二" }],
+    );
+  });
+
+  it("什么都没有时不给空块", () => {
+    assert.deepEqual(optimisticBlocks(payloadOf({})), []);
   });
 });

@@ -18,13 +18,6 @@ const normalizeSeparators = (path: string): string => path.replace(/\\/g, "/").r
 export const isUnderPath = (child: string, parent: string): boolean =>
   normalizeSeparators(child).startsWith(`${normalizeSeparators(parent)}/`);
 
-/** 目录名：取路径最后一段；根目录回落 `/` */
-export const baseName = (path: string): string => {
-  const trimmed = normalizeSeparators(path);
-  const index = trimmed.lastIndexOf("/");
-  return index >= 0 ? trimmed.slice(index + 1) || "/" : trimmed;
-};
-
 /** 拼接子路径；父路径为根目录时避免出现 `//` */
 export const joinPath = (parent: string, name: string): string =>
   parent.endsWith("/") ? `${parent}${name}` : `${parent}/${name}`;
@@ -38,15 +31,10 @@ export const dirName = (path: string): string => {
 };
 
 /**
- * 相对路径：`path` 落在 `root` 之下时去掉该前缀（与 `root` 同级时给 `.`），否则原样返回。
- * 与服务端展开 `@` 引用时算块上 `path` 属性的口径一致，正文里的引用标记据此保持同一写法。
+ * 相对路径与目录名：`@` 引用标记的换算口径在 `@ucode/markdown` 里（与服务端展开块的 `path` 同一份），
+ * 这里转出去给界面用，避免同一规则写两遍。
  */
-export const toRelativePath = (root: string, path: string): string => {
-  const base = root.replace(/\/+$/, "");
-  if (base === path) return ".";
-  // `base` 为空串（root 是 `/`）时只认绝对路径的前导斜杠
-  return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
-};
+export { baseName, toRelativePath } from "@ucode/markdown";
 
 /** 是否绝对路径；同时认 POSIX 的 `/` 与 Windows 的盘符 / UNC */
 export const isAbsolutePath = (path: string): boolean =>

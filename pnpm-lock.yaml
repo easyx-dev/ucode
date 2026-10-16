@@ -418,6 +418,37 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/markdown:
+    dependencies:
+      '@ucode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1(supports-color@10.2.2)
+      remark-parse:
+        specifier: ^11.0.0
+        version: 11.0.0(supports-color@10.2.2)
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
+      unist-util-visit:
+        specifier: ^5.1.0
+        version: 5.1.0
+    devDependencies:
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.19.0
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/sdk:
     dependencies:
       '@ucode/contracts':
@@ -526,6 +557,9 @@ importers:
       '@ucode/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@ucode/markdown':
+        specifier: workspace:*
+        version: link:../markdown
       '@ucode/sdk':
         specifier: workspace:*
         version: link:../sdk

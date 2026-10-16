@@ -340,6 +340,26 @@ agent 用的那组浏览器工具（`browser_open` / `browser_snapshot` / `brows
 - 服务端**没有文件变更推送**：客户端靠「切回面板时拉一次 + 每轮对话结束（`agent_settled`）后刷新 +
   手动刷新按钮」保持新鲜，不轮询。
 
+## 输入载荷（`messages/prompt` 与 `messages/edit`）
+
+两个接口用同一份载荷描述「用户写了什么」，各项互相独立：
+
+- `text`：容器外的用户正文。`@引用`、`图片 N`、`附件 N.<ext>` 都是正文里的位置标记，服务端按标记就地展开。
+- `contexts`：引用列表（绝对或工作目录相对路径 + 可选行范围），服务端读内容后前置成 `<context>` 块。
+- `attachments`：附件引用，只带内容 id。
+- `command`：提示词命令（最多一条），`{ name, args }`——`args` 是模板占位（`$ARGUMENTS` 等）的取值。
+- `skills`：技能调用（可多条，按顺序注入），每项 `{ name, args }`，参数是该技能自己容器里的那段。
+- `command` 与 `skills` 可以并存（命令是主指令，技能是附加流程）。
+
+至少一项非空，否则 `invalid_request`；无参数的 `/review`（只有 `command`）算有内容。
+
+**命令名不进正文，名字与参数的边界不由服务端从文本里切**。客户端在发送前把用户写的**方言**文本
+（`@ucode/markdown`：`:::command[name]` / `:::skill[name]` 容器、`@路径#L1-L2`、`![](attachment:类型/id)`）
+解析成上面这份载荷，手打的 `/name 参数` 由同一层定形；服务端只按名字查模板 / 技能正文，再把命令与技能包成
+`<command>` / `<skill>` 边界块（形状见 [`session-entries.md`](./session-entries.md)）。
+名字对不上清单（模板被删、技能文件读不出来）时报 400 而不是按普通消息投递：客户端是按清单把它定形成
+命令的，静默降级只会让用户写的参数变成发给模型的字面文本。
+
 ## 附件（attachments）
 
 附件库是**内容寻址**的：`id` 是内容 sha256（64 位小写 hex），字节落 `$APP_HOME/app/attachments/<id>`，

@@ -1,13 +1,12 @@
 /**
- * 用户消息的还原：前置展开块的剥离、正文里标记的切分、技能 / 命令 / 附件 chip 的取出。
+ * 会话条目 → 界面：前置展开块的剥离、正文里标记的切分、命令 / 技能 / 附件 chip 的取出。
  *
  * 服务端把注入内容拼成前置块与正文一起落进会话条目（顺序见 `server/src/services/sessions/run.ts`）：
  *   <skill …>…</skill> / <command …>…</command> / <context …>…</context> / 用户正文
- * 块内容只喂给模型，界面整体剥掉它们（不展开、不成段）：技能与命令各自出 chip 排在气泡上方，
+ * 块内容只喂给模型，界面整体剥掉它们（不展开、不成段）：命令与技能各自出 chip 排在气泡上方，
  * 正文里的 `@` 引用、图片标记与附件引用行是句子成分，就地还原成可点 chip（位置即用户当初放的位置）。
+ * 命令与技能的参数挂在展开块的 `args` 属性上，它们同样是「用户写的正文」，走同一遍扫描。
  * 块内容已由服务端的 `neutralizeTags` 转义同名标签，因此匹配首个闭合标签是安全的。
- *
- * 解析是「段落化」的：一次扫完所有前置块，再用同一遍扫描把正文里的标记切出来。
  */
 import {
   ATTACHMENT_REF_PATTERN,
@@ -15,14 +14,16 @@ import {
   COMMAND_TAG,
   CONTEXT_TAG,
   type ContextRef,
+  contextMarker,
   IMAGE_MARKER_PREFIX,
   SKILL_TAG,
+  scanAttachmentMarkers,
 } from "@ucode/contracts";
-import { toRelativePath } from "../../../utils/path";
-import type { ComposerPayload } from "./composer-payload";
+import { toRelativePath } from "./path.ts";
 
-export type SkillChip = { name: string };
-/** 提示词命令：chip 显示 `/name`，用户写的参数跟在正文里 */
+/** 技能 chip：显示技能名，参数是它自己容器里的那段 */
+export type SkillChip = { name: string; args: string };
+/** 提示词命令：chip 显示 `/name`，参数就是用户写的那段 */
 export type CommandChip = { name: string; args: string };
 /** 非图片附件：正文里是展开后的引用行 `[附件: <显示名> (id: <sha256>)]` */
 export type AttachmentChip = { id: string; name: string };
@@ -31,7 +32,7 @@ export type AttachmentChip = { id: string; name: string };
  * 正文的一段：普通文本、一条引用标记、一个非图片附件，或一张图片（按同类型附件的出现次序定位）。
  * 附件与图片在正文里的位置是用户想表达的位置，因此界面按段落就地渲染，而不是抽出来排成一行。
  */
-export type UserTextSegment =
+export type EntrySegment =
   | { type: "text"; text: string }
   | ({ type: "context" } & ContextRef)
   | ({ type: "attachment" } & AttachmentChip)
@@ -41,18 +42,18 @@ export type UserTextSegment =
       index: number;
     };
 
-export type ParsedUserMessage = {
-  skill?: SkillChip;
+export type ParsedEntry = {
+  /** 技能调用，按注入顺序；可多条 */
+  skills: SkillChip[];
   command?: CommandChip;
   /** 正文分段（标记已切出来），`text` 是它们的原始拼接 */
-  segments: UserTextSegment[];
+  segments: EntrySegment[];
   /** 用户正文：剥掉全部前置展开块，各类标记留在用户写的那句话里 */
   text: string;
 };
-
 // 标签名取自契约（服务端的包裹器用同一份名单）：名字一改两边同步，不会单边失效
 const SKILL_PATTERN = new RegExp(
-  `^<${SKILL_TAG} name="([^"]*)" location="[^"]*">\\n[\\s\\S]*?\\n</${SKILL_TAG}>\\n{0,2}`,
+  `^<${SKILL_TAG} name="([^"]*)" location="[^"]*" args="([^"]*)">\\n[\\s\\S]*?\\n</${SKILL_TAG}>\\n{0,2}`,
 );
 const COMMAND_PATTERN = new RegExp(
   `^<${COMMAND_TAG} name="([^"]*)" args="([^"]*)">\\n[\\s\\S]*?\\n</${COMMAND_TAG}>\\n{0,2}`,
@@ -65,8 +66,8 @@ const IMAGE_ORDINAL = /^\d+/;
 /** 早期消息把附件引用行前置在正文头部：连同其后的换行一起剥，免得气泡里多出空行 */
 const HEAD_ATTACHMENT_PATTERN = new RegExp(`^${ATTACHMENT_REF_PATTERN.source}\\n{0,2}`);
 
-/** `@` 引用的正文标记；标记与展开块一一对应，界面靠它还原引用在句子里的位置 */
-export const contextMarker = (path: string): string => `@${path}`;
+/** `@` 引用的正文标记（`@路径`）；本模块多处要用，也转出去给同域模块共用同一份字面量 */
+export { contextMarker };
 
 /**
  * 服务端 `wrapUntrusted` 的属性转义（`&` `<` `>` `"`）的逆运算。
@@ -99,11 +100,11 @@ const lineRangeOf = (raw: string | undefined): Pick<ContextRef, "startLine" | "e
  *
  * 图片标记只切出序号，图片本体（id）由调用方按 `index` 去 image blocks 里取。
  */
-const splitSegments = (text: string, refs: readonly ContextRef[]): UserTextSegment[] => {
+const splitSegments = (text: string, refs: readonly ContextRef[]): EntrySegment[] => {
   // 逐位置匹配用 sticky 正则：只在这里建，避免共享 `lastIndex`
   const attachmentAt = new RegExp(ATTACHMENT_REF_PATTERN.source, "y");
   const remaining = [...refs];
-  const segments: UserTextSegment[] = [];
+  const segments: EntrySegment[] = [];
   /** 当前文本段的起点；命中标记时把 [cursor, index) 推成一段 */
   let cursor = 0;
   let index = 0;
@@ -158,19 +159,22 @@ const splitSegments = (text: string, refs: readonly ContextRef[]): UserTextSegme
   return segments;
 };
 
-export const parseUserMessage = (raw: string): ParsedUserMessage => {
+export const parseEntryText = (raw: string): ParsedEntry => {
   let text = raw;
-  let skill: SkillChip | undefined;
+  const skills: SkillChip[] = [];
   let command: CommandChip | undefined;
   const contexts: ContextRef[] = [];
   /** 头部剥出来的附件引用行（早期写法）：位置不在句子里，但仍是附件段 */
-  const leading: UserTextSegment[] = [];
+  const leading: EntrySegment[] = [];
 
   // 前置展开块：形状由服务端给出，逐个从头部剥离；只可能出现在最前面，剥完即止
   for (;;) {
     const skillMatch = text.match(SKILL_PATTERN);
     if (skillMatch) {
-      skill = { name: unescapeAttribute(skillMatch[1] ?? "") };
+      skills.push({
+        name: unescapeAttribute(skillMatch[1] ?? ""),
+        args: unescapeAttribute(skillMatch[2] ?? ""),
+      });
       text = text.slice(skillMatch[0].length);
       continue;
     }
@@ -205,10 +209,15 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
     break;
   }
 
+  // 命令与技能的参数都挂在展开块的 `args` 属性里（模板正文 / 技能正文把用户那段换掉了），
+  // 它们同样是「用户写的正文」：与块外文本一起按同一遍标记扫描，引用与图片才还原得回来
+  const body = [command?.args, ...skills.map((item) => item.args), text]
+    .filter((part): part is string => Boolean(part))
+    .join("\n\n");
   return {
-    skill,
+    skills,
     command,
-    segments: [...leading, ...splitSegments(text, contexts)],
+    segments: [...leading, ...splitSegments(body, contexts)],
     text,
   };
 };
@@ -217,7 +226,7 @@ export const parseUserMessage = (raw: string): ParsedUserMessage => {
  * 用户写下的正文：去掉只对模型有意义的位置标记（附件引用行、图片标记），其余照原样；
  * 复制这条消息时要的是「用户当初写的那句」，不是把 id 也拷出去。
  */
-export const visibleTextOf = (segments: readonly UserTextSegment[]): string =>
+export const visibleTextOf = (segments: readonly EntrySegment[]): string =>
   segments
     .map((segment) =>
       segment.type === "text"
@@ -228,21 +237,51 @@ export const visibleTextOf = (segments: readonly UserTextSegment[]): string =>
     )
     .join("");
 
+/** 一条命令 / 技能还原成方言容器；参数为空时只写围栏 */
+const containerOf = (kind: "command" | "skill", name: string, args: string): string =>
+  args ? `:::${kind}[${name}]\n${args}\n:::` : `:::${kind}[${name}]\n:::`;
+
+/** 去掉只对模型有意义的位置标记（图片、非图片附件、附件引用行），复制出去的是用户写的那句 */
+const withoutAttachmentMarkers = (text: string): string => {
+  const withoutRefs = text.replaceAll(ATTACHMENT_REF_PATTERN, "");
+  let result = withoutRefs;
+  for (const hit of scanAttachmentMarkers(withoutRefs).reverse()) {
+    result = result.slice(0, hit.from) + result.slice(hit.to);
+  }
+  return result;
+};
+
 /**
- * 用户原文：命令与技能还原成 `/name args` / `/skill:name args`，其余照正文（去掉位置标记）。
- * 复制与编辑回填都要「用户当初写的那句」——注入进去的技能正文与模板正文不是原话，而技能块之后的
- * 正文恰好就是 `parsed.segments`（服务端展开时就是把参数接在块后的）。
+ * 用户原文：还原成**方言**（`:::command[name]` / `:::skill[name]` 容器 + 正文）。
+ * 复制、编辑与「输入框里那份文本」是同一份——注入进去的模板正文与技能正文不是用户写的字。
  */
-export const userMessageText = (parsed: ParsedUserMessage): string => {
+export const userMessageText = (parsed: ParsedEntry): string => {
+  const blocks: string[] = [];
   if (parsed.command) {
-    return [`/${parsed.command.name}`, parsed.command.args].filter(Boolean).join(" ");
+    blocks.push(
+      containerOf(
+        "command",
+        parsed.command.name,
+        withoutAttachmentMarkers(parsed.command.args).trim(),
+      ),
+    );
   }
-  if (parsed.skill) {
-    return [`/skill:${parsed.skill.name}`, visibleTextOf(parsed.segments).trim()]
-      .filter(Boolean)
-      .join(" ");
+  for (const skill of parsed.skills) {
+    blocks.push(containerOf("skill", skill.name, withoutAttachmentMarkers(skill.args).trim()));
   }
-  return visibleTextOf(parsed.segments);
+  const prose = withoutAttachmentMarkers(parsed.text).trim();
+  if (prose) blocks.push(prose);
+  return blocks.join("\n\n");
+};
+
+/** 引用换算要读写的字段：只要「正文 + 引用 + 命令 / 技能」，不绑定某一端的载荷定义 */
+export type MarkedPayload = {
+  text: string;
+  contexts: ContextRef[];
+  /** 附件（各项至少带 id）；是否原样透传取决于调用方，这里只保证类型对得上 */
+  attachments?: readonly unknown[] | undefined;
+  command?: { name: string; args: string } | undefined;
+  skills?: readonly { name: string; args: string }[] | undefined;
 };
 
 /**
@@ -250,12 +289,25 @@ export const userMessageText = (parsed: ParsedUserMessage): string => {
  * 载荷里的标记是编辑器插入的绝对路径，逐条按已知引用精确替换，不会误伤用户自己打的 `@`；
  * 认不出工作目录（或引用不在其下）时保持原样，正文里仍是一条完整的路径。
  */
-export const relativizeContextRefs = (payload: ComposerPayload, cwd?: string): ComposerPayload => {
+export const relativizeContextRefs = <T extends MarkedPayload>(payload: T, cwd?: string): T => {
   if (!cwd || payload.contexts.length === 0) return payload;
-  const text = payload.contexts.reduce(
-    (current, ref) =>
-      current.replaceAll(contextMarker(ref.path), contextMarker(toRelativePath(cwd, ref.path))),
-    payload.text,
-  );
-  return text === payload.text ? payload : { ...payload, text };
+  const relativize = (text: string): string =>
+    payload.contexts.reduce(
+      (current, ref) =>
+        current.replaceAll(contextMarker(ref.path), contextMarker(toRelativePath(cwd, ref.path))),
+      text,
+    );
+
+  // 命令与技能的参数同样是用户正文：里面的 `@绝对路径` 也要换算，否则条目里正文与展开块的 path 对不上
+  const command = payload.command
+    ? { ...payload.command, args: relativize(payload.command.args) }
+    : undefined;
+  const skills = payload.skills?.map((skill) => ({ ...skill, args: relativize(skill.args) }));
+  // 泛型保住调用方的载荷类型（载荷字段可能比这里读的三个多）
+  return {
+    ...payload,
+    text: relativize(payload.text),
+    ...(command ? { command } : {}),
+    ...(skills ? { skills } : {}),
+  } as T;
 };

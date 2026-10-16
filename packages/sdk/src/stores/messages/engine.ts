@@ -117,8 +117,17 @@ export const patch = (engine: Engine, next: Partial<SessionStreamState>): void =
  * 展开——而载荷只带附件 id，这里造不出名称与类型。与其编一个假的，不如先按标记原样显示，
  * 权威消息（几十毫秒后到达）会把同一条消息换成带 chip 的样子。
  */
-export const optimisticBlocks = (payload: PromptPayload) =>
-  payload.text ? [{ type: "text", text: payload.text } as const] : [];
+export const optimisticBlocks = (payload: PromptPayload) => {
+  // 命令与技能的参数都是用户写的那段（权威消息里它跟在 chip 后面），先合起来显示，免得乐观条目一片空白
+  const text = [
+    payload.command?.args,
+    ...(payload.skills ?? []).map((skill) => skill.args),
+    payload.text,
+  ]
+    .filter((part): part is string => Boolean(part && part.length > 0))
+    .join("\n\n");
+  return text ? [{ type: "text" as const, text }] : [];
+};
 
 /** 就地更新某个子智能体的进度；没有对应条目时忽略 */
 const updateSubagent = (

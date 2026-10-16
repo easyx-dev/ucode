@@ -7,7 +7,7 @@ import { afterEach, describe, it } from "node:test";
 import { createSyntheticSourceInfo, type Skill } from "@earendil-works/pi-coding-agent";
 
 import { skillIndexOf } from "..";
-import { matchSkillHit, matchSkillInvoke } from "../skill-hit";
+import { findSkillInvoke, matchSkillHit } from "../skill-hit";
 
 const created: string[] = [];
 
@@ -80,20 +80,18 @@ describe("matchSkillHit", () => {
   });
 });
 
-describe("matchSkillInvoke", () => {
-  it("`/skill:name` 认出来，后面的参数不影响", () => {
+describe("findSkillInvoke", () => {
+  it("按名字查到技能（名字由客户端定形后给过来）", () => {
     const review = skill("review");
     const index = indexOf([review], review.baseDir);
 
-    assert.equal(matchSkillInvoke("/skill:review 看看这个", index)?.name, "review");
-    assert.equal(matchSkillInvoke("/skill:review", index)?.name, "review");
+    assert.equal(findSkillInvoke("review", index)?.name, "review");
   });
 
-  it("普通输入与索引里没有的名字都返回 null", () => {
+  it("索引里没有的名字返回 null", () => {
     const review = skill("review");
     const index = indexOf([review], review.baseDir);
 
-    assert.equal(matchSkillInvoke("看看这个", index), null);
-    assert.equal(matchSkillInvoke("/skill:unknown x", index), null);
+    assert.equal(findSkillInvoke("unknown", index), null);
   });
 });

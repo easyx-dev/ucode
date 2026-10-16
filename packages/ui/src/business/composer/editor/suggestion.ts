@@ -19,6 +19,28 @@ type RendererProps = {
   clientRect?: (() => DOMRect | null) | null;
 };
 
+/** 弹层对按键的动作；`pass` 表示不消费，交回编辑器 */
+export type SuggestionKeyAction = "previous" | "next" | "select" | "dismiss" | "pass";
+
+/**
+ * 按键 → 动作。两条容易踩的边界：
+ * - `Shift+Enter` 是换行，输入法组合中的 `Enter` 是选字，都不能当成「选中当前项」——
+ *   否则菜单开着时插不进换行，反倒把高亮那一条填了进去。
+ * - 候选为空时什么都不消费，编辑器的发送逻辑照常生效。
+ */
+export const suggestionKeyActionOf = (
+  event: { key: string; shiftKey?: boolean; isComposing?: boolean },
+  count: number,
+): SuggestionKeyAction => {
+  if (count === 0) return "pass";
+  if (event.key === "Escape" || event.key === "Esc") return "dismiss";
+  if (event.key === "ArrowDown") return "next";
+  if (event.key === "ArrowUp") return "previous";
+  if (event.key === "Tab") return "select";
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) return "select";
+  return "pass";
+};
+
 /**
  * 建议弹层的渲染工厂。
  * `onActiveChange` 在「有候选」时置真、关闭或候选为空时置假——编辑器据此把 Enter / 方向键
@@ -105,23 +127,23 @@ export const createSuggestionRenderer = (onActiveChange?: (active: boolean) => v
     },
     onKeyDown: (props: { event: KeyboardEvent }): boolean => {
       const count = current?.items.length ?? 0;
-      if (count === 0) return false;
-      if (props.event.key === "ArrowDown") {
-        selected = (selected + 1) % count;
-        render();
-        return true;
+      switch (suggestionKeyActionOf(props.event, count)) {
+        case "next":
+          selected = (selected + 1) % count;
+          render();
+          return true;
+        case "previous":
+          selected = (selected - 1 + count) % count;
+          render();
+          return true;
+        case "select":
+          select(selected);
+          return true;
+        case "dismiss":
+          return true;
+        default:
+          return false;
       }
-      if (props.event.key === "ArrowUp") {
-        selected = (selected - 1 + count) % count;
-        render();
-        return true;
-      }
-      if (props.event.key === "Enter") {
-        select(selected);
-        return true;
-      }
-      if (props.event.key === "Escape") return true;
-      return false;
     },
     onExit: (): void => {
       container?.remove();

@@ -4,26 +4,25 @@
  * 与输入区的差别只有两处：命令节点只读（`/` 菜单停用，不能再造一个内置动作），
  * 发送键沿用输入区的 Enter（Shift+Enter 换行）——两处输入体验本来就该一致。
  */
+
+import { type DocNode, entryToDoc, type ParsedEntry, relativizeContextRefs } from "@ucode/markdown";
 import type { EditMessagePayload } from "@ucode/sdk";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "../../../base/button";
 import { useWorkbench } from "../../../provider/workbench";
 import type { ChatItem } from "../../../types";
-import { type ComposerNode, docToPayload } from "../../composer/document/composer-document";
 import { isPayloadEmpty } from "../../composer/document/composer-payload";
-import {
-  type ParsedUserMessage,
-  relativizeContextRefs,
-} from "../../composer/document/message-chips";
+import { diagnosticMessage, payloadOfDoc } from "../../composer/document/dialect";
 import { useContextItems } from "../../composer/editor/context-items";
 import { ComposerEditor, type ComposerEditorHandle } from "../../composer/editor/editor";
 import { useComposerAttachments } from "../../composer/editor/use-composer-attachments";
-import { messageTextToDoc } from "./message-document";
+import { useCommands } from "../../composer/use-commands";
 
 type FormProps = {
   item: ChatItem;
-  parsed: ParsedUserMessage;
+  parsed: ParsedEntry;
   images: readonly string[];
   onEdit: (item: ChatItem, payload: EditMessagePayload) => Promise<boolean>;
   onCancel: () => void;
@@ -34,20 +33,29 @@ type FormProps = {
  * 文档是载荷的唯一来源——引用与附件的位置、顺序都在里面（「文档 → 载荷」只有一条路径）。
  */
 const useEditComposer = ({ item, parsed, images, onEdit, onCancel }: FormProps) => {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<ComposerEditorHandle | null>(null);
-  const docRef = useRef<ComposerNode>(messageTextToDoc(parsed, images));
+  const docRef = useRef<DocNode>(entryToDoc(parsed, images));
   const { error, uploading, hasPendingUploads, addFiles } = useComposerAttachments({
     editor: editorRef,
   });
   // 没有工作台（子会话嵌套视图、测试）时 `@` 检索不可用，菜单在调用方停用
   const cwd = useWorkbench()?.cwd ?? null;
   const contextItems = useContextItems(cwd);
+  // 手打的命令要在编辑态同样定形（与首次发送同一条口径），清单按工作目录取
+  const commands = useCommands(null, cwd ?? undefined);
 
   const submit = useCallback(() => {
-    // 附件还在上传时不发：没拿到 id 的占位节点会被 `docToPayload` 跳过
+    // 附件还在上传时不发：没拿到 id 的占位节点会被方言投影跳过
     if (saving || hasPendingUploads()) return;
-    const payload = docToPayload(docRef.current);
+    const { payload: next, blocking, warnings } = payloadOfDoc(docRef.current, commands);
+    if (blocking.length > 0) {
+      toast.error(diagnosticMessage(t, blocking[0] as (typeof blocking)[number]));
+      return;
+    }
+    for (const warning of warnings) toast.warning(diagnosticMessage(t, warning));
+    const payload = next;
     if (isPayloadEmpty(payload)) return;
     setSaving(true);
     // 与首次发送同一条口径：正文里的引用标记换算成工作目录相对写法（展开块上的 `path` 也是它），
@@ -56,13 +64,14 @@ const useEditComposer = ({ item, parsed, images, onEdit, onCancel }: FormProps) 
       setSaving(false);
       if (accepted) onCancel();
     });
-  }, [cwd, hasPendingUploads, item, onCancel, onEdit, saving]);
+  }, [commands, cwd, hasPendingUploads, item, onCancel, onEdit, saving, t]);
 
-  const onChange = useCallback((doc: ComposerNode) => {
+  const onChange = useCallback((doc: DocNode) => {
     docRef.current = doc;
   }, []);
 
   return {
+    commands,
     editorRef,
     docRef,
     contextItems,
@@ -98,6 +107,8 @@ export function MessageEditForm({
             onChange={form.onChange}
             onSend={form.submit}
             {...(form.cwd ? { contextItems: form.contextItems } : {})}
+            dialectCandidates={form.commands}
+            dialectMessage={(diagnostic) => diagnosticMessage(t, diagnostic)}
             onEscape={onCancel}
             onFiles={form.addFiles}
           />

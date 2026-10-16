@@ -1,83 +1,89 @@
-/** 输入区文档 → 发送载荷的投影单测：引用在正文里留标记、命令 / 技能还原为文本 */
+/** 编辑器文档模型的单测：附件序号、文本还原成列表、空文档判定与追加 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-
 import {
   appendNodesToDoc,
   attachmentOrdinalInDoc,
-  type ComposerNode,
-  docToPayload,
+  type DocNode,
   isDocEmpty,
   pageElementNode,
   textToDoc,
-} from "../composer-document";
+} from "../doc-nodes.ts";
+import { docToDialect } from "../document.ts";
 
-const docOf = (children: ComposerNode[]): ComposerNode => ({
+const docOf = (children: DocNode[]): DocNode => ({
   type: "doc",
   content: [{ type: "paragraph", content: children }],
 });
 
-const text = (value: string): ComposerNode => ({ type: "text", text: value });
-const mention = (path: string, attrs: Record<string, unknown> = {}): ComposerNode => ({
+const text = (value: string): DocNode => ({ type: "text", text: value });
+const mention = (path: string, attrs: Record<string, unknown> = {}): DocNode => ({
   type: "contextMention",
   attrs: { path, ...attrs },
 });
 
 /** 附件节点：`id` 为空表示还在上传中，身份落在 `tempId` 上 */
-const attachment = (
-  id: string,
-  kind: "image" | "file",
-  tempId: string | null = null,
-): ComposerNode => ({
+const attachment = (id: string, kind: "image" | "file", tempId: string | null = null): DocNode => ({
   type: "attachmentMention",
   attrs: { id, name: kind === "image" ? null : `${id}.pdf`, kind, tempId },
 });
 
-describe("docToPayload 的 `@` 引用", () => {
-  it("引用在正文里落成标记，位置不变", () => {
-    const payload = docToPayload(
+describe("引用与列表的方言投影", () => {
+  it("引用保留位置，行范围只写进方言", () => {
+    const dialect = docToDialect(
       docOf([text("把这个计划落到 "), mention("/repo/plans/x.md"), text(" 中")]),
+      {},
     );
 
-    assert.equal(payload.text, "把这个计划落到 @/repo/plans/x.md 中");
-    assert.deepEqual(payload.contexts, [{ path: "/repo/plans/x.md" }]);
+    assert.equal(dialect, "把这个计划落到 @/repo/plans/x.md 中");
   });
 
-  it("多个引用按文档顺序进正文与 contexts", () => {
-    const payload = docToPayload(
+  it("多个引用按文档顺序，带行范围的写全", () => {
+    const dialect = docToDialect(
       docOf([
         text("先看 "),
         mention("/repo/a.ts"),
         text(" 再看 "),
         mention("/repo/b.ts", { startLine: 3, endLine: 8 }),
       ]),
+      {},
     );
 
-    assert.equal(payload.text, "先看 @/repo/a.ts 再看 @/repo/b.ts");
-    assert.deepEqual(payload.contexts, [
-      { path: "/repo/a.ts" },
-      { path: "/repo/b.ts", startLine: 3, endLine: 8 },
-    ]);
-  });
-
-  it("只有引用、没有正文时也能发出", () => {
-    const payload = docToPayload(docOf([mention("/repo/a.ts")]));
-    assert.equal(payload.text, "@/repo/a.ts");
-    assert.equal(payload.contexts.length, 1);
+    assert.equal(dialect, "先看 @/repo/a.ts 再看 @/repo/b.ts#L3-L8");
   });
 });
 
-describe("docToPayload 的命令与技能", () => {
-  it("命令 / 技能 mention 还原为 `/name` 与 `/skill:name`", () => {
-    const payload = docToPayload(
+describe("命令 / 技能的方言投影", () => {
+  it("mention 变成容器，命令名与它之后的分隔空白都不进内容", () => {
+    const dialect = docToDialect(
       docOf([
         { type: "commandMention", attrs: { kind: "skill", name: "review" } },
         text(" 看看这个"),
       ]),
+      {},
     );
 
-    assert.equal(payload.text, "/skill:review 看看这个");
-    assert.deepEqual(payload.contexts, []);
+    assert.equal(dialect, ":::skill[review]\n看看这个\n:::");
+  });
+
+  // 没有那个分隔空白也要成立：名字与参数的边界是节点位置给的，不靠空白
+  it("mention 后面没紧跟空白时，参数照样从第一个字开始", () => {
+    const dialect = docToDialect(
+      docOf([
+        { type: "commandMention", attrs: { kind: "prompt", name: "todo" } },
+        text("，有如果有未读的"),
+      ]),
+      {},
+    );
+
+    assert.equal(dialect, ":::command[todo]\n，有如果有未读的\n:::");
+  });
+
+  it("只有命令没有参数时内容为空，但仍算有内容", () => {
+    const doc = docOf([{ type: "commandMention", attrs: { kind: "prompt", name: "review" } }]);
+
+    assert.equal(docToDialect(doc, {}), ":::command[review]\n:::");
+    assert.equal(isDocEmpty(doc), false);
   });
 });
 
@@ -97,7 +103,7 @@ describe("attachmentOrdinalInDoc 的序号", () => {
   });
 
   it("跨段落接着数，不按段落重新开始", () => {
-    const doc: ComposerNode = {
+    const doc: DocNode = {
       type: "doc",
       content: [
         { type: "paragraph", content: [attachment("i1", "image")] },
@@ -124,85 +130,88 @@ describe("attachmentOrdinalInDoc 的序号", () => {
   });
 });
 
-const listItem = (...children: ComposerNode[]): ComposerNode => ({
+const listItem = (...children: DocNode[]): DocNode => ({
   type: "listItem",
   content: children,
 });
 
-const bulletList = (...items: ComposerNode[]): ComposerNode => ({
+const bulletList = (...items: DocNode[]): DocNode => ({
   type: "bulletList",
   content: items,
 });
 
-const orderedList = (...items: ComposerNode[]): ComposerNode => ({
+const orderedList = (...items: DocNode[]): DocNode => ({
   type: "orderedList",
   content: items,
 });
 
-const paragraphOf = (...children: ComposerNode[]): ComposerNode => ({
+const paragraphOf = (...children: DocNode[]): DocNode => ({
   type: "paragraph",
   content: children,
 });
 
-const listDoc = (...blocks: ComposerNode[]): ComposerNode => ({ type: "doc", content: blocks });
+const listDoc = (...blocks: DocNode[]): DocNode => ({ type: "doc", content: blocks });
 
-describe("docToPayload 的列表", () => {
+describe("列表的方言投影", () => {
   it("无序列表还原成 `- ` 行", () => {
-    const payload = docToPayload(
+    const dialect = docToDialect(
       listDoc(
         bulletList(listItem(paragraphOf(text("第一条"))), listItem(paragraphOf(text("第二条")))),
       ),
+      {},
     );
-    assert.equal(payload.text, "- 第一条\n- 第二条");
+    assert.equal(dialect, "- 第一条\n- 第二条");
   });
 
   it("有序列表按位置编号", () => {
-    const payload = docToPayload(
+    const dialect = docToDialect(
       listDoc(orderedList(listItem(paragraphOf(text("甲"))), listItem(paragraphOf(text("乙"))))),
+      {},
     );
-    assert.equal(payload.text, "1. 甲\n2. 乙");
+    assert.equal(dialect, "1. 甲\n2. 乙");
   });
 
   it("嵌套列表缩进两空格", () => {
-    const payload = docToPayload(
+    const dialect = docToDialect(
       listDoc(
         orderedList(
           listItem(paragraphOf(text("父")), bulletList(listItem(paragraphOf(text("子"))))),
         ),
       ),
+      {},
     );
-    assert.equal(payload.text, "1. 父\n  - 子");
+    assert.equal(dialect, "1. 父\n  - 子");
   });
 
   it("列表项里的引用与附件照样收进载荷", () => {
-    const payload = docToPayload(
+    const dialect = docToDialect(
       listDoc(
         bulletList(
           listItem(paragraphOf(mention("/repo/a.ts"), text(" "), attachment("f1", "file"))),
         ),
       ),
+      {},
     );
-    assert.equal(payload.text, "- @/repo/a.ts 附件 1.pdf");
-    assert.deepEqual(payload.contexts, [{ path: "/repo/a.ts" }]);
-    assert.deepEqual(payload.attachments, [{ id: "f1" }]);
+    assert.equal(dialect, "- @/repo/a.ts ![f1.pdf](attachment:pdf/f1)");
   });
 
   it("列表与段落混排时顺序不变", () => {
-    const payload = docToPayload(
+    const dialect = docToDialect(
       listDoc(
         paragraphOf(text("开头")),
         bulletList(listItem(paragraphOf(text("项")))),
         paragraphOf(text("结尾")),
       ),
+      {},
     );
-    assert.equal(payload.text, "开头\n- 项\n结尾");
+    assert.equal(dialect, "开头\n- 项\n结尾");
   });
 });
 
 describe("页面元素节点（编辑器里的芯片）", () => {
   it("进正文的是完整摘要，节点自己不产生任何字符", () => {
     const summary = "【页面元素】示例页（http://x/）\n- 选择器：#greet";
-    const doc: ComposerNode = {
+    const doc: DocNode = {
       type: "doc",
       content: [
         { type: "paragraph", content: [{ type: "text", text: "改一下这个" }] },
@@ -222,11 +231,11 @@ describe("页面元素节点（编辑器里的芯片）", () => {
     };
 
     // 段落之间隔一个换行：摘要落在用户那句话的下一行
-    assert.equal(docToPayload(doc).text, `改一下这个\n${summary}`);
+    assert.equal(docToDialect(doc, {}), `改一下这个\n${summary}`);
   });
 
   it("只有芯片的文档不算空（否则发送按钮会一直是禁用的）", () => {
-    const doc: ComposerNode = {
+    const doc: DocNode = {
       type: "doc",
       content: [
         { type: "paragraph", content: [pageElementNode({ label: "问候", summary: "摘要" })] },
@@ -236,14 +245,14 @@ describe("页面元素节点（编辑器里的芯片）", () => {
   });
 
   it("追加节点时保留已有内容（外部插入走的就是这条路）", () => {
-    const base: ComposerNode = {
+    const base: DocNode = {
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: "先写的" }] }],
     };
     const doc = appendNodesToDoc(base, [
       { type: "paragraph", content: [pageElementNode({ label: "问候", summary: "摘要" })] },
     ]);
-    assert.equal(docToPayload(doc).text, "先写的\n摘要");
+    assert.equal(docToDialect(doc, {}), "先写的\n摘要");
   });
 });
 
@@ -267,7 +276,7 @@ describe("外部插入的一段上下文（页面元素摘要）", () => {
     const doc = textToDoc(summary);
     // 字段行被解析成无序列表（渲染好看），这是有意的
     assert.equal(doc.content?.[1]?.type, "bulletList");
-    assert.equal(docToPayload(doc).text, summary);
+    assert.equal(docToDialect(doc, {}), summary);
   });
 });
 
@@ -277,7 +286,7 @@ describe("textToDoc 还原列表", () => {
     assert.equal(doc.content?.[0]?.type, "paragraph");
     assert.equal(doc.content?.[1]?.type, "bulletList");
     assert.equal(doc.content?.[1]?.content?.length, 2);
-    assert.equal(docToPayload(doc).text, "说明\n- 一\n- 二");
+    assert.equal(docToDialect(doc, {}), "说明\n- 一\n- 二");
   });
 
   it("有序与嵌套缩进都能还原（发送出去仍是同一份文本）", () => {
@@ -285,7 +294,7 @@ describe("textToDoc 还原列表", () => {
     const doc = textToDoc(source);
     assert.equal(doc.content?.[0]?.type, "orderedList");
     assert.equal(doc.content?.[0]?.content?.[0]?.content?.[1]?.type, "bulletList");
-    assert.equal(docToPayload(doc).text, source);
+    assert.equal(docToDialect(doc, {}), source);
   });
 
   it("同一层换列表种类时另起一个列表", () => {

@@ -326,6 +326,14 @@ export default {
   重构这段代码: "Refactor this code",
 
   // Messages
+  "命令不存在：{{name}}": "No such command: {{name}}",
+  "技能不存在：{{name}}": "No such skill: {{name}}",
+  一条消息只能有一个命令: "A message can only hold one command",
+  "容器没有闭合：{{name}}": "Container is not closed: {{name}}",
+  "容器里不能再写容器：{{name}}": "Containers cannot be nested: {{name}}",
+  "附件引用无效：{{raw}}": "Invalid attachment reference: {{raw}}",
+  "本条会注入 {{count}} 个技能，正文约 {{size}}":
+    "This message loads {{count}} skills (~{{size}} of instructions)",
   思考过程: "Reasoning",
   子智能体过程: "Subagent progress",
   查看进度: "View progress",

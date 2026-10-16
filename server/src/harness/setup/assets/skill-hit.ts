@@ -1,12 +1,11 @@
 /**
- * 技能命中与显式调用的判定：一次工具调用是否读到了某个技能文件、一条输入是否就是 `/skill:name`。
+ * 技能命中与显式调用的判定：一次工具调用是否读到了某个技能文件、一次显式调用落到哪个技能。
  *
  * 纯函数，只依赖技能索引与会话 cwd——命中比对与显式调用共用同一份索引（见 `assets/index`），
  * 免得「界面列出的」「pi 认的」「记下来的」出现三份口径。
  */
 
 import { normalizeSkillFile, type SkillIndex, type SkillIndexEntry } from "./";
-import { SKILL_PATTERN } from "./expand";
 
 /**
  * 一次工具调用是否读到了某个技能文件；命中返回那个技能，否则 null。
@@ -26,8 +25,6 @@ export const matchSkillHit = (
   return index.byFile.get(normalizeSkillFile(path, cwd)) ?? null;
 };
 
-/** 一条用户输入是否显式调用了某个技能；判据与 pi 的 `/skill:` 展开完全一致 */
-export const matchSkillInvoke = (text: string, index: SkillIndex): SkillIndexEntry | null => {
-  const name = SKILL_PATTERN.exec(text.trim())?.[1];
-  return name ? (index.byName.get(name) ?? null) : null;
-};
+/** 显式技能调用（`/skill:name`）落到哪个技能上：命令名由客户端定形后给过来，这里只查索引 */
+export const findSkillInvoke = (name: string, index: SkillIndex): SkillIndexEntry | null =>
+  index.byName.get(name) ?? null;

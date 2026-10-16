@@ -6,12 +6,12 @@
  */
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper, useEditorState } from "@tiptap/react";
+import { attachmentOrdinalInDoc, type DocNode } from "@ucode/markdown";
 import { useTranslation } from "react-i18next";
 import { AttachmentToken } from "../../attachment/attachment-token";
 import { openImagePreview } from "../../attachment/image-preview-dialog";
-import { attachmentOrdinalInDoc, type ComposerNode } from "../document/composer-document";
 
-/** 节点名；`docToPayload` 与编辑器命令都按它找附件节点 */
+/** 节点名；方言投影与编辑器命令都按它找附件节点 */
 export const ATTACHMENT_NODE = "attachmentMention";
 
 export function AttachmentChipView({ node, editor }: NodeViewProps) {
@@ -25,7 +25,7 @@ export function AttachmentChipView({ node, editor }: NodeViewProps) {
   const ordinal = useEditorState({
     editor,
     selector: ({ editor: target }) =>
-      attachmentOrdinalInDoc(target.getJSON() as ComposerNode, key, kind),
+      attachmentOrdinalInDoc(target.getJSON() as DocNode, key, kind),
   });
 
   const token = (

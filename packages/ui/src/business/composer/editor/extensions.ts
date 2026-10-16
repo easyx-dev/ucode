@@ -4,6 +4,7 @@
  * 单独一个模块是为了让 `editor.tsx` 只留「装配」：这里全是声明式配置，没有组件状态。
  * 回调一律经 ref 读取（`ComposerCallbacks`）——Tiptap 实例只在挂载时创建一次，直接传函数会拿到旧闭包。
  */
+
 import { Extension, type Extensions } from "@tiptap/core";
 import BulletList from "@tiptap/extension-bullet-list";
 import Document from "@tiptap/extension-document";
@@ -15,12 +16,22 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import Text from "@tiptap/extension-text";
 import { history, redo, undo } from "@tiptap/pm/history";
+import { Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import type { EditorProps } from "@tiptap/pm/view";
 import { ReactNodeViewRenderer } from "@tiptap/react";
+import type { DialectDiagnostic } from "@ucode/markdown";
+import {
+  escapeDialect,
+  hasDialectSyntax,
+  type InvocationCandidates,
+  PAGE_ELEMENT_NODE,
+} from "@ucode/markdown";
 import type { RefObject } from "react";
-import { PAGE_ELEMENT_NODE } from "../document/composer-document";
+
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
+import { createDialectMarks } from "./dialect-marks";
+import { createDialectSuggestion } from "./dialect-suggestion";
 import { PageElementChipView } from "./page-element-chip";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
@@ -38,6 +49,12 @@ const CONTENT_CLASS =
 export type ComposerCallbacks = {
   contextItems: RefObject<((query: string) => Promise<SuggestionItem[]>) | undefined>;
   commandItems: RefObject<((query: string) => SuggestionItem[]) | undefined>;
+  /** 方言菜单（行首 `:::`）的候选：命令与技能的名字 */
+  dialectItems: RefObject<((query: string) => SuggestionItem[]) | undefined>;
+  /** 方言解析要用的清单：判定围栏里的名字写没写对 */
+  dialectCandidates: RefObject<InvocationCandidates | undefined>;
+  /** 围栏写错时的行内提示文案 */
+  dialectMessage: RefObject<((diagnostic: DialectDiagnostic) => string) | undefined>;
   onBuiltin: RefObject<((id: string) => void) | undefined>;
   onFiles: RefObject<((files: File[]) => void) | undefined>;
   onEscape: RefObject<(() => void) | undefined>;
@@ -119,7 +136,7 @@ const AttachmentMention = Mention.extend({
   addNodeView() {
     return ReactNodeViewRenderer(AttachmentChipView);
   },
-  /** 正文里的位置标记由 `docToPayload` 生成，序列化到剪贴板时不再夹带一份 */
+  /** 正文里的位置标记由方言投影生成，序列化到剪贴板时不再夹带一份 */
   renderText: () => "",
 });
 
@@ -144,7 +161,7 @@ const PageElementMention = Mention.extend({
   addNodeView() {
     return ReactNodeViewRenderer(PageElementChipView);
   },
-  /** 正文里的完整摘要由 \`docToPayload\` 生成，序列化到剪贴板时不再夹带一份 */
+  /** 正文里的完整摘要由方言投影生成，序列化到剪贴板时不再夹带一份 */
   renderText: () => "",
 });
 
@@ -228,7 +245,7 @@ const createCommandMention = (callbacks: ComposerCallbacks, enabled: boolean) =>
 
 export const createComposerExtensions = (
   callbacks: ComposerCallbacks,
-  flags: { context: boolean; command: boolean; placeholder: string },
+  flags: { context: boolean; command: boolean; dialect: boolean; placeholder: string },
 ): Extensions => [
   Document,
   Paragraph,
@@ -241,6 +258,14 @@ export const createComposerExtensions = (
   History,
   createContextMention(callbacks, flags.context),
   createCommandMention(callbacks, flags.command),
+  createDialectSuggestion({
+    items: callbacks.dialectItems,
+    suggestionOpen: callbacks.suggestionOpen,
+  }),
+  createDialectMarks({
+    candidates: () => callbacks.dialectCandidates.current,
+    message: (diagnostic) => callbacks.dialectMessage.current?.(diagnostic) ?? "",
+  }),
   AttachmentMention,
   PageElementMention,
   Placeholder.configure({ placeholder: flags.placeholder }),
@@ -258,13 +283,26 @@ const isInsideListItem = (state: EditorState): boolean => {
 /** 编辑器的 DOM 行为：粘贴 / 拖拽入库、Esc、Enter 发送 */
 export const createEditorProps = (callbacks: ComposerCallbacks): EditorProps => ({
   attributes: { class: CONTENT_CLASS },
-  handlePaste: (_view, event) => {
+  handlePaste: (view, event) => {
     const onFiles = callbacks.onFiles.current;
-    if (!onFiles) return false;
-    const files = filesOf(event.clipboardData);
-    if (files.length === 0) return false;
+    const files = onFiles ? filesOf(event.clipboardData) : [];
+    if (onFiles && files.length > 0) {
+      event.preventDefault();
+      onFiles(files);
+      return true;
+    }
+    // 粘进来的文本里若藏着会生效的方言记号，先转义再落进文档：否则一段来路不明的文字
+    // 会悄悄把 `~/.ssh/id_rsa` 读进上下文、或让 `:::command[… ]` 变成一条命令
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (!text || !hasDialectSyntax(text)) return false;
     event.preventDefault();
-    onFiles(files);
+    const schema = view.state.schema;
+    const paragraph = schema.nodes.paragraph;
+    if (!paragraph) return false;
+    const nodes = escapeDialect(text)
+      .split("\n")
+      .map((line) => paragraph.create(null, line.length > 0 ? schema.text(line) : undefined));
+    view.dispatch(view.state.tr.replaceSelection(Slice.maxOpen(Fragment.fromArray(nodes))));
     return true;
   },
   handleDrop: (_view, event) => {

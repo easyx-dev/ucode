@@ -36,6 +36,9 @@ export const attachmentMarker = (index: number, name: string | null): string => 
   return `${ATTACHMENT_MARKER_PREFIX}${index + 1}${ext ? `.${ext}` : ""}`;
 };
 
+/** 正文里的引用标记：`@路径`（行范围只进 `contexts`，正文里不带） */
+export const contextMarker = (path: string): string => `@${path}`;
+
 /** 正则字面量转义：前缀里的 `[` 不转义会被当成字符集开头 */
 const escapeRegExp = (value: string): string => value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

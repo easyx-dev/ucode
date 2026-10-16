@@ -12,6 +12,7 @@
  * 编辑态复用输入区的编辑器（见 `message-edit-form`），改写后重发，旧分支留在会话文件里。
  */
 
+import { contextMarker, parseEntryText, userMessageText } from "@ucode/markdown";
 import { cn } from "cn";
 import { Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -25,11 +26,6 @@ import { clockLabel } from "../../../utils/time";
 import { AttachmentToken } from "../../attachment/attachment-token";
 import { openImagePreview } from "../../attachment/image-preview-dialog";
 import { useAttachmentUrl } from "../../attachment/use-attachment-url";
-import {
-  contextMarker,
-  parseUserMessage,
-  userMessageText,
-} from "../../composer/document/message-chips";
 import { MessageEditForm } from "./message-edit-form";
 import { ForkAction } from "./message-footer";
 
@@ -135,21 +131,15 @@ export function UserMessage({
   const canEdit = Boolean(onEdit) && !item.live;
 
   const raw = blocks.map((block) => (block.type === "text" ? block.text : "")).join("");
-  const parsed = parseUserMessage(raw);
+  const parsed = parseEntryText(raw);
   // 编辑回填与复制都要「用户当初写的那句」，而不是注入进去的模板正文
   const original = userMessageText(parsed);
   /**
-   * 命令被服务端整条换成了模板正文，用户写的东西只剩参数，因此把参数当正文显示；
-   * 其余消息正文就是各类标记切分后的分段（只有附件的消息分段非空、正文为空）。
+   * 气泡正文就是用户写的那句话：命令的参数、技能块之后的文本与普通消息一样，都在 `segments`
+   * （命令名与技能正文已由 chip 与块承载，不进正文）。
    */
-  const args = parsed.command?.args ?? "";
-  const segments =
-    parsed.segments.length > 0
-      ? parsed.segments
-      : args.length > 0
-        ? [{ type: "text" as const, text: args }]
-        : [];
-  const hasChips = Boolean(parsed.skill) || Boolean(parsed.command);
+  const segments = parsed.segments;
+  const hasChips = parsed.skills.length > 0 || Boolean(parsed.command);
 
   /** 图片块按出现顺序：正文里的 `图片 N` 就是这个次序里的第 N 张 */
   const imageBlocks = blocks.filter(
@@ -202,12 +192,13 @@ export function UserMessage({
     <div className="group ml-auto flex w-fit max-w-[85%] flex-col items-end gap-1">
       {hasChips ? (
         <div className="flex flex-wrap justify-end gap-1.5">
-          {parsed.skill ? (
-            <span className={CHIP_CLASS} title={t("技能")}>
+          {parsed.skills.map((skill, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 技能按注入顺序排列，同一个技能可以出现两次
+            <span key={`${skill.name}-${index}`} className={CHIP_CLASS} title={t("技能")}>
               <Sparkles className="size-icon-xs shrink-0" />
-              {parsed.skill.name}
+              {skill.name}
             </span>
-          ) : null}
+          ))}
           {parsed.command ? <span className={CHIP_CLASS}>{`/${parsed.command.name}`}</span> : null}
         </div>
       ) : null}
