@@ -72,14 +72,23 @@ export type PermissionVerdict = {
   rule?: PermissionRule;
 };
 
+/**
+ * 分隔符归一：规则串是 posix 口径（越界授权由 `externalScope` 生成、技能目录规则走 `toPosixPath`），
+ * 而越界检查的匹配对象是平台原生路径——Windows 上 `D:/app/**` 永远匹配不上 `D:\app\x`，
+ * 于是「本会话不再询问」过后仍反复弹审批。两侧归一后同一份规则在哪个平台都命中。
+ */
+const normalizeSeparators = (value: string): string => value.replaceAll("\\", "/");
+
 /** pattern 编译成正则：仅 `*` 是通配符，其余字符按字面量处理 */
 const toRegExp = (pattern: string): RegExp => {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  const escaped = normalizeSeparators(pattern)
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
   return new RegExp(`^${escaped}$`);
 };
 
 export const matchPattern = (pattern: string, subject: string): boolean =>
-  pattern === "*" || toRegExp(pattern).test(subject);
+  pattern === "*" || toRegExp(pattern).test(normalizeSeparators(subject));
 
 /** 规则是否命中：文本按 glob 匹配，`when` 按判定上下文匹配 */
 const matchesRule = (rule: PermissionRule, request: PermissionRequest): boolean => {
@@ -161,12 +170,14 @@ export const isExternal = (cwd: string, absolutePath: string): boolean => {
 
 /**
  * 越界授权的范围：取目标所在目录，整目录通配（与 opencode 对 `external_directory`
- * 按目录授权一致）。目标本身是根目录时退回自身，避免 `/**` 变成全盘放行。
+ * 按目录授权一致）。目标本身就在根目录（`/tmp`）或盘符根（`D:/x.txt` 的 dirname 是 `D:`）时退回自身，
+ * 否则 `/**` 会变成全盘放行。
  */
 export const externalScope = (absolutePath: string): string => {
   const path = toPosixPath(absolutePath);
   const dir = posix.dirname(path);
-  return dir === "/" || dir === "." ? `${path}/**` : `${dir}/**`;
+  const isRootDir = dir === "/" || dir === "." || /^[A-Za-z]:$/.test(dir);
+  return isRootDir ? `${path}/**` : `${dir}/**`;
 };
 
 const SEVERITY = { allow: 0, ask: 1, deny: 2 } as const;

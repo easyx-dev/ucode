@@ -40,6 +40,14 @@ describe("matchPattern", () => {
     assert.equal(matchPattern("a+b", "a+b"), true);
     assert.equal(matchPattern("a+b", "aab"), false);
   });
+
+  it("两侧都做分隔符归一：posix 规则能命中 Windows 形态的路径", () => {
+    assert.equal(matchPattern("D:/app/**", "D:\\app\\plm\\dbinfo.log"), true);
+    // 规则写成 Windows 写法也一样
+    assert.equal(matchPattern("D:\\app\\**", "D:/app/sub/y.txt"), true);
+    // 不误伤兄弟目录
+    assert.equal(matchPattern("D:/app/**", "D:/app2/x"), false);
+  });
 });
 
 describe("decidePermission", () => {
@@ -228,5 +236,31 @@ describe("externalScope", () => {
 
   it("目标本身在根目录时退回自身，避免 / ** 全盘放行", () => {
     assert.equal(externalScope("/tmp"), "/tmp/**");
+  });
+
+  it("盘符根也退回自身，不把整个盘授权出去", () => {
+    // Windows 上传进来的路径已由 `toPosixPath` 转成 `D:/…`，这里直接按那个形态喂
+    assert.equal(externalScope("D:/x.txt"), "D:/x.txt/**");
+    assert.equal(externalScope("D:/app/plm/dbinfo.log"), "D:/app/plm/**");
+  });
+});
+
+describe("越界授权覆盖子路径", () => {
+  it("先批准的宽规则命中子路径，同一会话不再重复询问", () => {
+    // 越界检查传的就是平台原生路径（engine 里那条 external_directory 判定），跨平台只能这样喂
+    const rules: PermissionRule[] = [
+      ...DEFAULT_PERMISSION_RULES,
+      { tool: "external_directory", pattern: "D:/app/**", action: "allow" },
+    ];
+    assert.equal(
+      evaluateRules(rules, { tool: "external_directory", subject: "D:\\app\\plm\\dbinfo.log" })
+        .action,
+      "allow",
+    );
+    // 没被授权的兄弟目录仍是默认的审批
+    assert.equal(
+      evaluateRules(rules, { tool: "external_directory", subject: "D:\\other\\a.log" }).action,
+      "ask",
+    );
   });
 });
