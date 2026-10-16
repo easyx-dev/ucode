@@ -28,6 +28,7 @@ import { projectOf } from "../../business/composer/project/project";
 import { useComposerDrafts } from "../../business/composer/use-composer-drafts";
 import { DialogHost } from "../../business/dialog/dialog-host";
 import { useSessionNotices } from "../../business/notify/use-session-notices";
+import { useWindowTitle } from "../../business/notify/use-window-title";
 import { SessionSidebar } from "../../business/session/session-sidebar";
 import { SettingsPanel } from "../../business/settings/settings-panel";
 import { CommandPalette } from "../../business/shell/command-palette";
@@ -125,6 +126,8 @@ export function WorkspaceLayout({
   const sessionUsage = useSessionUsage(activeId);
   // 唯一通知触发点：web 与桌面端都在这里判定，点开通知即切到那条会话
   useSessionNotices({ onSelectSession: setActiveId });
+  // 同一份状态也写进窗口标题：切到别的标签页也能看出「有人在等你」
+  useWindowTitle();
   // 唯一通知触发点之外的连接校准：后台错过的收尾帧靠定时器看门狗收敛不了（见 useConnectionResync）
   const hasActiveRun =
     chat.streaming || chat.compacting || sessions.sessions.some((session) => session.running);

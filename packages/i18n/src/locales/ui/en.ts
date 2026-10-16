@@ -834,6 +834,10 @@ export default {
   等待计划确认: "Waiting for plan review",
   会话已完成: "Session finished",
   会话出错: "Session failed",
+  // 窗口标题里的短状态词（内容与上面同源，但要塞进标签页，所以另给一份短的）
+  待审批: "Pending approval",
+  待回答: "Waiting for your answer",
+  待确认: "Plan to review",
   允许通知: "Allow notifications",
   "浏览器还没有允许通知，点「允许通知」授权后才会送达。":
     "The browser hasn't granted notification permission yet — use “Allow notifications” to grant it.",
