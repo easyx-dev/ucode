@@ -144,6 +144,7 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       engine.buffer = [];
       engine.hydrating = false;
       engine.hydrated = true;
+      engine.snapshotSeq = snapshot.seq;
       for (const frame of buffered) {
         if (frame.seq <= snapshot.seq) continue;
         applyFrame(engine, frame);
@@ -184,6 +185,11 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       engine.buffer.push(frame);
       return;
     }
+    // 快照已经覆盖的帧：SSE 与 `messages/list` 走的是不同连接，**送达顺序不保证**——发布在快照
+    // 读取之前的帧可能晚于快照响应到达，那时已经出了上面这层缓冲，再按序号拦一次。
+    // 漏掉这一步的后果不只是白跑一遍归并：同一 entry 会被 `mergeMessage` 追加成第二条（界面上
+    // 同一条消息出现两次），迟到的 `agent_settled` 还会把新起的一轮误判为已结束
+    if (frame.seq <= engine.snapshotSeq) return;
     applyFrame(engine, frame);
   };
 

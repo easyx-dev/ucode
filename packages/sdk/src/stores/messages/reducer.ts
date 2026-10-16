@@ -145,9 +145,22 @@ export const updateToolItem = (items: ChatItem[], data: Record<string, unknown>)
  * 权威消息：优先按 toolCallId 精确替换（pi 默认并发执行工具，按「最后一个」会错位）。
  * 被替掉的乐观条目可能带时间 / 报错等实时字段，但只继承 `uid`：界面的行 key 靠它保持稳定，
  * 其余字段一律以服务端消息为准。
+ *
+ * 同一条消息到两遍时按条目 id 就地替换（如同一次工具调用的重复 `tool_start`，见 `reduceEvent`）：
+ * 帧重复送达，或快照已含它而帧后到时，下面按「最后一条 live」找落点的分支会落空，
+ * 于是同一条消息被追加成两条——界面上就是一条消息出现两次。
  */
 export const mergeMessage = (items: ChatItem[], message: MessageDTO): ChatItem[] => {
   const { role } = message;
+
+  const duplicate = items.findIndex((item) => item.id === message.id);
+  if (duplicate >= 0) {
+    return replaceAt(items, duplicate, {
+      ...message,
+      live: false,
+      uid: items[duplicate]?.uid ?? message.id,
+    });
+  }
 
   if (role === "tool" && message.toolCallId) {
     const exact = items.findIndex((item) => item.id === `live-tool-${message.toolCallId}`);

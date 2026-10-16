@@ -5,7 +5,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { BackgroundService, MessageListResponse, ServerEventPayload } from "@ucode/contracts";
+import type {
+  BackgroundService,
+  MessageDTO,
+  MessageListResponse,
+  ServerEventPayload,
+} from "@ucode/contracts";
 import type { Apis } from "../../../apis";
 import type { EventStream } from "../../../events";
 import type { PromptPayload } from "../../../types";
@@ -22,10 +27,14 @@ const serviceOf = (port: number): BackgroundService => ({
   updatedAt: "2024-01-01T00:00:00.000Z",
 });
 
-const frameOf = (type: string, data: unknown): ServerEventPayload =>
-  ({ type, sessionId: "s1", seq: 1, data }) as ServerEventPayload;
+const frameOf = (type: string, data: unknown, seq = 1): ServerEventPayload =>
+  ({ type, sessionId: "s1", seq, data }) as ServerEventPayload;
 
-const snapshotOf = (services: BackgroundService[]): MessageListResponse => ({
+const userMessageOf = (id: string): MessageDTO =>
+  ({ id, role: "user", blocks: [{ type: "text", text: "看图" }] }) as MessageDTO;
+
+/** 快照序号：缺省 0 表示服务端到这时候一帧还没发过（下面的帧都用更大的序号） */
+const snapshotOf = (services: BackgroundService[], seq = 0): MessageListResponse => ({
   sessionId: "s1",
   messages: [],
   persisted: false,
@@ -33,7 +42,7 @@ const snapshotOf = (services: BackgroundService[]): MessageListResponse => ({
   running: false,
   subagents: [],
   services,
-  seq: 1,
+  seq,
 });
 
 const tick = (): Promise<void> =>
@@ -142,6 +151,44 @@ describe("会话流 · 后台服务清单", () => {
         .services.map((service) => service.port),
       [4000],
     );
+  });
+});
+
+/**
+ * 快照与实时帧的接续边界。`messages/list` 与 SSE 走的是不同连接，**送达顺序不保证**：
+ * 发布在快照读取之前的帧完全可能晚于快照响应到达，那时已经出了 hydrate 期间那层缓冲。
+ */
+describe("会话流 · 快照边界", () => {
+  it("快照已覆盖的帧后到时不再应用", async () => {
+    const message = userMessageOf("entry-1");
+    const { store, emit } = createHarness({ ...snapshotOf([]), messages: [message], seq: 4 }, []);
+    store.activate("s1");
+    await tick();
+
+    // 同一条消息的 message_end 与快照同序号：内容已经在快照里，应用它只会多出一条
+    emit(frameOf("message_end", message, 4));
+    assert.equal(store.get("s1").getState().items.length, 1);
+  });
+
+  it("快照之后的帧照常应用", async () => {
+    const { store, emit } = createHarness({ ...snapshotOf([]), seq: 4 }, []);
+    store.activate("s1");
+    await tick();
+
+    emit(frameOf("step_start", {}, 5));
+
+    assert.equal(store.get("s1").getState().running, true);
+  });
+
+  it("快照之后新起的一轮不被迟到的收尾帧误判为已结束", async () => {
+    const { store, emit } = createHarness({ ...snapshotOf([]), running: true, seq: 4 }, []);
+    store.activate("s1");
+    await tick();
+
+    // 与快照同序号的 agent_settled 是快照已经反映过的收尾：应用它会把新起的一轮收掉
+    emit(frameOf("agent_settled", {}, 4));
+
+    assert.equal(store.get("s1").getState().running, true);
   });
 });
 

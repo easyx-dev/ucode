@@ -72,6 +72,11 @@ export type Engine = {
   childToolCalls: Map<string, string>;
   /** 是否已取过快照；新建会话为「已知空历史」，避免切换时再拉一次 */
   hydrated: boolean;
+  /**
+   * 已应用的那份快照的序号。它之前的帧在服务端已经落进那份快照里，
+   * 但这些帧的**送达**可能晚于快照响应（见 `routeFrame` 的用法）。新建会话还没取过快照时为 0。
+   */
+  snapshotSeq: number;
   /** 当前 assistant 消息的思考计时，用于测算思考耗时；不落盘 */
   stream: StreamTiming | null;
 };
@@ -102,6 +107,7 @@ export const createEngine = (): Engine => ({
   buffer: [],
   childToolCalls: new Map(),
   hydrated: false,
+  snapshotSeq: 0,
   stream: null,
 });
 
