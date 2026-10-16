@@ -2,8 +2,8 @@
  * 消息编辑器（Tiptap）：只装结构节点与三个 mention，无任何排版 marks；输入区与消息编辑态共用。
  *
  * - `@`：`contextMention`（任意位置），发送时落成正文里的 `@路径` 标记并收进 `contexts[]`
- * - `/`：`commandMention`（仅文档开头），序列化为 `/name` 或 `/skill:name`；内置动作为空节点、立即执行。
- *   不传 `commandItems` 时整个菜单停用（消息编辑态：命令节点只读，不能再造一个）
+ * - `/`（中文输入法下也认 `、`）：`commandMention`（仅文档开头），序列化为 `/name` 或 `/skill:name`；
+ *   内置动作为空节点、立即执行。不传 `commandItems` 时整个菜单停用（消息编辑态：命令节点只读，不能再造一个）
  * - 附件：`attachmentMention` 原子节点，图片按缩略图预览、其余只显示文件名；正文里的位置标记由它生成
  * - 历史：`@tiptap/pm/history` 的插件包一层，`⌘Z` 撤销、`⌘⇧Z` 与 `⌘Y` 前进
  *

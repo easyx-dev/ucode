@@ -31,6 +31,7 @@ import type { RefObject } from "react";
 
 import { isTouchInput } from "../../../utils/platform";
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
+import { findCommandMatch } from "./command-trigger";
 import { createDialectMarks } from "./dialect-marks";
 import { createDialectSuggestion } from "./dialect-suggestion";
 import { composerKeyIntentOf } from "./key-intent";
@@ -204,7 +205,8 @@ const createContextMention = (callbacks: ComposerCallbacks, enabled: boolean) =>
   });
 
 /**
- * `/`：仅文档开头（`range.from === 1`），候选是内置动作 + 命令 + 技能；`enabled` 为假则整个菜单停用
+ * `/`：仅文档开头（`range.from === 1`），候选是内置动作 + 命令 + 技能；`enabled` 为假则整个菜单停用。
+ * 触发符除 `/` 外也认中文输入法下的 `、`（见 `./command-trigger`）；选中后落进正文的都是 `/name`。
  */
 const createCommandMention = (callbacks: ComposerCallbacks, enabled: boolean) =>
   CommandMention.configure({
@@ -213,6 +215,8 @@ const createCommandMention = (callbacks: ComposerCallbacks, enabled: boolean) =>
       node.attrs.kind === "skill" ? `/skill:${node.attrs.name}` : `/${node.attrs.name}`,
     suggestion: {
       char: "/",
+      // `char` 只收单个字符，多触发符靠覆盖匹配实现（`findCommandMatch` 内部仍用它逐个触发符试）
+      findSuggestionMatch: findCommandMatch,
       allow: ({ range }) => enabled && range.from === 1,
       items: ({ query }) => callbacks.commandItems.current?.(query) ?? [],
       render: createSuggestionRenderer((active) => {
