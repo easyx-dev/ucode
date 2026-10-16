@@ -129,7 +129,7 @@ export class GoalService {
         event: "completed",
         verdict: { achieved: true, reason: summary, nextStep: "" },
         tokensUsed,
-        ...this.turnMetrics(state, live, tokensUsed, now),
+        ...this.turnMetrics(state, record, live, tokensUsed, now),
       },
     );
     // 目标完成会在对话里留一条线，界面得重取快照才看得见
@@ -149,7 +149,7 @@ export class GoalService {
       cause: "blocked",
       tokensUsed,
       ...(text ? { verdict: { achieved: false, reason: text, nextStep: "" } } : {}),
-      ...this.turnMetrics(state, live, tokensUsed, now),
+      ...this.turnMetrics(state, record, live, tokensUsed, now),
     });
   }
 
@@ -235,7 +235,7 @@ export class GoalService {
           event: "completed",
           verdict: { achieved: true, reason: verdict.reason, nextStep: verdict.nextStep },
           tokensUsed,
-          ...this.turnMetrics(current, session, tokensUsed, now),
+          ...this.turnMetrics(current, record, session, tokensUsed, now),
         });
         // 目标完成会在对话里留一条线，界面得重取快照才看得见
         if (view) this.events.emitFrame(sessionId, "transcript_reset", { fromEntryId: "" });
@@ -244,8 +244,11 @@ export class GoalService {
 
       // 未达成（解析失败同样按未达成）：先更新无进展计数与校验结果
       const activity = lastAssistantActivity(session.messages);
+      // 工具调用数取自步级记录：原先看末条 assistant 的 `toolCalls`，它恒为 0，
+      // 于是「连续 3 轮无工具调用暂停」实际退化成「正文原样重复才暂停」
+      const turnToolCalls = this.turnToolCallsOf(current, record, session);
       const noProgress =
-        activity.toolCalls > 0
+        (turnToolCalls ?? 0) > 0
           ? 0
           : activity.text.length === 0 || activity.text === current.lastText
             ? current.noProgress + 1
@@ -273,7 +276,7 @@ export class GoalService {
           nextStep: next.verification?.nextStep ?? "",
         },
         tokensUsed,
-        ...this.turnMetrics(current, session, tokensUsed, now),
+        ...this.turnMetrics(current, record, session, tokensUsed, now, turnToolCalls),
       });
       if (next.tokenBudget !== null && tokensUsed >= next.tokenBudget) {
         this.persist(record, pauseGoal(next, "budget", now), session, {
@@ -381,20 +384,40 @@ export class GoalService {
   }
 
   /**
-   * 本轮的规模与耗时：用量增量按轮起点差算，工具调用数取最后一条 assistant 的调用数。
-   * 耗时只在两个时间点都能解析时给——存量目标的 `turnStartedAt` 是空串。
+   * 本轮（目标的 `turnStartedAt` 起）的工具调用次数。
+   * 轮起点不可解析时给 undefined——存量目标没有这个字段，那时无从划窗口。
+   */
+  private turnToolCallsOf(
+    state: GoalState,
+    record: SessionRecord,
+    live: AgentSession | undefined,
+  ): number | undefined {
+    const startedMs = Date.parse(state.turnStartedAt);
+    if (!Number.isFinite(startedMs)) return undefined;
+    return this.usage.toolCallsOf(record, { ...(live ? { live } : {}), sinceMs: startedMs });
+  }
+
+  /**
+   * 本轮的规模与耗时：用量增量按轮起点差算，工具调用数取同一窗口内的步级记录之和。
+   * 工具的计数不能取「最后一条 assistant 消息」——轮已落定就说明那条消息没有待执行工具，恒为 0。
+   * 两个轮次指标只在轮起点可解析时给：存量目标的 `turnStartedAt` 是空串。
+   *
+   * `turnToolCalls` 可由调用方先算好传进来：无进展判定也要用同一个值，传进来就不必把
+   * 步级记录在一轮里解析两遍。
    */
   private turnMetrics(
     state: GoalState,
+    record: SessionRecord,
     live: AgentSession | undefined,
     tokensUsed: number,
     now: string,
+    turnToolCalls = this.turnToolCallsOf(state, record, live),
   ): Pick<GoalRecord, "turnTokens" | "turnToolCalls" | "turnMs"> {
     const startedMs = Date.parse(state.turnStartedAt);
     const nowMs = Date.parse(now);
     return {
       turnTokens: Math.max(0, tokensUsed - state.tokensAtTurnStart),
-      turnToolCalls: live ? lastAssistantActivity(live.messages).toolCalls : 0,
+      ...(turnToolCalls === undefined ? {} : { turnToolCalls }),
       ...(Number.isFinite(startedMs) && Number.isFinite(nowMs) && nowMs >= startedMs
         ? { turnMs: nowMs - startedMs }
         : {}),

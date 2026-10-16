@@ -264,10 +264,14 @@ describe("GoalService 落定处理", () => {
 
     // 校验调用的用量条目：记下来供断言，并计入总量（服务端就是这么算的）
     const usages: Array<{ kind: string; provider: string; model: string; note?: string }> = [];
+    /** 一轮里的工具调用数：真实链路里步级记录（`STEP_RECORD_CUSTOM_TYPE`）就是这么累计的 */
+    const toolCallsIn = (messages: readonly SessionMessage[]): number =>
+      messages.reduce((sum, message) => sum + lastAssistantActivity([message]).toolCalls, 0);
     const usage = {
       usageOf: () => ({
         totalTokens: (options.tokensUsed ?? 0) + usages.length * VERIFY_TOKENS,
       }),
+      toolCallsOf: () => toolCallsIn(options.messages ?? []),
     } as unknown as UsageService;
     const events = new SessionEventBus();
     const frames: Array<unknown> = [];
@@ -376,6 +380,26 @@ describe("GoalService 落定处理", () => {
     assert.equal(state()?.status, "active");
     assert.equal(state()?.turns, 1);
     assert.equal(state()?.noProgress, 0);
+  });
+
+  it("本轮的工具调用数取自步级记录并写进目标记录", async () => {
+    const running = makeService({
+      state: startGoal("目标", null),
+      messages: asMessages([toolMessage(), toolMessage(), toolMessage()]),
+    });
+    await running.service.onSettled("s1", running.session);
+    assert.equal(running.entries[0]?.data.event, "verdict");
+    assert.equal(running.entries[0]?.data.turnToolCalls, 3);
+  });
+
+  it("存量目标没有轮起点时省略本轮指标，不当成 0", async () => {
+    const running = makeService({
+      state: { ...startGoal("目标", null), turnStartedAt: "" },
+      messages: asMessages([toolMessage(), toolMessage()]),
+    });
+    await running.service.onSettled("s1", running.session);
+    assert.equal(running.entries[0]?.data.turnToolCalls, undefined);
+    assert.equal(running.entries[0]?.data.turnMs, undefined);
   });
 
   it("连续三轮无工具调用触发无进展暂停", async () => {

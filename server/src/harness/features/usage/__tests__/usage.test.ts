@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { STEP_RECORD_CUSTOM_TYPE } from "@ucode/contracts";
 
 import type { SessionRecord, SessionRepository } from "../../../../db/session-repository";
 import { collectUsage, UsageService } from "..";
@@ -519,5 +520,54 @@ describe("UsageService", () => {
       chat.cleanup();
       old.cleanup();
     }
+  });
+});
+
+describe("UsageService.toolCallsOf", () => {
+  let dir: string;
+  let record: SessionRecord;
+
+  before(() => {
+    dir = mkdtempSync(join(tmpdir(), "session-tool-calls-"));
+    const manager = SessionManager.create("/tmp/usage-project", dir, { id: "s2" });
+    // pi 只在有助手回复时才真正落盘，先造一条消息
+    manager.appendMessage({
+      role: "assistant",
+      provider: "p",
+      model: "m",
+      usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+      content: [{ type: "text", text: "hi" }],
+      api: "x",
+      stopReason: "stop",
+      timestamp: 500,
+    } as unknown as Parameters<typeof manager.appendMessage>[0]);
+    // 两条步级记录：一条在窗口之前、一条在窗口之内
+    for (const [at, toolCalls] of [
+      [1000, 2],
+      [3000, 3],
+    ] as const) {
+      manager.appendCustomEntry(STEP_RECORD_CUSTOM_TYPE, {
+        startedAt: at - 500,
+        endedAt: at,
+        userTurn: 1,
+        toolCalls,
+      });
+    }
+    const sourcePath = manager.getSessionFile();
+    assert.ok(sourcePath, "会话应已落盘");
+    record = { id: "s2", sourcePath, model: null } as unknown as SessionRecord;
+  });
+
+  after(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("给窗口就只数窗口内的步，不给就是全程", () => {
+    const service = new UsageService(
+      { list: () => [record] } as unknown as SessionRepository,
+      () => null,
+    );
+    assert.equal(service.toolCallsOf(record, { sinceMs: 2000 }), 3);
+    assert.equal(service.toolCallsOf(record), 5);
   });
 });

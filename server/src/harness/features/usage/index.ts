@@ -98,6 +98,26 @@ export class UsageService {
   }
 
   /**
+   * 某个时间点之后的工具调用次数；目标轮的「本轮工具调用数」用它。
+   *
+   * 步级记录（`STEP_RECORD_CUSTOM_TYPE`）是唯一带工具调用数的来源：它按模型往返各记一次。
+   * 传 `sinceMs` 即从一轮的起点（目标的 `turnStartedAt`）往后数；不传就是全程。
+   */
+  toolCallsOf(
+    record: SessionRecord,
+    options: { live?: AgentSession | undefined; sinceMs?: number } = {},
+  ): number {
+    const steps = options.live
+      ? collectSteps(options.live.sessionManager.getEntries())
+      : (this.cachedOf(record)?.steps ?? []);
+    const sinceMs = options.sinceMs;
+    return steps.reduce(
+      (sum, step) => (sinceMs === undefined || step.at >= sinceMs ? sum + step.toolCalls : sum),
+      0,
+    );
+  }
+
+  /**
    * 单会话当前上下文占用；没有任何可信口径、或模型窗口不可知时返回 null。
    *
    * 池内会话直接问 pi（内存里已有投影，不必重解析文件）；离线会话按文件 mtime 缓存读基准。
