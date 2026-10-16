@@ -5,6 +5,7 @@
 import { cn } from "cn";
 import type { TFunction } from "i18next";
 import {
+  AppWindow,
   Bot,
   CheckCircle2,
   ChevronRight,
@@ -38,6 +39,7 @@ const KIND_ICON: Record<ToolKind, LucideIcon> = {
   list: FolderTree,
   network: Globe,
   agent: Bot,
+  browser: AppWindow,
   other: Wrench,
 };
 
@@ -73,8 +75,19 @@ export const toolTitleOf = (name: string, t: TFunction): string => {
     case "remember":
     case "forget":
       return t("记忆");
+    case "browser_open":
+      return t("打开页面");
+    case "browser_snapshot":
+      return t("页面快照");
+    case "browser_act":
+      return t("页面操作");
+    case "browser_screenshot":
+      return t("截图");
+    case "browser_close":
+      return t("关闭浏览器");
     default:
-      return t("工具");
+      // 没登记的（MCP 工具等）直接显示工具名：总比一律「工具」让人看不出调了什么
+      return name;
   }
 };
 
@@ -114,6 +127,7 @@ function PathLabel({ path, range }: { path: string; range?: string }) {
 }
 
 export function InputLabel({ input }: { input: ToolInput }) {
+  const { t } = useTranslation();
   switch (input.type) {
     case "path":
       return <PathLabel path={input.path} range={input.range} />;
@@ -149,6 +163,29 @@ export function InputLabel({ input }: { input: ToolInput }) {
       return (
         <span className="truncate font-mono text-xs text-foreground-subtlest" title={input.query}>
           {input.query}
+        </span>
+      );
+    case "action":
+      return (
+        <>
+          <span className="shrink-0 font-mono text-xs text-foreground-subtlest">
+            {input.action}
+          </span>
+          {input.target ? (
+            <span
+              className="truncate font-mono text-xs text-foreground-subtle"
+              title={input.target}
+            >
+              {input.target}
+            </span>
+          ) : null}
+        </>
+      );
+    case "screenshot":
+      return (
+        <span className="truncate font-mono text-xs text-foreground-subtlest">
+          {/* 默认只截视口（`fullPage` 缺省为 false）：没给 ref 也没要整页时不能写成「整页」 */}
+          {input.ref ?? (input.fullPage ? t("整页") : t("视口"))}
         </span>
       );
     default:

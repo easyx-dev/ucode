@@ -14,6 +14,7 @@ export type ToolKind =
   | "list"
   | "network"
   | "agent"
+  | "browser"
   | "other";
 
 const KIND_BY_NAME: Record<string, ToolKind> = {
@@ -28,6 +29,11 @@ const KIND_BY_NAME: Record<string, ToolKind> = {
   webfetch: "network",
   websearch: "network",
   subagent: "agent",
+  browser_open: "browser",
+  browser_snapshot: "browser",
+  browser_act: "browser",
+  browser_screenshot: "browser",
+  browser_close: "browser",
 };
 
 export const toolKindOf = (name: string): ToolKind => KIND_BY_NAME[name] ?? "other";
@@ -64,7 +70,15 @@ export type ToolInput =
   | { type: "pattern"; pattern: string; scope?: string }
   | { type: "url"; url: string }
   | { type: "query"; query: string }
+  /** `browser_act`：动作名 + 作用对象（元素编号 / 按键 / 滚动方向） */
+  | { type: "action"; action: string; target?: string }
+  /** `browser_screenshot`：整页或某个元素 */
+  | { type: "screenshot"; fullPage: boolean; ref?: string }
   | { type: "none" };
+
+/** `browser_act` 的作用对象：优先元素编号，其次按键，最后滚动方向 */
+const actTarget = (record: Record<string, unknown>): string | undefined =>
+  str(record.ref) ?? str(record.key) ?? str(record.direction);
 
 export const toolInputOf = (name: string, args: unknown): ToolInput => {
   const record = asRecord(args);
@@ -100,6 +114,28 @@ export const toolInputOf = (name: string, args: unknown): ToolInput => {
       const query = str(record.query);
       return query ? { type: "query", query } : { type: "none" };
     }
+    case "browser_open": {
+      const url = str(record.url);
+      return url ? { type: "url", url } : { type: "none" };
+    }
+    case "browser_act": {
+      const action = str(record.action);
+      if (!action) return { type: "none" };
+      const target = actTarget(record);
+      return target ? { type: "action", action, target } : { type: "action", action };
+    }
+    case "browser_screenshot": {
+      const ref = str(record.ref);
+      return {
+        type: "screenshot",
+        fullPage: record.fullPage === true,
+        ...(ref ? { ref } : {}),
+      };
+    }
+    // 快照与关闭没有可展示的入参（snapshot 的 headless / profile 不解释调用形态）
+    case "browser_snapshot":
+    case "browser_close":
+      return { type: "none" };
     default:
       return { type: "none" };
   }
