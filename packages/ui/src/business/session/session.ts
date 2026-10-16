@@ -3,9 +3,15 @@ import type { SessionSummary } from "@ucode/contracts";
 import type { TFunction } from "i18next";
 import { confirm } from "../dialog/queue";
 
-/** 会话标题：优先用户命名，其次首条消息，最后兜底（注意用 || 而不是 ??，空串要落到兜底） */
+/**
+ * 会话标题：用户命名优先，其余一律用调用方给的兜底（主会话「新会话」、子会话「子会话」）。
+ *
+ * 不回落首条用户消息：标题生成失败时那句话只是提问的一部分，当名字既不像名字、
+ * 又会让一屏会话看起来重名（它仍留在 `preview` 里供命令面板搜索）。
+ * 注意用 `||` 而不是 `??`，空串也要落到兜底。
+ */
 export const sessionTitle = (session: SessionSummary, fallback: string): string =>
-  session.name || session.preview.split("\n")[0]?.slice(0, 40) || fallback;
+  session.name || fallback;
 
 /**
  * 未读判定：距上次打开（标记已读）之后又有更新即未读。

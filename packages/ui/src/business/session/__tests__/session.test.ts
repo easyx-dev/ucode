@@ -58,10 +58,12 @@ afterEach(() => {
 });
 
 describe("会话标题", () => {
-  it("优先命名，其次首条消息，最后兜底", () => {
+  it("命名优先，未命名一律兜底", () => {
     assert.equal(sessionTitle(sessionOf({ name: "起过名字" }), "新会话"), "起过名字");
-    assert.equal(sessionTitle(sessionOf({ preview: "先问一句\n再说" }), "新会话"), "先问一句");
     assert.equal(sessionTitle(sessionOf(), "新会话"), "新会话");
+    // 首条用户消息不再当标题：它留在 preview 里供命令面板搜索
+    assert.equal(sessionTitle(sessionOf({ preview: "先问一句\n再说" }), "新会话"), "新会话");
+    assert.equal(sessionTitle(sessionOf({ name: "" }), "子会话"), "子会话");
   });
 
   it("未读：没读过即未读，生成中不算", () => {

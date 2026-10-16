@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ServerEvent } from "@ucode/contracts";
-
+import { TITLE_MAX_ATTEMPTS } from "../../../../constants/title";
 import type { SessionEventBus } from "../../../../core/event-bus";
 import type { SessionRecord, SessionRepository } from "../../../../db/session-repository";
 import { TitleService } from "..";
@@ -41,7 +41,7 @@ const makeSession = (
     sessionManager: { appendSessionInfo: (title: string) => appended.push(title) },
   }) as unknown as AgentSession;
 
-const setup = (options: { record?: SessionRecord; live: AgentSession }) => {
+const setup = (options: { record?: SessionRecord; live?: AgentSession }) => {
   let record = options.record ?? recordOf();
   const writes: Array<{ id: string; override: unknown }> = [];
   const summaries: string[] = [];
@@ -130,7 +130,7 @@ describe("TitleService.generateForPrompt", () => {
 });
 
 describe("TitleService 落定兜底", () => {
-  it("并行生成失败后用完整交流补一次，之后不再重复", async () => {
+  it("并行生成失败后用完整交流补上，成功之后不再重复", async () => {
     const appended: string[] = [];
     // 投递时首轮还没有消息，这一轮跑完才有交流可概括
     const messages: SessionMessage[] = [];
@@ -174,6 +174,102 @@ describe("TitleService 落定兜底", () => {
     service.generateForPrompt("s1", session, "登录超时了");
     await tick();
     settle("s1");
+    settle("s1");
+    await tick();
+
+    assert.equal(attempt, 1);
+  });
+
+  it("并行那次在落定后才收尾时，紧接着自己补一次", async () => {
+    const appended: string[] = [];
+    const messages: SessionMessage[] = [];
+    let attempt = 0;
+    // 第一次故意不结算：模拟「标题调用比首轮还慢」，落定时它仍在途
+    let release: (() => void) | undefined;
+    const session = makeSession(
+      messages,
+      () => {
+        attempt += 1;
+        if (attempt > 1) return Promise.resolve(answer("修复登录超时"));
+        return new Promise((resolve) => {
+          release = () => resolve(answer(""));
+        });
+      },
+      appended,
+    );
+    const { service, settle } = setup({ live: session });
+
+    service.generateForPrompt("s1", session, "登录超时了");
+    settle("s1");
+    assert.equal(attempt, 1);
+
+    messages.push(user("登录超时了"), assistant("我看下"));
+    release?.();
+    await tick();
+
+    assert.equal(attempt, 2);
+    assert.deepEqual(appended, ["修复登录超时"]);
+  });
+
+  it("一直没产出就补到尝试上限，之后不再调用", async () => {
+    const messages: SessionMessage[] = [];
+    let attempt = 0;
+    const session = makeSession(messages, () => {
+      attempt += 1;
+      return Promise.resolve(answer(""));
+    });
+    const { service, settle } = setup({ live: session });
+
+    service.generateForPrompt("s1", session, "登录超时了");
+    await tick();
+    // 首轮被中断：没有助手正文，料回落到投递时那句
+    messages.push(user("登录超时了"));
+
+    for (let round = 0; round < TITLE_MAX_ATTEMPTS + 1; round += 1) {
+      settle("s1");
+      await tick();
+    }
+
+    assert.equal(attempt, TITLE_MAX_ATTEMPTS);
+  });
+
+  it("超出可命名窗口后不再重试", async () => {
+    const messages: SessionMessage[] = [];
+    let attempt = 0;
+    const session = makeSession(messages, () => {
+      attempt += 1;
+      return Promise.resolve(answer(""));
+    });
+    const { service, settle } = setup({ live: session });
+
+    service.generateForPrompt("s1", session, "登录超时了");
+    await tick();
+
+    // 聊过上限轮数：firstExchange 与投递时那句都不再给料
+    messages.push(user("一"), assistant("回复一"), user("二"), assistant("回复二"), user("三"));
+    settle("s1");
+    await tick();
+    settle("s1");
+    await tick();
+
+    assert.equal(attempt, 1);
+  });
+
+  it("会话已被回收时清掉待补，不再重试", async () => {
+    const messages: SessionMessage[] = [];
+    let attempt = 0;
+    const session = makeSession(messages, () => {
+      attempt += 1;
+      return Promise.resolve(answer(""));
+    });
+    const options: { live?: AgentSession } = { live: session };
+    const { service, settle } = setup(options);
+
+    service.generateForPrompt("s1", session, "登录超时了");
+    await tick();
+    messages.push(user("登录超时了"), assistant("我看下"));
+
+    options.live = undefined;
     settle("s1");
     await tick();
 

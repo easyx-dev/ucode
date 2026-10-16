@@ -32,8 +32,8 @@ export const managerToIndex = (manager: SessionManager): SessionIndex | null => 
   let lastActivity = 0;
 
   for (const entry of entries) {
-    // 合成输入（目标启动 / 续跑、计划批准）也是「用户侧的第一句」：
-    // 目标会话没有普通用户消息，不认它会在侧栏退化成「新会话」
+    // 合成输入（目标启动 / 续跑、计划批准）也是「用户侧的第一句」：目标会话没有普通用户消息，
+    // 不认它，命令面板就搜不到这类会话，列表预览也是空的
     if (entry.type === "custom_message") {
       const time = Date.parse(entry.timestamp);
       if (!Number.isNaN(time)) lastActivity = Math.max(lastActivity, time);

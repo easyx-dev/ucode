@@ -10,10 +10,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "../../base/input";
 import type { SessionSummary } from "../../types";
 import { openDialog } from "../dialog/queue";
-import { sessionTitle } from "./session";
 
 type RenameSessionDialogProps = {
-  /** 待重命名的会话；初始名称由它派生 */
+  /** 待重命名的会话；已有名字时作为初始值 */
   session: SessionSummary;
   /** 提交新名称（已 trim、非空） */
   onSubmit: (name: string) => void;
@@ -23,7 +22,8 @@ type RenameSessionDialogProps = {
 
 export function RenameSessionDialog({ session, onSubmit, onCancel }: RenameSessionDialogProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState(() => sessionTitle(session, t("新会话")));
+  // 未命名的会话不预填首条用户消息：标题本来就不取它，预填一句提问反而与列表显示的名字不一致
+  const [name, setName] = useState(() => session.name ?? "");
 
   const submit = (): void => {
     const trimmed = name.trim();
@@ -45,6 +45,7 @@ export function RenameSessionDialog({ session, onSubmit, onCancel }: RenameSessi
         <Input
           autoFocus
           value={name}
+          placeholder={t("新会话")}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") submit();

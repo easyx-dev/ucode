@@ -2,6 +2,15 @@
 /** 会话标题生成时最多回看的用户轮数；超出即不再尝试（会话已经不是「一件事」） */
 export const TITLE_MAX_USER_TURNS = 2;
 
+/**
+ * 一个会话允许的标题生成次数（含投递时那次并行生成）。
+ *
+ * 模型给出的标题时有不合规的（多行、带「标题：」前缀、把回答当标题），解析不出就换一次料再问；
+ * 但这毕竟是后台动作，每次都是一笔模型调用，且重试都挂在轮末边界上，所以给一个固定上限而不是无限重试。
+ * 会话聊过 `TITLE_MAX_USER_TURNS` 轮之后本来就不可命名，实际上限通常比这个值更早触到。
+ */
+export const TITLE_MAX_ATTEMPTS = 3;
+
 /** 会话标题生成时交流文本的字符上限（单条） */
 export const TITLE_INPUT_MAX_CHARS = 2_000;
 
@@ -17,5 +26,5 @@ export const TITLE_MAX_LENGTH = 24;
  */
 export const TITLE_MAX_TOKENS = 1024;
 
-/** 会话标题调用的超时；超时只记日志，列表继续用派生的标题口径 */
+/** 会话标题调用的超时；超时只记日志，会话仍未命名（界面显示「新会话」），等下一次落定再试 */
 export const TITLE_TIMEOUT_MS = 20_000;

@@ -549,7 +549,7 @@
 | `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
-| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
@@ -609,7 +609,7 @@
 | `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
-| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
@@ -678,7 +678,7 @@
 | `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
-| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
@@ -715,7 +715,7 @@
 | `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
-| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
@@ -2218,7 +2218,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `cwd` | string | 是 | 会话的工作目录：绑定目录的会话是那个目录，未绑定的是分配给它自己的工作区 （`<助理根>/<sessionId>`，见 `health.workspace`）。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
-| `preview` | string | 是 | 首条用户消息，用作列表预览 |
+| `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
 | `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |

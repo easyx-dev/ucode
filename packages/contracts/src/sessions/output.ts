@@ -20,7 +20,7 @@ export type SessionSummary = {
   cwd: string;
   createdAt: string;
   updatedAt: string;
-  /** 首条用户消息，用作列表预览 */
+  /** 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 */
   preview: string;
   /** 生效的 "provider/model" */
   model: string | null;

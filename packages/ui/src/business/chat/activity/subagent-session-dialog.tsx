@@ -29,7 +29,10 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
   // 子会话不在侧栏列表里，摘要经 `sessions/info` 补齐；拿不到摘要说明它已经不可用，直接收起
   const session = useActiveSession(sessionId, onClose);
   const stream = useSessionStream(sessionId);
-  const name = session ? sessionTitle(session, t("子会话")) : t("子会话");
+  // 子会话不会被自动命名（标题服务只管主会话），所以未命名时回落委派任务的首句：
+  // 全部叫「子会话」等于没标题，而任务首句能说清这个子代理在干什么
+  const fallback = session?.preview.split("\n")[0]?.slice(0, 40) || t("子会话");
+  const name = session ? sessionTitle(session, fallback) : t("子会话");
 
   return (
     <Dialog

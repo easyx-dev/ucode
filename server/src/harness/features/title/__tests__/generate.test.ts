@@ -14,6 +14,7 @@ import {
   firstPromptExchange,
   generateSessionTitle,
   isFirstTurn,
+  isTitleWindowOpen,
   parseSessionTitle,
 } from "../generate";
 
@@ -133,6 +134,31 @@ describe("buildTitleMessage", () => {
     const message = buildTitleMessage({ userText: "登录超时了", assistantText: "先看下入口" });
     assert.ok(message.includes("助手的回复：\n先看下入口"));
   });
+
+  it("重试时收尾强调里把格式要求再说一遍", () => {
+    const retried = buildTitleMessage({ userText: "登录超时了" }, true);
+    assert.ok(retried.includes("上一次的输出不符合格式要求"));
+    assert.equal(
+      buildTitleMessage({ userText: "登录超时了" }).includes("上一次的输出不符合格式要求"),
+      false,
+    );
+  });
+});
+
+describe("isTitleWindowOpen", () => {
+  it("用户轮数不超过上限时仍在窗口内", () => {
+    assert.equal(isTitleWindowOpen([]), true);
+    assert.equal(isTitleWindowOpen([user("一"), assistant("回复一")]), true);
+    assert.equal(isTitleWindowOpen([user("一"), user("二"), user("三")]), false);
+  });
+
+  it("没有正文的用户消息（纯附件）不算一轮", () => {
+    const attachment = {
+      role: "user",
+      content: [{ type: "image", data: "..." }],
+    } as unknown as SessionMessage;
+    assert.equal(isTitleWindowOpen([attachment, attachment, attachment]), true);
+  });
 });
 
 describe("generateSessionTitle", () => {
@@ -192,6 +218,25 @@ describe("generateSessionTitle", () => {
     // 思考与正文共享 maxTokens：给少了只会拿到 thinking（实测 48 时正文为空）
     assert.ok((options.maxTokens ?? 0) >= 512, `maxTokens 太小：${options.maxTokens}`);
     assert.equal(options.reasoning, "minimal");
+  });
+
+  it("重试那次把格式强调带进请求消息", async () => {
+    let content = "";
+    const runtime = {
+      completeSimple: async (_model: unknown, context: { messages: { content: string }[] }) => {
+        content = context.messages[0]?.content ?? "";
+        return { role: "assistant", content: [{ type: "text", text: "修复登录超时" }] };
+      },
+    } as unknown as ModelRuntime;
+
+    await generateSessionTitle({
+      runtime,
+      model: {} as never,
+      exchange: { userText: "登录超时了" },
+      retry: true,
+    });
+
+    assert.ok(content.includes("上一次的输出不符合格式要求"));
   });
 
   it("只有 thinking、没有正文时返回 null，不把思考当标题", async () => {
