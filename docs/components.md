@@ -12,7 +12,11 @@
 但**只生成一次**：之后与其它代码一样由我们维护，同等适用本仓库的格式化、命名、颜色 token 与行数规则。
 
 - 新增基础组件用 `npx shadcn@latest add <name>` 生成，生成完即视为项目代码，按本规范整理
-- 生成后要把 `@/` 导入改成包内相对路径，`@/utils` 改成从 `cn` 包导入
+- 本包 tsconfig 没配 `@/*` 的 paths，CLI 会把 aliases 当字面路径，产物落在 `packages/ui/@/base/<name>.tsx`：
+  先生成、再挪到 `src/base/<name>.tsx`
+- 生成后要把 `@/` 导入改成包内相对路径、`@/utils` 改成从 `cn` 包导入，图标占位组件（`IconPlaceholder`）
+  换成 `lucide-react`，去掉本项目没定义的 style 专用类（如 `cn-menu-*` / `cn-rtl-flip`），`"use client"` 也去掉
+- CLI 写入过就会一直报 “Skipped 1 file”（包括文件已删时），这时用 `npx shadcn@latest view <name>` 取源码手写
 - 对已经改过的组件再跑 CLI 会覆盖我们的改动，需要手工合并
 - CLI 生成的那批不要求写文件级注释（都是对 Radix 的薄封装）；`base/` 下自研的原语照常要写
 

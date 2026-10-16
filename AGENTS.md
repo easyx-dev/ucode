@@ -107,25 +107,25 @@
 | [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
-规范靠 `pnpm check` 里的 `scripts/verify` 兜底（迁移版本连续、契约字段与类型配对、分层依赖方向（layers）、禁止裸色值与语义层字面色、设计档位白名单、配色主题覆盖完整性、i18n 目录范围与冗余/错误码映射/禁止硬编码中文、会话条目类型与字典对齐、有测试用例必须有 `test` 脚本、变更日志的规模与结构），
+规范靠 `pnpm check` 里的 `scripts/verify` 兜底（各项清单见 `scripts/verify/checks/` 与 README），
 文档与校验冲突时以校验为准并同步改文档。
 
 ### 验证命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍：本机只有一个平台，跟平台相关的回归靠它兜住 |
+| `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍 |
 | `pnpm check:fast` | 中途收窄：只查工作区改动的文件（biome）+ 全部包 typecheck + 约定校验，跳过测试（约 11 秒，全量约 22 秒） |
 | `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（各项见 `scripts/verify/checks/`；可 `--only` 只跑指定项） |
-| `pnpm typecheck` | 各包各自 `tsc --noEmit`（`packages/contracts` / `packages/brand` / `packages/i18n` / `packages/sdk` / `packages/ui` / `server` / `apps/web` / `apps/desktop`） |
+| `pnpm typecheck` | 各包各自 `tsc --noEmit` |
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
 | `pnpm start` | `node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
-| `pnpm -F @ucode/server browser:desktop-smoke` | 桌面端驱动的端到端冒烟（`server/scripts/browser-desktop-smoke.ts`）：**就地**起服务与本地页、起桌面端（构建产物）并让面板打开该页，然后直接调服务端的动作面跑 snapshot / click / screenshot / open 与元素选择，断言「点击改掉了页面标题」（从桌面端读回）。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test` |
-| `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟（`apps/desktop/scripts/browser-panel-smoke.mjs`）：起隔离服务与本地页，Electron 开调试端口，用 Playwright 连渲染层驱动界面——活动栏入口 / 新标签开出 webview / 地址栏导航 / 多标签常驻 / 切标签不丢页面。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test` |
+| `pnpm -F @ucode/server browser:desktop-smoke` | 桌面端驱动的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
+| `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
 | `pnpm -F @ucode/server browser:parity` | 与真 agent-browser 的对拍（`server/scripts/browser-parity.ts`）：同一批本地页面比元素覆盖与动作语义，报告写 `.tmp/browser-parity-report.md`。**依赖本机装了 agent-browser**，差异是信息不是失败 |
-| `pnpm -F @ucode/server browser:smoke` | 浏览器工具集端到端冒烟（`server/scripts/browser-smoke.ts`）：本地起静态页跑 open / snapshot / act / 截图 / 遮挡失败 / 导航失效 / close。**需要本机有浏览器**，因此不进 `pnpm test` |
+| `pnpm -F @ucode/server browser:smoke` | 浏览器工具集端到端冒烟（`server/scripts/browser-smoke.ts`）：本地起静态页跑 open / snapshot / act（含 eval）/ 截图 / 遮挡失败 / 导航失效 / close。**需要本机有浏览器**，因此不进 `pnpm test` |
 | `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`，`APP_HOME` 由脚本固定为 `.tmp/.ucode`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层固定 `:5174`，`strictPort`；`/api/*` 由 Vite 代理转给 `.env` 里的 `APP_PORT`）。服务需另行启动，不需要为桌面端配 `APP_CORS_ORIGIN`。开发形态会独立开一窗 DevTools，`⌘⌥I` / `F12` 切换（生产不自动开）。端口被占时渲染层直接报错、electron 随之退出（`concurrently -k`），不会再连上别的 dev server |
 | `pnpm start:desktop` | 构建桌面端后由 Electron 以应用内协议 `app://desktop` 加载产物（不起渲染层服务、与接口同源；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
@@ -138,8 +138,8 @@
 要试就换一个 `APP_HOME`。
 
 **起隔离的 dev 一对外加一个 `APP_PORT`**：`.env` 里的 `APP_PORT` 往往就是生产实例的端口，而 web 开发代理
-解析它的方式是 vite 的 `loadEnv`（本项目按空前缀调用，因此 `process.env` **压过** `.env` / `.env.local`）。
-所以想换端口要同时给两边：`APP_PORT=19691 APP_HOME=.tmp/<dir> pnpm -F @ucode/server dev` 与
+读 `.env` 的方式让 `process.env` **压过** `.env` / `.env.local`，所以想换端口要同时给两边：
+`APP_PORT=19691 APP_HOME=.tmp/<dir> pnpm -F @ucode/server dev` 与
 `APP_PORT=19691 pnpm -F @ucode/web dev --port 5175`；只改 `.env.local` 不起作用，只改 server 会让界面打到生产。
 
 **生产实例不可触碰**：`APP_HOME` 是 `~/.ucode`、从 `dist/ucode.js` 跑起来的那个实例就是生产服务，
@@ -160,11 +160,11 @@
 是唯一的验证数据目录。需要生产数据（会话、配置、插件）时，把要用的文件从生产目录
 **拷一份**到 `.tmp/` 再用，不就地读写。
 
-`pnpm check` 全量一趟约 22 秒（测试 11、全仓 typecheck 9、biome 与 verify 各 1），一轮里只跑一次、放在最后一次
-代码改动之后；中途要看有没有低级错误用 `pnpm check:fast`（跳过测试），只改了文档就直接
-`pnpm exec biome check <文件>`。在一轮里反复全量跑会直接排进会话耗时前排（实测一轮里 102 步、8.8 分钟）。
+`pnpm check` 全量一趟约 22 秒，一轮里只跑一次、放在最后一次代码改动之后；中途要看有没有低级错误用
+`pnpm check:fast`（跳过测试），只改了文档就直接 `pnpm exec biome check <文件>`；在一轮里反复全量跑是
+最亏的做法。
 
-`pnpm verify` 可只跑指定项：`pnpm verify -- --only changelog,i18n`（全量在 1 秒级，收窄是为了少看无关输出）。
+`pnpm verify` 可只跑指定项：`pnpm verify -- --only changelog,i18n`。
 
 单元测试放与被测模块同级的 `__tests__/` 目录，命名 `<模块>.test.ts`
 （如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
@@ -180,57 +180,38 @@ UI 改动**按需**在真实浏览器里看，不是每个改动都要看——�
 - 不用看：纯逻辑与文案、数值微调（间距 / 颜色 / 字号改一个值）、已经看过的那块再调一处像素；
   改动只落在这一类时，跑完 `pnpm check` 即可。
 - 要看的改动**合并成一次走查**（一轮里最多一次），不要每改一个文件就开浏览器。
-- 确要核对计算值（高度 / 间距 / 字号这类「比数字」的场景）时用 `agent-browser eval` 读 `getComputedStyle`，
-  不截图、不重开页面：截图留给静态检查盖不住的视觉问题，重开页面还会把已登录、已切好的页面状态丢掉。
 
-本机已装 `agent-browser`（`npm i -g agent-browser && agent-browser install`）：`pnpm build` 后打开
-`http://127.0.0.1:19688`，或 `pnpm dev` 后开 `:5173`。harness 自带的浏览器能力已撤（过于局限，
-改由插件提供，见 `TODO.md`）。两个坑：Chrome 把部分端口判为不安全（如 `2049`）会直接
-`ERR_UNSAFE_PORT`，换端口即可；弹层内部滚动容器里的元素要先 `scrollintoview` 再 `click`，
-否则坐标会落到遮罩上把弹层关掉。
+走查用内置的浏览器工具（`browser_open` / `browser_snapshot` / `browser_act` / `browser_screenshot` /
+`browser_close`，语义见 [`docs/browser.md`](./docs/browser.md)），不依赖外部的 `agent-browser` CLI：
 
-走查成本几乎全在调用次数上（每调一次都要起进程连浏览器），所以按这几条来：
+- 一条链路：`browser_open` 打开地址（`pnpm build` 后 `http://127.0.0.1:19688`，或 `pnpm dev` 后 `:5173`）→
+  `browser_snapshot` 拿 `@e` 编号 → `browser_act` 操作 → `browser_screenshot` 看画面。**走 dev 时用 `localhost:5173`**：
+  Vite 只监听 IPv6 的 `[::1]`，写 `127.0.0.1` 会 `ERR_CONNECTION_REFUSED`。
+- 交互一律用快照给的 `@e` 编号，不要手写 CSS 选择器；页面变了就重新快照（导航后编号整体失效）。
+- 要读计算值（高度 / 间距 / 字号这类「比数字」的场景）用 `browser_act` 的 `eval` 读 `getComputedStyle`，
+  不靠截图猜数字；多语句写成 IIFE。操作与测量分两步发——测量失败不该让操作从头再来。
+- **登录态**：走查登录后的界面有两种办法——给 `browser_open` 传 `profile`（这份数据长期保留）并自己先
+  登录一次；或在桌面端面板里开好页面，那时工具驱动的是**你正看着的那个标签**，画面本身就是证据。
+- 不要用 `sleep` 等界面稳定（固定空等已被 shell 预检拦下）：`browser_open` 已经等到 `domcontentloaded`，
+  还没就绪就重新快照一次。
 
-- 一串动作串成一次 bash：`agent-browser open <url> && wait --load networkidle && snapshot -i && click @e3 && snapshot -i`，
-  或用 `batch --json`。浏览器由后台 daemon 常驻，串联是官方推荐用法。
-- 等页面稳定用 `wait`，不要 `sleep`（固定空等已被 shell 预检拦下）：`wait --load domcontentloaded|load|networkidle`、
-  `wait "<选择器>" --state visible|hidden`、`wait --fn "…"`。
-- `wait` 只用在**已确认存在**的元素上：元素在不在，先由 `snapshot -i` 或一次 `eval` 列候选确认——
-  拿猜出来的选择器去等，只会等到超时，还把 `&&` 链上前面所有动作一起作废。
-- 「操作」与「测量」分两段：open / click / fill 串一条，`eval` 读样式与截图另起一条，不要用 `&&` 把两段绑死——
-  测量失败不该让操作从头再来。
-- 交互用 `snapshot -i` 给出的 `@eN` ref，不要手写 CSS 选择器——选择器脆，失败重试会变成一堆多余的往返。
-  页面变了要重新 snapshot，但同一次调用里完成。
-- 同一屏里的几个交互（切视图 → 开菜单 → 看结果）串成一条命令一次做完，别拆成多次调用。
-
-安全边界：不要用 `--auto-connect` / `--profile` 复用本机 Chrome 的登录态（那等于把全部登录态交给
-agent，是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里明文写口令，命令会原样落进会话 JSONL。
+安全边界：不要为了省一次登录去 attach 你日常在用的浏览器调试实例（那等于把全部登录态交给 agent，
+是否允许需另行拍板，见 `TODO.md`）；也不要在 bash 里明文写口令，命令会原样落进会话 JSONL。
 
 ### 构建与生产运行
 
 生产启动是「先构建、再跑产物」：`pnpm build` 把 web 构到 `apps/web/dist`，再由
-`scripts/build-cli.mjs`（esbuild）把 `server/src/cli.ts` 打成单文件 `dist/ucode.js`；
-`pnpm start` 即 `NODE_ENV=production node dist/ucode.js`。
+`scripts/build-cli.mjs`（esbuild）把 `server/src/cli.ts` 打成单文件 `dist/ucode.js`。
 
-- **第三方依赖一律 external**：pi SDK 带原生 / wasm 依赖与运行期动态加载，不能打进单文件。
+- **第三方依赖一律 external**，不能打进单文件：产物运行期从**仓库根**的 `node_modules` 解析它们，故根
+  `package.json` 的 `dependencies` 必须覆盖 `server` 的第三方运行时依赖（`scripts/verify` 的 manifest 校验兜底）。
 - **构建会覆写生产正在用的产物**：`apps/web/dist` 与 `dist/ucode.js` 既是构建输出、也是生产实例的静态根与入口
   （前端随刷新即生效，服务端要重启才生效）。生产运行时构建等于更新生产，见「验证命令」的生产边界。
-  产物运行时从**仓库根**的 `node_modules` 解析 external 依赖，故根 `package.json` 的
-  `dependencies` 必须覆盖 `server` 的第三方运行时依赖——`scripts/verify` 的 `manifest` 校验兜底
-  （工作区包由 esbuild 打进产物，不声明）。
-- **配置一律由环境变量声明，代码不带默认值**（缺失 / 非法即启动报错）：生产读 `.env.prod`、
-  其余读 `.env`，按 `NODE_ENV` 选择，统一从 cwd 向上查找（模板见 `.env.example` / `.env.prod.example`，
-  `.env` / `.env.prod` 为本地文件）；`APP_HOME` 支持 `~` 与相对路径（相对环境文件所在目录）。
-- **CLI 生命周期**：`server/src/cli.ts` 提供 `--port` / `--host` / `--open` / `--restart` /
-  `--status` / `--version`。`node dist/ucode.js` 不被 watch，编辑源码不会重启它——这正是
-  「用 UCode 开发 UCode」时避免打断会话的关键；改完显式 `pnpm build && pnpm start -- --restart`
-  即可停旧起新。`--restart` 先拿注册文件的 `instanceId` 与 `GET /api/v1/health` 核对身份，对不上就跳过
-  （陈旧 pid 在 Windows 上必然存在——那边 `SIGTERM` 不触发优雅退出），不依赖 `lsof`。
-  见 README「生产启动与自迭代」。
-- **`APP_HOST` / `APP_PORT` 是默认值**：`APP_HOST` 取值顺序为 显式（`--host` 或启动前已有环境变量）
-  > `service.json`（设置里改过的值）> `.env(.prod)`，故「局域网访问」开关重启后生效；`APP_PORT` 无设置入口，
-  取值 显式（`--port`）> `.env(.prod)`，`service.json` 仅兜底。
-- **未做**：全局命令 / npm 包 / 安装包分发（留待发布阶段，届时给根包加 `bin`/`files` 并复用本构建）。
+- **配置一律由环境变量声明，代码不带默认值**（缺失 / 非法即启动报错）：变量清单、`APP_HOME` 派生路径与
+  `APP_HOST` / `APP_PORT` 的取值顺序见 README「环境变量」。
+- **`node dist/ucode.js` 不被 watch**，编辑源码不会重启它——这正是「用 UCode 开发 UCode」时避免打断会话的
+  关键；改完显式 `pnpm build && pnpm start -- --restart` 停旧起新（`--restart` 按注册文件核对实例身份，
+  对不上就跳过）。见 README「生产启动与自迭代」。
 
 ### 接口规范（server）
 
@@ -318,7 +299,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 - `packages/sdk/`（`@ucode/sdk`）是 server `/api/v1` 的跨端客户端单一事实源，**不依赖 React / DOM**，
   web / 桌面 / TUI 共用，分两层：
   - `createApis(options)` 是无状态接口层：一方法一接口，外加传输层（封套拆解、baseUrl / token 注入）、
-    SSE 解析与重连事件流（`events.onEvent` / `onError` / `onConnected` / `onDisconnected`）。可单独使用。
+    SSE 解析与重连事件流。可单独使用。
   - `createClient(options)` 在其上装配各域同步 store（`sessions` / `messages` / `interactions` / `goal` /
     `models` / `health` / `commands` / `usage` / `config` / `mcp`），store 订阅事件流做增量归并，
     暴露 `getState` / `subscribe` + 动作，React 侧用 `useSyncExternalStore` 订阅。
@@ -347,29 +328,22 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 - 服务端**不做本地化**：失败封套与 SSE 错误帧只给 `code` + 固定中文兜底 `message` + 插值 `params`，
   由客户端按 `code` 查表渲染（见 `docs/api.md`「语言与本地化」）。
 - `.tmp/` 是仓库级临时目录（已在 `.gitignore`），临时脚本、抓包、一次性产物放 `.tmp/` 根下。
-- `$APP_HOME`（默认 `~/.ucode`）是运行时数据目录与 agent 的默认工作目录，按「谁的资产」分两层：
-  `harness/`（`auth.json` / `sessions/*.jsonl`）与 `app/`（`config.json` / `app.db` / `plugins.json` / `builtin/`）；
-  另有全局命令、技能与角色目录 `skills/`、`prompts/`、`agents/`、插件根 `plugins/`
-  （`cache/<market>/<plugin>/<version>` 安装副本、`marketplaces/<market>` 清单缓存、`data/<id>` 插件数据）
-  直接放在 `$APP_HOME` 下。
-  不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
+- `$APP_HOME`（默认 `~/.ucode`）是运行时数据目录与 agent 的默认工作目录，目录树、项目级目录与同名优先级
+  见 README「环境变量」。不要往里放无关文件——它会出现在 agent 的 `ls` 输出里。
 - `$APP_HOME/app/config.json` 由服务根据 `POST /api/v1/config/update` 生成（模型 provider 与 apiKey 只存这一份，
   不再派生 `harness/models.json`），`app/app.db` 由服务按 `db/index.ts` 的 `user_version` 迁移生成，都不要手工改。
-- `$APP_HOME` 下的目录布局可以直接调整（见「编码原则」的兼容性约定），不加版本目录。
 
 ### Biome 配置
 
-`biome.json` 有意保持**纯 JSON**：带注释会让 Biome 静默回退到默认配置（缩进变 tab、排除规则失效）。
-非默认设置的原因记在这里，不要在配置文件里加注释：
+`biome.json` 有意保持**纯 JSON**：带注释会让 Biome 静默回退到默认配置（缩进变 tab、排除规则失效），
+所以非默认设置的理由记在这里，不要在配置文件里加注释：
 
-- **没有排除任何路径**（`files.includes: ["**"]`）。曾经排除过三类文件，都已消除：
-  `packages/ui/src/base` 现在归我们维护（见「组件来源」），CSS 靠下面的 `tailwindDirectives` 解决，
-  `index.html` 的内联脚本改成顶层 `try` / `catch {}` 后不再触发 lint。
-- `css.parser.tailwindDirectives: true`：Biome 的 CSS parser 默认**关闭** Tailwind 语法，
-  关闭时 `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。打开后 CSS 正常纳入检查。
-- `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：本仓库有几处 effect 的依赖是
-  「触发条件」而不是在效果体内直接读取（随 `value` 变化重算 textarea 高度、随 `items` 变化滚动到底部）。
-- `security.noDangerouslySetInnerHtml` 降级为 `warn`：保留提示但不阻断构建，本仓库偶有内联第一方静态标记的正当场景。
+- **没有排除任何路径**（`files.includes: ["**"]`）——CSS 与内联脚本都已消除掉触发 lint 的写法。
+- `css.parser.tailwindDirectives: true`：Biome 的 CSS parser 默认**关闭** Tailwind 语法，关闭时
+  `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。
+- `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：有几处 effect 的依赖是「触发条件」
+  而不是在效果体内直接读取。
+- `security.noDangerouslySetInnerHtml` 降级为 `warn`：保留提示但不阻断构建。
 
 ### 组件来源
 
@@ -377,13 +351,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 同样适用本文件的命名、行数、颜色 token 与格式化规则；`base/` 下的自研原语（分段控件、工具条图标按钮、
 细化线、复制动作、品牌标识）本来就是我们的代码，只是同样无业务语义、只吃 props。
 
-- 豁免范围：只有 CLI 生成的那批不要求写文件级注释（都是对 Radix 的薄封装）
-- 新增基础组件用 CLI 在 `packages/ui`（配置见 `packages/ui/components.json`）生成。本包 tsconfig 没配 `@/*` 的
-  paths，CLI 会把 aliases 当字面路径，产物落在 `packages/ui/@/base/<name>.tsx`：先生成、再挪到
-  `src/base/<name>.tsx`，然后把 `@/` 导入改成包内相对路径、图标占位组件（`IconPlaceholder`）换成 `lucide-react`、
-  去掉本项目没定义的 style 专用类（如 `cn-menu-*` / `cn-rtl-flip`）、`"use client"` 也去掉（本包 rsc: false），
-  最后按本仓库规则整理。CLI 写入过就会一直报 “Skipped 1 file”（包括文件已删时），
-  这时用 `npx shadcn@latest view <name>` 取源码手写。对已改过的组件再跑 CLI 会覆盖改动，需手工合并
+生成新组件（含产物落点与要替换的占位）按 [`docs/components.md`](./docs/components.md)「组件来源与维护」的步骤来。
 
 ### 已知边界
 
