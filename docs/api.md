@@ -182,7 +182,7 @@
 - **会话事件帧**：`{ type, sessionId, seq, data }`
   - `type` 取自 `EVENT_NAMES`；`seq` 是**会话内**单调序号
   - 客户端用 `messages/list` 返回的快照 `seq` 切分：丢弃 `seq <= 快照 seq` 的帧，接续其余帧
-  - 除消息流（`message_*` / `tool_*` / `queue_update` / `compaction_*`）外，会话列表的增改删也走这里：
+  - 除消息流（`message_*` / `tool_*` / `step_start` / `queue_update` / `compaction_*`）外，会话列表的增改删也走这里：
     - `session_created`：载荷 `SessionSummary`，新建 / 分叉 / 子智能体创建
     - `session_updated`：载荷 `{ session: SessionSummary, usage?: UsageTotals, contextUsage?: ContextUsage | null }`，改名 / 换模型 /
       置顶 / 标记已读 / 落定后摘要刷新 / 运行态变化；`usage` 在需要客户端重算占用的帧上带上（落定后、改模型 /
@@ -196,6 +196,9 @@
     没有可总结的跨度或已是压缩后的状态，没做任何事、也不改变会话状态，客户端只弹一条轻提示；
     **自动压缩**失败时载荷为 `{ reason, errorMessage }`（它不中断这一轮，不能标成「本轮出错」）。
     压缩会重写可见历史：早期条目被摘要替代，只剩从 `firstKeptEntryId` 起的保留区间，与 `messages/list` 的投影一致
+  - `step_start`：载荷 `{}`，一次模型往返开始（服务端在发请求前下发）。界面据此给「等模型响应」那一段
+    （含请求上传与上游排队）起表，口径与每步耗时记录的 `firstEventMs` 同源——本端没发起这一轮的
+    （批准计划、目标续跑、多窗口）也报得出那段；它**不落盘**，只服务实时读数，刷新后由快照重建
   - `transcript_reset`：载荷 `{ fromEntryId }`，活动分支或可见历史已改变（编辑重发、追加界面标记、上下文压缩），
     客户端应重取快照；它不参与 `seq` 切分（收到即整表重取）
   - 交互（`interaction_request` / `interaction_resolved`）、目标（`goal_update`）同样在此下发

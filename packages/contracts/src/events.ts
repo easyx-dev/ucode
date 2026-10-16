@@ -8,6 +8,8 @@ import type { ProjectListResponse } from "./projects/output";
  * 会话事件名（挂在 `ServerEventPayload` 上，带 sessionId 与 seq）。载荷约定：
  *
  * - 消息 / 工具 / 队列 / 压缩：会话消息流（`data` 见 `docs/api.md`「全局事件流」）
+ * - `step_start`：`{}`，一次模型往返开始（服务端在发请求前下发）。界面据此给「等模型响应」起表：
+ *   它比客户端自己的发送时刻准，也让批准计划 / 目标续跑这类非本端发起的轮次有起点
  * - `compaction_start`：`{ reason }`，`reason` 为 `manual` / `threshold` / `overflow`
  * - `compaction_end`：`{ reason, tokensBefore?, estimatedTokensAfter? }`，两个规模字段只在压缩成功时存在；
  *   压缩会重写可见历史（早期消息被摘要替代），服务端随后下发 `transcript_reset`。
@@ -30,6 +32,7 @@ import type { ProjectListResponse } from "./projects/output";
  * - `session_archived`：`{ sessionId }`，归档（级联子会话逐个下发）
  */
 export const EVENT_NAMES = [
+  "step_start",
   "message_start",
   "text_delta",
   "thinking_delta",

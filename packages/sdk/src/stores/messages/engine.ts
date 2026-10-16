@@ -7,6 +7,7 @@ import type { BackgroundService, CompactionNotice, ServerEventPayload } from "@u
 import type { ApiError } from "../../error";
 import { createStore, type Store } from "../../store";
 import type { ChatItem, PromptPayload, SubagentStreams } from "../../types";
+import { advancePhase, type StreamPhase } from "./phase";
 import {
   asRecord,
   attachAssistantTiming,
@@ -17,6 +18,8 @@ import {
 
 /** 会让界面进入「生成中」的事件；agent_settled 是唯一的结束边界 */
 const ACTIVITY_EVENTS: ReadonlySet<string> = new Set([
+  // 服务端的起点：本端没发起这一轮（批准计划、目标续跑、多窗口）时也靠它点亮生成态
+  "step_start",
   "message_start",
   "text_delta",
   "thinking_delta",
@@ -44,6 +47,11 @@ export type SessionStreamState = {
   compactionNotice: CompactionNotice | null;
   /** 已受理、还没收到首个活动事件：消息区尾部显示等待指示 */
   pending: boolean;
+  /**
+   * 模型此刻在做什么（等响应 / 等首帧 / 生成 / 跑工具）：尾部提示据此换文案与计时起点。
+   * 取不到时为空（重连后重取快照、没有阶段概念的场景），界面退回统一的「工作中」
+   */
+  phase: StreamPhase | null;
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents: SubagentStreams;
   /**
@@ -80,6 +88,7 @@ export const EMPTY_STATE: SessionStreamState = {
   compacting: false,
   compactionNotice: null,
   pending: false,
+  phase: null,
   subagents: {},
   services: [],
   loadingHistory: false,
@@ -202,8 +211,10 @@ const trackStreamTiming = (engine: Engine, frame: ServerEventPayload): { thinkin
   }
 };
 
-/** 应用一条事件帧：维护生成态与子智能体，再交给 reducer 归并 */
+/** 应用一条事件帧：维护生成态、阶段与子智能体，再交给 reducer 归并 */
 export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
+  // 阶段与消息归并无关，先按帧推进一次；`patch` 在引用未变时不通知
+  patch(engine, { phase: advancePhase(engine.store.getState().phase, frame, Date.now()) });
   // 子智能体只发关联帧：建立 / 解除 childId → toolCallId 映射，进度靠子会话自身的帧
   if (frame.type === "subagent_start") {
     const data = asRecord(frame.data);

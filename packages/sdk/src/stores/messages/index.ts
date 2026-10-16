@@ -22,9 +22,12 @@ import {
   patch,
   type SessionStreamState,
 } from "./engine";
+import { createPhase } from "./phase";
 import { appendUserItem, isLiveUid, removeUserItem, settle } from "./reducer";
 
 export type { SessionStreamState } from "./engine";
+export type { PhaseKind, StepSegmentRow, StepSegments, StreamPhase } from "./phase";
+export { createPhase, stepBreakdown } from "./phase";
 
 export type MessagesStore = {
   /** 取某个会话的 store；sessionId 为 null 时返回共享的空 store */
@@ -129,9 +132,10 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
         subagents: runningSubagents,
         // 服务清单是全量运行态：快照里没有的即已停止，直接以快照为准
         services: asServices(snapshot.services),
-        // 快照不携带压缩进度与压缩结果提示：压缩中收到快照（如切换会话回来）时只能退回统一的「工作中」提示
+        // 快照不携带压缩进度、压缩结果提示与阶段：压缩中或重连后收到快照时只能退回统一的「工作中」提示
         compacting: false,
         compactionNotice: null,
+        phase: null,
         pending: false,
         error: null,
       });
@@ -186,15 +190,15 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
   deps.events.onEvent((frame) => {
     if (frame.type === "error") {
       // 错误帧是一轮的结束信号：「压缩中」也要一并清——留下它会毒到下一轮，
-      // 尾部提示会把普通生成错报成「正在压缩上下文」
+      // 尾部提示会把普通生成错报成「正在压缩上下文」；阶段同理，它描述的也是上一轮
       const error = toApiError(frame);
       if (frame.sessionId) {
         const engine = engines.get(frame.sessionId);
         if (!engine) return;
-        patch(engine, { running: false, pending: false, compacting: false, error });
+        patch(engine, { running: false, pending: false, compacting: false, phase: null, error });
         return;
       }
-      for (const engine of engines.values()) patch(engine, { error });
+      for (const engine of engines.values()) patch(engine, { phase: null, error });
       return;
     }
 
@@ -247,8 +251,12 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       const engine = ensure(sessionId);
       patch(engine, { error: null });
       const optimistic = appendUserItem(engine.store.getState().items, optimisticBlocks(payload));
-      // 立刻给出反馈：首个 token 都算在这段等待里
-      patch(engine, { items: optimistic.items, pending: true });
+      // 立刻给出反馈：首个 token 都算在这段等待里；阶段同时起表，界面才能把「等模型响应」那一段报出来
+      patch(engine, {
+        items: optimistic.items,
+        pending: true,
+        phase: createPhase(Date.now()),
+      });
 
       try {
         await deps.apis.messages.prompt({

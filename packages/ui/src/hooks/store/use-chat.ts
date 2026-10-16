@@ -5,7 +5,7 @@ import type {
   SessionCreateRequest,
   SessionSummary,
 } from "@ucode/contracts";
-import type { ChatItem, EditMessagePayload, SubagentStreams } from "@ucode/sdk";
+import type { ChatItem, EditMessagePayload, StreamPhase, SubagentStreams } from "@ucode/sdk";
 import { useCallback, useRef, useState } from "react";
 
 import type { ComposerPayload } from "../../business/composer/document/composer-payload";
@@ -28,6 +28,8 @@ export type ChatController = {
   streaming: boolean;
   /** 本轮进行的是上下文压缩：尾部提示据此换文案 */
   compacting: boolean;
+  /** 模型此刻在做什么（等响应 / 等首帧 / 生成 / 跑工具）：尾部提示据此换文案与计时起点；拿不到时为空 */
+  phase: StreamPhase | null;
   /** 当前语言渲染的错误文案 */
   error: string | null;
   loadingHistory: boolean;
@@ -141,9 +143,10 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     items: stream.items,
     subagents: stream.subagents,
     services: stream.services,
-    // 在途的三种情况合并成一个「进行中」：列表尾部据此显示工作中提示
+    // 在途的三种情况合并成一个「进行中」：列表尾部据此显示进行中提示
     streaming: stream.running || sending || stream.pending,
     compacting: stream.compacting,
+    phase: stream.phase,
     error,
     loadingHistory: stream.loadingHistory,
     send,

@@ -4,6 +4,8 @@
  * 间距用 padding 而不是 margin —— 虚拟列表的默认测量取元素高度，margin 不计入，会让滚动位置算错。
  * 新一轮留白更大（`pt-6`），轮内各行用 `pt-3`，读者靠这个差值分辨轮次边界。
  */
+
+import type { StreamPhase } from "@ucode/sdk";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import type { ChatItem, EditMessagePayload } from "../../../types";
@@ -27,6 +29,8 @@ export type MessageRowContext = {
   renderToolTrailing?: (entry: ToolEntry) => ReactNode;
   /** 正在压缩上下文：尾部的进行中提示据此换文案，且不报本轮耗时 */
   compacting?: boolean;
+  /** 模型此刻在做什么：尾部的进行中提示据此换文案与计时起点；拿不到时为空 */
+  phase?: StreamPhase | null;
   /** 从该条消息分叉（仅主对话） */
   onFork?: (item: ChatItem) => void;
   /** 编辑某条用户消息并重发（仅主对话） */
@@ -39,7 +43,13 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
   let body: ReactNode;
 
   if (row.kind === "working") {
-    body = <WorkingIndicator startedAt={row.startedAt} compacting={context.compacting} />;
+    body = (
+      <WorkingIndicator
+        startedAt={row.startedAt}
+        phase={context.phase}
+        compacting={context.compacting}
+      />
+    );
   } else if (row.kind === "question") {
     body = (
       <QuestionForm

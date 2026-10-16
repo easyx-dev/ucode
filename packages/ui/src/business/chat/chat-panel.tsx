@@ -356,6 +356,7 @@ export function ChatPanel({
             loading={chat.loadingHistory}
             working={chat.streaming}
             compacting={chat.compacting}
+            phase={chat.phase}
             resetKey={session?.id ?? ""}
             sentTick={sentTick}
             onOpenSession={openSubagent}

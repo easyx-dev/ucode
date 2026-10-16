@@ -151,6 +151,10 @@ const toToolEvents = (event: AgentSessionEvent): SseEvent[] | null => {
 /** 队列、压缩、会话信息与收尾事件 */
 const toSessionEvents = (event: AgentSessionEvent): SseEvent[] | null => {
   switch (event.type) {
+    case "turn_start":
+      // 一次模型往返开始：界面据此给「等模型响应」起表。它比客户端自己的发送时刻准（含服务端装配），
+      // 也覆盖批准计划 / 目标续跑这类非本端发起的轮次；不落盘，只服务实时读数
+      return [{ event: "step_start", data: {} }];
     case "queue_update":
       return [
         { event: "queue_update", data: { steering: event.steering, followUp: event.followUp } },

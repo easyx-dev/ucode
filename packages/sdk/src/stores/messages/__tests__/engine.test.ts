@@ -145,6 +145,42 @@ describe("会话流 · 后台服务清单", () => {
   });
 });
 
+/** 生成阶段：服务端的起点帧要让界面在非本端发起的轮次上也能起表并亮起生成态 */
+describe("会话流 · 生成阶段", () => {
+  it("step_start 点亮生成态并从服务端起表", async () => {
+    const { store, emit } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    assert.equal(store.get("s1").getState().running, false);
+    assert.equal(store.get("s1").getState().phase, null);
+
+    emit(frameOf("step_start", {}));
+
+    const state = store.get("s1").getState();
+    assert.equal(state.running, true);
+    assert.equal(state.pending, false);
+    assert.equal(state.phase?.kind, "waitingResponse");
+    assert.equal(
+      typeof (state.phase?.kind === "waitingResponse" ? state.phase.startedAt : null),
+      "number",
+    );
+  });
+
+  it("本轮落定把阶段清空", async () => {
+    const { store, emit } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    emit(frameOf("step_start", {}));
+    emit(frameOf("agent_settled", {}));
+
+    const state = store.get("s1").getState();
+    assert.equal(state.phase, null);
+    assert.equal(state.running, false);
+  });
+});
+
 /** 乐观区块：命令与技能的参数都是用户写的那段，发送瞬间就该显示出来 */
 describe("乐观区块", () => {
   const payloadOf = (parts: Partial<PromptPayload>): PromptPayload => ({

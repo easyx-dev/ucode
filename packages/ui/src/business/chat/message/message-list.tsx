@@ -5,6 +5,7 @@
  * 用户上翻回看历史后，新内容不会把人拉回去。
  */
 import { useVirtualizer } from "@tanstack/react-virtual";
+import type { StreamPhase } from "@ucode/sdk";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,10 +51,12 @@ type MessageListProps = {
   /** 进行中的子智能体进度，按父会话里的 toolCallId 索引 */
   subagents?: SubagentStreams;
   loading?: boolean;
-  /** 正在进行中：列表尾部显示「工作中」与实时耗时 */
+  /** 正在进行中：列表尾部显示当前阶段与实时耗时 */
   working?: boolean;
   /** 本轮进行的是上下文压缩：尾部提示改报「正在压缩上下文」 */
   compacting?: boolean;
+  /** 模型此刻在做什么：尾部提示据此换文案与计时起点 */
+  phase?: StreamPhase | null;
   empty?: React.ReactNode;
   /** 切换会话时变化，用于重置滚动位置与已测量的行高 */
   resetKey?: string;
@@ -75,6 +78,7 @@ export function MessageList({
   loading,
   working,
   compacting,
+  phase,
   empty,
   resetKey,
   sentTick,
@@ -166,11 +170,12 @@ export function MessageList({
     () => ({
       renderToolTrailing,
       ...(compacting ? { compacting } : {}),
+      ...(phase ? { phase } : {}),
       ...(onFork ? { onFork } : {}),
       ...(onEdit ? { onEdit } : {}),
       ...(highlightKey ? { highlightKey } : {}),
     }),
-    [renderToolTrailing, compacting, onFork, onEdit, highlightKey],
+    [renderToolTrailing, compacting, phase, onFork, onEdit, highlightKey],
   );
 
   const setFollowingBoth = useCallback((next: boolean) => {

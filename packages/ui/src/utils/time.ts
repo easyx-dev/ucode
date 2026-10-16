@@ -33,13 +33,19 @@ export const clockLabel = (iso?: string): string => {
   return time.isValid() ? time.format("HH:mm:ss") : "";
 };
 
-/** 耗时标签：毫秒 → 紧凑可读（840ms / 3.2s / 1m05s / 1h02m），非法值返回空串 */
-export const durationLabel = (ms: number): string => {
+/**
+ * 耗时标签：毫秒 → 紧凑可读（840ms / 3.2s / 1m05s / 1h02m），非法值返回空串。
+ *
+ * `precision` 为 `second` 时不到一分钟只报整数秒：实时读数按秒刷新，留着那一位小数只会永远停在
+ * 同一个数字上（秒以下的位本该随时间变）。
+ */
+export const durationLabel = (ms: number, precision: "tenth" | "second" = "tenth"): string => {
   if (!Number.isFinite(ms) || ms < 0) return "";
   if (ms < 1000) return `${Math.round(ms)}ms`;
-  // 先按一位小数取整再判断进位，避免 59.96s 显示成 60.0s
-  const seconds = Math.round(ms / 100) / 10;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  // 先按目标精度取整再判断进位，避免 59.96s 显示成 60.0s
+  const seconds = precision === "second" ? Math.round(ms / 1000) : Math.round(ms / 100) / 10;
+  if (seconds < 60) return precision === "second" ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+  // 分档只需要整数秒，与上面那档的精度无关
   const totalSeconds = Math.round(seconds);
   const minutes = Math.floor(totalSeconds / 60);
   if (minutes < 60) return `${minutes}m${String(totalSeconds % 60).padStart(2, "0")}s`;

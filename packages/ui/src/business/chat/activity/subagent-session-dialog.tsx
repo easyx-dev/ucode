@@ -58,6 +58,8 @@ export function SubagentSessionDialog({ sessionId, onClose }: SubagentSessionDia
             subagents={stream.subagents}
             loading={stream.loadingHistory}
             working={stream.running}
+            compacting={stream.compacting}
+            phase={stream.phase}
             resetKey={sessionId}
             empty={<p className="text-sm text-foreground-subtle">{t("还没有内容")}</p>}
           />

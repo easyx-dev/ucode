@@ -2065,7 +2065,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "service_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
+| `type` | "step_start" \| "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "service_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
 | `sessionId` | string | 是 | — |
 | `seq` | number | 是 | — |
 | `data` | unknown | 是 | — |
@@ -2126,6 +2126,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 **事件名（`type`）**
 
+- `step_start`
 - `message_start`
 - `text_delta`
 - `thinking_delta`

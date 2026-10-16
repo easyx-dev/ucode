@@ -40,8 +40,14 @@ export {
 export { createMcpStore, type McpState, type McpStore } from "./stores/mcp";
 export {
   createMessagesStore,
+  createPhase,
   type MessagesStore,
+  type PhaseKind,
   type SessionStreamState,
+  type StepSegmentRow,
+  type StepSegments,
+  type StreamPhase,
+  stepBreakdown,
 } from "./stores/messages";
 export { createModelsStore, type ModelsState, type ModelsStore } from "./stores/models";
 export {

@@ -92,3 +92,16 @@ describe("message_end 的条目 id", () => {
     assert.match(String(frames[0]?.data.id), /^live-\d+-[0-9a-f]+$/);
   });
 });
+
+/** 模型往返的起点：界面靠它给「等模型响应」起表，本端没发起这一轮时也只有它有起点 */
+describe("模型往返起点的映射", () => {
+  it("turn_start 映射成一帧不带载荷的 step_start", () => {
+    assert.deepEqual(toSseEvents(piEvent({ type: "turn_start" })), [
+      { event: "step_start", data: {} },
+    ]);
+  });
+
+  it("turn_end 不下发：阶段由客户端按帧推进，多一帧只是多一次无意义的重渲染", () => {
+    assert.deepEqual(toSseEvents(piEvent({ type: "turn_end" })), []);
+  });
+});
