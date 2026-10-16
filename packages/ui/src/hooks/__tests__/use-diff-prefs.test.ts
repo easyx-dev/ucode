@@ -1,8 +1,8 @@
-/** diff-prefs：diff 视图的展示偏好（默认双栏、不换行，只认认识的存量值） */
+/** diff 展示偏好：默认双栏、不换行，只认认识的存量值 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DEFAULT_DIFF_MODE, DEFAULT_DIFF_WRAP, diffModeOf, diffWrapOf } from "../diff-prefs";
+import { DEFAULT_DIFF_MODE, DEFAULT_DIFF_WRAP, diffModeOf, diffWrapOf } from "../use-diff-prefs";
 
 describe("diffModeOf", () => {
   it("默认双栏", () => {

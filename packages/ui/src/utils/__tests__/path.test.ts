@@ -1,8 +1,8 @@
-/** path：绝对路径判定、分隔符归一、路径包含关系与末段取名 */
+/** path：绝对路径判定、分隔符归一、路径包含关系、末段取名与长路径缩写 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { baseName, isAbsolutePath, isUnderPath, resolveFromCwd } from "../path";
+import { baseName, isAbsolutePath, isUnderPath, resolveFromCwd, shortenPath } from "../path";
 
 describe("isAbsolutePath", () => {
   it("认 POSIX 绝对路径与 Windows 盘符 / UNC", () => {
@@ -55,5 +55,37 @@ describe("baseName", () => {
     assert.equal(baseName("C:\\work\\repo\\"), "repo");
     assert.equal(baseName("C:\\"), "C:");
     assert.equal(baseName("\\\\server\\share\\proj"), "proj");
+  });
+});
+
+describe("shortenPath", () => {
+  it("装得下就原样返回", () => {
+    assert.equal(shortenPath("src/a.ts", 42), "src/a.ts");
+    assert.equal(shortenPath("/repo/src/a.ts", 42), "/repo/src/a.ts");
+  });
+
+  it("Windows 的 `\\` 也按段收", () => {
+    assert.equal(shortenPath("C:\\repo\\packages\\ui\\src\\a.ts", 20), "…/ui/src/a.ts");
+  });
+
+  it("留尾部：从后往前收整段，前缀收成 `…/`", () => {
+    const path = "/srv/checkout/app/packages/ui/src/business/chat/tool/x.tsx";
+    assert.equal(shortenPath(path, 30), "…/src/business/chat/tool/x.tsx");
+    assert.equal(shortenPath(path, 20), "…/chat/tool/x.tsx");
+    assert.equal(shortenPath(path, 12), "…/tool/x.tsx");
+  });
+
+  it("一段都装不下时硬留末段尾部，文件名仍认得出", () => {
+    assert.equal(shortenPath("/a/working-indicator.tsx", 10), "…cator.tsx");
+  });
+
+  it("结果不超预算（除末段本身超长那种）", () => {
+    const path = "/srv/checkout/app/packages/ui/src/index.ts";
+    for (const max of [8, 12, 20, 30, 40, 60]) {
+      assert.ok(
+        shortenPath(path, max).length <= Math.max(max, 1),
+        `${max}: ${shortenPath(path, max)}`,
+      );
+    }
   });
 });

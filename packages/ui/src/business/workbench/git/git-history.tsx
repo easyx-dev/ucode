@@ -3,14 +3,14 @@ import type { GitCommitSummary } from "@ucode/contracts";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { DiffDisplayControls } from "../../../base/diff-controls";
 import { Spinner } from "../../../base/spinner";
+import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import { relativeTimeLabel } from "../../../utils/time";
 import { useGitCommit, useGitLog } from "../use-workbench-data";
-import { DiffDisplayControls } from "./diff-controls";
 import { DiffStack, type DiffStackItem } from "./diff-stack";
 import { GitCounts } from "./git-change-marks";
 import { GitCommitList } from "./git-commit-list";
-import { useDiffPreferences } from "./use-diff-prefs";
 
 /** 一次拉取的提交条数；「加载更多」按这个步长翻页 */
 const PAGE_SIZE = 30;

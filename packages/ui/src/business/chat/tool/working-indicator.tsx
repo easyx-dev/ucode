@@ -1,13 +1,11 @@
 /**
- * 生成中的尾部提示：加载图标 + 当前状态与它已走的时长，悬停展开本步的分段耗时明细。
+ * 生成中的尾部提示：加载图标 + 「工作中」+ 本轮已走的时间，悬停展开本步的分段耗时明细。
  *
- * 行内只回答「现在卡在哪、卡了多久」——把本步分段与本轮总耗时并排摆在同一行，两个读数没有主次，
- * 看不出哪个是哪个；明细交给浮层（数据见 `StreamPhase` 与 `stepBreakdown`）。
+ * 行内只报一个数——本轮总耗时（与落定后页脚里的耗时同源）。模型现在在做什么（等响应 / 等首帧 /
+ * 生成 / 跑哪个工具 / 在等用户）以及本步四段的读数都收进浮层：与总耗时并排摆着，那两个数看着
+ * 像同一件事，读者得先分辨才能读出意思。
  *
- * 等用户（审批 / 提问挂起）不换阶段而是换文案，读数变成「等了你多久」：与状态条的口径一致
- * （待答请求优先于生成中），也免得把等用户的时间看成工具慢。
- *
- * 计时是纯前端——起点分别取帧到达与本轮用户消息的时刻，刷新页面也能接着算。
+ * 计时是纯前端——起点取帧到达与本轮用户消息的时刻，刷新页面也能接着算。
  */
 import { type StepSegmentRow, type StreamPhase, stepBreakdown } from "@ucode/sdk";
 import { cn } from "cn";
@@ -45,29 +43,20 @@ const elapsedMs = (startedAt: number | string | undefined, now: number): number 
   return Number.isNaN(start) ? undefined : Math.max(0, now - start);
 };
 
-/** 正在做的事：等用户优先，工具阶段报工具名，并行调用多种时报种类数 */
-const phaseLabelOf = (phase: StreamPhase, t: TFunction): string => {
-  if (phase.waiting) {
-    return phase.waiting.kind === "question" ? t("等待你的回答") : t("等待权限审批");
-  }
-  switch (phase.kind) {
-    case "waitingResponse":
-      return t("等待模型响应");
-    case "waitingFirstToken":
-      return t("等待首帧");
-    case "streaming":
-      return t("生成中");
-    case "tool": {
-      const names = [...new Set(phase.tools.map((tool) => tool.name))];
-      const only = names.length === 1 ? names[0] : undefined;
-      if (only) return t("执行 {{name}}", { name: toolTitleOf(only, t) });
-      return names.length > 1 ? t("执行 {{count}} 个工具", { count: names.length }) : t("工作中");
-    }
-  }
+/**
+ * 浮层里工具段的文案：正跑着就报工具名（一眼看出卡在哪个工具），跑完只报汇总。
+ * 工具名对不上的（未登记的 MCP 工具等）由 `toolTitleOf` 回落成原名。
+ */
+const toolRowLabelOf = (phase: StreamPhase, t: TFunction): string => {
+  if (phase.kind !== "tool") return t("执行工具");
+  const names = [...new Set(phase.tools.map((tool) => tool.name))];
+  const only = names.length === 1 ? names[0] : undefined;
+  if (only) return t("执行 {{name}}", { name: toolTitleOf(only, t) });
+  return names.length > 1 ? t("执行 {{count}} 个工具", { count: names.length }) : t("执行工具");
 };
 
-/** 浮层里分段的名字：与行内同一套词，只有工具段是汇总（具体工具名在行内报） */
-const segmentLabelOf = (key: StepSegmentRow["key"], t: TFunction): string => {
+/** 浮层里分段的名字：与行内同一套词，工具段另行接上工具名 */
+const segmentLabelOf = (key: StepSegmentRow["key"], phase: StreamPhase, t: TFunction): string => {
   switch (key) {
     case "response":
       return t("等待模型响应");
@@ -76,8 +65,17 @@ const segmentLabelOf = (key: StepSegmentRow["key"], t: TFunction): string => {
     case "streaming":
       return t("生成中");
     case "tool":
-      return t("执行工具");
+      return toolRowLabelOf(phase, t);
   }
+};
+
+/**
+ * 等用户那一行：正挂起就报「等待权限审批 / 等待你的回答」（这行读数就是已经等了多久），等过了报
+ * 「其中等用户」——它在工具段里重叠加过账，不与「本次请求」相加。
+ */
+const waitRowLabelOf = (phase: StreamPhase, t: TFunction): string => {
+  if (!phase.waiting) return t("其中等用户");
+  return phase.waiting.kind === "question" ? t("等待你的回答") : t("等待权限审批");
 };
 
 /** 浮层里的一行：左文案右读数，读数等宽，逐秒变化时左右不会抖 */
@@ -104,12 +102,7 @@ export function WorkingIndicator({
 }) {
   const { t } = useTranslation();
   const now = useNow(!compacting && (Boolean(startedAt) || Boolean(phase)));
-  // 行内的读数只有一个：当前状态已经走了多久（等用户时就是等了多久）
-  const liveMs = compacting
-    ? undefined
-    : phase
-      ? elapsedMs(phase.waiting ? phase.waiting.since : phase.startedAt, now)
-      : elapsedMs(startedAt, now);
+  // 行内的读数只有一个：本轮已经走了多久（与落定后页脚里的耗时同源）
   const turnMs = compacting ? undefined : elapsedMs(startedAt, now);
   const detail = phase && !compacting ? stepBreakdown(phase, now) : null;
 
@@ -122,27 +115,27 @@ export function WorkingIndicator({
           className="flex w-fit items-center gap-2 text-xs text-foreground-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           <Spinner />
-          {compacting ? t("正在压缩上下文…") : phase ? phaseLabelOf(phase, t) : t("工作中")}
-          {liveMs !== undefined && liveMs >= MIN_VISIBLE_MS ? (
-            <span className="tabular-nums">{durationLabel(liveMs, "second")}</span>
+          {compacting ? t("正在压缩上下文…") : t("工作中")}
+          {turnMs !== undefined && turnMs >= MIN_VISIBLE_MS ? (
+            <span className="tabular-nums">{durationLabel(turnMs, "second")}</span>
           ) : null}
         </button>
       </TooltipTrigger>
-      {detail ? (
+      {phase && detail ? (
         <TooltipContent side="top">
           <div className="flex flex-col gap-1">
             <DetailRow label={t("本次请求")} value={durationLabel(detail.totalMs, "second")} />
             {detail.rows.map((row) => (
               <DetailRow
                 key={row.key}
-                label={segmentLabelOf(row.key, t)}
+                label={segmentLabelOf(row.key, phase, t)}
                 value={durationLabel(row.ms, "second")}
                 muted
               />
             ))}
             {detail.userWaitMs > 0 ? (
               <DetailRow
-                label={t("其中等用户")}
+                label={waitRowLabelOf(phase, t)}
                 value={durationLabel(detail.userWaitMs, "second")}
                 muted
               />

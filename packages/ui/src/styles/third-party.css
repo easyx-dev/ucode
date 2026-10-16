@@ -62,6 +62,47 @@
 }
 
 /*
+ * 工具卡的 diff 不报行号（`.tool-diff` 挂在卡片里那层滚动容器上）：它的 patch 由「改前 / 改后」
+ * 片段拼成，行号从 1 起、不是文件里的位置，当文件位置读会带偏。库那套行号留给 git 面板。
+ *
+ * 行号那一格与 hunk 行那一格都收成 0 宽：库把宽与最小宽写在内联样式上，只能 `!important` 压。
+ * `min-width` 不一起收的话收不掉——表格单元格的 `min-width` 会参与列的最小宽，库给这一列设的
+ * `min-w`（分栏 40px、统一 100px）就是那个底。
+ * 收完之后这一列只剩 hunk 行那枚「展开未变更区域」的按钮（它同属这一列），列宽于是由它定：
+ * 没有可展开区域时是 0，有时是按钮的宽度；两种情形下所有行共用同一列，不会错位。
+ * 只有 `width` / `min-width` 需要 `!important`，内边距不必——库那边也是类名写的。
+ * 这与上面「行号列宽度不要动」不冲突：这里要的是整列收掉，不是争宽窄。
+ *
+ * 不用 `display: none`：单元格参与表格列模型，直接不生成盒子会把内容挪到第一列，与 hunk 行、
+ * 「展开未变更区域」行的两列写法错位。
+ */
+.tool-diff .diff-line-num,
+.tool-diff .diff-line-old-num,
+.tool-diff .diff-line-new-num {
+  /* biome-ignore lint/complexity/noImportantStyles: 库把列宽写在这几个格子的内联样式上 */
+  width: 0 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: 同上（库写在类名里的 `min-w` 与内联 `minWidth` 都会撑住这一列） */
+  min-width: 0 !important;
+  /* 10px 的左右内边距会给这一列留下 20px 的底（单元格的最小内容宽度），去掉它 */
+  padding: 0;
+}
+.tool-diff .diff-line-num > *,
+.tool-diff .diff-line-old-num > *,
+.tool-diff .diff-line-new-num > * {
+  display: none;
+}
+
+.tool-diff .diff-line-hunk-action {
+  /* biome-ignore lint/complexity/noImportantStyles: 库把列宽写在 hunk 行那一格的内联样式上 */
+  width: 0 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: 同上 */
+  min-width: 0 !important;
+  /* 左右各留 4px：列宽就归那枚 16px 的图标，点击区不至于小到不好点 */
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/*
  * diff 里的语法高亮取色：库对 `.diff-line-syntax-raw *` 写了未分层的 `color: var(--diff-view-light, inherit)`，
  * 而 base.css 里按 `--shiki-light` / `--shiki-dark` 取色的规则在 `@layer base` 中，层叠上输给未分层规则，
  * token 颜色会被压成 inherit（高亮丢失）。这里在库样式之后、用更高的特异性把取色规则补回来。

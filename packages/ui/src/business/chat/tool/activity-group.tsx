@@ -41,7 +41,7 @@ function ThinkingRow({ text, thinkingMs }: { text: string; thinkingMs?: number }
         ) : null}
         <ChevronRight
           className={cn(
-            "size-icon-sm shrink-0 opacity-0 transition group-hover/thought:opacity-100 group-data-[state=open]:opacity-100",
+            "size-icon-sm shrink-0 opacity-0 transition group-hover/thought:opacity-100 group-data-[state=open]/thought:opacity-100",
             open && "rotate-90",
           )}
         />
@@ -112,7 +112,7 @@ export function ActivityGroup({ legs, footer, renderTrailing, onFork }: Activity
           </span>
           <ChevronRight
             className={cn(
-              "size-icon-sm shrink-0 opacity-0 transition group-hover/activity:opacity-100 group-data-[state=open]:opacity-100",
+              "size-icon-sm shrink-0 opacity-0 transition group-hover/activity:opacity-100 group-data-[state=open]/activity:opacity-100",
               open && "rotate-90",
             )}
           />

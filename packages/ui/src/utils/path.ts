@@ -7,6 +7,34 @@ const HOME_PREFIX = /^(?:\/Users\/[^/]+|\/home\/[^/]+|\/root)(?=\/|$)/;
 export const abbreviateHome = (path: string): string => path.replace(HOME_PREFIX, "~");
 
 /**
+ * 长路径的尾部保留缩写：`/a/b/c/d.ts` 在宽度不够时写成 `…/c/d.ts`。
+ *
+ * 保留尾部而不是首部：同一份文件在界面里认的是文件名与它所在的那几层目录（`ui/src/business`），
+ * 前缀（家目录、仓库根）最没信息量，前缀先丢。装得下就原样返回。
+ */
+export const shortenPath = (path: string, maxChars: number): string => {
+  if (path.length <= maxChars) return path;
+
+  // 只切段时归一两种分隔符：装得下仍原样返回，Windows 的 `C:\a\b` 也按段收
+  const segments = normalizeSeparators(path)
+    .split("/")
+    .filter((segment) => segment !== "");
+  const tail: string[] = [];
+  // 逐段从后往前收，直到再添一段就超预算（`…/` 两个字符也算进去）
+  for (const segment of [...segments].reverse()) {
+    if ([...tail, segment].join("/").length + 2 > maxChars) break;
+    tail.unshift(segment);
+  }
+
+  // 一段都装不下（末段本身就超长）时硬留尾部，至少让文件名认得出
+  if (tail.length === 0 && segments.length > 0) {
+    const last = segments[segments.length - 1] ?? "";
+    return `…${last.slice(-Math.max(1, maxChars - 1))}`;
+  }
+  return `…/${tail.join("/")}`;
+};
+
+/**
  * 分隔符归一：Windows 的 `\` 与 POSIX 的 `/` 都归一成 `/`，并去掉尾部分隔符。
  *
  * 不按运行平台选分隔符：路径可能来自另一种写法的接口数据，

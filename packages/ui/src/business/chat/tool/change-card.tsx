@@ -23,7 +23,8 @@ type ChangeCardProps = {
 export function ChangeCard({ entry, footer, onFork }: ChangeCardProps) {
   return (
     <>
-      <div className="rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-border-strong">
+      {/* `group/card`：卡片那圈内边距也要算「悬停卡片」，否则指针落在边缘时行内的悬停操作不现身 */}
+      <div className="group/card rounded-lg bg-muted/40 px-3 py-2.5 ring-1 ring-border-strong">
         <ToolCall entry={entry} />
       </div>
       {footer ? (

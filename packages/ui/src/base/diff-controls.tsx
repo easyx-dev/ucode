@@ -1,14 +1,16 @@
 /**
- * diff 的展示控件：统一 / 双栏切换与自动换行开关（单文件标签与堆叠视图共用）。
+ * diff 的展示控件：统一 / 双栏切换与自动换行开关。
  *
- * 「全部展开 / 收起」不在这里——它要拿到某一份 diff 的库实例，属于各视图自己的事。
+ * 工作台的 git 面板与消息流的改动卡片共用；「全部展开 / 收起」不在这里——它要拿到某一份 diff
+ * 的库实例，属于各视图自己的事。控件本身不存偏好（`hooks/use-diff-prefs` 管那份状态）。
  */
+import { cn } from "cn";
 import { AlignLeft, Columns2, WrapText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { IconButton } from "../../../base/button";
-import { SegmentedControl } from "../../../base/segmented-control";
-import type { DiffMode } from "./diff-prefs";
+import type { DiffMode } from "../hooks/use-diff-prefs";
+import { IconButton } from "./button";
+import { SegmentedControl } from "./segmented-control";
 
 /** 两个控件都不可压缩：工具条窄时宁可挤掉标题，也不要让它们折行 */
 export function DiffDisplayControls({
@@ -16,16 +18,19 @@ export function DiffDisplayControls({
   wrap,
   onSelectMode,
   onToggleWrap,
+  className,
 }: {
   mode: DiffMode;
   wrap: boolean;
   onSelectMode: (mode: DiffMode) => void;
   onToggleWrap: () => void;
+  /** 调用方要自己控制显隐时挂在这一层（如改动卡片里悬停才现） */
+  className?: string;
 }) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className={cn("flex shrink-0 items-center gap-2", className)}>
       <SegmentedControl
         label={t("展示方式")}
         value={mode}

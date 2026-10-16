@@ -7,9 +7,9 @@
 import { cn } from "cn";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
+import type { DiffMode } from "../../../hooks/use-diff-prefs";
 import { useInViewOnce } from "../../../hooks/use-in-view";
 import type { GitDiffTarget } from "../use-workbench-data";
-import type { DiffMode } from "./diff-prefs";
 import { DiffViewer } from "./diff-viewer";
 import { GitCounts, GitStatusMark } from "./git-change-marks";
 import type { GitMark } from "./git-marks";

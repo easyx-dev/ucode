@@ -23,11 +23,14 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../base/collapsible";
+import { DiffDisplayControls } from "../../../base/diff-controls";
 import { Spinner } from "../../../base/spinner";
+import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import { useWorkbench } from "../../../provider/workbench";
-import { resolveFromCwd } from "../../../utils/path";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
+import { resolveFromCwd, shortenPath } from "../../../utils/path";
 import { AttachmentImage } from "../../attachment/attachment-image";
-import { type DiffRow, type DiffRowType, DiffView } from "../../markdown/diff-view";
+import { PatchDiff } from "../../markdown/patch-diff";
 import type { ToolEntry } from "../message/chat-nodes";
 import { type ToolInput, type ToolKind, toolDiff, toolInputOf, toolKindOf } from "./tool-view";
 
@@ -92,36 +95,49 @@ export const toolTitleOf = (name: string, t: TFunction): string => {
   }
 };
 
+/** 路径展示的字符预算：超出后只留尾部（`…/chat/tool/working-indicator.tsx`） */
+const PATH_MAX_CHARS = 42;
+
+/** patch 交给库渲染的行数预算；超过就退回纯文本（库不做虚拟滚动，一次铺几万行会占满主线程） */
+const MAX_DIFF_LINES = 1000;
+
 /**
  * 入参里的路径：工作台可用时做成按钮，点开右侧预览（路径相对会话工作目录解析）。
- * 合成在一个完整路径上，因为它只是展示元素，不参与布局。
+ *
+ * 长路径留尾部：前缀（家目录、仓库根）几乎不携带信息，切掉它才看得见「哪个文件的哪里」；
+ * 容器再窄时用「右对齐 + 裁左边」兜住，被裁掉的一侧正好是那块没信息量的前缀，尾部始终在。
  */
 function PathLabel({ path, range }: { path: string; range?: string }) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   const text = (
-    <span className="truncate font-mono text-xs text-foreground-subtlest" title={path}>
-      {path}
+    <span
+      className="shrink-0 font-mono text-xs whitespace-nowrap text-foreground-subtlest"
+      title={path}
+    >
+      {shortenPath(path, PATH_MAX_CHARS)}
     </span>
   );
   return (
     <>
-      {workbench ? (
-        <button
-          type="button"
-          className="truncate rounded-sm text-left font-mono text-xs text-foreground-subtlest hover:text-foreground hover:underline"
-          title={t("预览 {{path}}", { path })}
-          onClick={(event) => {
-            // 工具行本身可展开，路径点击不应该顺带把行打开 / 收起
-            event.stopPropagation();
-            workbench.openFile(resolveFromCwd(workbench.cwd, path));
-          }}
-        >
-          {text}
-        </button>
-      ) : (
-        text
-      )}
+      <span className="flex min-w-0 justify-end overflow-hidden rounded-sm">
+        {workbench ? (
+          <button
+            type="button"
+            className="rounded-sm text-left font-mono text-xs text-foreground-subtlest hover:text-foreground hover:underline"
+            title={t("预览 {{path}}", { path })}
+            onClick={(event) => {
+              // 工具行本身可展开，路径点击不应该顺带把行打开 / 收起
+              event.stopPropagation();
+              workbench.openFile(resolveFromCwd(workbench.cwd, path));
+            }}
+          >
+            {text}
+          </button>
+        ) : (
+          text
+        )}
+      </span>
       {range ? <span className="shrink-0 font-mono text-xs text-warning">:{range}</span> : null}
     </>
   );
@@ -207,10 +223,6 @@ function OutputView({ text, isError }: { text: string; isError?: boolean }) {
   );
 }
 
-/** 工具 diff 只有行类型与文本，交给统一的 `DiffView` 铺开（行号由 git 面板传入） */
-const toDiffRows = (lines: readonly { type: DiffRowType; text: string }[]): DiffRow[] =>
-  lines.map((line) => ({ type: line.type, text: line.text }));
-
 type ToolCallProps = {
   entry: ToolEntry;
   /** 行内尾部：收起状态下也看得见的入口（如子智能体的「查看进度」） */
@@ -227,7 +239,10 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
   );
   const showArgs = input.type === "none" && args !== null && Object.keys(args).length > 0;
   const diff = useMemo(() => toolDiff(entry.name, entry.args), [entry.name, entry.args]);
+  // 预算按 patch 行数算而不是改动量：编辑距离那道闸门只管比对，管不到渲染
+  const diffLines = useMemo(() => (diff ? diff.patch.split("\n").length : 0), [diff]);
   const output = (entry.result ?? "").trimEnd();
+  const { mode, wrap, selectMode, toggleWrap } = useDiffPreferences();
 
   // 一律默认折叠：失败与执行中由状态图标提示，要不要看细节由用户决定
   const [open, setOpen] = useState(false);
@@ -257,6 +272,24 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
           ) : null}
         </span>
         {trailing}
+        {/* 改动卡片有 diff 时先撑开：状态图标与小三角一律贴右沿，超预算退回纯文本那支也一样 */}
+        {diff !== null ? <span className="flex-1" /> : null}
+        {/* 改动卡片把 diff 的展示方式摆在头部：改完就想看改动，不必再跑一趟 git 面板。
+            靠右对齐、悬停卡片或展开时才现：控件一直占着位置（opacity 而不是 display），出现时不挤动路径；
+            键盘 Tab 进来的那一刻也现（focus-within），触屏没有悬停态则常驻（HOVER_ACTION_CLASS）。
+            `group-hover/card` 管卡片那圈内边距，`group-hover/tool` 管行本身 */}
+        {diff !== null && diffLines <= MAX_DIFF_LINES ? (
+          <DiffDisplayControls
+            className={cn(
+              HOVER_ACTION_CLASS,
+              "group-hover/tool:opacity-100 group-hover/card:opacity-100 group-data-[state=open]/tool:opacity-100 focus-within:opacity-100",
+            )}
+            mode={mode}
+            wrap={wrap}
+            onSelectMode={selectMode}
+            onToggleWrap={toggleWrap}
+          />
+        ) : null}
         <span
           className="flex shrink-0 items-center"
           role="img"
@@ -273,7 +306,7 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
         </span>
         <ChevronRight
           className={cn(
-            "size-icon-sm shrink-0 text-foreground-subtle opacity-0 transition group-hover/tool:opacity-100 group-data-[state=open]:opacity-100",
+            "size-icon-sm shrink-0 text-foreground-subtle opacity-0 transition group-hover/tool:opacity-100 group-hover/card:opacity-100 group-data-[state=open]/tool:opacity-100",
             open && "rotate-90",
           )}
         />
@@ -300,7 +333,22 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
             </div>
           ) : null}
           {diff !== null ? (
-            <DiffView rows={toDiffRows(diff)} className="max-h-96 overflow-y-auto" />
+            diffLines > MAX_DIFF_LINES ? (
+              <>
+                <p className="text-xs text-foreground-subtle">
+                  {t("改动过大，只给纯文本 diff（{{value}} 行）", { value: diffLines })}
+                </p>
+                <pre className="max-h-96 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs leading-relaxed whitespace-pre">
+                  {diff.patch}
+                </pre>
+              </>
+            ) : (
+              // 高度照工具卡的惯例收在 `max-h-96` 内滚动；展示方式由头部那两个控件决定。
+              // `tool-diff` 是样式钩子（见 `styles/third-party.css`）：卡片里的行号不是文件位置
+              <div className="tool-diff max-h-96 overflow-y-auto">
+                <PatchDiff data={diff} mode={mode} wrap={wrap} />
+              </div>
+            )
           ) : null}
           {showArgs ? (
             <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">

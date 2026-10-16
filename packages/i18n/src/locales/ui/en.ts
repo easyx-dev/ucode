@@ -971,6 +971,8 @@ export default {
   "二进制文件，git 不展开差异": "Binary file; git does not expand its diff",
   没有差异: "No differences",
   "差异过大，已按上限截断": "The diff is too large and was truncated",
+  "改动过大，只给纯文本 diff（{{value}} 行）":
+    "The change is too large; showing the plain-text diff ({{value}} lines)",
   统一: "Unified",
   双栏: "Split",
   全部展开: "Expand all",

@@ -7,14 +7,14 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { DiffDisplayControls } from "../../../base/diff-controls";
 import { Spinner } from "../../../base/spinner";
+import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import { useGitStatus } from "../use-workbench-data";
-import { DiffDisplayControls } from "./diff-controls";
 import { DiffStack, type DiffStackItem } from "./diff-stack";
 import { GitCounts } from "./git-change-marks";
 import { countChanges, type GitChangeGroup, groupChanges } from "./git-groups";
 import { markOf } from "./git-marks";
-import { useDiffPreferences } from "./use-diff-prefs";
 
 /** 分组标题文案（key 即中文原文；查表取值处已收窄 t 的签名） */
 const GROUP_TITLE: Record<GitChangeGroup["id"], string> = {

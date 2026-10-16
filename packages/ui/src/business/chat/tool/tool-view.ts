@@ -3,7 +3,7 @@
  * 只做纯计算，不引入 i18n——中文文案由组件用 `t()` 取，避免在纯逻辑里散落界面文案。
  */
 import type { ToolEntry } from "../message/chat-nodes";
-import { type DiffLine, diffLines } from "./text-diff";
+import { type TextChange, type TextPatch, toTextPatch } from "./text-diff";
 
 export type ToolKind =
   | "read"
@@ -142,7 +142,7 @@ export const toolInputOf = (name: string, args: unknown): ToolInput => {
 };
 
 /** edit 的改动列表；兼容 `edits[]` 与单组 `oldText` / `newText` */
-export const editChanges = (args: unknown): Array<{ oldText: string; newText: string }> => {
+export const editChanges = (args: unknown): TextChange[] => {
   const record = asRecord(args);
   const edits = record.edits;
   if (Array.isArray(edits)) {
@@ -160,24 +160,30 @@ export const editChanges = (args: unknown): Array<{ oldText: string; newText: st
 
 const writeContent = (args: unknown): string | undefined => text(asRecord(args).content);
 
-/** 编辑 / 写入的差异行；其它工具返回 null 表示走普通输出 */
-export const toolDiff = (name: string, args: unknown): DiffLine[] | null => {
+/** 改动列表：`edit` 取它的改动，`write` 一律当成「旧侧为空」；不写盘或拿不到内容时为 null */
+const changesOf = (name: string, args: unknown): TextChange[] | null => {
   if (name === "write") {
     const content = writeContent(args);
-    return content === undefined ? null : diffLines("", content);
+    return content === undefined ? null : [{ oldText: "", newText: content }];
   }
   if (name === "edit") {
     const changes = editChanges(args);
-    if (changes.length === 0) return null;
-    const lines: DiffLine[] = [];
-    changes.forEach((change, index) => {
-      // 多次改动之间空一行，便于区分不同 hunk
-      if (index > 0) lines.push({ type: "ctx", text: "" });
-      lines.push(...diffLines(change.oldText, change.newText));
-    });
-    return lines;
+    return changes.length === 0 ? null : changes;
   }
   return null;
+};
+
+/** 写盘类工具的改动：patch 与两侧原文，外加入参里的路径（库按扩展名决定高亮的语言） */
+export type ToolDiff = { fileName: string } & TextPatch;
+
+/** 编辑 / 写入的改动；其它工具、拿不到内容、两侧无差异时返回 null，表示走普通输出 */
+export const toolDiff = (name: string, args: unknown): ToolDiff | null => {
+  const changes = changesOf(name, args);
+  if (changes === null) return null;
+
+  const fileName = argPath(asRecord(args)) ?? "";
+  const patch = toTextPatch(fileName, changes);
+  return patch.patch === "" ? null : { fileName, ...patch };
 };
 
 /**

@@ -9,11 +9,12 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { IconButton } from "../../../base/button";
+import { DiffDisplayControls } from "../../../base/diff-controls";
+import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
+import type { PatchDiffRef } from "../../markdown/patch-diff";
 import type { GitDiffTarget } from "../use-workbench-data";
-import { DiffDisplayControls } from "./diff-controls";
-import { type DiffFileRef, DiffViewer } from "./diff-viewer";
+import { DiffViewer } from "./diff-viewer";
 import { GitCounts, GitStatusMark } from "./git-change-marks";
-import { useDiffPreferences } from "./use-diff-prefs";
 import { useFileDiff } from "./use-file-diff";
 
 export function GitFileDiff({
@@ -28,7 +29,7 @@ export function GitFileDiff({
   const data = fileDiff.diff.data;
   const { mode, wrap, selectMode, toggleWrap } = useDiffPreferences();
   const [allExpanded, setAllExpanded] = useState(false);
-  const diffRef = useRef<DiffFileRef>(null);
+  const diffRef = useRef<PatchDiffRef>(null);
 
   /** 全部展开 / 收起：直接调库的实例方法，状态以按钮自己的记忆为准 */
   const toggleAll = (): void => {
