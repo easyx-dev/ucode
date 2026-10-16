@@ -13,6 +13,7 @@ import { buildChatNodes, type ChatFooter, type ChatNode } from "./chat-nodes";
 type ContentNode = Extract<ChatNode, { kind: "content" }>;
 type ActivityNode = Extract<ChatNode, { kind: "activity" }>;
 type QuestionNode = Extract<ChatNode, { kind: "question" }>;
+type ChangeNode = Extract<ChatNode, { kind: "change" }>;
 type PermissionNode = Extract<ChatNode, { kind: "permission" }>;
 type CompactionNode = Extract<ChatNode, { kind: "compaction" }>;
 type InjectedNode = Extract<ChatNode, { kind: "injected" }>;
@@ -48,6 +49,9 @@ export type ChatActivityRow = ChatRowBase & {
 /** 提问行：一次提问与用户的答复，独立成段（不并进聚合行） */
 export type ChatQuestionRow = ChatRowBase & { kind: "question"; node: QuestionNode };
 
+/** 改动卡片行：一次写盘（`edit` / `write`）与它的行级 diff，独立成段（不并进聚合行） */
+export type ChatChangeRow = ChatRowBase & { kind: "change"; node: ChangeNode };
+
 /** 审批记录行：一次权限确认的对象与结论，独立成段（不并进聚合行） */
 export type ChatPermissionRow = ChatRowBase & { kind: "permission"; node: PermissionNode };
 
@@ -78,6 +82,7 @@ export type ChatRow =
   | ChatContentRow
   | ChatActivityRow
   | ChatQuestionRow
+  | ChatChangeRow
   | ChatPermissionRow
   | ChatCompactionRow
   | ChatInjectedRow
@@ -120,6 +125,7 @@ const rowOfNode = (
   if (node.kind === "content") return { ...base, kind: "content", node };
   if (node.kind === "activity") return { ...base, kind: "activity", node };
   if (node.kind === "question") return { ...base, kind: "question", node };
+  if (node.kind === "change") return { ...base, kind: "change", node };
   return { ...base, kind: "permission", node };
 };
 

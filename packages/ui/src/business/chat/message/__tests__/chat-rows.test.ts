@@ -24,6 +24,14 @@ const text = (value: string): MessageBlock => ({ type: "text", text: value });
 const thinking = (value: string): MessageBlock => ({ type: "thinking", text: value });
 const call = (id: string, name: string): MessageBlock => ({ type: "toolCall", id, name, args: {} });
 
+/** 带真实入参的调用：改动卡片要按入参比 diff，不能只给空对象 */
+const callWith = (id: string, name: string, args: unknown): MessageBlock => ({
+  type: "toolCall",
+  id,
+  name,
+  args,
+});
+
 const userItem = (id: string, value: string): ChatItem => ({
   id,
   role: "user",
@@ -200,12 +208,12 @@ describe("buildChatRows 的聚合", () => {
       userItem("u1", "问题"),
       assistantItem("a1", [thinking("想一下"), call("c1", "bash")]),
       toolItem("t1", "c1", "bash", "输出"),
-      assistantItem("a2", [thinking("接着想"), call("c2", "edit")]),
-      toolItem("t2", "c2", "edit", "改了"),
+      assistantItem("a2", [thinking("接着想"), call("c2", "grep")]),
+      toolItem("t2", "c2", "grep", "命中"),
     ]);
 
     assert.deepEqual(kindsOf(rows), ["content", "activity"]);
-    assert.equal(legsOf(rowsOfKind(rows, "activity")[0]!), "thought+bash+thought+edit");
+    assert.equal(legsOf(rowsOfKind(rows, "activity")[0]!), "thought+bash+thought+grep");
   });
 
   it("正文按定义打断聚合，切成三段独立的行", () => {
@@ -358,6 +366,49 @@ describe("buildChatRows 的页脚归位", () => {
       footerRows(rows).map((row) => row.turnKey),
       ["u1", "u2"],
     );
+  });
+});
+
+describe("buildChatRows 的改动卡片", () => {
+  it("编辑独立成卡片：两侧聚合被切开，自己带上入参", () => {
+    const rows = buildChatRows([
+      userItem("u1", "改一下"),
+      assistantItem("a1", [
+        call("c1", "read"),
+        callWith("c2", "edit", { edits: [{ oldText: "甲", newText: "乙" }] }),
+        call("c3", "bash"),
+      ]),
+    ]);
+
+    assert.deepEqual(kindsOf(rows), ["content", "activity", "change", "activity"]);
+    assert.equal(legsOf(rowsOfKind(rows, "activity")[0]!), "read");
+    assert.equal(legsOf(rowsOfKind(rows, "activity")[1]!), "bash");
+
+    const change = rowsOfKind(rows, "change")[0];
+    assert.equal(change?.key, "change:c2");
+    assert.equal(change?.node.entry.name, "edit");
+  });
+
+  it("写入同样独立成卡片，与编辑连在一起也各自一张", () => {
+    const rows = buildChatRows([
+      userItem("u1", "写一点"),
+      assistantItem("a1", [
+        callWith("c1", "write", { content: "新文件" }),
+        callWith("c2", "write", { content: "另一个" }),
+      ]),
+    ]);
+
+    assert.deepEqual(kindsOf(rows), ["content", "change", "change"]);
+    assert.deepEqual(keysOf(rows).slice(1), ["change:c1", "change:c2"]);
+  });
+
+  it("改动卡片承载轮页脚（它也是本轮的回答之一）", () => {
+    const rows = buildChatRows([
+      userItem("u1", "改一下"),
+      assistantItem("a1", [callWith("c1", "edit", { oldText: "甲", newText: "乙" })], AT),
+    ]);
+
+    assert.equal(rowsOfKind(rows, "change")[0]?.footer?.item.id, "a1");
   });
 });
 

@@ -100,6 +100,21 @@ type QuestionNode = {
   footer?: ChatFooter;
 };
 
+/**
+ * 一次写盘（`edit` / `write`）：独立成一卡片，展开看行级 diff，不并进聚合行。
+ *
+ * 聚合行把改动折进一句「使用了 2 个 编辑」，事后回看时看不出到底改了哪几行；而「改了什么」正是
+ * 用户最常回看的内容。`write` 保持中性标题：pi 的 write 是 create-or-overwrite，区分不出新建与覆盖。
+ */
+type ChangeNode = {
+  kind: "change";
+  key: string;
+  entry: ToolEntry;
+  /** 发起这次调用的 assistant 消息 */
+  source?: ChatItem;
+  footer?: ChatFooter;
+};
+
 /** 一次权限审批记录：独立成段，不并进聚合行 */
 type PermissionNode = {
   kind: "permission";
@@ -167,6 +182,7 @@ export type ChatNode =
   | ContentNode
   | ActivityNode
   | QuestionNode
+  | ChangeNode
   | PermissionNode
   | CompactionNode
   | InjectedNode
@@ -186,6 +202,7 @@ type ToolCallBlock = Extract<MessageBlock, { type: "toolCall" }>;
 type AssistantLeg =
   | { kind: "thought"; key: string; text: string }
   | { kind: "tool"; key: string; entry: ToolEntry }
+  | { kind: "change"; key: string; entry: ToolEntry }
   | {
       kind: "question";
       key: string;
@@ -197,6 +214,12 @@ type AssistantLeg =
 
 /** 交互式提问的工具名：它自己成段展示（含答复），不并进聚合行 */
 const QUESTION_TOOL = "question";
+
+/**
+ * 写盘类工具：改动本身就是要看的东西，也独立成段（见 `tool/change-card`）。
+ * 其余工具仍折进聚合行——一次轮次里几十次读 / 跑，逐条铺开会把回答挤出屏幕。
+ */
+const isChangeTool = (name: string): boolean => name === "edit" || name === "write";
 
 /** 入参来自模型，形状不可信：逐项挑出合法字段，缺 header / question 的条目直接丢弃 */
 const questionItemsOf = (args: unknown): QuestionItem[] => {
@@ -313,6 +336,15 @@ const buildAssistantLegs = (
         });
         return;
       }
+      // 写盘类工具的改动独立成卡片，不并进聚合行
+      if (isChangeTool(block.name)) {
+        legs.push({
+          kind: "change",
+          key: block.id,
+          entry: toolEntryOf(item, block, results, skillHits),
+        });
+        return;
+      }
       legs.push({
         kind: "tool",
         key: block.id,
@@ -340,7 +372,7 @@ const buildAssistantLegs = (
   return legs;
 };
 
-/** 把一段的段追加进节点列表：连续段续到末位聚合行，正文与提问各自成节点 */
+/** 把一段的段追加进节点列表：连续段续到末位聚合行，正文 / 提问 / 改动各自成节点 */
 const appendLegs = (nodes: ChatNode[], legs: AssistantLeg[], item: ChatItem): void => {
   for (const leg of legs) {
     if (leg.kind === "content") {
@@ -363,6 +395,11 @@ const appendLegs = (nodes: ChatNode[], legs: AssistantLeg[], item: ChatItem): vo
         settled: leg.settled,
         source: item,
       });
+      continue;
+    }
+
+    if (leg.kind === "change") {
+      nodes.push({ kind: "change", key: `change:${leg.key}`, entry: leg.entry, source: item });
       continue;
     }
 
@@ -394,6 +431,7 @@ const appendToolResult = (nodes: ChatNode[], item: ChatItem, callIds: Set<string
     running: Boolean(item.live),
   };
   const last = nodes[nodes.length - 1];
+  // 孤立的写盘结果没有入参、比不出 diff，留在聚合行里（有入参的那种见 `appendLegs` 的改动卡片）
   if (last?.kind === "activity") last.legs.push({ kind: "tool", key: entry.id, entry });
   else
     nodes.push({

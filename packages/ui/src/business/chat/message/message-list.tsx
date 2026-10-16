@@ -28,6 +28,7 @@ import { MessageRow } from "./message-row";
 const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
   content: 120,
   activity: 36,
+  change: 52,
   question: 180,
   permission: 72,
   compaction: 44,

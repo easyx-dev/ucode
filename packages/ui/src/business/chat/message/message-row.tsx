@@ -12,6 +12,7 @@ import { GoalTurnLine } from "../../goal/goal-turn-line";
 import { PermissionRecordView } from "../decision/permission-record";
 import { QuestionForm } from "../decision/question-form";
 import { ActivityGroup } from "../tool/activity-group";
+import { ChangeCard } from "../tool/change-card";
 import { WorkingIndicator } from "../tool/working-indicator";
 import type { ToolEntry } from "./chat-nodes";
 import type { ChatRow } from "./chat-rows";
@@ -49,6 +50,8 @@ export function MessageRow({ row, context }: { row: ChatRow; context: MessageRow
         onFork={context.onFork}
       />
     );
+  } else if (row.kind === "change") {
+    body = <ChangeCard entry={row.node.entry} footer={row.footer} onFork={context.onFork} />;
   } else if (row.kind === "permission") {
     body = (
       <PermissionRecordView record={row.node.record} footer={row.footer} onFork={context.onFork} />

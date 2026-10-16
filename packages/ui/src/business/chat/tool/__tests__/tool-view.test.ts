@@ -2,7 +2,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { subagentSessionIdOf, summarizeToolNames, toolInputOf, toolKindOf } from "../tool-view";
+import {
+  subagentSessionIdOf,
+  summarizeToolNames,
+  toolDiff,
+  toolInputOf,
+  toolKindOf,
+} from "../tool-view";
 
 describe("summarizeToolNames", () => {
   it("按工具名计数，并按首次出现顺序排列", () => {
@@ -17,6 +23,46 @@ describe("summarizeToolNames", () => {
         { name: "bash", count: 1 },
       ],
     );
+  });
+});
+
+describe("toolDiff", () => {
+  it("写入：旧文本为空，整篇都是新增行", () => {
+    assert.deepEqual(toolDiff("write", { content: "第一行\n第二行" }), [
+      { type: "add", text: "第一行" },
+      { type: "add", text: "第二行" },
+    ]);
+  });
+
+  it("编辑：支持 `edits[]` 与单组 `oldText` / `newText`，两处改动之间空一行", () => {
+    assert.deepEqual(toolDiff("edit", { oldText: "旧", newText: "新" }), [
+      { type: "del", text: "旧" },
+      { type: "add", text: "新" },
+    ]);
+
+    const lines = toolDiff("edit", {
+      edits: [
+        { oldText: "甲", newText: "乙" },
+        { oldText: "丙", newText: "丁" },
+      ],
+    });
+    assert.equal(lines?.filter((line) => line.type === "ctx").length, 1);
+    assert.deepEqual(
+      lines?.filter((line) => line.type !== "ctx"),
+      [
+        { type: "del", text: "甲" },
+        { type: "add", text: "乙" },
+        { type: "del", text: "丙" },
+        { type: "add", text: "丁" },
+      ],
+    );
+  });
+
+  it("入参不可用时返回 null（走普通输出），其它工具一律 null", () => {
+    assert.equal(toolDiff("write", {}), null);
+    assert.equal(toolDiff("edit", { edits: [] }), null);
+    assert.equal(toolDiff("edit", undefined), null);
+    assert.equal(toolDiff("read", { content: "不该有 diff" }), null);
   });
 });
 
