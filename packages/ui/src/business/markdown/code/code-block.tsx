@@ -5,7 +5,10 @@
  * 复制按钮与图块、表格、图片的悬浮按钮同一口径：悬停或键盘聚焦时出现。
  */
 
+import { cn } from "cn";
+
 import { CopyAction } from "../../../base/copy-action";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { useHighlightedLines } from "./use-highlighted-lines";
 
 export function CodeBlock({
@@ -43,7 +46,10 @@ export function CodeBlock({
         </code>
       </pre>
       <CopyAction
-        className="absolute top-2 right-2 bg-card/80 text-foreground opacity-0 backdrop-blur-sm transition group-hover/code:opacity-100 focus-visible:opacity-100"
+        className={cn(
+          HOVER_ACTION_CLASS,
+          "absolute top-2 right-2 bg-card/80 text-foreground backdrop-blur-sm transition group-hover/code:opacity-100 focus-visible:opacity-100",
+        )}
         text={code}
       />
     </div>

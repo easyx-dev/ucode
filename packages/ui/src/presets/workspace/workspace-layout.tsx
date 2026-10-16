@@ -438,7 +438,8 @@ export function WorkspaceLayout({
             </Sheet>
 
             <Sheet open={chrome.workbenchSheetOpen} onOpenChange={chrome.setWorkbenchSheetOpen}>
-              <SheetContent side="right" title={t("工作台")} className="md:hidden">
+              {/* 工作台是铺满屏幕的主面板，不是浮在对话上的抽屉：用实色底，玻璃面会透出下层的对话 */}
+              <SheetContent side="right" title={t("工作台")} className="md:hidden" surface>
                 <WorkbenchPanel />
               </SheetContent>
             </Sheet>

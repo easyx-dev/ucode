@@ -4,9 +4,11 @@
  * 回落刻意不做错误面板——流式未闭合、粘进来的非标准语法都是常态，为一张图弹一次错误提示会打断阅读，
  * 而源码本身仍然可读。尺寸由 mermaid 给定，宽图在块内横向滚动，不缩字。
  */
+import { cn } from "cn";
 import { Loader2, Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../base/button";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { openDialog } from "../../dialog/queue";
 import { MermaidPreviewDialog } from "./mermaid-preview-dialog";
 import { useMermaidSvg } from "./use-mermaid-svg";
@@ -39,7 +41,10 @@ export function MermaidBlock({ code, deferred }: { code: string; deferred?: bool
         </div>
         <Button
           aria-label={t("全屏查看")}
-          className="absolute top-2 right-2 bg-card/80 opacity-0 backdrop-blur-sm transition group-hover/mermaid:opacity-100 focus-visible:opacity-100"
+          className={cn(
+            HOVER_ACTION_CLASS,
+            "absolute top-2 right-2 bg-card/80 backdrop-blur-sm transition group-hover/mermaid:opacity-100 focus-visible:opacity-100",
+          )}
           onClick={openPreview}
           size="icon-xs"
           title={t("全屏查看")}

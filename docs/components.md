@@ -172,7 +172,9 @@ packages/ui/src/
 状态用 `data-*` 属性表达，样式通过 `data-[state=...]:` 变体取值。
 
 **隐藏式操作**：行内操作按钮可以默认隐藏（悬停或聚焦时显现），但必须保留占位（绝对定位或固定宽度），
-不能让它在出现时挤压同行内容。键盘路径同样要能显现（`focus-visible`）。
+不能让它在出现时挤压同行内容。键盘路径同样要能显现（`focus-visible`）；**触屏没有悬停态，这类操作一律常驻**
+（`[@media(pointer:coarse)]:opacity-100`，共用 `HOVER_ACTION_CLASS`，见 `ui/src/utils/hover-actions.ts`）——
+否则移动端要么看不到入口，要么是一枚「看不见但点得到」的盲区。
 
 ## 可访问性
 

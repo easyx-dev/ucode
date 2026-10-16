@@ -21,6 +21,7 @@ import { IconButton } from "../../../base/button";
 import { CopyAction } from "../../../base/copy-action";
 import { useWorkbench } from "../../../provider/workbench";
 import type { ChatItem, EditMessagePayload, MessageBlock } from "../../../types";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { resolveFromCwd } from "../../../utils/path";
 import { clockLabel } from "../../../utils/time";
 import { AttachmentToken } from "../../attachment/attachment-token";
@@ -282,7 +283,12 @@ export function UserMessage({
         </button>
       ) : null}
 
-      <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      <div
+        className={cn(
+          HOVER_ACTION_CLASS,
+          "flex min-h-6 items-center gap-1 focus-within:opacity-100 group-hover:opacity-100",
+        )}
+      >
         <span className="text-xs text-foreground-subtle">{clockLabel(item.createdAt)}</span>
         {canFork ? <ForkAction onClick={() => onFork?.(item)} /> : null}
         {canEdit ? <EditAction onClick={() => setEditing(true)} /> : null}

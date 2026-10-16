@@ -15,12 +15,20 @@ function SheetContent({
   children,
   title,
   side = "left",
+  surface = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   /** 无障碍标题；抽屉由调用方给出本地化文案 */
   title: string;
   /** 滑入方向；左侧用于会话侧栏，右侧用于工作台面板 */
   side?: "left" | "right";
+  /**
+   * 用实色面板底而不是玻璃面。
+   *
+   * 玻璃面是「外壳与侧栏」的底色（见 DESIGN.md「分层」），它压在内容之上会透出下层内容；
+   * 移动端的工作台是铺满屏幕的主面板（不是浮在对话上的抽屉），透出来就成了观感上的半透明。
+   */
+  surface?: boolean;
 }) {
   return (
     <DialogPrimitive.Portal>
@@ -32,7 +40,8 @@ function SheetContent({
         data-slot="sheet-content"
         // 只留入场动画：退场若用 `data-closed:animate-out`，Radix Presence 会在动画结束前一直挂着节点
         className={cn(
-          "fixed inset-y-0 z-50 flex h-full w-full flex-col bg-glass shadow-dialog outline-none supports-backdrop-filter:backdrop-blur-sm",
+          "fixed inset-y-0 z-50 flex h-full w-full flex-col shadow-dialog outline-none",
+          surface ? "bg-surface" : "bg-glass supports-backdrop-filter:backdrop-blur-sm",
           "data-open:animate-in",
           side === "left"
             ? "left-0 border-r border-border data-open:slide-in-from-left"

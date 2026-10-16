@@ -4,12 +4,15 @@
  * 保证每轮只出现一次。要不要渲染由行的 `footer` 决定（生成中的那一轮在投影层就把页脚去掉了）。
  * 模型与供应商都按目录里的显示名展示（见 `utils/model`），目录里查不到才回落原 ID。
  */
+
+import { cn } from "cn";
 import { GitFork } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "../../../base/button";
 import { CopyAction } from "../../../base/copy-action";
 import { useModelNames } from "../../../hooks/store/use-model-names";
 import type { ChatItem } from "../../../types";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { modelRefText } from "../../../utils/model";
 import { thinkingLevelLabel } from "../../../utils/thinking";
 import { clockLabel, durationLabel } from "../../../utils/time";
@@ -66,7 +69,12 @@ export function MessageFooter({ item, durationMs, onFork }: MessageFooterProps) 
     .join(" · ");
 
   return (
-    <div className="flex min-h-6 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+    <div
+      className={cn(
+        HOVER_ACTION_CLASS,
+        "flex min-h-6 items-center gap-1 focus-within:opacity-100 group-hover:opacity-100",
+      )}
+    >
       <span className="min-w-0 flex-1 truncate text-xs text-foreground-subtle" title={full}>
         {[modelLabel, duration].filter(Boolean).join(" · ")}
       </span>

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { ExtraProps } from "streamdown";
 import { IconButton } from "../../../base/button";
 import { useCopyFeedback } from "../../../base/copy-action";
+import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { openDialog } from "../../dialog/queue";
 import { downloadTableCsv, tableToMarkdown } from "./table-export";
 import { TablePreviewDialog } from "./table-preview-dialog";
@@ -54,7 +55,12 @@ export function MarkdownTable({ children }: MarkdownTableProps) {
   return (
     <div className="group/table w-fit max-w-full">
       {/* 表格级操作的统一落点，后续表格操作都加在这一行；高度常驻，免得悬停时顶动下方内容 */}
-      <div className="mb-1 flex min-h-7 items-center justify-end gap-1 opacity-0 transition focus-within:opacity-100 group-hover/table:opacity-100">
+      <div
+        className={cn(
+          HOVER_ACTION_CLASS,
+          "mb-1 flex min-h-7 items-center justify-end gap-1 focus-within:opacity-100 group-hover/table:opacity-100",
+        )}
+      >
         <IconButton label={t("自动换行")} pressed={wrap} onClick={toggleWrap}>
           <WrapText />
         </IconButton>
