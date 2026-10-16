@@ -147,7 +147,7 @@ describe("ProjectService.remember", () => {
       assert.equal(seen.length, 0);
 
       env.service.remember("/work/a", { mode: "plan" });
-      env.service.rename("/work/a", "甲");
+      env.service.update("/work/a", { name: "甲" });
       assert.equal(seen.length, 2);
       assert.equal(seen[1]?.length, 1);
       assert.equal(seen[1]?.[0]?.path, "/work/a");
@@ -204,7 +204,7 @@ describe("ProjectService.reconcile", () => {
     const env = makeService();
     try {
       env.service.remember("/work/alive", { mode: "plan" });
-      env.service.rename("/work/gone", "已经不用的");
+      env.service.update("/work/gone", { name: "已经不用的" });
 
       assert.deepEqual(env.service.reconcile(["/work/./alive"]), ["/work/gone"]);
       assert.deepEqual(
@@ -217,12 +217,12 @@ describe("ProjectService.reconcile", () => {
   });
 });
 
-describe("ProjectService.rename", () => {
+describe("ProjectService.update", () => {
   it("改名对还没有行目录也生效", () => {
     const env = makeService();
     try {
-      assert.equal(env.service.rename("/work/new", "新项目").name, "新项目");
-      assert.equal(env.service.rename("/work/new", null).name, null);
+      assert.equal(env.service.update("/work/new", { name: "新项目" }).name, "新项目");
+      assert.equal(env.service.update("/work/new", { name: null }).name, null);
     } finally {
       env.close();
     }
@@ -231,7 +231,72 @@ describe("ProjectService.rename", () => {
   it("助理工作区不是项目，改名直接 400", () => {
     const env = makeService();
     try {
-      assert.throws(() => env.service.rename(`${WORKSPACES}/s1`, "助理"), /不是项目目录/);
+      assert.throws(() => env.service.update(`${WORKSPACES}/s1`, { name: "助理" }), /不是项目目录/);
+    } finally {
+      env.close();
+    }
+  });
+});
+
+describe("ProjectService.update 的记忆开关", () => {
+  it("显式开关写进项目行并广播，`null` 回到「跟随全局」", () => {
+    const seen: ProjectSummary[][] = [];
+    const env = makeService((list) => seen.push(list));
+    try {
+      assert.equal(env.service.update("/work/a", { memoryEnabled: true }).memoryEnabled, true);
+      assert.equal(env.service.memoryOverrideOf("/work/a"), true);
+
+      assert.equal(env.service.update("/work/a", { memoryEnabled: null }).memoryEnabled, null);
+      assert.equal(env.service.memoryOverrideOf("/work/a"), null);
+      // 两次写入都要广播，各端手上的项目行才跟得上
+      assert.equal(seen.length, 2);
+    } finally {
+      env.close();
+    }
+  });
+
+  it("改开关不改名字，改名字不动开关", () => {
+    const env = makeService();
+    try {
+      env.service.update("/work/a", { name: "甲" });
+      env.service.update("/work/a", { memoryEnabled: false });
+      const project = env.service.update("/work/a", { name: "乙" });
+
+      assert.equal(project.name, "乙");
+      assert.equal(project.memoryEnabled, false);
+    } finally {
+      env.close();
+    }
+  });
+
+  it("改开关时通知装配层重装会话；只改名字不通知", () => {
+    const changed: number[] = [];
+    const root = mkdtempSync(join(tmpdir(), "project-memory-"));
+    created.push(root);
+    const db = openDatabase(join(root, "app.db"));
+    const service = new ProjectService({
+      repository: new ProjectRepository(db),
+      isModelUsable: () => true,
+      hasMode: () => true,
+      workspacesDir: WORKSPACES,
+      onMemoryChange: () => changed.push(Date.now()),
+    });
+    try {
+      service.update("/work/a", { name: "甲" });
+      assert.equal(changed.length, 0);
+      service.update("/work/a", { memoryEnabled: true });
+      assert.equal(changed.length, 1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("未设过与不是项目目录（助理工作区）都算「跟随全局」", () => {
+    const env = makeService();
+    try {
+      assert.equal(env.service.memoryOverrideOf("/work/none"), null);
+      assert.equal(env.service.memoryOverrideOf(`${WORKSPACES}/s1`), null);
+      assert.equal(env.service.memoryOverrideOf(null), null);
     } finally {
       env.close();
     }

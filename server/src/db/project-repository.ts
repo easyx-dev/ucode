@@ -32,6 +32,8 @@ export type ProjectRecord = {
   thinkingLevel: string | null;
   mode: string | null;
   permissionMode: string | null;
+  /** 项目级记忆开关的覆盖；`null` 表示未设过（跟随全局开关） */
+  memoryEnabled: boolean | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,6 +48,7 @@ const PROJECT_COLUMNS = [
   "thinking_level",
   "mode",
   "permission_mode",
+  "memory_enabled",
   "created_at",
   "updated_at",
 ].join(", ");
@@ -65,6 +68,7 @@ const rowSchema = z.object({
   thinking_level: z.string().nullable(),
   mode: z.string().nullable(),
   permission_mode: z.string().nullable(),
+  memory_enabled: z.number().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -80,6 +84,8 @@ const rowToRecord = (row: ProjectRow): ProjectRecord => ({
   thinkingLevel: row.thinking_level,
   mode: row.mode,
   permissionMode: row.permission_mode,
+  // SQLite 没有布尔型：0 / 1 映射回真假，NULL 保持「未设过」
+  memoryEnabled: row.memory_enabled === null ? null : row.memory_enabled !== 0,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -158,6 +164,22 @@ export class ProjectRepository {
          ON CONFLICT(path) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
       )
       .run(randomUUID(), path, name, now, now);
+  }
+
+  /**
+   * 写项目级记忆开关的覆盖；`null` 表示回到「跟随全局」。行不存在时补建，与其它写入同一口径。
+   */
+  setMemoryEnabled(path: string, enabled: boolean | null): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO project (id, path, memory_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(path) DO UPDATE SET
+           memory_enabled = excluded.memory_enabled,
+           updated_at = excluded.updated_at`,
+      )
+      .run(randomUUID(), path, enabled === null ? null : enabled ? 1 : 0, now, now);
   }
 
   /**

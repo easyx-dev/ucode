@@ -2,17 +2,23 @@
 import { z } from "zod";
 
 /**
- * 修改项目：按 `path` 寻址（项目的自然键就是路径），行还不存在时补建。
- * 目前只有「改名」一个可改项，`name` 必给、`null` 表示清空。
+ * 修改项目：按 `path` 寻址（项目的自然键就是路径），行还不存在时补建。只动给到的字段，至少给一个。
  *
  * 模型 / 档位 / 模式不走这个接口：它们由用户在会话里选择后自动写回（见 `sessions/update`），
- * 单一写入口径才不会出现「项目设置」与「会话选择」互相覆盖的情形。
+ * 单一写入口径才不会出现「项目设置」与「会话选择」互相覆盖的情形。记忆开关没有「在会话里选一次」
+ * 这个动作，是纯项目级设置，所以走这里。
  */
-export const projectUpdateInputSchema = z.object({
-  path: z.string().min(1),
-  /** 新的展示名；`null` 表示清空（客户端回落目录末段） */
-  name: z.string().min(1).nullable(),
-});
+export const projectUpdateInputSchema = z
+  .object({
+    path: z.string().min(1),
+    /** 新的展示名；`null` 表示清空（客户端回落目录末段） */
+    name: z.string().min(1).nullable().optional(),
+    /** 项目级记忆开关：`null` 表示回到「跟随全局 `memory.enabled`」 */
+    memoryEnabled: z.boolean().nullable().optional(),
+  })
+  .refine((value) => value.name !== undefined || value.memoryEnabled !== undefined, {
+    message: "至少要给一个要改的字段",
+  });
 
 export type ProjectUpdateRequest = z.input<typeof projectUpdateInputSchema>;
 export type ProjectUpdateInput = z.infer<typeof projectUpdateInputSchema>;

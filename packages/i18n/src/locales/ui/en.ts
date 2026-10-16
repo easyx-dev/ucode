@@ -25,6 +25,8 @@ export default {
   保存: "Save",
   重命名: "Rename",
   重命名项目: "Rename project",
+  开启项目记忆: "Turn on project memory",
+  关闭项目记忆: "Turn off project memory",
   留空即用目录名: "Leave empty to use the directory name",
   删除: "Delete",
   更多操作: "More actions",
@@ -82,8 +84,8 @@ export default {
   // Memory
   记忆: "Memory",
   项目记忆: "Project memory",
-  "开启后，每轮对话结束会在后台回顾并保存项目级长期记忆，同一项目的后续会话自动带上；记忆只保存在本机，并按项目目录隔离。":
-    "When on, each conversation is reviewed in the background and durable facts are saved per project; later sessions in the same project load them automatically. Memory is stored locally and isolated by project directory.",
+  "开启后，每轮对话结束会在后台回顾并保存项目级长期记忆，同一项目的后续会话自动带上；记忆只保存在本机，并按项目目录隔离。这里是默认值，单个项目可以在侧栏的项目行上单独开关。":
+    "When on, each turn ends with a background review that stores long-term project memory, and later sessions in the same project pick it up automatically. Memory stays on this machine and is isolated per project directory. This is the default; each project can be toggled on its sidebar row.",
 
   // Appearance
   界面主题: "Theme",

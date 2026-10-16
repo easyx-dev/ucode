@@ -757,7 +757,8 @@
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `path` | string（长度≥1） | 是 | — | — |
-| `name` | string（长度≥1） \| null | 是 | — | 新的展示名；`null` 表示清空（客户端回落目录末段） |
+| `name` | string（长度≥1） \| null | 否 | — | 新的展示名；`null` 表示清空（客户端回落目录末段） |
+| `memoryEnabled` | boolean \| null | 否 | — | 项目级记忆开关：`null` 表示回到「跟随全局 `memory.enabled`」 |
 
 **响应类型**：`ProjectSummary`
 
@@ -770,6 +771,7 @@
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
 | `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
 | `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `memoryEnabled` | boolean | 是 | 项目级记忆开关的覆盖：`null` 表示未设过（跟随全局 `memory.enabled`）， 否则是这个目录的显式开关。侧栏项目行据此标「已开启记忆」。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
 
@@ -2279,6 +2281,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
 | `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
 | `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `memoryEnabled` | boolean | 是 | 项目级记忆开关的覆盖：`null` 表示未设过（跟随全局 `memory.enabled`）， 否则是这个目录的显式开关。侧栏项目行据此标「已开启记忆」。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
 

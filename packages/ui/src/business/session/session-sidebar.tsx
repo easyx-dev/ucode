@@ -31,6 +31,8 @@ type SessionSidebarProps = {
   onCreateInDirectory: (path: string) => void;
   /** 请求重命名某个项目（对话框由 App 承载） */
   onRenameProject: (path: string) => void;
+  /** 切项目级记忆开关 */
+  onToggleProjectMemory: (path: string) => void;
   /** 项目拖拽后的新次序（从上到下）；写回服务端后各端一致 */
   onReorderProjects: (paths: string[]) => void;
   onArchive: (sessionId: string) => void;
@@ -56,6 +58,7 @@ export function SessionSidebar({
   onCreateAssistant,
   onCreateInDirectory,
   onRenameProject,
+  onToggleProjectMemory,
   onReorderProjects,
   onArchive,
   onTogglePin,
@@ -101,6 +104,7 @@ export function SessionSidebar({
         onCreate={onCreateInDirectory}
         onCreateAssistant={onCreateAssistant}
         onRenameProject={onRenameProject}
+        onToggleProjectMemory={onToggleProjectMemory}
         onReorderProjects={onReorderProjects}
         onArchive={(session) => {
           void confirmArchiveSession(session, t).then((confirmed) => {

@@ -268,6 +268,7 @@ export function WorkspaceLayout({
     onCreateAssistant: actions.startAssistantSession,
     onCreateInDirectory: actions.startInDirectory,
     onRenameProject: actions.requestRenameProject,
+    onToggleProjectMemory: actions.toggleProjectMemory,
     onReorderProjects: (paths: string[]) => {
       void projects.reorder(paths);
     },

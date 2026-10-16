@@ -280,7 +280,7 @@ const createSessionLoader = async (
       agentSection: promptSectionOf(profile, toolNames),
       tools: toolNames,
       variant,
-      memoryEnabled: input.memory?.enabled === true,
+      memoryEnabled: input.memory?.enabledFor(input.cwd) === true,
     }),
   });
   await loader.reload();

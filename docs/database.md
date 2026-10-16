@@ -83,11 +83,13 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 
 ### `project` 表
 
-按会话工作目录（cwd）归口的偏好（schema v10），列分三组语义：
+按会话工作目录（cwd）归口的偏好（schema v11），列分三组语义：
 
 - **展示**：`name`（为空时客户端回落目录末段）、`sort_order`（侧栏里的次序）
 - **会话默认值**：`model` / `thinking_level` / `mode` / `permission_mode`——新建会话时请求里缺的项
   由它们补，用户在会话里改了就写回（见 [`docs/api.md`](./api.md)「项目」）
+- **项目级开关**：`memory_enabled`——项目记忆的覆盖，`NULL` 表示未设过（跟随全局 `memory.enabled`），
+  `0` / `1` 为显式关 / 开（SQLite 没有布尔型，与 `session.running` 同款写法）
 
 `path` 是**项目的自然键**：归一化后的绝对路径，与 `session.cwd` 同一口径（`resolveTargetPath`，
 不做 `realpath`——同一目录的符号链接写法会算成两个项目，与侧栏分组同款行为）。
@@ -98,8 +100,7 @@ SQLite 存的是应用自有数据：会话索引与展示用元数据。**会�
 模型 / 模式这类「可能已经不可用」的值只在读取时校验：读到非法枚举、
 模型已不存在、模式角色已移除，一律按未设置回落（与 `session` 表的枚举读法一致）。
 
-`sort_order` 是侧栏的拖拽次序（`projects/reorder` 写回 0..n-1），为空表示还没排过；
-列表顺序就是侧栏顺序：`ORDER BY sort_order IS NULL, sort_order, created_at DESC`——
+`sort_order` 是侧栏的拖拽次序（`projects/reorder` 写回 0..n-1），为空表示还没排过；列表顺序就是侧栏顺序：`ORDER BY sort_order IS NULL, sort_order, created_at DESC`——
 排过的在前，没排过的按登记时间降序接在后面。`updated_at` 不进排序键：项目里发条消息就把它的位置顶走，
 顺序就变成随使用情况乱跳了。
 

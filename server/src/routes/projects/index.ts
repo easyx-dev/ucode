@@ -1,4 +1,4 @@
-/** /api/v1/projects：项目列表、改名与重排（模型 / 档位 / 模式由会话里的选择写回，不走这里） */
+/** /api/v1/projects：项目列表、改设置与重排（模型 / 档位 / 模式由会话里的选择写回，不走这里） */
 import {
   emptyInputSchema,
   type ProjectListResponse,
@@ -28,8 +28,8 @@ export const createProjectsRoute = (services: Services) => {
   router.post("/list", jsonBody(emptyInputSchema), (c) => c.json(ok(projectList(services))));
   router.post("/update", jsonBody(projectUpdateInputSchema), (c) => {
     const input = c.req.valid("json") satisfies ProjectUpdateInput;
-    // 广播在服务层统一做（改名与写回默认值都会发），这里只回响应
-    const project: ProjectSummary = services.projects.rename(input.path, input.name);
+    // 广播在服务层统一做（改名与记忆开关都会发），这里只回响应
+    const project: ProjectSummary = services.projects.update(input.path, input);
     return c.json(ok(project));
   });
   router.post("/reorder", jsonBody(projectReorderInputSchema), (c) => {

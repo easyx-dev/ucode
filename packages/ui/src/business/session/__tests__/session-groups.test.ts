@@ -41,6 +41,7 @@ const project = (path: string): ProjectSummary => ({
   thinkingLevel: null,
   mode: null,
   permissionMode: null,
+  memoryEnabled: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 });

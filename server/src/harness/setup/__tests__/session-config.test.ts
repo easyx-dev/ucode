@@ -326,6 +326,21 @@ describe("buildSessionOptions 项目记忆", () => {
       }
     }
   });
+
+  it("全局关着、项目覆盖开着时按开处理（开关按会话 cwd 求值）", async () => {
+    rememberFact(cwd, { title: "包管理器", content: "项目统一用 pnpm。" }, memoryAppDir);
+    const projectOn = new MemoryService(
+      () => ({ enabled: false }),
+      memoryAppDir,
+      (askedCwd) => (askedCwd === cwd ? true : null),
+    );
+
+    const { tools, systemPrompt } = await snapshotOf("build", "custom", projectOn);
+    for (const name of ["remember", "forget"]) {
+      assert.ok(tools.includes(name), `项目开了就应启用 ${name}`);
+    }
+    assert.ok(systemPrompt.includes("## 项目记忆"), "项目开了就该拼入记忆分节");
+  });
 });
 
 describe("buildSessionOptions 系统提示词", () => {

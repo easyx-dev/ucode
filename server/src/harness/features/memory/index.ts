@@ -1,7 +1,7 @@
 /**
  * 项目级记忆（Memory）的装配入口：索引注入、remember / forget 工具、会话落定后的自动回顾。
  *
- * 记忆按会话工作目录归属（见 `paths.ts`），设置开关来自 config（`memory.enabled`）。
+ * 记忆按会话工作目录归属（见 `paths.ts`），开关是「项目覆盖 > 全局设置」（`enabledFor`）。
  * 自动回顾是纯后台动作：不阻塞本轮、失败只记日志，且同一会话同一时间只跑一次，
  * 避免连续两轮各起一次回顾同时改索引。
  */
@@ -22,15 +22,21 @@ export class MemoryService {
   constructor(
     private readonly settings: () => MemoryConfig,
     private readonly appDir: string = env.appDir,
+    /**
+     * 项目级覆盖：返回这个目录显式设的开关（`null` = 未设过，跟随全局）。由调用方注入
+     * （`services` 里查项目表），记忆服务自己不碰数据库。
+     */
+    private readonly projectOverride: (cwd: string) => boolean | null = () => null,
   ) {}
 
-  get enabled(): boolean {
-    return this.settings().enabled;
+  /** 该项目下记忆是否生效：项目覆盖优先，未设过时跟随全局开关 */
+  enabledFor(cwd: string): boolean {
+    return this.projectOverride(cwd) ?? this.settings().enabled;
   }
 
   /** 供 resourceLoader 注入的索引文件；未开启、无条目时返回 null */
   indexFile(cwd: string): { path: string; content: string } | null {
-    if (!this.enabled) return null;
+    if (!this.enabledFor(cwd)) return null;
     const content = readIndexText(cwd, this.appDir);
     if (!content) return null;
     return {
@@ -44,19 +50,19 @@ export class MemoryService {
 
   /** build 模式的记忆工具；未开启时返回空数组 */
   tools(cwd: string): ToolDefinition[] {
-    return this.enabled ? createMemoryTools(cwd, this.appDir) : [];
+    return this.enabledFor(cwd) ? createMemoryTools(cwd, this.appDir) : [];
   }
 
   /** 会话落定后异步回顾最近交流，不阻塞调用方 */
   review(sessionId: string, session: AgentSession): void {
-    if (!this.enabled || this.reviewing.has(sessionId)) return;
+    const cwd = session.sessionManager.getCwd();
+    if (!this.enabledFor(cwd) || this.reviewing.has(sessionId)) return;
     if (!shouldReview(session.messages)) return;
     const model = session.model;
     if (!model) return;
     const turns = extractExchange(session.messages);
     if (turns.length === 0) return;
 
-    const cwd = session.sessionManager.getCwd();
     this.reviewing.add(sessionId);
     void runMemoryReview({
       runtime: session.modelRuntime,

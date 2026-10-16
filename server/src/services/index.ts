@@ -117,6 +117,12 @@ export const createServices = async (registration: ServiceRegistration): Promise
         type: "projects_changed",
         projects: { projects: list, total: list.length },
       }),
+    /*
+      记忆开关在会话装配时读入（与全局开关同一条路径），改完要让已建好的会话按新值重装：
+      空闲实例直接丢掉、等审批 / 等计划确认的只标脏（见 `pool.recycleForConfigChange`）。
+      池在下面才建，回调用到时现取。
+     */
+    onMemoryChange: () => pool.recycleForConfigChange(),
   });
   // 池在这里之后才建，回调用到时现取（挂起的交互只存在于正在跑的会话上）
   const interactions = new InteractionBroker(events, ({ sessionId, request, outcome }) => {
@@ -152,7 +158,12 @@ export const createServices = async (registration: ServiceRegistration): Promise
       }).triggerTokens;
     },
   );
-  const memory = new MemoryService(() => config.get().memory);
+  const memory = new MemoryService(
+    () => config.get().memory,
+    env.appDir,
+    // 项目级覆盖：与全局开关同一处收口，装配期按会话 cwd 求值
+    (cwd) => projects.memoryOverrideOf(cwd),
+  );
   const goals = new GoalService(sessions, usage, events);
   // 插件在池之前建：池的装配需要它的资产目录；而它的变更回收又用回池，两边都是延迟取值
   const pluginState = new PluginStateStore();

@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -102,6 +102,10 @@ const migrations: Record<number, string> = {
   // 项目在侧栏里的次序：拖拽排序写回；为空表示还没排过，排在排过的后面（见 docs/database.md）
   10: `
     ALTER TABLE project ADD COLUMN sort_order INTEGER;
+  `,
+  // 项目级记忆开关的覆盖：NULL 表示未设过（跟随全局开关），0 / 1 为显式关 / 开
+  11: `
+    ALTER TABLE project ADD COLUMN memory_enabled INTEGER;
   `,
 };
 

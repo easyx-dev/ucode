@@ -43,6 +43,9 @@ type SessionProjectGroupsProps = {
   onCollapsedChange: (path: string, collapsed: boolean) => void;
   onCreate: (path: string) => void;
   onRename: (path: string) => void;
+  /** 该目录的记忆开关生效值（项目覆盖优先，未设过时跟随全局） */
+  memoryEnabledOf: (path: string) => boolean;
+  onToggleMemory: (path: string) => void;
   /** 拖拽落定后的新次序（从上到下） */
   onReorder: (paths: string[]) => void;
   renderItem: (session: SessionSummary) => ReactNode;
@@ -55,6 +58,8 @@ export function SessionProjectGroups({
   onCollapsedChange,
   onCreate,
   onRename,
+  memoryEnabledOf,
+  onToggleMemory,
   onReorder,
   renderItem,
 }: SessionProjectGroupsProps) {
@@ -93,6 +98,8 @@ export function SessionProjectGroups({
             onCollapsedChange={(next) => onCollapsedChange(group.path, next)}
             onCreate={() => onCreate(group.path)}
             onRename={() => onRename(group.path)}
+            memoryEnabled={memoryEnabledOf(group.path)}
+            onToggleMemory={() => onToggleMemory(group.path)}
             renderItem={renderItem}
           />
         ))}

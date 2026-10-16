@@ -1,4 +1,4 @@
-/** 项目列表的 React 绑定：状态与改名都在 SDK projects store，失败由 ErrorToaster 统一提示 */
+/** 项目列表的 React 绑定：状态、改名与记忆开关都在 SDK projects store，失败由 ErrorToaster 统一提示 */
 import type { ProjectSummary, ProjectUpdateRequest } from "@ucode/contracts";
 
 import { useClient } from "../../provider";
@@ -8,6 +8,8 @@ export type ProjectsController = {
   projects: ProjectSummary[];
   /** 重命名（`name` 传 null 即清空，界面回落目录末段） */
   rename: (body: ProjectUpdateRequest) => Promise<ProjectSummary | null>;
+  /** 设项目级记忆开关（`null` 表示回到「跟随全局」） */
+  setMemory: (path: string, enabled: boolean | null) => Promise<ProjectSummary | null>;
   /** 重排（`paths` 是侧栏里从上到下的目录次序） */
   reorder: (paths: string[]) => Promise<void>;
 };
@@ -19,6 +21,7 @@ export function useProjects(): ProjectsController {
   return {
     projects: state.data?.projects ?? [],
     rename: client.projects.rename,
+    setMemory: client.projects.setMemory,
     reorder: client.projects.reorder,
   };
 }

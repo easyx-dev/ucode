@@ -22,6 +22,14 @@ import { resolveTargetPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
 import type { SessionSeed } from "../sessions/create";
 
+/** 可改的项目设置：只有改名与项目级记忆开关，只动给到的字段 */
+export type ProjectUpdatePatch = {
+  /** 新的展示名；`null` 表示清空（界面回落目录末段） */
+  name?: string | null;
+  /** 项目级记忆开关：`null` 表示回到「跟随全局」 */
+  memoryEnabled?: boolean | null;
+};
+
 export type ProjectServiceOptions = {
   /** 仓储；缺省用默认连接（测试可注入临时库） */
   repository?: ProjectRepository;
@@ -32,10 +40,15 @@ export type ProjectServiceOptions = {
   /** 会话工作区根目录；它下面的目录是服务分配的，不算项目 */
   workspacesDir?: string;
   /**
-   * 一次写入（改名或写回默认值）后的广播：客户端靠它刷新项目行。
+   * 一次写入（改名、记忆开关或写回默认值）后的广播：客户端靠它刷新项目行。
    * 写回是「在会话里改了参数」的副作用，不发的话各端手上的还是初次加载的那份旧值。
    */
   onChange?: (projects: ProjectSummary[]) => void;
+  /**
+   * 记忆开关改过后的生效动作：该开关在会话装配时读入，已建好的会话要按新值重装
+   * （与改全局配置同一条路径，见 `services/config`）。由装配层注入，项目服务不认识会话池。
+   */
+  onMemoryChange?: () => void;
 };
 
 export class ProjectService {
@@ -55,21 +68,38 @@ export class ProjectService {
     return this.repository.list().map((record) => this.viewOf(record));
   }
 
-  /** 改名；`name` 为 null 清空（界面回落目录末段）。路径不存在于磁盘上也允许——目录可能只是暂时没挂上 */
-  rename(path: string, name: string | null): ProjectSummary {
+  /**
+   * 改项目设置：按 `path` 寻址（项目的自然键就是路径），行还不存在时补建；只动给到的字段。
+   * 改名与项目级记忆开关都走这里（与 `sessions/update` 同理，写完广播整份列表）。
+   */
+  update(path: string, patch: ProjectUpdatePatch): ProjectSummary {
     const normalized = this.toProjectPath(path);
     if (!normalized) {
       throw new AppError(ERROR_CODES.invalidRequest, "助理工作区不是项目目录", 400, undefined, {
         path,
       });
     }
-    this.repository.setName(normalized, name);
+    if (patch.name !== undefined) this.repository.setName(normalized, patch.name);
+    if (patch.memoryEnabled !== undefined) {
+      this.repository.setMemoryEnabled(normalized, patch.memoryEnabled);
+      // 装配期读的开关，改完要让已建好的会话按新值重装
+      this.options.onMemoryChange?.();
+    }
     const record = this.repository.find(normalized);
     if (!record) {
       throw new AppError(ERROR_CODES.internal, "项目写入后读不回来", 500);
     }
     this.notify();
     return this.viewOf(record);
+  }
+
+  /**
+   * 该项目记忆开关的覆盖值；`null` 表示未设过（调用方回落全局开关）。
+   * 不是项目目录（未绑定目录的会话、助理工作区）也按未设过算。
+   */
+  memoryOverrideOf(cwd: string | null | undefined): boolean | null {
+    const path = this.toProjectPath(cwd);
+    return path ? (this.repository.find(path)?.memoryEnabled ?? null) : null;
   }
 
   /**
@@ -184,6 +214,7 @@ export class ProjectService {
       thinkingLevel: defaults.thinkingLevel ?? null,
       mode: defaults.mode ?? null,
       permissionMode: defaults.permissionMode ?? null,
+      memoryEnabled: record.memoryEnabled,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };

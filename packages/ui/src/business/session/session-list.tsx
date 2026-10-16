@@ -4,7 +4,9 @@ import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
+import { useConfig } from "../../hooks/store/use-config";
 import type { ProjectSummary, SessionSummary } from "../../types";
+import { projectMemoryEnabled, projectOf } from "../composer/project/project";
 import { isSessionUnread } from "./session";
 import { groupSessions, type SessionGroup } from "./session-groups";
 import { SessionListItem } from "./session-list-item";
@@ -44,6 +46,8 @@ type SessionListProps = {
   onOpenWorkspace: () => void;
   /** 重命名项目（项目区组头的铅笔） */
   onRenameProject: (path: string) => void;
+  /** 切项目级记忆开关（项目区组头的脑图标） */
+  onToggleProjectMemory: (path: string) => void;
   /** 项目拖拽后的新次序（从上到下） */
   onReorderProjects: (paths: string[]) => void;
   onArchive: (session: SessionSummary) => void;
@@ -61,6 +65,7 @@ export function SessionList({
   onCreateAssistant,
   onOpenWorkspace,
   onRenameProject,
+  onToggleProjectMemory,
   onReorderProjects,
   onArchive,
   onTogglePin,
@@ -69,6 +74,13 @@ export function SessionList({
   const sections = useMemo(
     () => groupSessions(sessions, workspacesDir, projects),
     [sessions, workspacesDir, projects],
+  );
+  // 全局记忆开关是项目级的默认值：项目设过覆盖就用它，没设过跟随全局
+  const config = useConfig();
+  const memoryDefault = config?.config.memory.enabled ?? false;
+  const memoryEnabledOf = useCallback(
+    (path: string) => projectMemoryEnabled(projectOf(projects, path), memoryDefault),
+    [projects, memoryDefault],
   );
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
 
@@ -152,6 +164,8 @@ export function SessionList({
                       onCollapsedChange={(path, next) => toggle(path, next)}
                       onCreate={onCreate}
                       onRename={onRenameProject}
+                      memoryEnabledOf={memoryEnabledOf}
+                      onToggleMemory={onToggleProjectMemory}
                       onReorder={onReorderProjects}
                       renderItem={renderItem}
                     />

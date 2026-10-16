@@ -15,6 +15,15 @@ export const projectLabel = (path: string, project?: ProjectSummary | null): str
   project?.name ?? baseName(path);
 
 /**
+ * 项目记忆开关的**生效值**：项目显式设过就用它，没设过（`null`，或这个目录还没项目行）跟随全局。
+ * 全局当默认值、项目双向覆盖（与服务端 `MemoryService.enabledFor` 同一口径）。
+ */
+export const projectMemoryEnabled = (
+  project: ProjectSummary | null | undefined,
+  globalEnabled: boolean,
+): boolean => project?.memoryEnabled ?? globalEnabled;
+
+/**
  * 新建会话的初始设置：项目记住的那几项，缺的给 `undefined`。
  *
  * 缺的必须显式给 `undefined` 而不是省略：草稿按浅合并写入，漏掉的键会继承上一个目录的值——

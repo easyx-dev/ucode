@@ -6,7 +6,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "cn";
-import { Folder, FolderOpen, Pencil, Plus } from "lucide-react";
+import { Brain, Folder, FolderOpen, Pencil, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
@@ -28,6 +28,10 @@ type SessionProjectGroupProps = {
   onCreate: () => void;
   /** 重命名项目（改的是项目展示名，目录本身不动） */
   onRename: () => void;
+  /** 记忆开关的生效值（项目覆盖优先，未设过时跟随全局） */
+  memoryEnabled: boolean;
+  /** 切换项目级记忆开关 */
+  onToggleMemory: () => void;
   /** 渲染组内一行；由上层统一带上选中态与子会话下钻数据 */
   renderItem: (session: SessionSummary) => ReactNode;
 };
@@ -45,6 +49,8 @@ export function SessionProjectGroup({
   onCollapsedChange,
   onCreate,
   onRename,
+  memoryEnabled,
+  onToggleMemory,
   renderItem,
 }: SessionProjectGroupProps) {
   const { t } = useTranslation();
@@ -81,6 +87,21 @@ export function SessionProjectGroup({
               {hasUnread ? <span className="size-1.5 shrink-0 rounded-full bg-info" /> : null}
             </button>
           </CollapsibleTrigger>
+
+          {/*
+            记忆开着时这枚图标常驻（「一眼看出哪些项目开了记忆」），关着时与其他入口一样悬停才现。
+            与旁边两个入口同槽位，关着时不用多占位置。
+          */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={memoryEnabled ? "size-7 shrink-0" : ACTION_CLASS}
+            title={memoryEnabled ? t("关闭项目记忆") : t("开启项目记忆")}
+            aria-pressed={memoryEnabled}
+            onClick={onToggleMemory}
+          >
+            <Brain className="size-icon-sm" />
+          </Button>
 
           <Button
             variant="ghost"

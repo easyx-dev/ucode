@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProjectSummary } from "../../../../types";
-import { projectLabel, projectOf, projectSeedOf } from "../project";
+import { projectLabel, projectMemoryEnabled, projectOf, projectSeedOf } from "../project";
 
 const project = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({
   id: "p1",
@@ -12,6 +12,7 @@ const project = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({
   thinkingLevel: null,
   mode: null,
   permissionMode: null,
+  memoryEnabled: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   ...over,
@@ -54,5 +55,15 @@ describe("projectSeedOf", () => {
     };
     assert.deepEqual(projectSeedOf(null), empty);
     assert.deepEqual(projectSeedOf(project()), empty);
+  });
+});
+
+describe("projectMemoryEnabled", () => {
+  it("项目设过覆盖就用它，没设过（或这个目录没有项目行）跟随全局", () => {
+    assert.equal(projectMemoryEnabled(project({ memoryEnabled: true }), false), true);
+    assert.equal(projectMemoryEnabled(project({ memoryEnabled: false }), true), false);
+    assert.equal(projectMemoryEnabled(project(), true), true);
+    assert.equal(projectMemoryEnabled(project(), false), false);
+    assert.equal(projectMemoryEnabled(null, true), true);
   });
 });

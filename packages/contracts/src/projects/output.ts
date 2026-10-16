@@ -22,6 +22,11 @@ export type ProjectSummary = {
   mode: string | null;
   /** 最近一次在该项目里选择的权限档位；为空表示未记住 */
   permissionMode: PermissionMode | null;
+  /**
+   * 项目级记忆开关的覆盖：`null` 表示未设过（跟随全局 `memory.enabled`），
+   * 否则是这个目录的显式开关。侧栏项目行据此标「已开启记忆」。
+   */
+  memoryEnabled: boolean | null;
   createdAt: string;
   updatedAt: string;
 };

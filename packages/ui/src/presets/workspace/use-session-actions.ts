@@ -11,12 +11,17 @@ import {
   composerKeyOf,
   NEW_SESSION_KEY,
 } from "../../business/composer/document/composer-draft";
-import { projectOf, projectSeedOf } from "../../business/composer/project/project";
+import {
+  projectMemoryEnabled,
+  projectOf,
+  projectSeedOf,
+} from "../../business/composer/project/project";
 import { openRenameProjectDialog } from "../../business/composer/project/rename-project-dialog";
 import type { useComposerDrafts } from "../../business/composer/use-composer-drafts";
 import { openDirectoryPickerDialog } from "../../business/dialog/directory-picker-dialog";
 import { openRenameSessionDialog } from "../../business/session/rename-session-dialog";
 import { isWorkspaceSession } from "../../business/session/session-groups";
+import { useConfig } from "../../hooks/store/use-config";
 import type { useProjects } from "../../hooks/store/use-projects";
 import type { useSessions } from "../../hooks/store/use-sessions";
 import type { useActiveSession } from "../../hooks/use-active-session";
@@ -34,6 +39,8 @@ export type SessionActions = {
   forkCurrent: () => void;
   requestRename: (session: SessionSummary) => void;
   requestRenameProject: (path: string) => void;
+  /** 切项目级记忆开关（生效值取反后写回） */
+  toggleProjectMemory: (path: string) => void;
   loadTranscript: () => Promise<string>;
   selectModel: (model: string) => void;
   selectThinkingLevel: (level: ThinkingPreference) => void;
@@ -60,6 +67,8 @@ export function useSessionActions({
 }): SessionActions {
   const { t } = useTranslation();
   const client = useClient();
+  // 项目记忆开关的默认值：全局配置（项目没设过覆盖时用它，与侧栏标记同一口径）
+  const memoryDefault = useConfig()?.config.memory.enabled ?? false;
 
   /**
    * 草稿的初始设置按目录所属的项目填：项目记住的模型 / 档位 / 模式 / 权限档位直接带进去，
@@ -139,6 +148,15 @@ export function useSessionActions({
   };
 
   /**
+   * 切项目级记忆开关：按「当前生效值」取反，写回后才由控制帧带回权威列表。
+   * 生效值与侧栏标记同一口径（项目覆盖优先，未设过时跟随全局开关）。
+   */
+  const toggleProjectMemory = (path: string): void => {
+    const enabled = projectMemoryEnabled(projectOf(projects.projects, path), memoryDefault);
+    void projects.setMemory(path, !enabled);
+  };
+
+  /**
    * 取当前会话的原始记录（JSONL 文本）供复制。内容可能几 MB，所以只在点按钮时取。
    * 失败要说清原因（记录过大、文件读不到），否则「复制出来是空的」看不出是失败。
    */
@@ -190,6 +208,7 @@ export function useSessionActions({
     forkCurrent,
     requestRename,
     requestRenameProject,
+    toggleProjectMemory,
     loadTranscript,
     selectModel,
     selectThinkingLevel,

@@ -1,4 +1,4 @@
-/** 项目列表：初次加载，改名后由 projects_changed 控制帧刷新 */
+/** 项目列表：初次加载，改名 / 记忆开关后由 projects_changed 控制帧刷新 */
 import type { ProjectListResponse, ProjectSummary, ProjectUpdateRequest } from "@ucode/contracts";
 
 import type { Apis } from "../apis";
@@ -17,6 +17,8 @@ export type ProjectsStore = {
   load: () => Promise<void>;
   /** 重命名（`name` 传 null 即清空）；成功后由控制帧带来权威列表 */
   rename: (body: ProjectUpdateRequest) => Promise<ProjectSummary | null>;
+  /** 设项目级记忆开关（`null` 表示回到「跟随全局」）；成功后由控制帧带来权威列表 */
+  setMemory: (path: string, enabled: boolean | null) => Promise<ProjectSummary | null>;
   /** 重排（`paths` 是侧栏里从上到下的目录次序） */
   reorder: (paths: string[]) => Promise<void>;
 };
@@ -43,6 +45,16 @@ export const createProjectsStore = (deps: { apis: Apis; events: EventStream }): 
     }
   };
 
+  /** 改项目设置：两个入口走同一个接口，失败都记到 error 上 */
+  const send = async (body: ProjectUpdateRequest): Promise<ProjectSummary | null> => {
+    try {
+      return await deps.apis.projects.update(body);
+    } catch (error) {
+      store.setState((prev) => ({ ...prev, error: asApiError(error) }));
+      return null;
+    }
+  };
+
   deps.events.onEvent((frame) => {
     if (frame.type === "projects_changed") {
       store.setState((prev) => ({ ...prev, data: frame.projects, error: null }));
@@ -65,14 +77,8 @@ export const createProjectsStore = (deps: { apis: Apis; events: EventStream }): 
     getState: store.getState,
     subscribe: store.subscribe,
     load,
-    async rename(body) {
-      try {
-        return await deps.apis.projects.update(body);
-      } catch (error) {
-        store.setState((prev) => ({ ...prev, error: asApiError(error) }));
-        return null;
-      }
-    },
+    rename: send,
+    setMemory: (path, enabled) => send({ path, memoryEnabled: enabled }),
     async reorder(paths) {
       // 拖拽落下就要看到新次序：先在本地落位，再用服务端回的整份列表覆盖
       store.setState((prev) =>

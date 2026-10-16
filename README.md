@@ -127,7 +127,8 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 ```
 $APP_HOME/                 # 默认 ~/.ucode
 ├── harness/               # 运行时私有：auth.json / sessions/
-├── app/                   # 应用自有：config.json / service.json / app.db（SQLite）
+├── app/                   # 应用自有：config.json / service.json / app.db（SQLite）/ attachments/
+│                          #           / browser/（内置浏览器 profile）/ memory/projects/（项目记忆）
 ├── skills/                # 全局技能：<id>/SKILL.md
 ├── prompts/               # 全局命令（提示词模板）：<name>.md
 ├── agents/                # 全局自定义角色：<slug>.md（primary / subagent）
