@@ -6,7 +6,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "cn";
-import { Brain, Folder, FolderOpen, Pencil, Plus } from "lucide-react";
+import { Brain, Folder, FolderOpen, Pencil, Plus, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../base/button";
@@ -30,8 +30,12 @@ type SessionProjectGroupProps = {
   onRename: () => void;
   /** 记忆开关的生效值（项目覆盖优先，未设过时跟随全局） */
   memoryEnabled: boolean;
+  /** 项目是否显式设过记忆开关；没设过时「跟随全局默认」那个入口不适用 */
+  memoryOverridden: boolean;
   /** 切换项目级记忆开关 */
   onToggleMemory: () => void;
+  /** 清掉项目级覆盖，回到「跟随全局默认」 */
+  onResetMemory: () => void;
   /** 渲染组内一行；由上层统一带上选中态与子会话下钻数据 */
   renderItem: (session: SessionSummary) => ReactNode;
 };
@@ -50,7 +54,9 @@ export function SessionProjectGroup({
   onCreate,
   onRename,
   memoryEnabled,
+  memoryOverridden,
   onToggleMemory,
+  onResetMemory,
   renderItem,
 }: SessionProjectGroupProps) {
   const { t } = useTranslation();
@@ -90,7 +96,7 @@ export function SessionProjectGroup({
 
           {/*
             记忆开着时这枚图标常驻（「一眼看出哪些项目开了记忆」），关着时与其他入口一样悬停才现。
-            与旁边两个入口同槽位，关着时不用多占位置。
+            与旁边几个入口同槽位，关着时不用多占位置。
           */}
           <Button
             variant="ghost"
@@ -101,6 +107,17 @@ export function SessionProjectGroup({
             onClick={onToggleMemory}
           >
             <Brain className="size-icon-sm" />
+          </Button>
+
+          {/* 改过之后就与全局脱钩了（全局不会再影响它），所以留一个回去的入口 */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(ACTION_CLASS, !memoryOverridden && "invisible")}
+            title={t("跟随全局默认")}
+            onClick={onResetMemory}
+          >
+            <Undo2 className="size-icon-sm" />
           </Button>
 
           <Button

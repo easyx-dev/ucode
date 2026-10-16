@@ -45,7 +45,10 @@ type SessionProjectGroupsProps = {
   onRename: (path: string) => void;
   /** 该目录的记忆开关生效值（项目覆盖优先，未设过时跟随全局） */
   memoryEnabledOf: (path: string) => boolean;
+  /** 该目录是否显式设过记忆开关（设过才需要「跟随全局默认」那个入口） */
+  memoryOverriddenOf: (path: string) => boolean;
   onToggleMemory: (path: string) => void;
+  onResetMemory: (path: string) => void;
   /** 拖拽落定后的新次序（从上到下） */
   onReorder: (paths: string[]) => void;
   renderItem: (session: SessionSummary) => ReactNode;
@@ -59,7 +62,9 @@ export function SessionProjectGroups({
   onCreate,
   onRename,
   memoryEnabledOf,
+  memoryOverriddenOf,
   onToggleMemory,
+  onResetMemory,
   onReorder,
   renderItem,
 }: SessionProjectGroupsProps) {
@@ -99,7 +104,9 @@ export function SessionProjectGroups({
             onCreate={() => onCreate(group.path)}
             onRename={() => onRename(group.path)}
             memoryEnabled={memoryEnabledOf(group.path)}
+            memoryOverridden={memoryOverriddenOf(group.path)}
             onToggleMemory={() => onToggleMemory(group.path)}
+            onResetMemory={() => onResetMemory(group.path)}
             renderItem={renderItem}
           />
         ))}

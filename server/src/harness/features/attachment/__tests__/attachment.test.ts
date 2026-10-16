@@ -1,12 +1,18 @@
 /** harness/features/attachment：内容寻址附件库（文件 + SQLite 元数据） */
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { openDatabase } from "../../../../db";
 import { AttachmentRepository } from "../../../../db/attachment-repository";
-import { expireTempAttachments, materializeAttachment, putAttachment, resolveAttachment } from "..";
+import {
+  attachmentIdOf,
+  expireTempAttachments,
+  materializeAttachment,
+  putAttachment,
+  resolveAttachment,
+} from "..";
 
 const created: string[] = [];
 
@@ -116,18 +122,20 @@ describe("附件库", () => {
 });
 
 describe("materializeAttachment", () => {
-  it("入库并标记为已引用（躲开草稿 TTL），重复调用不重复写", () => {
+  it("入库并标记为已引用（躲开草稿 TTL），重复调用不重复写、也不重查库", () => {
     const env = makeEnv();
     const bytes = new TextEncoder().encode("截图字节");
+    const id = attachmentIdOf(bytes);
 
-    const first = materializeAttachment(bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
-    const referencedAt = env.repo.find(first.id)?.referencedAt;
+    materializeAttachment(id, bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
+    const referencedAt = env.repo.find(id)?.referencedAt;
     assert.notEqual(referencedAt, null);
 
-    const again = materializeAttachment(bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
-    assert.equal(again.id, first.id);
-    // 已经标记过的引用时间不回退
-    assert.equal(env.repo.find(first.id)?.referencedAt, referencedAt);
+    // 第二次命中进程内缓存：字节不重写（同内容本来就只落一份），引用时间也不回退
+    materializeAttachment(id, bytes, "image/jpeg", { repo: env.repo, dir: env.dir });
+    assert.equal(env.repo.find(id)?.referencedAt, referencedAt);
+    assert.equal(readdirSync(env.dir).length, 1);
+
     // 被引用过的附件不参与草稿清理，哪怕 TTL 早就过了
     const expired = expireTempAttachments(
       { repo: env.repo, dir: env.dir },

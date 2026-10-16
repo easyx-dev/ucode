@@ -281,17 +281,24 @@ export function ToolCall({ entry, trailing }: ToolCallProps) {
 
       <CollapsibleContent>
         <div className="space-y-2 py-1 pr-1.5 pl-6">
-          {entry.images?.map((image) => (
-            <div key={image.id} className="space-y-1">
-              <AttachmentImage alt={t("工具产出的图片")} className="my-1 block" url={image.url} />
-              {/* 清理过正文的卡片里，模型与用户看到的东西不一致，说明一句免得「它明明看得见」 */}
+          {entry.images && entry.images.length > 0 ? (
+            <div className="space-y-1">
+              {entry.images.map((image) => (
+                <AttachmentImage
+                  key={image.id}
+                  alt={t("工具产出的图片")}
+                  className="my-1 block"
+                  url={image.url}
+                />
+              ))}
+              {/* 正文已被清理的卡片里，模型与用户看到的东西不一致，说一句免得「它明明看得见」 */}
               {entry.pruned ? (
                 <p className="text-xs text-foreground-subtle">
-                  {t("这段输出已从模型上下文清理，图片仍保留")}
+                  {t("图片仍保留，但模型已不再看到它")}
                 </p>
               ) : null}
             </div>
-          ))}
+          ) : null}
           {diff !== null ? (
             <DiffView rows={toDiffRows(diff)} className="max-h-96 overflow-y-auto" />
           ) : null}

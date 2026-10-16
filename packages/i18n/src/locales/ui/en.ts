@@ -27,6 +27,7 @@ export default {
   重命名项目: "Rename project",
   开启项目记忆: "Turn on project memory",
   关闭项目记忆: "Turn off project memory",
+  跟随全局默认: "Follow the global default",
   留空即用目录名: "Leave empty to use the directory name",
   删除: "Delete",
   更多操作: "More actions",
@@ -402,8 +403,8 @@ export default {
   页面操作: "Page action",
   截图: "Screenshot",
   工具产出的图片: "Image produced by a tool",
-  "这段输出已从模型上下文清理，图片仍保留":
-    "This output was pruned from the model context; the image is still kept here.",
+  "图片仍保留，但模型已不再看到它":
+    "The image is still kept here, but the model no longer sees it.",
   关闭浏览器: "Close browser",
   整页: "Full page",
   视口: "Viewport",

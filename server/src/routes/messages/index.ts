@@ -58,8 +58,8 @@ export const createMessagesRoute = (services: Services) => {
     const projection = projectMessages(sessionId, live, entries, states, {
       // 历史里的图片按需落进附件库（幂等）：界面按附件路由取字节，而它们原本只以 base64 在会话记录里；
       // `extras` 把「原始条目里的图片」与「哪些条目被旧输出清理过」一并带进来（见 TranscriptExtras）
-      writeImage: (bytes, mimeType) =>
-        materializeAttachment(bytes, mimeType, { repo: services.attachments }).id,
+      writeImage: (id, bytes, mimeType) =>
+        materializeAttachment(id, bytes, mimeType, { repo: services.attachments }),
       extras: transcriptExtrasOf(branch),
     });
 

@@ -66,23 +66,32 @@ export const resolveAttachment = (id: string, deps: AttachmentDeps): ResolvedAtt
 };
 
 /**
- * 把一份字节收进附件库并标记为「已被消息引用」。
+ * 把历史里的图片字节收进附件库并标记为「已被消息引用」。
  *
  * 用在会话记录里的图片上（工具产出的截图 / 读到的图、用户发过的图）：界面只能按附件路由取字节，
  * 而这些图片原本只以 base64 躺在会话记录里，不落库就取不到。
  *
  * 标记引用是必须的：这份字节的来源是**已落盘的会话记录**、不是草稿，按草稿语义（`referenced_at` 为空）
- * 会被 TTL 清掉——历史里明明还有图，界面却先坏了。幂等：同内容不会重复写，重复标记也不改时间。
+ * 会被 TTL 清掉——历史里明明还有图，界面却先坏了。
+ *
+ * `materialized` 是本进程的「已经收过」集合：投影（`/messages/list` 与实时帧）每次都会走一遍历史里的
+ * 每张图，不短路的话每开一次会话都要重算 stat、查库与标记引用。被引用过的附件不会被 TTL 清理，
+ * 所以“缓存说在、实际已不在”只可能由将来的手动清理由造成——那时要在删除处一并清这里。
  */
 export const materializeAttachment = (
+  id: string,
   bytes: Uint8Array,
   mimeType: string,
   deps: AttachmentDeps,
-): AttachmentRecord => {
+): void => {
+  if (materialized.has(id)) return;
   const record = putAttachment(bytes, { mimeType }, deps);
   deps.repo.markReferenced([record.id], new Date().toISOString());
-  return record;
+  materialized.add(id);
 };
+
+/** 本进程内已经收进附件库并标记过引用的附件 id（见 `materializeAttachment`） */
+const materialized = new Set<string>();
 
 /**
  * 清理「从未被消息引用、且早于 `before` 创建」的草稿临时附件（元数据 + 字节）。

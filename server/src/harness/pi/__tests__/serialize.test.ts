@@ -422,23 +422,22 @@ describe("历史里的图片落库与旧输出清理", () => {
       targetId,
     }) as unknown as SessionEntry;
 
-  it("工具产出的图片落库：writeImage 拿到字节，块里的 id 与附件库一致", () => {
-    const written: Array<{ size: number; mimeType: string }> = [];
+  it("工具产出的图片落库：writeImage 拿到算好的 id 与字节", () => {
+    const written: Array<{ id: string; size: number; mimeType: string }> = [];
     const imageEntry = toolEntry("t1", [{ type: "image", data: DATA, mimeType: "image/jpeg" }]);
 
     const dto = entryToDTO(
       imageEntry,
       {},
       {
-        writeImage: (bytes, mimeType) => {
-          written.push({ size: bytes.length, mimeType });
-          return ID;
+        writeImage: (id, bytes, mimeType) => {
+          written.push({ id, size: bytes.length, mimeType });
         },
       },
     );
 
     assert.deepEqual(written, [
-      { size: Buffer.from(DATA, "base64").length, mimeType: "image/jpeg" },
+      { id: ID, size: Buffer.from(DATA, "base64").length, mimeType: "image/jpeg" },
     ]);
     assert.deepEqual(dto?.blocks, [
       { type: "image", id: ID, mimeType: "image/jpeg", url: `${API_BASE_PATH}/attachments/${ID}` },
@@ -478,7 +477,7 @@ describe("历史里的图片落库与旧输出清理", () => {
     assert.equal(dto?.pruned, undefined);
   });
 
-  it("单张超过上限时不落库，降级成文字占位", () => {
+  it("超过单张上限时不落库，但块照旧下发（已在库里的大图仍然能看）", () => {
     const huge = Buffer.alloc(MATERIALIZE_IMAGE_MAX_BYTES + 1, 1).toString("base64");
     let called = false;
     const dto = entryToDTO(
@@ -487,12 +486,11 @@ describe("历史里的图片落库与旧输出清理", () => {
       {
         writeImage: () => {
           called = true;
-          return ID;
         },
       },
     );
 
     assert.equal(called, false);
-    assert.deepEqual(dto?.blocks, [{ type: "text", text: "[图片]" }]);
+    assert.equal(dto?.blocks[0]?.type, "image");
   });
 });

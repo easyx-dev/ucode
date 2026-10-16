@@ -33,6 +33,8 @@ type SessionSidebarProps = {
   onRenameProject: (path: string) => void;
   /** 切项目级记忆开关 */
   onToggleProjectMemory: (path: string) => void;
+  /** 把项目级记忆开关清回「跟随全局默认」 */
+  onResetProjectMemory: (path: string) => void;
   /** 项目拖拽后的新次序（从上到下）；写回服务端后各端一致 */
   onReorderProjects: (paths: string[]) => void;
   onArchive: (sessionId: string) => void;
@@ -59,6 +61,7 @@ export function SessionSidebar({
   onCreateInDirectory,
   onRenameProject,
   onToggleProjectMemory,
+  onResetProjectMemory,
   onReorderProjects,
   onArchive,
   onTogglePin,
@@ -105,6 +108,7 @@ export function SessionSidebar({
         onCreateAssistant={onCreateAssistant}
         onRenameProject={onRenameProject}
         onToggleProjectMemory={onToggleProjectMemory}
+        onResetProjectMemory={onResetProjectMemory}
         onReorderProjects={onReorderProjects}
         onArchive={(session) => {
           void confirmArchiveSession(session, t).then((confirmed) => {

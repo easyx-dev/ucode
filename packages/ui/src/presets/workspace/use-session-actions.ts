@@ -41,6 +41,8 @@ export type SessionActions = {
   requestRenameProject: (path: string) => void;
   /** 切项目级记忆开关（生效值取反后写回） */
   toggleProjectMemory: (path: string) => void;
+  /** 清掉项目级记忆覆盖，回到「跟随全局默认」（全局开关再次影响这个项目） */
+  resetProjectMemory: (path: string) => void;
   loadTranscript: () => Promise<string>;
   selectModel: (model: string) => void;
   selectThinkingLevel: (level: ThinkingPreference) => void;
@@ -156,6 +158,11 @@ export function useSessionActions({
     void projects.setMemory(path, !enabled);
   };
 
+  /** 清掉覆盖：写入 `null` 即回到「跟随全局默认」 */
+  const resetProjectMemory = (path: string): void => {
+    void projects.setMemory(path, null);
+  };
+
   /**
    * 取当前会话的原始记录（JSONL 文本）供复制。内容可能几 MB，所以只在点按钮时取。
    * 失败要说清原因（记录过大、文件读不到），否则「复制出来是空的」看不出是失败。
@@ -209,6 +216,7 @@ export function useSessionActions({
     requestRename,
     requestRenameProject,
     toggleProjectMemory,
+    resetProjectMemory,
     loadTranscript,
     selectModel,
     selectThinkingLevel,

@@ -49,8 +49,8 @@ import { MATERIALIZE_IMAGE_MAX_BYTES } from "../../constants/attachments";
 import type { SessionOverride } from "../../db/session-repository";
 import { isRecord } from "../../utils/object";
 
-/** 把一份图片字节收进附件库，返回附件 id（内容寻址，重复调用无副作用） */
-export type ImageWriter = (bytes: Uint8Array, mimeType: string) => string;
+/** 把一份图片字节收进附件库；`id` 是内容寻址的 sha256，由调用方算好（投影本来就要它做 url） */
+export type ImageWriter = (id: string, bytes: Uint8Array, mimeType: string) => void;
 
 /**
  * 从**原始条目**（`getBranch()`，未经 `context_edit`）读出来的两份东西，供投影补齐正文之外的信息。
@@ -103,7 +103,8 @@ export const transcriptExtrasOf = (branch: readonly SessionEntry[]): TranscriptE
  * 会话记录里的一个 image 块 → 给界面的块。
  *
  * `writeImage` 给了才落库：工具产出的图只以 base64 躺在会话记录里，附件库里没有记录时界面按 url 取不到
- * 字节。数据不合法或超出单张上限（见 `MATERIALIZE_IMAGE_MAX_BYTES`）时返回 null，由调用方降级成文本。
+ * 字节。**上限只卡落库**（见 `MATERIALIZE_IMAGE_MAX_BYTES`）而不卡块本身：已经在库里的大图（用户上传的）
+ * 这个 url 仍然有效，不该因为“不复制第二份”而看不到。数据不合法（缺 data / mimeType）时才没有块。
  */
 const imageBlockOf = (
   part: Record<string, unknown>,
@@ -112,10 +113,11 @@ const imageBlockOf = (
   const { data, mimeType } = part;
   if (typeof data !== "string" || typeof mimeType !== "string") return null;
   const bytes = Buffer.from(data, "base64");
-  if (bytes.length > MATERIALIZE_IMAGE_MAX_BYTES) return null;
   // 图片落库时按归一化后的字节算 sha256，与这里重算的一致，故 url 能直接命中附件路由
-  deps?.writeImage?.(bytes, mimeType);
   const id = createHash("sha256").update(bytes).digest("hex");
+  if (deps?.writeImage && bytes.length <= MATERIALIZE_IMAGE_MAX_BYTES) {
+    deps.writeImage(id, bytes, mimeType);
+  }
   return { type: "image", id, mimeType, url: `${API_BASE_PATH}/attachments/${id}` };
 };
 

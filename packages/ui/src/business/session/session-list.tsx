@@ -48,6 +48,8 @@ type SessionListProps = {
   onRenameProject: (path: string) => void;
   /** 切项目级记忆开关（项目区组头的脑图标） */
   onToggleProjectMemory: (path: string) => void;
+  /** 清掉项目级记忆覆盖，回到「跟随全局默认」 */
+  onResetProjectMemory: (path: string) => void;
   /** 项目拖拽后的新次序（从上到下） */
   onReorderProjects: (paths: string[]) => void;
   onArchive: (session: SessionSummary) => void;
@@ -66,6 +68,7 @@ export function SessionList({
   onOpenWorkspace,
   onRenameProject,
   onToggleProjectMemory,
+  onResetProjectMemory,
   onReorderProjects,
   onArchive,
   onTogglePin,
@@ -81,6 +84,13 @@ export function SessionList({
   const memoryEnabledOf = useCallback(
     (path: string) => projectMemoryEnabled(projectOf(projects, path), memoryDefault),
     [projects, memoryDefault],
+  );
+  const memoryOverriddenOf = useCallback(
+    (path: string) => {
+      const override = projectOf(projects, path)?.memoryEnabled;
+      return override === true || override === false;
+    },
+    [projects],
   );
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
 
@@ -165,7 +175,9 @@ export function SessionList({
                       onCreate={onCreate}
                       onRename={onRenameProject}
                       memoryEnabledOf={memoryEnabledOf}
+                      memoryOverriddenOf={memoryOverriddenOf}
                       onToggleMemory={onToggleProjectMemory}
+                      onResetMemory={onResetProjectMemory}
                       onReorder={onReorderProjects}
                       renderItem={renderItem}
                     />

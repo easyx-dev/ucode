@@ -103,8 +103,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
   }
   const events = new SessionEventBus({
     // 实时帧里的图片当场落库：工具刚截的图不落，界面在刷新前一直取不到字节
-    writeImage: (bytes, mimeType) =>
-      materializeAttachment(bytes, mimeType, { repo: attachments }).id,
+    writeImage: (id, bytes, mimeType) =>
+      materializeAttachment(id, bytes, mimeType, { repo: attachments }),
   });
   const projects = new ProjectService({
     repository: new ProjectRepository(db),
