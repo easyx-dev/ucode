@@ -22,10 +22,12 @@ import {
 } from "../../../constants/browser";
 import {
   type BrowserActInput,
+  formatEvalResult,
   normalizeRef,
   type ResolvedAct,
   resolveAct,
   scrollDelta,
+  toEvalError,
 } from "./actions";
 import { detectFailureMessage, resolveBrowser } from "./detect";
 import { browserError, toBrowserError } from "./errors";
@@ -33,8 +35,11 @@ import {
   assertRefActionable,
   assertRefInSnapshot,
   captureSnapshot,
+  documentChanged,
   type Evaluate,
+  readDocumentOrigin,
 } from "./page-ops";
+import { evalScript } from "./page-scripts";
 import type { SnapshotEntry } from "./snapshot";
 
 /** 受管实例的两种模式：配置里可选的就是这两种（见 `BrowserConfig.mode`） */
@@ -101,15 +106,14 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
   let context: BrowserContext | null = null;
   let page: Page | null = null;
   let entries: SnapshotEntry[] = [];
+  /**
+   * 最近一次快照所在文档的身份。**故意不监听 `framenavigated`**：Playwright 对 `pushState` 这类同文档导航
+   * 也会触发它，拿它清表会让 SPA 里每次路由跳转都白丢一次快照；真失效由 `snapshot` 的文档身份判断与
+   * 页面上的 `BROWSER_REF_ATTRIBUTE` 属性（新文档里没有，命中检测报缺失）两处兜住。
+   */
+  let documentOrigin: number | null = null;
   let lastUsedAt = Date.now();
   let activeCalls = 0;
-
-  /** 导航后旧编号必然失效，直接清空，强制模型重新快照（源方案 §6.4） */
-  const watchNavigation = (target: Page): void => {
-    target.on("framenavigated", (frame) => {
-      if (frame === target.mainFrame()) entries = [];
-    });
-  };
 
   const requireExecutable = (): string => {
     const found = resolveBrowser(input.executablePath);
@@ -192,7 +196,6 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
       input.mode === "attach" ? await live.newPage() : (live.pages()[0] ?? (await live.newPage()));
     created.setDefaultTimeout(BROWSER_ACTION_TIMEOUT_MS);
     created.setDefaultNavigationTimeout(BROWSER_NAVIGATION_TIMEOUT_MS);
-    watchNavigation(created);
     page = created;
     return created;
   };
@@ -244,6 +247,14 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
       case "select":
         await requireLocator().selectOption(act.text, { timeout });
         return `已在 @${act.ref} 选择「${act.text}」`;
+      case "eval": {
+        try {
+          const value = await evaluateOn(target)(evalScript(act.text));
+          return `表达式结果：${formatEvalResult(value)}`;
+        } catch (error) {
+          throw toEvalError(error);
+        }
+      }
       default: {
         if (act.ref) {
           await requireLocator().scrollIntoViewIfNeeded({ timeout });
@@ -276,8 +287,12 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
 
     async snapshot({ diff = false, compact = false }) {
       const target = requirePage();
-      const outcome = await captureSnapshot(evaluateOn(target), entries, { diff, compact });
+      // 换了文档（真导航）才作废旧表与 diff 基准；同文档的 pushState 不算
+      const origin = await readDocumentOrigin(evaluateOn(target));
+      const previous = origin === documentOrigin ? entries : [];
+      const outcome = await captureSnapshot(evaluateOn(target), previous, { diff, compact });
       entries = outcome.entries;
+      documentOrigin = origin;
 
       return {
         text: outcome.text,
@@ -293,7 +308,7 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
       const act = resolveAct(actInput);
       if (act.ref) assertRefInSnapshot(entries, act.ref);
       if (act.ref) await assertRefActionable(evaluateOn(target), act.ref);
-      const before = target.url();
+      const before = { url: target.url(), origin: await readDocumentOrigin(evaluateOn(target)) };
       let summary: string;
       try {
         summary = await runAction(target, act);
@@ -301,7 +316,7 @@ export const createBrowserSession = (input: BrowserSessionInput): BrowserSession
         throw toBrowserError(error, `${act.action} 动作`);
       }
       const url = target.url();
-      return { summary, url, navigated: url !== before };
+      return { summary, url, navigated: await documentChanged(evaluateOn(target), before, url) };
     },
 
     async screenshot({ fullPage = false, ref }) {

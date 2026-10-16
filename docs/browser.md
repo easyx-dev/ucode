@@ -60,7 +60,7 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 | --- | --- |
 | `browser_open` | 打开 http/https 地址（或 attach 到你已启动的调试实例）；带 `profile` 名即长期保留这份数据 |
 | `browser_snapshot` | 当前页面的元素列表，每行 `@e1a2 button "登录"`；可选 `diff`（只回传变化）与 `compact`（取噪） |
-| `browser_act` | 对 `@e` 编号元素执行 click / fill / type / press / select / scroll |
+| `browser_act` | 对 `@e` 编号元素执行 click / fill / type / press / select / scroll，或用 `eval` 求值一段表达式 |
 | `browser_screenshot` | 整页或某个元素的 jpeg（作为 image 结果交回模型） |
 | `browser_close` | 关掉自己启动的实例；attach 模式只断开，不动你的浏览器 |
 
@@ -68,10 +68,18 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 不会硬等到超时——遮挡用中心点命中检测（被遮罩盖住的元素在 DOM 里仍「可见」，`isVisible()` 判不出来），
 实测 1ms 级失败并报出遮挡者。
 
+`eval` 在页面上下文求值一段表达式并把结果带回来，用来读快照看不见的东西——最典型是计算值
+（`getComputedStyle` 的高度 / 间距 / 字号，这类「比数字」的场景截图比不了）。服务端把表达式固定包成
+`(() => (…))()`，两条传输拿到的是同一个字符串，所以两边行为一致；也因此**多语句要自己写成 IIFE**
+（`(() => { const s = getComputedStyle(document.querySelector(".x")); return { h: s.height }; })()`）。
+结果转成文本：字符串原样、其余紧凑 JSON，上限 4000 字符（超了截断并注明原长度）；表达式没有返回值、
+或返回 DOM 节点这类序列化不了的值，当场报错并说清该怎么写，不递一个空结果让人猜。
+
 ## 编号与快照语义
 
 - 编号按 `role + 可访问名`（同名再带序号）哈希生成，**不是递增序号**：页面多出弹层 / toast 时已有编号不错位。
-- **导航后编号整体失效**，强制重新快照。
+- **导航后编号整体失效**，强制重新快照；**SPA 路由（`pushState`）不算导航**——地址变了而文档没换，
+  编号继续有效（判定看文档的 `performance.timeOrigin`，不看 URL）。
 - 采集范围：`a[href]` / `button` / `input`（非 hidden）/ `select` / `textarea` / `summary` / `h1`–`h3` /
   `[role]` / `[contenteditable]` / `[tabindex]`。因此 `role="status"` 这类语义状态文本也在列表里（对验证有用）。
 - 名字取可访问名：`aria-label` → `aria-labelledby` → `<label>` 文本（**只取控件之外的那部分**，否则
@@ -91,7 +99,7 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 
 - **只读模式（plan / ask）放行观察面、页面操作看实例**：`browser_open` / `browser_snapshot` /
   `browser_screenshot` / `browser_close` 是观察面（打开页面、看元素、截图、断开），只读模式下照常可用——
-  `browser_open` 沿用默认规则的按站点审批，其余三个按默认放行。`browser_act`（点击 / 输入 / 滚动）只在
+  四个都按默认规则放行（没有单独的审批规则）。`browser_act`（点击 / 输入 / 滚动 / 表达式求值）只在
   **受管实例**（我们自启的 Chromium，`mode === "isolated"`）里放行：attach 连的是你自己的调试实例、
   desktop 驱动的是桌面端面板里你正看着的标签，那两种下仍阻断。哪几个算观察面写在
   `harness/features/browser/tools.ts` 的 `BROWSER_OBSERVE_TOOL_NAMES`，新增的浏览器工具默认落在阻断侧。
@@ -100,7 +108,8 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
   传了 `profile`（或设置页里配了默认 profile——`browser_open` 每次都会把它带上去）就是长期保留的那一份数据
   （含登录态），在它上面点按钮等于以你的身份操作该站点。计划 / 问答模式对 `browser_act` 的放行只看
   「实例是我们起的」，所以介意这点就别给这些会话留默认 profile，或切到编码模式动手。
-- **`browser_open` 默认审批**，匹配对象是目标站点（host），可「本会话恒允许该站点」；其余工具作用于已批准的页面。
+- **不做站点级审批**：`browser_open` 与 `bash` / `webfetch` / `websearch` 同档默认放行——单独给浏览器加确认不成立
+  （那几个的外联面更宽）。真正的凭证面是带持久 profile 打开站点：那次操作等于以你的身份访问该站。
 - **回环与私网允许**（本地自测是主要用途），**`file://` 与 `data:` 一律拒绝**——要读本地文件用 `read` 工具。
 - **不主动打开你默认 profile 的浏览器**：attach 只连你自己启动的调试实例；Chrome 136 起默认 user-data-dir 上
   的 `--remote-debugging-port` 会被忽略，必须配非默认的 `--user-data-dir`。术语与档位见
@@ -136,7 +145,7 @@ agent 驱动那条 CDP 通道**互不相干**：不驱动也能自己选元素�
 | 命令 | 覆盖 |
 | --- | --- |
 | `pnpm check` | 类型 + 单测（`server/src/harness/features/browser/__tests__`、`services/browser/__tests__`）+ 约定校验 |
-| `pnpm -F @ucode/server browser:smoke` | 真浏览器端到端：open / snapshot / fill+click / 遮挡失败 / 截图 / 导航失效 / 临时与持久化 profile / close |
+| `pnpm -F @ucode/server browser:smoke` | 真浏览器端到端：open / snapshot / fill+click / eval / 遮挡失败 / 截图 / 导航失效 / 临时与持久化 profile / close |
 | `pnpm -F @ucode/server browser:parity` | 与 agent-browser 的对拍（需要本机装了 `agent-browser`） |
 | `pnpm -F @ucode/server browser:desktop-smoke` | 桌面端**驱动**的端到端冒烟：本进程起服务与本地页 → 起桌面端并在面板里打开该页 → 直接调动作面跑 snapshot / click / screenshot / open，以及**元素选择**（面板进点选模式后用 CDP 真点一下，断言摘要进了输入框）；断言是跨进程可见的（点击后页面标题经桌面端读回变成「已点击」）。**需要先 `pnpm -F @ucode/desktop build`** |
 | `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟：活动栏入口 / 新标签开出 webview / 地址栏导航 / 多标签常驻 / 切标签不丢页面，以及**注册通道**（服务端看到两个标签、激活项正确、带上 `webContentsId`）。**需要先 `pnpm -F @ucode/desktop build`**（产物过期时脚本自己会报错），所以不进 `pnpm test` |

@@ -409,7 +409,7 @@ describe("桌面端会话（CDP 转发）", () => {
     assert.equal(readyStateCalls, 2, "销毁后应当重试一次");
   });
 
-  it("同文档导航（hash / pushState）也清编号表，与 Playwright 那条一致", async () => {
+  it("同文档导航（hash / pushState）只更新地址，编号表照旧——与 Playwright 那条一致", async () => {
     const fake = buttonPage();
     const session = sessionOn(fake);
     const snapshot = await session.snapshot({});
@@ -417,9 +417,15 @@ describe("桌面端会话（CDP 转发）", () => {
 
     fake.emit("Page.navigatedWithinDocument", { url: "https://example.com/#section" });
     assert.equal(session.currentUrl(), "https://example.com/#section", "地址跟着变");
-    await assert.rejects(
-      () => session.act({ action: "click", ref }),
-      (error: unknown) => isBrowserError(error) && error.code === "stale_ref",
+
+    // 文档没换：编号仍属于最近一次快照，不该在「不认识这个编号」这一步被拒
+    const failure = await session
+      .act({ action: "click", ref })
+      .then(() => null)
+      .catch((error: unknown) => error);
+    assert.ok(
+      !(isBrowserError(failure) && failure.code === "stale_ref"),
+      `不该报 stale_ref：${failure instanceof Error ? failure.message : "（无错误）"}`,
     );
   });
 

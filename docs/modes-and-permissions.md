@@ -15,7 +15,7 @@
 
 所以档位只能「放宽询问」，不能「授予能力」：在只读模式下把档位调到 `full`，`write` / `edit` 照样被阻断，
 `bash` 也只放行被判定为只读的命令，`browser_act` 只在受管实例里放行（`deny` 与上下文条件都不参与放宽）；
-浏览器的观察面里只有 `browser_open` 会问，那条审批来自全局默认规则，档位调高时与编码模式一样会放宽（见下节）。
+浏览器的观察面四个都按默认规则放行（没有站点级审批，见下节）。
 
 ## 会话模式
 
@@ -28,8 +28,8 @@
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
 | --- | --- | --- | --- | --- | --- |
-| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）+ 浏览器工具（`browser_*`，只在默认集会话注册）；Windows 上另有 `powershell` | 无（只受全局默认规则约束，其中 `browser_open` 默认 `ask`） | `xhigh` | 正常编码与执行 |
-| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write`；`bash` / `powershell` 兜底 `deny` + 放行被判定为只读的命令；`browser_act` 只在受管实例里放行；浏览器观察面按默认规则（`browser_open` 按站点审批） | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
+| `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）+ 浏览器工具（`browser_*`，只在默认集会话注册）；Windows 上另有 `powershell` | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
+| `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write`；`bash` / `powershell` 兜底 `deny` + 放行被判定为只读的命令；`browser_act` 只在受管实例里放行；浏览器观察面按默认规则放行 | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
 | `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | 与 `plan` 相同 | `medium` | 只读分析与回答 |
 
 ### 只读为什么不收窄工具集
@@ -103,10 +103,10 @@
   路径类工具不做「允许但限制路径」——命令里的路径无法可靠解析，那是假约束。
   它落在规则层（不是从工具表里去掉），所以连同 `codemode` 的嵌套调用与子会话一起拦住。
 - **浏览器的观察面照常可用**：`browser_open` / `browser_snapshot` / `browser_screenshot` / `browser_close`
-  在只读模式下不落 `deny`，于是 `browser_open` 沿用默认规则的**按站点审批**（与编码模式一致），其余三个按默认放行。
+  在只读模式下不落 `deny`，四个都按默认规则放行（没有站点级审批）。
   哪几个算观察面写在 `harness/features/browser/tools.ts` 的 `BROWSER_OBSERVE_TOOL_NAMES`（新增的浏览器工具
   默认落在阻断侧）。
-- **`browser_act`（点击 / 输入 / 滚动）只在受管实例里放行**：条件是 `when: "managedBrowser"`，由装配层每次判定
+- **`browser_act`（点击 / 输入 / 滚动 / 表达式求值）只在受管实例里放行**：条件是 `when: "managedBrowser"`，由装配层每次判定
   现问浏览器服务（`BrowserHooks.isManaged`）——attach 连的是你自己的调试实例、desktop 驱动的是桌面端面板里你正看着的
   标签，那两种下点一下就是真的点在你的浏览器与登录态上，因此仍走兜底的 `deny`。这条与档位无关，也不看站点的审批。
   它在实际形态上弱于命令白名单：打开页面会起进程、出网，用 `profile` 还会复用你自己的登录态，详见
@@ -189,8 +189,7 @@ MCP 工具没有命中显式规则时，按服务器声明的 annotations 兜底
 - `auto` 覆盖内置工具与 MCP 写类工具；`full`（完全访问）连工作目录之外的读取与写入审批也跳过，
   即除 `deny` 外不再有审批弹窗。
 - `deny` 在任何档位都不变：`.env` 阻断、只读模式对写盘与（非受管实例里的）页面操作的阻断，以及执行类工具
-  「白名单之外一律阻断」的兜底，都不受档位影响（只读命令与受管实例都是**上下文条件**，同样不看档位；
-  `browser_open` 的按站点审批来自默认规则，会随档位放宽）。
+  「白名单之外一律阻断」的兜底，都不受档位影响（只读命令与受管实例都是**上下文条件**，同样不看档位）。
 - `full` 在输入区用 warning 色标记，提示它已跳过越界审批；选中时不弹二次确认。
 - 切换档位与换模型 / 换模式同款处理：生成中拒绝（`409 session_busy`），落库后重建会话实例（`pool.dispose`），
   并用 `session_updated` 事件下发，多端同步。

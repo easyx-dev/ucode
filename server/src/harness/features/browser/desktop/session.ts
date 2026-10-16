@@ -17,21 +17,26 @@ import {
 } from "../../../../constants/browser";
 import {
   type BrowserActInput,
+  formatEvalResult,
   normalizeRef,
   type ResolvedAct,
   resolveAct,
   scrollDelta,
+  toEvalError,
 } from "../actions";
 import { browserError, toBrowserError } from "../errors";
 import {
   assertRefActionable,
   assertRefInSnapshot,
   captureSnapshot,
+  documentChanged,
   type Evaluate,
+  readDocumentOrigin,
 } from "../page-ops";
 import {
   documentStateScript,
   elementBoxScript,
+  evalScript,
   focusForInputScript,
   selectOptionScript,
 } from "../page-scripts";
@@ -259,6 +264,14 @@ export const createDesktopSession = (input: DesktopSessionInput): BrowserSession
         }
         return `已在 @${act.ref} 选择「${picked.value ?? act.text}」`;
       }
+      case "eval": {
+        try {
+          const value = await evaluate<unknown>(evalScript(act.text));
+          return `表达式结果：${formatEvalResult(value)}`;
+        } catch (error) {
+          throw toEvalError(error);
+        }
+      }
       default: {
         if (act.ref) {
           // 量盒子顺带滚进视口（见 elementBoxScript），与 Playwright 的 scrollIntoViewIfNeeded 同效
@@ -295,8 +308,8 @@ export const createDesktopSession = (input: DesktopSessionInput): BrowserSession
       }
     }
     if (event.method === "Page.navigatedWithinDocument" && typeof event.params.url === "string") {
-      // 同文档导航（hash / pushState）也算导航：SPA 换路由后旧编号不该继续被接受
-      entries = [];
+      // 同文档导航（hash / pushState）：地址跟着更新，但文档没换、编号继续有效——与 Playwright 那条一致；
+      // 路由后元素真的不在了，由命中检测（编号属性缺失）报 stale_ref 兑住
       url = event.params.url;
     }
   });
@@ -361,12 +374,12 @@ export const createDesktopSession = (input: DesktopSessionInput): BrowserSession
       if (act.ref) assertRefInSnapshot(entries, act.ref);
       if (act.ref) await assertRefActionable(evaluate, act.ref);
 
-      const before = url;
+      const before = { url, origin: await readDocumentOrigin(evaluate) };
       const summary = await runAction(act);
       const state = await readDocumentState();
       url = state.url;
       title = state.title;
-      return { summary, url, navigated: url !== before };
+      return { summary, url, navigated: await documentChanged(evaluate, before, url) };
     },
 
     async screenshot({ fullPage = false, ref }) {

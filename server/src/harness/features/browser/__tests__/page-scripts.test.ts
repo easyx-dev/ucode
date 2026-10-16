@@ -8,7 +8,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { applyRefsScript, collectScript, hitTestScript } from "../page-scripts";
+import {
+  applyRefsScript,
+  collectScript,
+  documentIdentityScript,
+  evalScript,
+  hitTestScript,
+} from "../page-scripts";
 
 type FakeElement = {
   tagName: string;
@@ -92,6 +98,26 @@ const withDocument = (
 };
 
 const run = (script: string): unknown => new Function(`return ${script}`)();
+
+describe("文档身份脚本", () => {
+  it("读的是 timeOrigin（SPA 路由不改它，真导航才会）", () => {
+    const script = documentIdentityScript();
+    assert.match(script, /performance\.timeOrigin/);
+    assert.equal(typeof new Function(`return ${script}`)(), "number");
+  });
+});
+
+describe("eval 表达式包装", () => {
+  it("包成 IIFE 调用，表达式按原样嵌进去", () => {
+    assert.equal(evalScript("1 + 1"), "(() => (1 + 1))()");
+  });
+
+  it("包出来的脚本能直接执行", () => {
+    // eslint 之类不参与：这是测试里对生成脚本做的一次真求值
+    const run = new Function(`return ${evalScript("1 + 1")}`) as () => number;
+    assert.equal(run(), 2);
+  });
+});
 
 describe("脚本本身", () => {
   const scripts = () => [

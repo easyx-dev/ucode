@@ -12,10 +12,10 @@ import { blockedCommandNotice, withBlockedCommands } from "../blocked";
 
 describe("shell 命令预检", () => {
   it("拦下写死的 sleep，并给出替代写法", () => {
-    const notice = blockedCommandNotice("sleep 20; agent-browser eval 'x'");
+    const notice = blockedCommandNotice("sleep 20; curl -s localhost:19688/api/v1/health");
     assert.ok(notice);
     assert.match(notice, /sleep 20/);
-    assert.match(notice, /wait --load/);
+    assert.match(notice, /browser_snapshot/);
   });
 
   it("承接在连接符 / 管道 / 子 shell 后的 sleep 同样拦下，且认单位", () => {

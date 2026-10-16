@@ -7,12 +7,16 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_SCROLL_STEP,
+  formatEvalResult,
+  MAX_EVAL_RESULT_CHARS,
   MAX_TEXT_CHARS,
   normalizeRef,
   probeToError,
   resolveAct,
   scrollDelta,
+  toEvalError,
 } from "../actions";
+import { browserError } from "../errors";
 
 describe("normalizeRef", () => {
   it("去掉 @ 前缀并小写", () => {
@@ -104,5 +108,72 @@ describe("probeToError", () => {
       "e7",
     );
     assert.match(error?.message ?? "", /视口之外/);
+  });
+});
+
+describe("resolveAct 的 eval", () => {
+  it("不要 ref，只要表达式", () => {
+    assert.equal(resolveAct({ action: "eval", text: "document.title" }).text, "document.title");
+  });
+
+  it("缺表达式时失败，并提示把表达式写在 text 里", () => {
+    assert.throws(
+      () => resolveAct({ action: "eval" }),
+      (error: Error & { hint?: string }) => {
+        assert.match(error.message, /eval 需要 text/);
+        assert.match(error.hint ?? "", /text/);
+        return true;
+      },
+    );
+  });
+});
+
+describe("formatEvalResult", () => {
+  it("字符串原样、其余类型转紧凑 JSON", () => {
+    assert.equal(formatEvalResult("登录"), "登录");
+    assert.equal(formatEvalResult({ height: "32px" }), '{"height":"32px"}');
+    assert.equal(formatEvalResult(0), "0");
+    assert.equal(formatEvalResult(false), "false");
+  });
+
+  it("没有返回值时说清原因，而不是回一个空串", () => {
+    assert.match(formatEvalResult(undefined), /没有返回值/);
+    assert.match(formatEvalResult(""), /空字符串/);
+  });
+
+  it("循环引用直接报错，并给可序列化的提示", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    assert.throws(
+      () => formatEvalResult(circular),
+      (error: Error & { code?: string }) => {
+        assert.equal(error.code, "action_failed");
+        assert.match(error.message, /无法序列化/);
+        return true;
+      },
+    );
+  });
+
+  it("超长结果截断并说明原长度", () => {
+    const text = formatEvalResult("x".repeat(MAX_EVAL_RESULT_CHARS + 10));
+    assert.match(text, /结果已截断/);
+    assert.ok(text.length < MAX_EVAL_RESULT_CHARS + 60);
+  });
+});
+
+describe("toEvalError", () => {
+  it("语法错点到「写成 IIFE」：表达式只包一层求值", () => {
+    const error = toEvalError(new SyntaxError("Unexpected token 'const'"));
+    assert.match(error.message, /表达式执行失败/);
+    assert.match(error.hint, /IIFE/);
+  });
+
+  it("已有更具体提示的浏览器错误不被覆盖", () => {
+    const original = browserError("stale_ref", "ref 不在页面上", { hint: "重新快照" });
+    assert.equal(toEvalError(original), original);
+  });
+
+  it("其余异常给可执行的下一步", () => {
+    assert.match(toEvalError(new Error("boom")).hint, /控制台/);
   });
 });

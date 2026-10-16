@@ -7,7 +7,12 @@
 import { BROWSER_INDEX_ATTRIBUTE, BROWSER_REF_ATTRIBUTE } from "../../../constants/browser";
 import { probeToError } from "./actions";
 import { browserError } from "./errors";
-import { applyRefsScript, collectScript, hitTestScript } from "./page-scripts";
+import {
+  applyRefsScript,
+  collectScript,
+  documentIdentityScript,
+  hitTestScript,
+} from "./page-scripts";
 import {
   assignRefs,
   diffSnapshots,
@@ -90,4 +95,26 @@ export const assertRefActionable = async (evaluate: Evaluate, ref: string): Prom
   );
   const error = probeToError(probe, ref);
   if (error) throw error;
+};
+
+/**
+ * 读当前文档的身份。求值失败（多半是导航提交那一瞬间上下文被销毁）返回 `NaN`：
+ * `NaN !== NaN`，于是这一刻会被当成「换了新文档」——那正好是当时真实发生的事。
+ */
+export const readDocumentOrigin = async (evaluate: Evaluate): Promise<number> =>
+  evaluate<number>(documentIdentityScript()).catch(() => Number.NaN);
+
+/**
+ * 这次动作之后是不是换了一个文档（= 真导航）。
+ *
+ * 只在地址变了才去问页面：地址没变的重载很少见，而它漏判的后果由 `assertRefInSnapshot`
+ * 兼「ref 不在页面里」那两种失败兜住。地址变了但 `timeOrigin` 没变 = `pushState`，编号仍然有效。
+ */
+export const documentChanged = async (
+  evaluate: Evaluate,
+  before: { url: string; origin: number },
+  afterUrl: string,
+): Promise<boolean> => {
+  if (afterUrl === before.url) return false;
+  return !Object.is(await readDocumentOrigin(evaluate), before.origin);
 };

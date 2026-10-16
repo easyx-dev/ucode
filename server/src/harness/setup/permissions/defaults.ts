@@ -5,6 +5,10 @@
  * - 工作目录之外的路径默认走审批（`external_directory`）。
  *
  * 规则是「最后命中者胜」，所以放行 `.env.example` 的规则必须排在通配的阻断规则之后。
+ *
+ * 浏览器工具**不在这里**：`browser_open` 曾有一条按站点 `ask`，但它是同类里唯一的审批面
+ * （`bash` / `webfetch` / `websearch` 都默认放行，而外联面比它宽），自测与走查的摩擦大于收益。
+ * 站点级的把关改由两处承担：会话权限档位，以及只读模式对 `browser_act` 的阻断。
  */
 
 import { toPosixPath } from "../../../platform/paths";
@@ -19,9 +23,6 @@ export const DEFAULT_PERMISSION_RULES: readonly PermissionRule[] = [
     { tool, pattern: "*.env.*", action: "deny", note: "环境变量文件通常含密钥" },
     { tool, pattern: "*.env.example", action: "allow", note: "示例文件不含真实密钥" },
   ]),
-  // 打开外部页面要经过一次确认：匹配对象是目标站点（`toolTarget` 取 host），用户能对某个站点
-  // 「本会话恒允」；其余 browser_* 作用于已批准的页面，不重复审批。
-  { tool: "browser_open", pattern: "*", action: "ask", note: "打开外部页面" },
   { tool: "external_directory", pattern: "*", action: "ask", note: "工作目录之外的路径" },
 ];
 

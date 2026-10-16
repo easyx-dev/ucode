@@ -67,12 +67,13 @@ describe("只读模式", () => {
         }).action,
         "allow",
       );
-      // 打开页面落回默认规则的按站点审批；其余观察类工具按默认放行
-      assert.equal(
-        evaluateRules(rules, { tool: "browser_open", subject: "example.com" }).action,
-        "ask",
-      );
-      for (const name of ["browser_snapshot", "browser_screenshot", "browser_close"]) {
+      // 观察面四个都按默认规则放行：没有站点级审批，也没有单独的规则
+      for (const name of [
+        "browser_open",
+        "browser_snapshot",
+        "browser_screenshot",
+        "browser_close",
+      ]) {
         assert.equal(
           evaluateRules(rules, { tool: name, subject: "" }).action,
           "allow",
@@ -90,11 +91,11 @@ describe("只读模式", () => {
     assert.match(actRule?.note ?? "", /只放行受管实例里的页面操作/);
   });
 
-  it("编码模式下打开页面走审批（默认规则给的 ask），其余浏览器工具放行", () => {
+  it("编码模式下浏览器工具都按默认放行（没有站点级审批）", () => {
     const rules = agentRules(PRIMARY_PROFILES.build);
     assert.equal(
       evaluateRules(rules, { tool: "browser_open", subject: "example.com" }).action,
-      "ask",
+      "allow",
     );
     assert.equal(evaluateRules(rules, { tool: "browser_act", subject: "" }).action, "allow");
   });

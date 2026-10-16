@@ -17,6 +17,18 @@ import {
 
 const CWD = "/work";
 
+describe("默认规则不给浏览器单独设规则", () => {
+  it("browser_open 未命中任何规则，即默认放行（不再有站点级审批）", () => {
+    const decision = decidePermission(
+      DEFAULT_PERMISSION_RULES,
+      "browser_open",
+      { url: "https://example.com" },
+      CWD,
+    );
+    assert.equal(decision.action, "allow");
+  });
+});
+
 describe("matchPattern", () => {
   it("`*` 跨路径分隔符匹配", () => {
     assert.equal(matchPattern("*.env", "config/.env"), true);

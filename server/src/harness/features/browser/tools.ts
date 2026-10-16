@@ -222,13 +222,16 @@ const actTool = (browser: BrowserHooks) =>
     name: "browser_act",
     label: "browser_act",
     description:
-      "对 @e 编号的元素执行一个动作：click / fill / type / press / select / scroll。" +
+      "对 @e 编号的元素执行一个动作：click / fill / type / press / select / scroll / eval。" +
       "不做自动等待也不自动重试：元素被遮挡、不可见或编号失效会立刻失败，" +
       "失败信息里给出原因与下一步（该重新快照还是该先滚动）。",
-    promptSnippet: "对元素执行点击 / 输入 / 按键 / 选择 / 滚动",
+    promptSnippet: "对元素执行点击 / 输入 / 按键 / 选择 / 滚动，或在页面里求值表达式",
     promptGuidelines: [
       "fill 覆盖内容、type 逐字输入（触发按键事件）、press 按键；select 传选项的 value 或可见文本。",
       "动作之后需要确认页面变了没有：把新 URL 与结果摘要当作判断依据，必要时再快照或截图。",
+      "要核对计算值（高度 / 间距 / 字号这类「比数字」的场景）用 eval 传表达式，如 " +
+        "(() => { const s = getComputedStyle(document.querySelector('.x')); return { h: s.height }; })()；" +
+        "多句要写成 IIFE（eval 只包一层求值，不接裸的多语句）。",
     ],
     parameters: browserActParameters,
     annotations: { destructiveHint: true, openWorldHint: true },

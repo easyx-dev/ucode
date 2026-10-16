@@ -348,3 +348,20 @@ export const selectOptionScript = (options: {
 
 /** 文档状态：打开地址后轮询 readyState 等页面可用，顺带取回地址与标题 */
 export const documentStateScript = (): string => `(${DOCUMENT_STATE})()`;
+
+const DOCUMENT_IDENTITY = `function () {
+  return performance.timeOrigin;
+}`;
+
+/**
+ * 这一次求值落在哪个文档上：新文档的 `timeOrigin` 会变，而 `pushState` 这类 SPA 路由不会。
+ * 用它区分「真导航」与「只是地址变了」——只看 URL 会把 SPA 路由当成导航，误报「编号已失效」。
+ */
+export const documentIdentityScript = (): string => `(${DOCUMENT_IDENTITY})()`;
+
+/**
+ * eval 动作的表达式包装：固定包成一句 IIFE 调用，两条传输（Playwright / CDP）拿到的是同一个字符串，
+ * 语义只有一套。裸的多语句到这里会变成语法错误——要写多句就由调用方自己包 IIFE，
+ * 比两边各自“容忍度不同”好排查。
+ */
+export const evalScript = (expression: string): string => `(() => (${expression}))()`;

@@ -1,6 +1,6 @@
 /**
  * 浏览器工具集的端到端冒烟：本地起一个静态页，跑通
- * open → snapshot → fill → click → 遮挡失败 → 截图 → 导航失效 → close。
+ * open → snapshot → fill → click → eval → 遮挡失败 → 截图 → 导航失效 → close。
  *
  * 需要本机有浏览器（走自动探测，可用 `CHROME_PATH` 覆盖），因此**不进 `pnpm test`**——
  * CI 上没有浏览器。用法：`pnpm -F @ucode/server browser:smoke`。
@@ -27,6 +27,7 @@ const PAGE = `<!doctype html>
     <input id="name" placeholder="请输入名字" />
     <button id="greet">问候</button>
     <button id="cover">盖住</button>
+    <button id="spa">改地址</button>
     <button id="cookie">种 cookie</button>
     <a href="/other">下一页</a>
     <p id="result" role="status">（未问候）</p>
@@ -41,6 +42,10 @@ const PAGE = `<!doctype html>
       });
       document.getElementById("cover").addEventListener("click", () => {
         document.getElementById("mask").style.display = "block";
+      });
+      // SPA 路由：地址变了但文档没换——不得被当成导航
+      document.getElementById("spa").addEventListener("click", () => {
+        history.pushState({}, "", "/spa");
       });
       document.getElementById("dismiss").addEventListener("click", () => {
         document.getElementById("mask").style.display = "none";
@@ -101,6 +106,39 @@ const main = async (): Promise<void> => {
     const after = await session.snapshot({});
     assert.match(after.text, /status "你好，UCode"/, "点击后结果文本应出现在快照里");
     console.log("✓ 交互结果通过 role=status 读回：你好，UCode");
+
+    // eval：读快照看不见的计算值（走查里「比数字」的场景）——一个动作、一处包装，两条传输共用
+    const computed = await session.act({
+      action: "eval",
+      text:
+        '(() => { const s = getComputedStyle(document.getElementById("result")); ' +
+        "return { weight: s.fontWeight, size: s.fontSize }; })()",
+    });
+    assert.equal(computed.navigated, false);
+    assert.match(computed.summary, /"weight"/, `eval 应回传计算值：${computed.summary}`);
+    console.log(`✓ eval：${computed.summary}`);
+
+    // 字符串原样回传：模型不用自己剥 JSON 引号
+    const readBack = await session.act({ action: "eval", text: "document.title" });
+    assert.match(readBack.summary, /浏览器冒烟页/);
+
+    // SPA 路由（pushState）不是导航：地址变了而编号仍有效，不该误报「编号已失效」
+    const spaRef = refOfName(after.text, "改地址");
+    const pushed = await session.act({ action: "click", ref: spaRef });
+    assert.equal(pushed.navigated, false, `pushState 不该算导航（url: ${pushed.url}）`);
+    assert.match(pushed.url, /\/spa$/);
+    const pushedAgain = await session.act({ action: "click", ref: spaRef });
+    assert.equal(pushedAgain.navigated, false);
+    console.log("✓ SPA 路由不算导航：地址已变，同一编号仍可继续用");
+
+    // 裸的多语句必然语法错（表达式只包一层求值）：报错要点到「写成 IIFE」
+    const syntaxFailure = await session
+      .act({ action: "eval", text: "const a = 1; a + 1" })
+      .then(() => null)
+      .catch((error: BrowserError) => error);
+    assert.ok(syntaxFailure, "裸的多语句应当失败");
+    assert.match(syntaxFailure.hint, /IIFE/);
+    console.log(`✓ eval 多语句报错：${syntaxFailure.message}`);
 
     // 遮挡：盖住以后中心点命中的是遮罩，必须立刻失败并指出被谁挡住（源方案 §6.3）
     const coverRef = refOfName(after.text, "盖住");

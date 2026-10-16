@@ -73,9 +73,8 @@ const execPermissions = (tool: string): PermissionRule[] => [
 ];
 
 /**
- * 浏览器的观察面（打开 / 快照 / 截图 / 断开）在只读模式下照常可用：这里不给它规则，
- * 于是 `browser_open` 落回默认规则的按站点审批、其余按默认放行；会改变页面状态的 `browser_act`
- * 另按受管实例判定。
+ * 浏览器的观察面（打开 / 快照 / 截图 / 断开）在只读模式下照常可用：这里不给它规则，于是全部按默认放行
+ * （`browser_open` 也没有站点级审批）；会改变页面状态的 `browser_act` 另按受管实例判定。
  */
 const READ_ONLY_PERMISSIONS: readonly PermissionRule[] = WRITE_TOOLS.flatMap((tool) => {
   if (isExecTool(tool)) return execPermissions(tool);
