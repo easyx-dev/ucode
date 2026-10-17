@@ -60,6 +60,9 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 - 产物运行时从**仓库根**的 `node_modules` 解析第三方依赖（esbuild 里设为 external），
   故根 `package.json` 的 `dependencies` 必须覆盖 `server` 的第三方运行时依赖——由 `scripts/verify`
   的 `manifest` 校验兜底。
+- 跨包共用的依赖（同名同版本出现在两个及以上工作区包）版本只写 `pnpm-workspace.yaml` 的 `catalog:`，
+  各处 `package.json` 写 `"catalog:"` 引用；只在单个包里用的依赖仍写在原地——同一条 `manifest` 校验
+  会拦下重复写版本与 catalog 里的死条目。
 - 生产（`NODE_ENV=production`）读 **`.env.prod`**（模板 `.env.prod.example`），从 cwd 向上查找；
   `.env.prod` 声明 `APP_HOME=~/.ucode`、端口 `19688`，与开发（`.env` → `.tmp/.ucode`）的数据目录隔离。
   缺失必需项会直接报错退出，代码不带默认值。

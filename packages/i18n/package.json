@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@ucode/contracts": "workspace:*",
-    "i18next": "^26.4.2"
+    "i18next": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "catalog:"
   }
 }

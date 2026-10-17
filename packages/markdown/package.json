@@ -21,8 +21,8 @@
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",
-    "@types/node": "^24.10.1",
-    "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }

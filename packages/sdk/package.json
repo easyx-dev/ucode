@@ -18,8 +18,8 @@
     "eventsource-parser": "^4.1.1"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }
