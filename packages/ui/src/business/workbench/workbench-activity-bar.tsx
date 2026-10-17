@@ -5,24 +5,11 @@
  * 两个图标都在位，不随目录是不是 git 仓库变化：位置固定比省一个图标重要。
  */
 
-import { AppWindow, FolderTree, GitCompare, PanelRightClose, SquareTerminal } from "lucide-react";
+import { PanelRightClose } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "../../base/button";
 import { useWorkbench, WORKBENCH_VIEWS, type WorkbenchView } from "../../provider/workbench";
-
-const VIEW_ICON: Record<WorkbenchView, typeof FolderTree> = {
-  files: FolderTree,
-  changes: GitCompare,
-  terminal: SquareTerminal,
-  browser: AppWindow,
-};
-
-const VIEW_LABEL: Record<WorkbenchView, string> = {
-  files: "文件浏览", // i18n-ignore
-  changes: "源代码管理", // i18n-ignore
-  terminal: "终端", // i18n-ignore
-  browser: "浏览器", // i18n-ignore
-};
+import { VIEW_ICON, VIEW_LABEL } from "./workbench-views";
 
 export function WorkbenchActivityBar() {
   const { t } = useTranslation();

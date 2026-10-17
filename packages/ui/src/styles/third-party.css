@@ -10,6 +10,7 @@
 /*
  * 行号列宽度不要动：库按行号位数估算，通过内联样式把 width / min-width / max-width 都写进每个 td
  * （`--diff-aside-width--`），外面再写宽度也只是与它打架——想更窄/更宽应当先确认估算规则本身出了问题。
+ * 下面两处是刻意例外：工具卡的 diff 整列不要行号（`.tool-diff`），窄容器下把两列收成一列（`.diff-scope`）。
  *
  * diff 视图（@git-diff-view/react）：库把配色收敛成一组 `--diff-*` 变量，深浅色由 token 自己跟随，
  * 不再分 light / dark 两套。语法高亮由我们注册的 shiki 适配器着色（`business/markdown/shiki-diff.ts`），
@@ -100,6 +101,64 @@
   /* 左右各留 4px：列宽就归那枚 16px 的图标，点击区不至于小到不好点 */
   padding-left: 4px;
   padding-right: 4px;
+}
+
+/*
+ * 窄容器（< 30rem：移动端整屏与拖窄后的工作台）下把两列行号收成一列。
+ *
+ * 统一模式下库把一行写成「旧号 + 10px 间隔 + 新号」，并将格宽内联成 `calc((var(--diff-aside-width--) + 5px) * 2)`
+ * （类名里还叠了一条 100px 的下限）：350px 的内容区里这一列能吃掉近 100px，代码只剩两百多 px。
+ * 这里把它收回库自己的一列宽（`aside + 5px`，就是它原先算给一列的那个值）。
+ *
+ * 只收「行号」这一列，不动展示方式与换行：那是用户的偏好（`hooks/use-diff-prefs`），窄不窄都算数。
+ * 分栏模式有自己的一列宽（旧 / 新两侧各一个格），这里一概不碰：`.diff-line-num` 只在统一视图里出现，
+ * hunk 行那格两个模式共用同一个类名，所以那一条要额外限定在 `.unified-diff-view` 里。
+ * 两类行取同一个值是为了自动换行那档（库切 `table-layout: fixed`，列宽由首行 hunk 行定）。
+ * 库把宽与最小宽写在内联样式上，只能 `!important` 压（与上面 `.tool-diff` 同一手法）。
+ * 选择器依赖库的 DOM（`.diff-line-num` / `.diff-line-hunk-action` 与 `data-line-old-num` / `data-line-new-num`），
+ * 升级库时要复核。容器锚点由 `business/workbench/git/diff-viewer.tsx` 打在这层外面。
+ */
+.diff-scope {
+  container: diff / inline-size;
+}
+
+@container diff (max-width: 30rem) {
+  .diff-tailwindcss-wrapper .diff-line-num,
+  .diff-tailwindcss-wrapper .unified-diff-view .diff-line-hunk-action {
+    /* biome-ignore lint/complexity/noImportantStyles: 库把列宽写在这几个格子的内联样式上 */
+    width: calc(var(--diff-aside-width--) + 5px) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 同上（库类名里那条 100px 下限也会撑住这一列） */
+    min-width: calc(var(--diff-aside-width--) + 5px) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 同上 */
+    max-width: calc(var(--diff-aside-width--) + 5px) !important;
+  }
+
+  /* 行号格左右各 10px 的内边距占了 20px，收窄；hunk 行那格只留 4px（里面是展开按钮） */
+  .diff-tailwindcss-wrapper .diff-line-num {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .diff-tailwindcss-wrapper .unified-diff-view .diff-line-hunk-action {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  /*
+   * 统一模式那一行里放的是「旧号 + 间隔 + 新号」三个 span：删除行只填旧号、新增行只填新号、
+   * 未变更行两颗都填。这里收成「有新号显示新号，否则回退到旧号」的一列。
+   */
+  .diff-tailwindcss-wrapper .diff-line-num > div > span:empty {
+    display: none;
+  }
+  .diff-tailwindcss-wrapper
+    .diff-line-num
+    > div:has([data-line-new-num]:not(:empty))
+    > [data-line-old-num] {
+    display: none;
+  }
+  .diff-tailwindcss-wrapper .diff-line-num > div > span:not(:empty) {
+    width: 100%;
+  }
 }
 
 /*

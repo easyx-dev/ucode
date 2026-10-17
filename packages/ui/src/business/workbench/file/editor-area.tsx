@@ -19,7 +19,17 @@ import { TerminalView } from "../terminal/terminal-view";
 import { EditorTabs } from "./editor-tabs";
 import { FileContent } from "./file-content";
 
-export function EditorArea({ review, onBack }: { review: GitReview; onBack?: () => void }) {
+export function EditorArea({
+  review,
+  onBack,
+  onCollapse,
+}: {
+  review: GitReview;
+  /** 窄屏专用：回到列表页（桌面端不传，两栏并排时没有「返回」这回事） */
+  onBack?: () => void;
+  /** 窄屏专用：收起整个工作台抽屉（桌面端不传，退出入口在活动栏） */
+  onCollapse?: () => void;
+}) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   if (!workbench) return null;
@@ -32,7 +42,7 @@ export function EditorArea({ review, onBack }: { review: GitReview; onBack?: () 
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <EditorTabs onBack={onBack} />
+      <EditorTabs onBack={onBack} onCollapse={onCollapse} />
       <div className="flex min-h-0 flex-1 flex-col">
         {doc === null ? (
           <Empty

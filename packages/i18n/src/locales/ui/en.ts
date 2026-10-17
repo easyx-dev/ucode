@@ -920,6 +920,7 @@ export default {
   打开工作台: "Open workbench",
   切换工作台: "Toggle workbench",
   活动栏: "Activity bar",
+  视图切换: "Switch view",
   文件浏览: "Files",
   源代码管理: "Source control",
   终端: "Terminal",

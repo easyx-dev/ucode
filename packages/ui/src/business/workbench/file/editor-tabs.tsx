@@ -2,7 +2,8 @@
  * 编辑器区的标签条：一份文档一个标签，可切换、可关闭。
  *
  * 每格拆成两个同级按钮（标题 + 关闭）——把按钮套进按钮会产生非法 HTML，读屏与键盘焦点也会错乱
- * （见 DESIGN.md「交互嵌套」）。窄屏下侧栏与编辑器互斥，最左给一个返回侧栏的箭头。
+ * （见 DESIGN.md「交互嵌套」）。窄屏下侧栏与编辑器互斥，最左给一个返回侧栏的箭头，最右给一个
+ * 收起整个工作台的入口（窄屏没有活动栏，不给入口就只能靠对话区那颗被抽屉盖住的开关）。
  * 标签横向溢出时整条滚动，不换行。
  */
 
@@ -14,10 +15,12 @@ import {
   FileDiff,
   GitCommitHorizontal,
   Layers,
+  PanelRightClose,
   SquareTerminal,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "../../../base/button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -62,7 +65,13 @@ const iconOf = (doc: WorkbenchDoc) => {
   return doc.kind === "diff" ? FileDiff : GitCommitHorizontal;
 };
 
-export function EditorTabs({ onBack }: { onBack?: () => void }) {
+export function EditorTabs({
+  onBack,
+  onCollapse,
+}: {
+  onBack?: () => void;
+  onCollapse?: () => void;
+}) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   if (!workbench) return null;
@@ -75,14 +84,14 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-border">
       {onBack ? (
-        <button
-          type="button"
-          className="flex w-8 shrink-0 items-center justify-center text-foreground-subtle hover:text-foreground"
-          title={t("返回文件列表")}
+        <IconButton
+          className="shrink-0 text-foreground-subtle hover:text-foreground"
+          label={t("返回文件列表")}
+          size="icon-lg"
           onClick={onBack}
         >
           <ChevronLeft className="size-icon-base" />
-        </button>
+        </IconButton>
       ) : null}
 
       <div
@@ -149,6 +158,17 @@ export function EditorTabs({ onBack }: { onBack?: () => void }) {
           );
         })}
       </div>
+
+      {onCollapse ? (
+        <IconButton
+          className="shrink-0 border-l border-border text-foreground-subtle hover:text-foreground"
+          label={t("收起面板")}
+          size="icon-lg"
+          onClick={onCollapse}
+        >
+          <PanelRightClose className="size-icon-base" />
+        </IconButton>
+      ) : null}
     </div>
   );
 }

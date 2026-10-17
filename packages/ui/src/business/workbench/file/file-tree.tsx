@@ -189,8 +189,9 @@ export function FileTree({
           <InputSearch
             value={query}
             placeholder={t("在「{{name}}」中筛选文件", { name: baseName(root) || root })}
-            // 与下方列表行同高（`h-7`），也与代码管理头部里的分段控件同档：24px 在这条 36px 的头部里偏窄
-            className="h-7 text-xs md:text-xs"
+            // 与下方列表行同高（`h-7`），也与代码管理头部里的分段控件同档：24px 在这条 36px 的头部里偏窄。
+            // 窄屏不跟着缩字号：16px 是 iOS 聚焦不缩放页面的前提（DESIGN.md「响应式」），此处是该例外唯一要走上的输入框
+            className="h-8 text-base md:h-7 md:text-xs"
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>

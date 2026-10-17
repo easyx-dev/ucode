@@ -66,16 +66,19 @@ export function DiffViewer({
   }
 
   return (
-    <PatchDiff
-      data={{
-        fileName: file,
-        oldContent: contents?.old?.text ?? "",
-        newContent: contents?.new?.text ?? "",
-        patch,
-      }}
-      mode={mode}
-      wrap={wrap}
-      diffRef={diffRef}
-    />
+    // 窄容器下的适配（行号列收成一列）按 `.diff-scope` 这一层做容器查询，见 `styles/third-party.css`
+    <div className="diff-scope">
+      <PatchDiff
+        data={{
+          fileName: file,
+          oldContent: contents?.old?.text ?? "",
+          newContent: contents?.new?.text ?? "",
+          patch,
+        }}
+        mode={mode}
+        wrap={wrap}
+        diffRef={diffRef}
+      />
+    </div>
   );
 }

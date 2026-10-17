@@ -150,6 +150,9 @@ packages/ui/src/
 - 布尔 prop 用肯定语义（`disabled`、`streaming`、`dense`），不用反义命名
 - 变体用 `cva` 而不是三元堆叠；本项目自己的组件优先 `className` + `cn`，只有真正多变的才上 `cva`
 - 不传「样式开关」类 prop（`hideBorder`、`big`）；需要不同外观就在调用处传 `className` 或拆组件
+- 选项数据（`SegmentedOption` 这类）可以带类名字段：窄容器里收起某项的文案由调用方传类
+  （`sr-only` 加阈值变体，如 `sr-only @[30rem]:not-sr-only`），原语不认容器查询。藏文案要让单选钮保住可访问名——
+  用 `sr-only`，不用 `hidden`
 - **包裹类关注点**可以由 prop 内聚（`Button` 的 `tooltip`、`CopyAction` 的复制反馈）：它们不改动内容结构，
   只为内容包一层容器。内容是另一回事——插槽仍走 children，`icon` / `title` 这类 prop 只用来接文案
 

@@ -4,12 +4,13 @@
  * 取数与渲染都在 `use-file-diff` / `diff-viewer` 里，「全部改动」堆叠视图共用同一套；
  * 这里只补单文件独有的那条工具条。组件由外层用 `key={doc.id}` 挂载，切标签即重置折叠状态。
  */
+import { cn } from "cn";
 import { FoldVertical, UnfoldVertical } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { IconButton } from "../../../base/button";
-import { DiffDisplayControls } from "../../../base/diff-controls";
+import { DIFF_TOOLBAR_CONTAINER_CLASS, DiffDisplayControls } from "../../../base/diff-controls";
 import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import type { PatchDiffRef } from "../../markdown/patch-diff";
 import type { GitDiffTarget } from "../use-workbench-data";
@@ -45,7 +46,13 @@ export function GitFileDiff({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
+      {/* `@container` 在这一行：展示控件在窄容器里只留图标（见 base/diff-controls） */}
+      <div
+        className={cn(
+          DIFF_TOOLBAR_CONTAINER_CLASS,
+          "flex h-9 shrink-0 items-center gap-2 border-b border-border px-2",
+        )}
+      >
         {data ? <GitStatusMark mark={data.status} /> : null}
         <span className="min-w-0 flex-1 truncate font-mono text-xs" title={target.file}>
           {target.file}

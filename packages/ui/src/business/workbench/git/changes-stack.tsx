@@ -4,10 +4,11 @@
  * 与单文件标签并存而不是取代——顺手改一处就在标签里看，一次过一遍大改动就在堆叠里扫。
  * 卡片本体在 `diff-stack` 里（提交详情共用），这里只补头部工具条与分组。
  */
+import { cn } from "cn";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { DiffDisplayControls } from "../../../base/diff-controls";
+import { DIFF_TOOLBAR_CONTAINER_CLASS, DiffDisplayControls } from "../../../base/diff-controls";
 import { Spinner } from "../../../base/spinner";
 import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import { useGitStatus } from "../use-workbench-data";
@@ -48,11 +49,17 @@ export function ChangesStack({ path, reloadToken }: { path: string; reloadToken:
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
+      {/* `@container` 在这一行：窄容器里文件计数与展示控件的文字都让位给标题与路径 */}
+      <div
+        className={cn(
+          DIFF_TOOLBAR_CONTAINER_CLASS,
+          "flex h-9 shrink-0 items-center gap-2 border-b border-border px-2",
+        )}
+      >
         <span className="shrink-0 text-xs font-medium">{t("全部改动")}</span>
         {status.data?.isRepo ? (
           <>
-            <span className="min-w-0 truncate text-xs text-foreground-subtle">
+            <span className="hidden min-w-0 truncate text-xs text-foreground-subtle @[30rem]/diff-toolbar:inline">
               {t("{{value}} 个文件", { value: entries.length })}
             </span>
             <GitCounts additions={totals.additions} deletions={totals.deletions} />

@@ -1,8 +1,9 @@
 /**
- * 工作台面板：活动栏 + 侧栏 + 编辑器区。
+ * 工作台面板：桌面端是活动栏 + 侧栏 + 编辑器区，窄屏是顶部视图条 + 单列（列表或编辑器）。
  *
  * 桌面端侧栏与编辑器并排、可拖宽（宽度按栏记忆），侧栏可以整列收起、收起后编辑器占满；
- * 窄屏抽屉只有一列宽，两者互斥——点开文件即切到编辑器，编辑器标签条左侧给返回箭头。
+ * 窄屏抽屉只有一列宽，两者互斥——点开文件即切到编辑器，编辑器标签条左侧给返回箭头；
+ * 那 40px 宽的竖排活动栏只在桌面端出现，窄屏换成列表页顶部那一条视图条（见 `workbench-view-bar`）。
  */
 import { useEffect } from "react";
 
@@ -20,6 +21,7 @@ import { EditorArea } from "./file/editor-area";
 import { useGitReview } from "./git/use-git-review";
 import { WorkbenchActivityBar } from "./workbench-activity-bar";
 import { WorkbenchSidebar } from "./workbench-sidebar";
+import { WorkbenchViewBar } from "./workbench-view-bar";
 
 export function WorkbenchPanel() {
   const workbench = useWorkbench();
@@ -41,16 +43,22 @@ export function WorkbenchPanel() {
   const activeFile = activeDoc?.kind === "file" ? activeDoc.path : null;
   const sidebar = <WorkbenchSidebar review={review} activeFile={activeFile} />;
   const editor = (
-    <EditorArea review={review} onBack={isDesktop ? undefined : () => setSidebarVisible?.(true)} />
+    <EditorArea
+      review={review}
+      onBack={isDesktop ? undefined : () => workbench.setSidebarVisible(true)}
+      onCollapse={isDesktop ? undefined : workbench.collapse}
+    />
   );
   const showSidebar = workbench.sidebarVisible;
   // 窄屏没有分栏，只显示其中一边
   const narrowMain = showSidebar ? sidebar : editor;
 
   return (
-    <div className="flex h-full min-h-0 w-full">
-      <WorkbenchActivityBar />
-      <div className="flex min-w-0 flex-1">
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {/* 窄屏看文档时顶部是标签条（自带返回与收起），视图条只在列表页出现 */}
+      {isDesktop || !showSidebar ? null : <WorkbenchViewBar />}
+      <div className="flex min-h-0 min-w-0 flex-1">
+        {isDesktop ? <WorkbenchActivityBar /> : null}
         {!isDesktop ? (
           narrowMain
         ) : showSidebar ? (

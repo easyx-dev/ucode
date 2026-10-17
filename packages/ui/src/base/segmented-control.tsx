@@ -8,6 +8,12 @@ export type SegmentedOption<T extends string> = {
   label: string;
   /** 可选的选项图标；窄栏（如预览工具条）用它省文字宽度 */
   icon?: React.ReactNode;
+  /**
+   * 选项文案的附加类名。收文字留图标时传 `sr-only` 加一个阈值变体，如 `sr-only @[30rem]:not-sr-only`：
+   * 用 `sr-only` 而不是 `hidden`——单选钮的可访问名来自这段文案，藏起来也不能丢（见 `base/diff-controls`）。
+   * 注释里不要写出带占位符的类名（如 `@[<宽>]`）：Tailwind 连注释一起扫，会把占位符当场生成一条样式。
+   */
+  labelClassName?: string;
 };
 
 type SegmentedControlProps<T extends string> = {
@@ -60,7 +66,7 @@ export function SegmentedControl<T extends string>({
               className="sr-only"
             />
             {option.icon}
-            {option.label}
+            <span className={option.labelClassName}>{option.label}</span>
           </label>
         );
       })}

@@ -1,9 +1,10 @@
 /** 提交历史：列表（自带分页取数）与单次提交详情（元信息 + 各文件的 diff 堆叠） */
 import type { GitCommitSummary } from "@ucode/contracts";
+import { cn } from "cn";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { DiffDisplayControls } from "../../../base/diff-controls";
+import { DIFF_TOOLBAR_CONTAINER_CLASS, DiffDisplayControls } from "../../../base/diff-controls";
 import { Spinner } from "../../../base/spinner";
 import { useDiffPreferences } from "../../../hooks/use-diff-prefs";
 import { relativeTimeLabel } from "../../../utils/time";
@@ -89,7 +90,13 @@ export function CommitDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
+      {/* `@container` 在这一行：窄容器里展示控件只留图标（见 base/diff-controls） */}
+      <div
+        className={cn(
+          DIFF_TOOLBAR_CONTAINER_CLASS,
+          "flex h-9 shrink-0 items-center gap-2 border-b border-border px-2",
+        )}
+      >
         <span className="shrink-0 font-mono text-xs text-foreground-subtle">
           {commit.shortHash}
         </span>
