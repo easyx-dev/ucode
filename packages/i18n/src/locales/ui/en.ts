@@ -28,6 +28,7 @@ export default {
   开启项目记忆: "Turn on project memory",
   关闭项目记忆: "Turn off project memory",
   跟随全局默认: "Follow the global default",
+  此项目已开启记忆: "Memory is on for this project",
   留空即用目录名: "Leave empty to use the directory name",
   删除: "Delete",
   更多操作: "More actions",
