@@ -551,16 +551,16 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
-| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
-| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `permissionMode` | "auto" \| "default" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
-| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_plan" \| "waiting_question" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -611,16 +611,16 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
-| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
-| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `permissionMode` | "auto" \| "default" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
-| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_plan" \| "waiting_question" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -680,16 +680,16 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
-| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
-| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `permissionMode` | "auto" \| "default" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
-| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_plan" \| "waiting_question" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -717,16 +717,16 @@
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
-| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
-| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `permissionMode` | "auto" \| "default" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
-| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_plan" \| "waiting_question" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -768,9 +768,9 @@
 | `path` | string | 是 | 归一化后的绝对路径；项目的自然键，会话按 cwd 归到它上面 |
 | `name` | string \| null | 是 | 展示名；为空时客户端回落目录末段 |
 | `model` | string \| null | 是 | 最近一次在该项目里选择的模型；为空表示未记住，或记住的那个已不可用 |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
 | `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
-| `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `permissionMode` | "auto" \| "default" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
 | `memoryEnabled` | boolean | 是 | 项目级记忆开关的覆盖：`null` 表示未设过（跟随全局 `memory.enabled`）， 否则是这个目录的显式开关。侧栏项目行据此标「已开启记忆」。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
@@ -1091,7 +1091,7 @@
 | `name` | string | 是 | 文件名字（路径末段），供预览器 tab 直接使用 |
 | `size` | number | 是 | 字节数 |
 | `updatedAt` | string | 是 | — |
-| `kind` | "text" \| "binary" | 是 | — |
+| `kind` | "binary" \| "text" | 是 | — |
 | `text` | string | 否 | UTF-8 文本；`kind` 为 `binary` 或超出文本内联上限时缺省 |
 | `base64` | string | 否 | base64 字节；`kind` 为 `text` 或超出二进制内联上限时缺省 |
 | `truncated` | boolean | 是 | 内容是否因体积上限被截断（二进制超限时为 true 且整块不给） |
@@ -1144,7 +1144,7 @@
 | --- | --- | --- | --- |
 | `path` | string | 是 | — |
 | `oldPath` | string | 否 | — |
-| `status` | "added" \| "modified" \| "deleted" \| "renamed" \| "copied" \| "typeChanged" \| "conflicted" | 是 | — |
+| `status` | "added" \| "conflicted" \| "copied" \| "deleted" \| "modified" \| "renamed" \| "typeChanged" | 是 | — |
 | `binary` | boolean | 是 | — |
 | `additions` | number | 是 | — |
 | `deletions` | number | 是 | — |
@@ -1596,18 +1596,18 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `kind` | "agent" \| "command" \| "skill" | 是 | — |
 | `name` | string | 是 | — |
 | `label` | string | 是 | — |
 | `description` | string | 是 | — |
-| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | — |
+| `source` | "agents-project" \| "agents-user" \| "builtin" \| "global" \| "plugin" \| "project" | 是 | — |
 | `editable` | boolean | 是 | — |
-| `scope` | "project" \| "global" | 否 | — |
+| `scope` | "global" \| "project" | 否 | — |
 | `path` | string | 是 | — |
 | `mode` | "all" \| "primary" \| "subagent" | 否 | 角色专有字段 |
 | `tools` | string[] | 否 | — |
 | `model` | string | 否 | — |
-| `thinking` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | — |
+| `thinking` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 否 | — |
 | `advertise` | boolean | 否 | — |
 | `hidden` | boolean | 否 | — |
 | `argumentHint` | string | 否 | 命令专有字段 |
@@ -1645,7 +1645,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `kind` | "agent" \| "command" \| "skill" | 是 | — |
 | `name` | string | 是 | — |
 | `path` | string | 是 | — |
 | `created` | boolean | 是 | 本次是新建（true）还是覆盖已有文件（false） |
@@ -1667,7 +1667,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `kind` | "agent" \| "command" \| "skill" | 是 | — |
 | `name` | string | 是 | — |
 | `path` | string | 是 | — |
 | `removed` | boolean | 是 | 是否命中并删除；目标不存在时为 false |
@@ -2065,7 +2065,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | "step_start" \| "message_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_start" \| "tool_update" \| "tool_end" \| "message_end" \| "queue_update" \| "compaction_start" \| "compaction_end" \| "agent_settled" \| "transcript_reset" \| "interaction_request" \| "interaction_resolved" \| "subagent_start" \| "subagent_end" \| "goal_update" \| "service_update" \| "session_created" \| "session_updated" \| "session_archived" | 是 | — |
+| `type` | "agent_settled" \| "compaction_end" \| "compaction_start" \| "goal_update" \| "interaction_request" \| "interaction_resolved" \| "message_end" \| "message_start" \| "queue_update" \| "service_update" \| "session_archived" \| "session_created" \| "session_updated" \| "step_start" \| "subagent_end" \| "subagent_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_end" \| "tool_start" \| "tool_update" \| "transcript_reset" | 是 | — |
 | `sessionId` | string | 是 | — |
 | `seq` | number | 是 | — |
 | `data` | unknown | 是 | — |
@@ -2174,7 +2174,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `name` | string | 是 | — |
 | `baseUrl` | string \| null | 是 | 内置目录里可能没有固定端点（这类 provider 不参与一键接入） |
 | `api` | string | 是 | — |
-| `source` | "custom" \| "builtin" | 是 | — |
+| `source` | "builtin" \| "custom" | 是 | — |
 | `available` | boolean | 是 | 该 provider 是否已配置可用的鉴权 |
 | `authSource` | string \| null | 是 | 鉴权来源：stored / runtime / environment / fallback；未配置时为 null |
 | `authName` | string | 是 | 鉴权说明文案，如 "DeepSeek API key" |
@@ -2209,7 +2209,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `vision` | boolean | 是 | 是否接受图片输入（推断） |
 | `contextWindow` | number | 是 | 上下文窗口（推断） |
 | `maxTokens` | number | 是 | 单次输出上限（推断） |
-| `capabilitySource` | "default" \| "configured" \| "upstream" \| "catalog" \| "heuristic" | 是 | 上述能力的取值来源 |
+| `capabilitySource` | "catalog" \| "configured" \| "default" \| "heuristic" \| "upstream" | 是 | 上述能力的取值来源 |
 | `configured` | boolean | 是 | 是否已存在于该 provider 的配置里（按 id 比对） |
 
 ### SessionSummary
@@ -2223,16 +2223,16 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `updatedAt` | string | 是 | — |
 | `preview` | string | 是 | 首条用户消息（含合成输入）；供命令面板搜索，界面标题不回落它 |
 | `model` | string \| null | 是 | 生效的 "provider/model" |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
-| `resolvedThinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 思考档位偏好：`auto` 表示按本会话模式的推荐档位 |
+| `resolvedThinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 是 | 实际生效的思考档位（`auto` 解析后的结果）。 会话在内存时取 pi 的实际值——它已按模型能力夹过，可能不等于模式的推荐档位。 |
 | `mode` | string | 是 | 会话模式（primary agent slug）：决定工具集与权限 |
-| `permissionMode` | "default" \| "auto" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
+| `permissionMode` | "auto" \| "default" \| "full" | 是 | 会话级权限档位：命中 `ask` 时是弹审批还是自动放行；不改变工具集与 `deny` |
 | `parentSessionId` | string \| null | 是 | 父会话 id；子智能体会话非空 |
 | `agent` | string \| null | 是 | 子智能体的角色 slug（如 `general` / `explore`）；主会话为空 |
 | `forkedFromId` | string \| null | 是 | 本会话分叉自哪个会话（`sessions/fork` 生成）；非分叉会话为空 |
 | `childCount` | number | 是 | 未归档的直接子会话数；主会话据此决定侧栏是否可下钻 |
 | `running` | boolean | 是 | 是否有活跃生成（进程内的 run 或流式会话） |
-| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_question" \| "waiting_plan" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
+| `status` | "error" \| "idle" \| "running" \| "waiting_permission" \| "waiting_plan" \| "waiting_question" | 是 | 细分状态：生成中 / 等待用户输入（权限审批、问答、计划确认）/ 已完成 / 本轮出错。 等待类状态的判定口径在服务端（见 `docs/api.md`「会话状态」），都由「这一轮已经停下、 等用户动作」构成；`running` 为真时 `status` 也可能不是生成中。 |
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
@@ -2262,8 +2262,8 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `objective` | string | 是 | — |
-| `status` | "active" \| "paused" \| "completed" | 是 | — |
-| `cause` | "error" \| "mode" \| "limit" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
+| `status` | "active" \| "completed" \| "paused" | 是 | — |
+| `cause` | "blocked" \| "budget" \| "error" \| "interrupted" \| "limit" \| "mode" \| "no_progress" \| "user" \| null | 是 | 暂停原因；`active` / `completed` 时为空 |
 | `turns` | number | 是 | 已自动续跑的轮数（不含用户触发的那轮） |
 | `tokenBudget` | number \| null | 是 | token 预算；为空表示不限 |
 | `tokensUsed` | number | 是 | 目标开始后本会话累计消耗的 token（含校验调用） |
@@ -2279,9 +2279,9 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `path` | string | 是 | 归一化后的绝对路径；项目的自然键，会话按 cwd 归到它上面 |
 | `name` | string \| null | 是 | 展示名；为空时客户端回落目录末段 |
 | `model` | string \| null | 是 | 最近一次在该项目里选择的模型；为空表示未记住，或记住的那个已不可用 |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| "auto" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
+| `thinkingLevel` | "auto" \| "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" \| null | 是 | 最近一次在该项目里选择的思考档位偏好；为空表示未记住 |
 | `mode` | string \| null | 是 | 最近一次在该项目里选择的会话模式；为空表示未记住，或该模式的角色已不存在 |
-| `permissionMode` | "default" \| "auto" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
+| `permissionMode` | "auto" \| "default" \| "full" \| null | 是 | 最近一次在该项目里选择的权限档位；为空表示未记住 |
 | `memoryEnabled` | boolean | 是 | 项目级记忆开关的覆盖：`null` 表示未设过（跟随全局 `memory.enabled`）， 否则是这个目录的显式开关。侧栏项目行据此标「已开启记忆」。 |
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
@@ -2291,11 +2291,11 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `id` | string | 是 | — |
-| `role` | "custom" \| "user" \| "assistant" \| "tool" \| "summary" | 是 | — |
+| `role` | "assistant" \| "custom" \| "summary" \| "tool" \| "user" | 是 | — |
 | `blocks` | [MessageBlock](#messageblock)[] | 是 | — |
 | `model` | string | 否 | assistant 专用：产生该回复的模型 id |
 | `provider` | string | 否 | assistant 专用：模型所属 provider id |
-| `thinkingLevel` | "off" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" | 否 | assistant 专用：产生该回复时生效的推理等级 |
+| `thinkingLevel` | "high" \| "low" \| "max" \| "medium" \| "minimal" \| "off" \| "xhigh" | 否 | assistant 专用：产生该回复时生效的推理等级 |
 | `toolCallId` | string | 否 | tool 专用：与 toolCall block 的 id 对应，便于前端精确合并 |
 | `toolName` | string | 否 | tool 专用 |
 | `questionAnswers` | string[][] | 否 | tool 专用：`question` 的结构化答复，与调用入参里的 `questions` 同序（每项可多值） |
@@ -2365,7 +2365,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `name` | string | 是 | — |
 | `path` | string | 是 | 绝对路径 |
-| `type` | "file" \| "directory" | 是 | — |
+| `type` | "directory" \| "file" | 是 | — |
 | `size` | number | 是 | 字节数；目录为 0 |
 | `updatedAt` | string | 是 | — |
 
@@ -2375,7 +2375,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `path` | string | 是 | — |
 | `oldPath` | string | 否 | — |
-| `status` | "added" \| "modified" \| "deleted" \| "renamed" \| "copied" \| "typeChanged" \| "conflicted" | 是 | — |
+| `status` | "added" \| "conflicted" \| "copied" \| "deleted" \| "modified" \| "renamed" \| "typeChanged" | 是 | — |
 | `additions` | number \| null | 是 | 新增行数；未跟踪、重命名与二进制文件无法统计时为 null |
 | `deletions` | number \| null | 是 | 删除行数；无法统计时为 null |
 
@@ -2427,9 +2427,9 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `name` | string | 是 | — |
 | `enabled` | boolean | 是 | — |
 | `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 是 | — |
+| `timeout` | number | 否 | 单请求超时（秒），省略即用 pi 默认 60 |
 | `type` | "stdio" | 是 | — |
 | `command` | string | 是 | — |
-| `timeout` | number | 否 | 单请求超时（秒），省略即用 pi 默认 60 |
 | `args` | string[] | 否 | — |
 | `env` | Record<string, string> | 否 | — |
 | `cwd` | string | 否 | 相对路径按会话工作目录解析 |
@@ -2441,9 +2441,9 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `name` | string | 是 | — |
 | `enabled` | boolean | 是 | — |
 | `exposure` | "codemode" \| "deferred" \| "direct" \| "hidden" | 是 | — |
+| `timeout` | number | 否 | — |
 | `type` | "http" | 是 | — |
 | `url` | string | 是 | — |
-| `timeout` | number | 否 | — |
 | `headers` | Record<string, string> | 否 | — |
 
 ### PluginView
@@ -2455,16 +2455,16 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `displayName` | string | 是 | 界面显示名，缺省与 `name` 相同 |
 | `description` | string | 是 | — |
 | `version` | string | 是 | — |
-| `source` | "official" \| "local" \| "market" | 是 | 信任档位：执行类组件是否注入按它判定 |
+| `source` | "local" \| "market" \| "official" | 是 | 信任档位：执行类组件是否注入按它判定 |
 | `enabled` | boolean | 是 | 生效的启用状态：项目 / 本地覆盖优先于用户登记表里的值 |
-| `enabledBy` | "project" \| "user" \| "local" | 是 | `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 |
+| `enabledBy` | "local" \| "project" \| "user" | 是 | `enabled` 由哪一层决定；界面据此提示「这个仓库里被设成了 X」 |
 | `path` | string | 是 | 安装目录绝对路径（`${*_PLUGIN_ROOT}` 指向它） |
 | `installedAt` | string | 是 | 安装时间（ISO 8601） |
 | `components` | [PluginComponentCounts](#plugincomponentcounts) | 是 | — |
 | `componentRefs` | [PluginComponentRefView](#plugincomponentrefview)[] | 是 | 组件逐个列出：列表只给计数，详情页要名字 |
 | `userConfig` | [PluginUserConfigFieldView](#pluginuserconfigfieldview)[] | 是 | userConfig 的声明；没有配置项时为空数组 |
 | `config` | Record<string, string \| number \| boolean> | 是 | userConfig 的已存值；敏感项不在其中（只体现 `configured` 语义） |
-| `blockedComponents` | ("skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
+| `blockedComponents` | ("agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
 | `updateAvailable` | boolean | 是 | 来源内容是否已变（目录来源按内容哈希、git 按 ls-remote 的 commit、npm 按 registry 版本、 url 按条件请求判定）。由「刷新市场」这类显式动作重算，列表接口本身不打网络、不扫盘， 只回显上次结论。 |
 | `latestVersion` | string | 否 | 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 |
 | `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
@@ -2545,8 +2545,8 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `level` | "error" \| "warning" \| "info" | 是 | — |
-| `component` | "skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
+| `level` | "error" \| "info" \| "warning" | 是 | — |
+| `component` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
 | `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
 
 ### AgentView
@@ -2557,20 +2557,20 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `label` | string | 是 | 展示名 |
 | `description` | string | 是 | 角色说明；供界面展示与模型挑选 |
 | `kind` | "primary" \| "subagent" | 是 | — |
-| `source` | "project" \| "global" \| "plugin" \| "builtin" | 是 | — |
+| `source` | "builtin" \| "global" \| "plugin" \| "project" | 是 | — |
 | `hidden` | boolean | 否 | 是否对选择器隐藏（`hidden: true`）；隐藏项仍可按名调用 |
 
 ### AssetView
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `kind` | "agent" \| "command" \| "skill" | 是 | — |
 | `name` | string | 是 | 资产名：角色的 slug、技能的目录名、命令的文件名 |
 | `label` | string | 是 | 展示名：角色取 frontmatter `name`，其余同 `name` |
 | `description` | string | 是 | 一句话说明；解析失败时为空串 |
-| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源档位，顺序即同名优先级（前者胜） |
+| `source` | "agents-project" \| "agents-user" \| "builtin" \| "global" \| "plugin" \| "project" | 是 | 来源档位，顺序即同名优先级（前者胜） |
 | `editable` | boolean | 是 | 是否可编辑（全局 / 项目两档为 true） |
-| `scope` | "project" \| "global" | 否 | 可写档的落点作用域；只读来源缺省 |
+| `scope` | "global" \| "project" | 否 | 可写档的落点作用域；只读来源缺省 |
 | `path` | string | 是 | 磁盘路径；内置命令这类没有真身的项给 `builtin:<name>` |
 | `active` | boolean | 是 | 是否生效：同名时优先级最高者为 true，被压住的为 false |
 | `overriddenBy` | string | 否 | 压住它的那一条的路径；仅 `active` 为 false 时有 |
@@ -2579,7 +2579,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "command" \| "agent" \| "skill" | 是 | — |
+| `kind` | "agent" \| "command" \| "skill" | 是 | — |
 | `name` | string | 是 | — |
 | `path` | string | 是 | — |
 | `reason` | string | 是 | — |
@@ -2592,7 +2592,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `description` | string | 是 | 一句话说明，供菜单展示 |
 | `argumentHint` | string | 否 | 参数提示，如 `[focus]`；无参数时缺省 |
 | `bytes` | number | 是 | 模板正文的 UTF-8 字节数：界面据此估计这条输入会往上下文里塞多少 |
-| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源；同名时数组顺序靠前者胜 |
+| `source` | "agents-project" \| "agents-user" \| "builtin" \| "global" \| "plugin" \| "project" | 是 | 来源；同名时数组顺序靠前者胜 |
 
 ### SkillCommandView
 
@@ -2601,7 +2601,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `name` | string | 是 | 技能名；显式调用序列化为 `/skill:name`，模型也可按描述自动选用 |
 | `description` | string | 是 | — |
 | `bytes` | number | 是 | 技能正文（SKILL.md）的 UTF-8 字节数：一条消息可以带多条技能，界面据此提示上下文占用 |
-| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | — |
+| `source` | "agents-project" \| "agents-user" \| "builtin" \| "global" \| "plugin" \| "project" | 是 | — |
 
 ### ModelUsage
 
@@ -2617,7 +2617,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | --- | --- | --- | --- |
 | `sessionId` | string | 是 | — |
 | `name` | string \| null | 是 | — |
-| `kind` | "primary" \| "subagent" \| "forked" | 是 | — |
+| `kind` | "forked" \| "primary" \| "subagent" | 是 | — |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档，统计里仍计入，但界面不应再打开该会话 |
 | `totals` | [UsageTotals](#usagetotals) | 是 | — |
 
@@ -2745,7 +2745,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `id` | string | 是 | — |
 | `name` | string | 是 | — |
 | `baseUrl` | string | 否 | 留空表示继承 pi 内置目录的同名 provider |
-| `api` | "openai-completions" \| "openai-responses" \| "anthropic-messages" \| "google-generative-ai" \| "mistral-conversations" \| "azure-openai-responses" \| "openai-codex-responses" \| "bedrock-converse-stream" \| "google-vertex" \| "pi-messages" | 是 | — |
+| `api` | "anthropic-messages" \| "azure-openai-responses" \| "bedrock-converse-stream" \| "google-generative-ai" \| "google-vertex" \| "mistral-conversations" \| "openai-codex-responses" \| "openai-completions" \| "openai-responses" \| "pi-messages" | 是 | — |
 | `apiKeyMasked` | string | 是 | 脱敏后的 key，仅用于回显「已保存」 |
 | `models` | object[] | 否 | 留空表示模型清单继承 pi 内置目录 |
 
@@ -2753,7 +2753,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `provider` | "tavily" \| "searxng" \| "brave" | 是 | — |
+| `provider` | "brave" \| "searxng" \| "tavily" | 是 | — |
 | `apiKeyMasked` | string | 是 | — |
 | `baseUrl` | string | 是 | 自建 SearXNG 的实例地址；其他 provider 恒为空串 |
 | `configured` | boolean | 是 | 该 provider 的前置条件是否齐备（key 或实例地址）；决定 websearch 工具是否可用 |
@@ -2768,7 +2768,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `mode` | "isolated" \| "attach" | 是 | — |
+| `mode` | "attach" \| "isolated" | 是 | — |
 | `endpoint` | string | 是 | — |
 | `profile` | string | 是 | — |
 
@@ -2841,12 +2841,12 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `reason` | "manual" \| "threshold" \| "overflow" | 是 | — |
-| `outcome` | "done" \| "skipped" \| "failed" | 是 | — |
+| `reason` | "manual" \| "overflow" \| "threshold" | 是 | — |
+| `outcome` | "done" \| "failed" \| "skipped" | 是 | — |
 | `tokensBefore` | number | 否 | 压缩前的上下文占用（token） |
 | `tokensAfter` | number | 否 | 压缩后的估算占用（token）；pi 拿不到时省略 |
 | `keptFrom` | string | 否 | 保留区间的起点条目 id（压缩后模型还看得到的部分从这里开始） |
-| `skip` | "too_small" \| "already_compacted" | 否 | `skipped` 专用：正常拒绝的原因 |
+| `skip` | "already_compacted" \| "too_small" | 否 | `skipped` 专用：正常拒绝的原因 |
 | `error` | string | 否 | `failed` 专用：pi 给的原始失败原因 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
@@ -2854,9 +2854,9 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `event` | "set" \| "completed" \| "budget" \| "pause" \| "resume" \| "clear" \| "verdict" | 是 | — |
-| `status` | "active" \| "paused" \| "completed" | 否 | 本次事件后的状态（`clear` 时缺省） |
-| `cause` | "error" \| "mode" \| "limit" \| "user" \| "interrupted" \| "no_progress" \| "budget" \| "blocked" | 否 | `pause` 专用：暂停原因 |
+| `event` | "budget" \| "clear" \| "completed" \| "pause" \| "resume" \| "set" \| "verdict" | 是 | — |
+| `status` | "active" \| "completed" \| "paused" | 否 | 本次事件后的状态（`clear` 时缺省） |
+| `cause` | "blocked" \| "budget" \| "error" \| "interrupted" \| "limit" \| "mode" \| "no_progress" \| "user" | 否 | `pause` 专用：暂停原因 |
 | `turns` | number | 否 | 目标激活后累计的轮数 |
 | `turnTokens` | number | 否 | 本轮的用量增量（token），含本轮校验开销；`verdict` 与 `completed` 都带 |
 | `turnToolCalls` | number | 否 | 本轮的工具调用次数；`verdict` 与 `completed` 都带 |
@@ -2870,10 +2870,10 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `event` | "invoke" \| "hit" | 是 | 使用方式 |
+| `event` | "hit" \| "invoke" | 是 | 使用方式 |
 | `name` | string | 是 | 技能名（pi 的 `Skill.name`） |
 | `file` | string | 是 | 技能文件（`SKILL.md`）的绝对路径 |
-| `source` | "project" \| "agents-project" \| "global" \| "agents-user" \| "plugin" \| "builtin" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
+| `source` | "agents-project" \| "agents-user" \| "builtin" \| "global" \| "plugin" \| "project" | 是 | 来源目录档位，与 `commands/list` 的 `source` 同口径 |
 | `toolCallId` | string | 否 | 读到它的那次工具调用；仅 `hit` 有 |
 | `at` | string | 是 | 写入时刻（ISO 8601 UTC） |
 
@@ -2881,7 +2881,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `event` | "start" \| "end" | 是 | 时点 |
+| `event` | "end" \| "start" | 是 | 时点 |
 | `attempt` | number | 是 | 第几次重试（1 起） |
 | `maxAttempts` | number | 是 | 本次允许的最大重试次数 |
 | `delayMs` | number | 否 | 距下次尝试的等待时长（毫秒）；仅 `start` 有 |
@@ -2893,7 +2893,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "resume" \| "kickoff" \| "continuation" | 是 | — |
+| `kind` | "continuation" \| "kickoff" \| "resume" | 是 | — |
 | `turn` | number | 否 | 续跑专用：这是目标激活后的第几轮 |
 
 ### QuestionItem
@@ -2909,7 +2909,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `kind` | "ctx" \| "add" \| "del" | 是 | — |
+| `kind` | "add" \| "ctx" \| "del" | 是 | — |
 | `oldLine` | number \| null | 是 | — |
 | `newLine` | number \| null | 是 | — |
 | `text` | string | 是 | 行内容（不含前导的 +/-/空格） |
@@ -2930,7 +2930,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `group` | "skills" \| "manifest" \| "commands" \| "agents" \| "hooks" \| "mcp" \| "bin" \| "extensions" \| "userConfig" | 是 | — |
+| `group` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig" | 是 | — |
 | `name` | string | 是 | — |
 
 ### PluginUserConfigFieldView

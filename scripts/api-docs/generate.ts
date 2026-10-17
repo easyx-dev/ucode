@@ -155,6 +155,14 @@ const renderEventsSection = (
 /** 生成完整文档 */
 export const buildApiDoc = (): string => {
   const ctx = createContractProgram();
+  try {
+    return buildApiDocContent(ctx);
+  } finally {
+    ctx.close();
+  }
+};
+
+const buildApiDocContent = (ctx: ReturnType<typeof createContractProgram>): string => {
   const refs = createRefRegistry();
   const lines: string[] = [
     "# 接口参考",

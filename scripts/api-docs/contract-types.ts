@@ -3,103 +3,149 @@
  *
  * 响应侧目前只有 TS 类型（没有 zod schema），响应结构与字段说明只能从这里取；
  * 请求侧的字段说明也复用这套（zod 推断出的 `*Input` 类型会把 schema 字面量上的 JSDoc 带出来）。
+ *
+ * TS 7 起类型查询只在 `typescript/unstable/sync` 里：语言服务跑在独立子进程，本模块负责起进程、
+ * 按契约包的 tsconfig 开项目；用完必须 `close()`，否则子进程会一直挂着不退。
  */
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
-import ts from "typescript";
+import {
+  isArrayTypeNode,
+  isPropertySignatureDeclaration,
+  isTypeAliasDeclaration,
+  isTypeReferenceNode,
+} from "typescript/unstable/ast";
+import {
+  API,
+  type Checker,
+  type Project,
+  SymbolFlags,
+  type Symbol as TsSymbol,
+  type Type,
+  TypeFlags,
+  type TypeReference,
+  type UnionType,
+} from "typescript/unstable/sync";
 
 import type { DocField, DocNode } from "./model.ts";
 
 const CONTRACTS_DIR = resolve(import.meta.dirname, "../../packages/contracts");
-const CONTRACTS_SRC = `${CONTRACTS_DIR}/src`;
+
+/**
+ * 统一成 `/` 分隔再比对。TS 给的路径一律用 `/`（`typescript` 包里 `documentURIToFileName` 的文档就写着
+ * `c:/path/to/file.ts`），而 `node:path` 在 Windows 上会把 `join` 出的分隔符变成 `\`——直接比会整体不匹配。
+ */
+const toPosix = (path: string): string => path.replace(/\\/g, "/");
+
+/** 源码目录前缀，用于筛程序里的文件名（保留原大小写） */
+const CONTRACTS_SRC = toPosix(`${CONTRACTS_DIR}/src`);
 
 export type ContractProgram = {
-  program: ts.Program;
-  checker: ts.TypeChecker;
+  project: Project;
+  checker: Checker;
+  /**
+   * 契约源码目录前缀，用于判断符号声明在不在契约里：`NodeHandle.path` 是 TS 归一过的路径
+   * （分隔符一律 `/`，大小写不敏感的平台还会整体小写），与程序里文件名的拼法不是同一套，不能共用常量。
+   */
+  srcPath: string;
+  /** 契约包里「名字 → 导出符号」，扫一次源文件建表，避免每个类型都重扫 */
+  exports: Map<string, TsSymbol>;
+  /** 关掉语言服务子进程 */
+  close: () => void;
 };
 
-/** 以契约包的 tsconfig 建 Program（Bundler 解析，能正确解析 zod 推断出的类型） */
+/** 以契约包的 tsconfig 开项目（Bundler 解析，能正确解析 zod 推断出的类型） */
 export const createContractProgram = (): ContractProgram => {
   const configPath = resolve(CONTRACTS_DIR, "tsconfig.json");
-  const config = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (config.error) {
-    throw new Error(
-      `读取契约 tsconfig 失败：${ts.flattenDiagnosticMessageText(config.error.messageText, " ")}`,
-    );
+  const api = new API();
+  try {
+    const snapshot = api.updateSnapshot({ openProjects: [configPath] });
+    const project = snapshot.getProject(configPath);
+    if (!project) throw new Error(`打开契约项目失败：${configPath}`);
+    return {
+      project,
+      checker: project.checker,
+      srcPath: `${toPosix(dirname(project.id))}/src`,
+      exports: collectExports(project, project.checker),
+      close: () => api.close(),
+    };
+  } catch (error) {
+    api.close();
+    throw error;
   }
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, CONTRACTS_DIR);
-  const program = ts.createProgram(parsed.fileNames, parsed.options);
-  return { program, checker: program.getTypeChecker() };
 };
 
-const isInContractsSrc = (symbol: ts.Symbol | undefined): boolean =>
-  symbol?.declarations?.some((decl) => decl.getSourceFile().fileName.startsWith(CONTRACTS_SRC)) ??
+/** 契约包各源文件的导出符号（`export *` 转出来的也算在各自文件上） */
+const collectExports = (project: Project, checker: Checker): Map<string, TsSymbol> => {
+  const exports = new Map<string, TsSymbol>();
+  for (const fileName of project.program.getSourceFileNames()) {
+    if (!toPosix(fileName).startsWith(CONTRACTS_SRC)) continue;
+    const source = project.program.getSourceFile(fileName);
+    if (!source) continue;
+    const moduleSymbol = checker.getSymbolAtLocation(source);
+    if (!moduleSymbol) continue;
+    for (const symbol of checker.getExportsOfModule(moduleSymbol)) {
+      if (!exports.has(symbol.name)) exports.set(symbol.name, symbol);
+    }
+  }
+  return exports;
+};
+
+const isInContractsSrc = (ctx: ContractProgram, symbol: TsSymbol | undefined): boolean =>
+  symbol?.declarations.some((declaration) => toPosix(declaration.path).startsWith(ctx.srcPath)) ??
   false;
 
 /** 类型或类型别名是否声明在契约源码里 */
-const contractNameOf = (type: ts.Type): string | undefined => {
-  const alias = type.aliasSymbol;
-  if (alias && isInContractsSrc(alias)) return alias.getName();
+const contractNameOf = (ctx: ContractProgram, type: Type): string | undefined => {
+  const alias = type.getAliasSymbol();
+  if (alias && isInContractsSrc(ctx, alias)) return alias.name;
   const symbol = type.getSymbol();
-  if (symbol && isInContractsSrc(symbol)) {
-    const name = symbol.getName();
-    if (!name.startsWith("__")) return name;
+  if (symbol && isInContractsSrc(ctx, symbol)) {
+    if (!symbol.name.startsWith("__")) return symbol.name;
   }
   return undefined;
 };
 
-const isObjectFlags = (type: ts.Type): boolean =>
-  (type.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)) !== 0;
+const isObjectFlags = (type: Type): boolean =>
+  (type.flags & (TypeFlags.Object | TypeFlags.Intersection)) !== 0;
 
-const isObjectLike = (checker: ts.TypeChecker, type: ts.Type): boolean => {
+const isObjectLike = (checker: Checker, type: Type): boolean => {
   if (checker.isArrayType(type)) return false;
-  if (type.isUnion()) return type.types.some((member) => isObjectLike(checker, member));
+  if (type.isUnionType()) return type.getTypes().some((member) => isObjectLike(checker, member));
   return isObjectFlags(type) && checker.getPropertiesOfType(type).length > 0;
 };
 
-/** 找到契约包里导出的具名符号（类型或常量） */
-const findExport = (ctx: ContractProgram, name: string): ts.Symbol | undefined => {
-  for (const source of ctx.program.getSourceFiles()) {
-    if (!source.fileName.startsWith(CONTRACTS_SRC)) continue;
-    const moduleSymbol = ctx.checker.getSymbolAtLocation(source);
-    if (!moduleSymbol) continue;
-    for (const symbol of ctx.checker.getExportsOfModule(moduleSymbol)) {
-      if (symbol.getName() === name) return symbol;
-    }
-  }
-  return undefined;
-};
-
 /** 解析导出类型别名 / 具名类型为可用类型 */
-const typeOfExport = (ctx: ContractProgram, name: string): ts.Type => {
-  const symbol = findExport(ctx, name);
+const typeOfExport = (ctx: ContractProgram, name: string): Type => {
+  const symbol = ctx.exports.get(name);
   if (!symbol) throw new Error(`契约里找不到导出：${name}`);
-  const declaration = symbol.declarations?.[0];
-  if (declaration && ts.isTypeAliasDeclaration(declaration)) {
-    return ctx.checker.getTypeAtLocation(declaration.type);
+  const declaration = symbol.declarations[0]?.resolve(ctx.project);
+  if (declaration && isTypeAliasDeclaration(declaration)) {
+    const aliasType = ctx.checker.getTypeAtLocation(declaration.type);
+    if (aliasType) return aliasType;
   }
   return ctx.checker.getDeclaredTypeOfSymbol(symbol);
 };
 
 const cleanDoc = (raw: string): string => raw.replace(/\s+/g, " ").trim();
 
-const isUndefined = (type: ts.Type): boolean => (type.flags & ts.TypeFlags.Undefined) !== 0;
-const isNull = (type: ts.Type): boolean => (type.flags & ts.TypeFlags.Null) !== 0;
+const isUndefined = (type: Type): boolean => (type.flags & TypeFlags.Undefined) !== 0;
+const isNull = (type: Type): boolean => (type.flags & TypeFlags.Null) !== 0;
 
 /** 联合的判别字段：各分支都有、且取互异字符串字面量的那个字段 */
-const detectDiscriminator = (ctx: ContractProgram, type: ts.UnionType): string | undefined => {
-  const members = type.types.filter((member) => isObjectFlags(member));
+const detectDiscriminator = (ctx: ContractProgram, type: UnionType): string | undefined => {
+  const members = type.getTypes().filter((member) => isObjectFlags(member));
   const first = members[0];
   if (!first || members.length < 2) return undefined;
   for (const property of ctx.checker.getPropertiesOfType(first)) {
     const values = members.map((member) => {
-      const target = ctx.checker.getPropertyOfType(member, property.getName());
+      const target = ctx.checker.getPropertyOfType(member, property.name);
       if (!target) return undefined;
       const memberType = ctx.checker.getTypeOfSymbol(target);
-      return memberType.isStringLiteral() ? memberType.value : undefined;
+      return memberType?.isStringLiteralType() ? memberType.value : undefined;
     });
     if (values.every((value) => value !== undefined) && new Set(values).size === members.length) {
-      return property.getName();
+      return property.name;
     }
   }
   return undefined;
@@ -113,63 +159,82 @@ export type BuildOptions = {
 /** 字段声明类型是契约里具名的类型引用时，取其名字（用于 zod 推断丢失 aliasSymbol 的场合，如 `McpServerView`） */
 const declaredRefNode = (
   ctx: ContractProgram,
-  property: ts.Symbol,
-  resolved: ts.Type,
+  property: TsSymbol,
+  resolved: Type,
 ): DocNode | undefined => {
-  const declaration = property.valueDeclaration;
-  if (!declaration || !ts.isPropertySignature(declaration) || !declaration.type) return undefined;
+  const declaration = property.valueDeclaration?.resolve(ctx.project);
+  if (!declaration || !isPropertySignatureDeclaration(declaration) || !declaration.type)
+    return undefined;
   const typeNode = declaration.type;
 
-  if (ts.isTypeReferenceNode(typeNode)) {
+  if (isTypeReferenceNode(typeNode)) {
     const symbol = ctx.checker.getSymbolAtLocation(typeNode.typeName);
-    if (symbol && isInContractsSrc(symbol) && isObjectLike(ctx.checker, resolved)) {
+    if (symbol && isInContractsSrc(ctx, symbol) && isObjectLike(ctx.checker, resolved)) {
       return { kind: "ref", name: typeNode.typeName.getText() };
     }
     return undefined;
   }
 
-  if (ts.isArrayTypeNode(typeNode) && ts.isTypeReferenceNode(typeNode.elementType)) {
-    const symbol = ctx.checker.getSymbolAtLocation(typeNode.elementType.typeName);
-    if (!symbol || !isInContractsSrc(symbol) || !ctx.checker.isArrayType(resolved))
+  if (isArrayTypeNode(typeNode) && isTypeReferenceNode(typeNode.elementType)) {
+    const elementName = typeNode.elementType.typeName;
+    const symbol = ctx.checker.getSymbolAtLocation(elementName);
+    if (!symbol || !isInContractsSrc(ctx, symbol) || !ctx.checker.isArrayType(resolved)) {
       return undefined;
-    const [element] = ctx.checker.getTypeArguments(resolved as ts.TypeReference);
+    }
+    const [element] = ctx.checker.getTypeArguments(resolved as TypeReference);
     if (element && isObjectLike(ctx.checker, element)) {
-      return {
-        kind: "array",
-        element: { kind: "ref", name: typeNode.elementType.typeName.getText() },
-      };
+      return { kind: "array", element: { kind: "ref", name: elementName.getText() } };
     }
   }
 
   return undefined;
 };
 
-const buildNode = (ctx: ContractProgram, type: ts.Type, options: BuildOptions): DocNode => {
+/** 字符串索引签名的值类型，如 `Record<string, T>` 里的 `T` */
+const stringIndexValue = (ctx: ContractProgram, type: Type): Type | undefined =>
+  ctx.checker
+    .getIndexInfosOfType(type)
+    .find((info) => (info.keyType.flags & TypeFlags.String) !== 0)?.valueType;
+
+const fieldsOfType = (ctx: ContractProgram, type: Type): DocField[] =>
+  ctx.checker.getPropertiesOfType(type).map((property) => {
+    const resolved = ctx.checker.getTypeOfSymbol(property) ?? ctx.checker.getAnyType();
+    const override = declaredRefNode(ctx, property, resolved);
+    return {
+      name: property.name,
+      optional: (property.flags & SymbolFlags.Optional) !== 0,
+      doc: cleanDoc(property.getDocumentationComment(ctx.checker)),
+      node: override ?? buildNode(ctx, resolved, { asRef: true }),
+    };
+  });
+
+const buildNode = (ctx: ContractProgram, type: Type, options: BuildOptions): DocNode => {
   if (options.asRef && isObjectLike(ctx.checker, type)) {
-    const name = contractNameOf(type);
+    const name = contractNameOf(ctx, type);
     if (name) return { kind: "ref", name };
   }
 
   if (ctx.checker.isArrayType(type)) {
-    const [element] = ctx.checker.getTypeArguments(type as ts.TypeReference);
+    const [element] = ctx.checker.getTypeArguments(type as TypeReference);
     return {
       kind: "array",
       element: element ? buildNode(ctx, element, options) : { kind: "text", text: "unknown" },
     };
   }
 
-  if (type.isUnion()) {
-    const nonNull = type.types.filter((member) => !isUndefined(member) && !isNull(member));
+  if (type.isUnionType()) {
+    const members = type.getTypes();
+    const nonNull = members.filter((member) => !isUndefined(member) && !isNull(member));
     // TS 内部把 boolean 表示成 `false | true`，按语义还原成 boolean，避免表格里出现 `false | true`
     if (
       nonNull.length === 2 &&
-      nonNull.every((member) => (member.flags & ts.TypeFlags.BooleanLiteral) !== 0)
+      nonNull.every((member) => (member.flags & TypeFlags.BooleanLiteral) !== 0)
     ) {
       return { kind: "text", text: "boolean" };
     }
     const variants: DocNode[] = [];
     let nullable = false;
-    for (const member of type.types) {
+    for (const member of members) {
       if (isUndefined(member)) continue;
       if (isNull(member)) {
         nullable = true;
@@ -181,21 +246,9 @@ const buildNode = (ctx: ContractProgram, type: ts.Type, options: BuildOptions): 
   }
 
   if (isObjectFlags(type)) {
-    const properties = ctx.checker.getPropertiesOfType(type);
-    if (properties.length > 0) {
-      const fields: DocField[] = properties.map((property) => {
-        const resolved = ctx.checker.getTypeOfSymbol(property);
-        const override = declaredRefNode(ctx, property, resolved);
-        return {
-          name: property.getName(),
-          optional: (property.flags & ts.SymbolFlags.Optional) !== 0,
-          doc: cleanDoc(ts.displayPartsToString(property.getDocumentationComment(ctx.checker))),
-          node: override ?? buildNode(ctx, resolved, { asRef: true }),
-        };
-      });
-      return { kind: "object", fields };
-    }
-    const indexValue = ctx.checker.getIndexTypeOfType(type, ts.IndexKind.String);
+    const fields = fieldsOfType(ctx, type);
+    if (fields.length > 0) return { kind: "object", fields };
+    const indexValue = stringIndexValue(ctx, type);
     if (indexValue) {
       return { kind: "text", text: `Record<string, ${ctx.checker.typeToString(indexValue)}>` };
     }
