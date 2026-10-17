@@ -98,10 +98,13 @@ describe("后台服务观测 · 端口线索", () => {
 });
 
 describe("后台服务观测 · 命中判定", () => {
-  it("执行前不可连、执行后能连：记为本次命令起的服务", async () => {
+  it("执行前不可连、执行后能连：记为本次命令起的服务", async (t) => {
     const port = await freePort();
     const { observed, hooks } = collector();
     let close: (() => Promise<void>) | undefined;
+    // 收尾一律放 `t.after`：监听口跨断言留着，断言一抛就跳过后面的收尾，测试文件进程会带着
+    // LISTEN 句柄不退出，`node --test` 于是等它到底（整条 `pnpm check` 再无输出）
+    t.after(() => close?.());
     const base: BashOperations = {
       exec: async () => {
         // 服务晚于命令返回才 listen —— 正是「一次探测不够、需要重试窗口」的场景
@@ -119,13 +122,13 @@ describe("后台服务观测 · 命中判定", () => {
     assert.equal(observed.length, 1);
     assert.equal(observed[0]?.port, port);
     assert.equal(observed[0]?.cwd, "/tmp");
-    await close?.();
   });
 
-  it("命令文本里没有端口时，按输出里打印的地址记账", async () => {
+  it("命令文本里没有端口时，按输出里打印的地址记账", async (t) => {
     const port = await freePort();
     const { observed, hooks } = collector();
     let close: (() => Promise<void>) | undefined;
+    t.after(() => close?.());
     const base: BashOperations = {
       exec: async (command, cwd, options) => {
         // 服务晚于命令返回才 listen：`npm run dev` 那类命令的真实形态（靠重试窗口才认得出）
@@ -142,12 +145,12 @@ describe("后台服务观测 · 命中判定", () => {
 
     assert.equal(observed.length, 1);
     assert.equal(observed[0]?.port, port);
-    await close?.();
   });
 
-  it("执行前就能连上的端口不算本次命令起的", async () => {
+  it("执行前就能连上的端口不算本次命令起的", async (t) => {
     const port = await freePort();
     const close = await listen(port);
+    t.after(() => close());
     const { observed, hooks } = collector();
 
     await withServiceWatch(noop, hooks).exec(`curl http://localhost:${port}`, "/tmp", {
@@ -156,7 +159,6 @@ describe("后台服务观测 · 命中判定", () => {
     await delay(400);
 
     assert.equal(observed.length, 0);
-    await close();
   });
 
   it("执行前后都连不上就不记", async () => {
@@ -171,12 +173,16 @@ describe("后台服务观测 · 命中判定", () => {
     assert.equal(observed.length, 0);
   });
 
-  it("命令抛错（超时 / 中断）时仍结算：服务已 detach 存活", async () => {
+  it("命令抛错（超时 / 中断）时仍结算：服务已 detach 存活", async (t) => {
     const port = await freePort();
     const { observed, hooks } = collector();
     let close: (() => Promise<void>) | undefined;
+    t.after(() => close?.());
     const base: BashOperations = {
       exec: async () => {
+        // 先等一拍、让「执行前」那次探测落地：它只发起不 await（见 `services.ts`），机器一忙 connect
+        // 的完成就可能落在 listen 之后，那样这次判定会读成「本来就开着」而不记账（同文件其它用例同口径）
+        await delay(50);
         close = await listen(port);
         throw new Error("timeout:600");
       },
@@ -191,6 +197,5 @@ describe("后台服务观测 · 命中判定", () => {
 
     assert.equal(observed.length, 1);
     assert.equal(observed[0]?.port, port);
-    await close?.();
   });
 });

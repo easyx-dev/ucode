@@ -84,9 +84,11 @@ describe("BackgroundServices", () => {
     assert.equal(first?.port, list[0]?.port);
   });
 
-  it("仍在跑的端口留在清单里，且不重复下发", async () => {
+  it("仍在跑的端口留在清单里，且不重复下发", async (t) => {
     const [port] = await freePorts(1);
     const close = await listen(port ?? 0);
+    // 收尾放 `t.after`：断言一抛就跳过后面的收尾，监听口会把测试进程挂住（同 services.test.ts）
+    t.after(() => close());
     const { services, frames } = createHarness();
 
     services.observe("s1", { command: "pnpm dev", cwd: "/w", port: port ?? 0 });
@@ -96,7 +98,6 @@ describe("BackgroundServices", () => {
 
     assert.equal(services.listOf("s1").length, 1, "探得到就留着");
     assert.equal(frames.length, before, "清单没变不应重复下发");
-    await close();
   });
 
   it("探不到的端口从清单移除，并下发一帧", async () => {

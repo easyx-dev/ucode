@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
-    "test": "node --import tsx --test \"src/**/__tests__/**/*.test.ts\"",
+    "test": "node --import tsx --test --test-force-exit \"src/**/__tests__/**/*.test.ts\"",
     "smoke": "tsx scripts/smoke.ts",
     "eval": "tsx scripts/eval.ts",
     "typecheck": "tsc --noEmit",
