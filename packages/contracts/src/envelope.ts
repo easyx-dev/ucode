@@ -130,6 +130,19 @@ export const ERROR_CODES = {
   /** 该 profile 正被浏览器实例持有，不能删 */
   browserProfileInUse: "browser_profile_in_use",
   /** 该 profile 当前没有在跑的浏览器实例（帧流要先打开页面） */
+
+  /** 连不上中继：地址非法、DNS / 连接 / TLS 失败或超时 */
+  hubUnreachable: "hub_unreachable",
+  /** 中继不认这份凭证：账号密码错误、登录态失效或设备令牌已吊销 */
+  hubLoginFailed: "hub_login_failed",
+  /** 中继拒绝了请求，或回了认不出的响应（登记设备失败） */
+  hubRegisterFailed: "hub_register_failed",
+  /** 还没填中继地址就点了登录 */
+  hubNotConfigured: "hub_not_configured",
+  /** 本机还没有中继设备令牌（没登录过，或绑定已被清掉） */
+  hubNotBound: "hub_not_bound",
+  /** 中继侧没有可用模型：中继后台没配 AI 厂商 */
+  hubModelsEmpty: "hub_models_empty",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

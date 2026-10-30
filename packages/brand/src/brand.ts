@@ -37,3 +37,13 @@ export const sessionTokenStorageKey = `${brand.slug}-session-token`;
 
 /** 应用主目录名：默认落在用户主目录下（`~/<appHomeDirname>`），随品牌 slug 变化 */
 export const appHomeDirname = `.${brand.slug}`;
+
+/**
+ * 部署项：随交付环境变化、与品牌无关的入口。
+ *
+ * 中继（hub）地址在这里给默认值，本机设置页可覆盖并把结果落到 `$APP_HOME/app/service.json` 的 `relay.url`；
+ * null 表示这次交付未接入中继。B 端交付时只改上面的品牌值与这里，其余照旧。
+ */
+export const deployment: { readonly hubUrl: string | null } = {
+  hubUrl: null,
+};

@@ -27,6 +27,8 @@ export * from "./git/output";
 export * from "./goals/input";
 export * from "./goals/output";
 export * from "./health/output";
+export * from "./hub/input";
+export * from "./hub/output";
 export * from "./interactions/input";
 export * from "./interactions/output";
 export * from "./locale";

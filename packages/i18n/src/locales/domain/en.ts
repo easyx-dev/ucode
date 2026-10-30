@@ -51,4 +51,13 @@ export default {
   "该 profile 正在使用中，请先关掉对应实例":
     "This profile is in use; close the browser instance first",
   "该 profile 还没有在跑的浏览器实例": "No running browser instance for this profile yet",
+  "无法连接中继 {{url}}：{{reason}}": "Cannot reach the relay {{url}}: {{reason}}",
+  "中继登录失败：{{reason}}": "Relay sign-in failed: {{reason}}",
+  "在中继登记本机设备失败：{{reason}}": "Failed to register this device with the relay: {{reason}}",
+  "未配置中继地址：请填写中继服务地址后再登录":
+    "No relay address configured. Enter the relay address, then sign in.",
+  "本机还没有绑定中继设备：请先登录中继":
+    "This machine is not bound to a relay device. Sign in to the relay first.",
+  "中继没有可用的模型：请先在中继后台配置 AI 厂商":
+    "The relay has no available models. Configure an AI vendor in the relay admin first.",
 };

@@ -49,6 +49,12 @@ export const errorMessageKeys = {
   marketplace_invalid: "市场配置无效：{{reason}}",
   browser_profile_invalid: "浏览器 profile 名不合法：{{reason}}",
   browser_profile_in_use: "该 profile 正在使用中，请先关掉对应实例",
+  hub_unreachable: "无法连接中继 {{url}}：{{reason}}",
+  hub_login_failed: "中继登录失败：{{reason}}",
+  hub_register_failed: "在中继登记本机设备失败：{{reason}}",
+  hub_not_configured: "未配置中继地址：请填写中继服务地址后再登录",
+  hub_not_bound: "本机还没有绑定中继设备：请先登录中继",
+  hub_models_empty: "中继没有可用的模型：请先在中继后台配置 AI 厂商",
 } as const satisfies Record<ErrorCode, string>;
 
 /** key 的联合，供客户端 `t()` 的类型收窄 */

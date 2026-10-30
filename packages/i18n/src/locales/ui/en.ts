@@ -839,6 +839,58 @@ export default {
   "新密码至少 8 位；修改后所有设备都需要重新登录。":
     "At least 8 characters; all devices will need to sign in again after the change.",
 
+  // Relay (hub)
+  中继: "Relay",
+  "把本机接入中继：登录后由服务维持隧道，中继侧的请求转给本机服务。":
+    "Connect this machine to a relay: once signed in, the service keeps the tunnel up and requests on the relay are forwarded to this service.",
+  接入中继: "Connect to a relay",
+  "用中继侧的账号登录：登录成功即把本机登记为中继上的一台设备，此后由服务维持隧道保活。":
+    "Sign in with your relay account; a successful sign-in registers this machine as a device on the relay, and the service keeps the tunnel alive from then on.",
+  中继地址: "Relay address",
+  留空则用部署预置值: "Leave empty to use the deployment default",
+  "形如 https://hub.example.com。公网访问入口由中继侧部署决定，可能与本机连接的地址不同。":
+    "For example https://hub.example.com. The public entry point is decided by the relay deployment and may differ from the address this machine connects to.",
+  账号: "Account",
+  接入信息: "Connection details",
+  刷新状态: "Refresh status",
+  "本机连接中继用的地址；公网访问入口由中继侧部署决定，与它可能不同。":
+    "The address this machine uses to reach the relay; the public entry point is decided by the relay deployment and may differ.",
+  登录账号: "Signed-in account",
+  设备名称: "Device name",
+  "登记到中继时用的名字，缺省是本机主机名。":
+    "The name used when registering with the relay; defaults to this machine's host name.",
+  设备标识: "Device ID",
+  "中继为本机分配的 id，隧道按它识别这台设备。":
+    "The id the relay assigned to this machine; the tunnel identifies it by this id.",
+  隧道: "Tunnel",
+  已连接: "Connected",
+  重连中: "Reconnecting",
+  未连接: "Not connected",
+  "本机已与中继建立隧道，中继上的请求可以转给本机服务。":
+    "The tunnel to the relay is up; requests on the relay can be forwarded to this service.",
+  "正在与中继建立隧道连接。": "Establishing the tunnel to the relay.",
+  "连接已断开，正在按退避重试；重连成功前请求无法转给本机。":
+    "The connection dropped and is being retried with backoff; until it reconnects, requests can't be forwarded to this machine.",
+  "当前没有隧道连接。": "There is no tunnel connection right now.",
+  上线时间: "Online since",
+  最近错误: "Last error",
+  重连次数: "Reconnect attempts",
+  登出: "Sign out",
+  "登出中继？": "Sign out of the relay?",
+  "登出会清掉本机凭证，并尽力吊销中继上的这台设备；需重新登录。":
+    "Signing out clears this machine's credentials and best-effort revokes this device on the relay; you'll need to sign in again.",
+  "登出后本机不再接受经中继转发的请求，直到重新登录。":
+    "This machine stops serving requests forwarded through the relay until you sign in again.",
+  模型端点: "Model endpoint",
+  "中继提供 OpenAI 兼容的模型端点：对话由中继用它配好的厂商转发，并按中继账号记账。写成本机供应商后即可在模型设置里选它的模型。":
+    "The relay exposes an OpenAI-compatible model endpoint: it forwards conversations to the vendors configured on the relay and bills them to your relay account. Write it as a local provider to pick its models in model settings.",
+  添加为中继供应商: "Add as a relay provider",
+  "已写入 {{count}} 个模型，可在模型设置里选它":
+    "Wrote {{count}} models. You can now pick them in model settings.",
+  "已覆盖同 id 的供应商「{{id}}」并写入 {{count}} 个模型，可在模型设置里选它":
+    "Overwrote the existing provider with id {{id}} and wrote {{count}} models. You can now pick them in model settings.",
+  "已写入 {{count}} 个模型：{{baseUrl}}": "Wrote {{count}} models: {{baseUrl}}",
+
   // Notifications（系统通知的标题与设置项）
   消息通知: "Notifications",
   "会话等待你的输入、完成或出错时发送系统通知；页面在前台时不打扰。":

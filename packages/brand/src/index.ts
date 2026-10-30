@@ -6,6 +6,7 @@ export {
   appearanceStorageKey,
   appHomeDirname,
   brand,
+  deployment,
   localeStorageKey,
   sessionTokenStorageKey,
   themeStorageKey,
