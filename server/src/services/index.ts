@@ -31,7 +31,9 @@ import { PairingStore } from "./auth/pairing";
 import { RateLimiter } from "./auth/rate-limit";
 import { SessionService } from "./auth/sessions";
 import { type BrowserService, createBrowserService } from "./browser";
+import { startBuiltinCloudSync } from "./builtin";
 import { createConfigService } from "./config";
+import { createHubService, type HubService } from "./hub";
 import { createLifecycle } from "./lifecycle";
 import { createPluginService, type PluginService, PluginStateStore } from "./plugins";
 import { createMarketplaceService, type MarketplaceService } from "./plugins/marketplace";
@@ -75,6 +77,8 @@ export type Services = {
   plugins: PluginService;
   /** 插件市场来源：登记 / 移除 / 刷新 */
   marketplaces: MarketplaceService;
+  /** 中继（hub）客户端：登录、设备绑定与隧道保活 */
+  hub: HubService;
   /** 终端：按工作目录归口的 PTY 池（只在进程内存，不落库） */
   terminals: TerminalService;
   /** 浏览器：实例注册表与 profile 数据面（数据落在 `$APP_HOME/app/browser`） */
@@ -101,6 +105,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
   for (const message of builtin.diagnostics) {
     logger.warn({ message, module: "plugins.builtin" }, "内置资产物化有诊断");
   }
+  // 云端下发不阻塞启动：拉取由本侧主动发起，中继不可达只是「拿不到更新」
+  startBuiltinCloudSync();
   const events = new SessionEventBus({
     // 实时帧里的图片当场落库：工具刚截的图不落，界面在刷新前一直取不到字节
     writeImage: (id, bytes, mimeType) =>
@@ -224,6 +230,13 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const configService = createConfigService({ config, runtime, pool, events });
   // 终端排在会话池之后：它只用到会话仓储（据此把 sessionId 解析成工作目录）
   const terminals = createTerminalService({ sessions });
+  // 中继客户端：按 service.json 里已有的绑定尝试连隧道，没有绑定就只待在「未接入」状态
+  const hub = createHubService({
+    getProviders: () => config.get().providers,
+    // 写中继 provider 也走同一条保存路径：落盘 + 重建运行时 + 回收内存会话
+    applyConfig: (patch) => configService.applyConfig(patch),
+  });
+  hub.start();
 
   await lifecycle.start();
 
@@ -244,6 +257,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     marketplaces,
     terminals,
     browsers,
+    hub,
     auth: {
       credentials,
       sessions: authSessions,
@@ -255,6 +269,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     reload: configService.reload,
     close: () => {
       // 终端与浏览器进程都不归会话池管（也不随会话回收），服务退出时在这里一并清掉
+      hub.stop();
       terminals.disposeAll();
       browsers.disposeAll();
       lifecycle.stop();

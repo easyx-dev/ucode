@@ -29,7 +29,14 @@ const makeApp = (peekTicket: (ticket: string, terminalId: string) => boolean = (
     serviceToken: "service-token-value",
     password: "登录密码",
     createdAt: "2026-01-01T00:00:00.000Z",
-    relay: { enabled: false, url: null, deviceId: null, deviceToken: null },
+    relay: {
+      enabled: false,
+      url: null,
+      deviceId: null,
+      deviceToken: null,
+      token: null,
+      username: null,
+    },
   };
   const credentials = new CredentialStore(registration, join(root, "service.json"));
   const sessions = new SessionService(new AuthSessionRepository(db));

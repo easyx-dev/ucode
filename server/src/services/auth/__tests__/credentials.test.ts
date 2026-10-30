@@ -27,7 +27,14 @@ const makeRegistration = (): ServiceRegistration => ({
   serviceToken: "token-abc",
   password: "old-password",
   createdAt: "2026-01-01T00:00:00.000Z",
-  relay: { enabled: false, url: null, deviceId: null, deviceToken: null },
+  relay: {
+    enabled: false,
+    url: null,
+    deviceId: null,
+    deviceToken: null,
+    token: null,
+    username: null,
+  },
 });
 
 afterEach(() => {

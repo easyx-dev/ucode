@@ -21,6 +21,7 @@
     "@hono/zod-validator": "catalog:",
     "@ucode/brand": "workspace:*",
     "@ucode/contracts": "workspace:*",
+    "@ucode/hub-protocol": "workspace:*",
     "execa": "catalog:",
     "fflate": "catalog:",
     "fuzzysort": "catalog:",

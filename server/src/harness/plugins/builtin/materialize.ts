@@ -5,29 +5,24 @@
  * - **幂等**：内容相同不写盘（判据是内容比较，不是时间戳）；
  * - **完整性**：声明了必需文件却缺失时**拒绝物化**，保留上一版目录并出诊断——宁可用旧的，也不要半个技能；
  * - **不做哈希目录名**：技能命中记录里存的是绝对路径，路径一变记录就对不上。
+ *
+ * 云端下发的同名技能不归这里管：`resolveBuiltinAssets` 会把已生效的云端记录对应的随包资产剔掉，
+ * 否则每次启动都会把云端内容写回随包版本（下一次云同步又会盖回来，形成来回翻）。
  */
 
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 
-import { BUILTIN_DIRNAME, SKILL_FILENAME, SKILLS_DIRNAME } from "../../../constants/dirs";
+import { SKILLS_DIRNAME } from "../../../constants/dirs";
 import { type BuiltinAsset, resolveBuiltinAssets } from "./index";
-
-/** 物化状态清单文件名（位于内置资产目录下） */
-export const BUILTIN_MANIFEST_FILENAME = "manifest.json";
-
-/** 一条物化记录：内容哈希用于判断「要不要重写」，来源用于排查「这份是谁给的」 */
-export type BuiltinMaterializedAsset = {
-  id: string;
-  kind: "skill";
-  version: string;
-  /** 该资产全部文件的内容哈希（按路径排序后拼接） */
-  sha256: string;
-  /** `packaged` = 随包；云端下发时会记成中继标识 */
-  origin: string;
-  updatedAt: string;
-};
+import {
+  BUILTIN_MANIFEST_FILENAME,
+  type BuiltinAssetRecord,
+  hashBuiltinAssetFiles,
+  readBuiltinManifest,
+  upsertBuiltinRecords,
+  writeFileIfChanged,
+} from "./manifest";
 
 export type BuiltinMaterializeResult = {
   /** 物化后的技能父目录：装配层按它注入 loader */
@@ -38,17 +33,8 @@ export type BuiltinMaterializeResult = {
   diagnostics: string[];
 };
 
-/** 读已有的状态清单；读不出来（首次运行、坏 JSON）就当没有 */
-const readManifest = (path: string): BuiltinMaterializedAsset[] => {
-  const content = readIfExists(path);
-  if (!content) return [];
-  try {
-    const parsed = JSON.parse(content) as { assets?: BuiltinMaterializedAsset[] };
-    return Array.isArray(parsed.assets) ? parsed.assets : [];
-  } catch {
-    return [];
-  }
-};
+/** 一条物化记录：内容哈希用于判断「要不要重写」，来源用于排查「这份是谁给的」 */
+export type BuiltinMaterializedAsset = BuiltinAssetRecord;
 
 /**
  * 内容没变就沿用上一次的 `updatedAt`：否则每次启动都会因为时间戳不同而重写清单，
@@ -71,32 +57,15 @@ const withPreviousTimestamps = (
   });
 
 /** 内容哈希：路径排序后逐个拼接，路径或内容任一变化都会变 */
-export const hashBuiltinFiles = (files: Record<string, string>): string => {
-  const hash = createHash("sha256");
-  for (const path of Object.keys(files).sort()) {
-    hash.update(path);
-    hash.update("\0");
-    hash.update(files[path] ?? "");
-    hash.update("\0");
-  }
-  return hash.digest("hex");
-};
-
-const readIfExists = (path: string): string | null => {
-  try {
-    return readFileSync(path, "utf8");
-  } catch {
-    return null;
-  }
-};
+export const hashBuiltinFiles = (files: Record<string, string>): string =>
+  hashBuiltinAssetFiles(
+    Object.entries(files).map(([path, content]) => ({ path, bytes: Buffer.from(content, "utf8") })),
+  );
 
 /** 写文件，内容相同就跳过；返回是否真的写了 */
 const writeIfChanged = (path: string, content: string, diagnostics: string[]): boolean => {
-  if (readIfExists(path) === content) return false;
   try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content, "utf8");
-    return true;
+    return writeFileIfChanged(path, content);
   } catch (error) {
     diagnostics.push(
       `${path}：写不进去（${error instanceof Error ? error.message : String(error)}）`,
@@ -131,6 +100,9 @@ const materializeSkill = (
       version: asset.version,
       sha256: hashBuiltinFiles(asset.files),
       origin: "packaged",
+      // 随包内容不含可执行部分（技能只有正文与参考资料），也不会有未生效状态
+      executable: false,
+      active: true,
       updatedAt: now,
     },
     written,
@@ -148,27 +120,32 @@ export const materializeBuiltinAssets = (input: {
 }): BuiltinMaterializeResult => {
   const skillsDir = join(input.builtinDir, SKILLS_DIRNAME);
   const diagnostics: string[] = [];
-  const skills = (input.assets ?? resolveBuiltinAssets()).filter(
+  // 默认集合已把「云端已生效的同名技能」剔掉，这里不会把云端内容写回随包版本
+  const skills = (input.assets ?? resolveBuiltinAssets({ builtinDir: input.builtinDir })).filter(
     (asset): asset is Extract<BuiltinAsset, { kind: "skill" }> => asset.kind === "skill",
   );
   const now = input.now ?? new Date().toISOString();
 
   let written = 0;
-  const records: BuiltinMaterializedAsset[] = [];
+  const materialized: BuiltinMaterializedAsset[] = [];
   for (const skill of skills) {
     const result = materializeSkill(skill, skillsDir, diagnostics, now);
     if (!result) continue;
     written += result.written;
-    records.push(result.record);
+    materialized.push(result.record);
   }
 
-  const manifestPath = join(input.builtinDir, BUILTIN_MANIFEST_FILENAME);
+  const previous = readBuiltinManifest(input.builtinDir);
   const manifest = JSON.stringify(
-    { version: 1, assets: withPreviousTimestamps(records, readManifest(manifestPath)) },
+    upsertBuiltinRecords(previous, withPreviousTimestamps(materialized, previous.assets)),
     null,
     2,
   );
-  if (writeIfChanged(manifestPath, `${manifest}\n`, diagnostics)) written += 1;
+  if (
+    writeIfChanged(join(input.builtinDir, BUILTIN_MANIFEST_FILENAME), `${manifest}\n`, diagnostics)
+  ) {
+    written += 1;
+  }
 
   // 一个技能都没有时也要建出目录：装配层按它注入 loader，目录不存在会被当成「没有内置技能」
   if (!existsSync(skillsDir)) mkdirSync(skillsDir, { recursive: true });

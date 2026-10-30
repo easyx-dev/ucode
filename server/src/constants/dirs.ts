@@ -87,8 +87,14 @@ export const PLUGIN_PROJECT_OVERRIDES_LOCAL_FILENAME = "plugins.local.json";
 /** 市场清单文件名（位于市场目录 / 直链末尾） */
 export const PLUGIN_MARKETPLACE_FILENAME = "marketplace.json";
 
-/** 内置资产物化目录名（位于 app 目录下）：`skills/` 与 `manifest.json` */
+/** 内置资产物化目录名（位于 app 目录下）：`skills/` `prompts/` `quarantine/` 与 `manifest.json` */
 export const BUILTIN_DIRNAME = "builtin";
+
+/**
+ * 云端下发但未生效的内置资产目录名（位于内置资产目录下）：`quarantine/<id>/<version>/`。
+ * 只落盘备查，不进装配扫描的目录——含可执行内容的资产要等到显式信任才激活。
+ */
+export const BUILTIN_QUARANTINE_DIRNAME = "quarantine";
 
 /** 浏览器数据目录名（位于 app 目录下）：`profiles/<name>` 是各份持久化 profile */
 export const BROWSER_DIRNAME = "browser";

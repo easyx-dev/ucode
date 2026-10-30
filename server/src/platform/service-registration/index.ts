@@ -17,11 +17,21 @@ import { instanceId } from "../instance";
 /** 可读凭证字符集：去掉 0/O/1/l/I 等易混字符，密码要能被人抄写 */
 const PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
+/**
+ * 中继（hub）配置：地址 + 设备绑定 + 登录态。
+ *
+ * 后两项（`token` / `username`）随中继客户端引入，旧注册文件里没有，故默认回落 `null`
+ * ——注册文件读不出来会让服务重新生成凭证，代价远大于少两个可选字段。
+ */
 const relaySchema = z.object({
   enabled: z.boolean(),
   url: z.string().nullable(),
   deviceId: z.string().nullable(),
   deviceToken: z.string().nullable(),
+  /** 中继登录会话令牌 */
+  token: z.string().nullable().default(null),
+  /** 中继登录账号（界面展示用） */
+  username: z.string().nullable().default(null),
 });
 
 const registrationSchema = z.object({
@@ -52,6 +62,8 @@ const defaultRelay = (): ServiceRegistration["relay"] => ({
   url: null,
   deviceId: null,
   deviceToken: null,
+  token: null,
+  username: null,
 });
 
 /** 生成静态 Bearer 凭证（256bit 随机） */

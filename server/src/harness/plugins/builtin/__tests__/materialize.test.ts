@@ -66,7 +66,15 @@ describe("materializeBuiltinAssets", () => {
     assert.ok(existsSync(join(first.skillsDir, "demo-skill", "SKILL.md")));
 
     const manifest = JSON.parse(readFileSync(join(builtinDir, "manifest.json"), "utf8")) as {
-      assets: { id: string; kind: string; version: string; origin: string; sha256: string }[];
+      assets: {
+        id: string;
+        kind: string;
+        version: string;
+        origin: string;
+        sha256: string;
+        executable: boolean;
+        active: boolean;
+      }[];
     };
     assert.deepEqual(manifest.assets, [
       {
@@ -75,6 +83,8 @@ describe("materializeBuiltinAssets", () => {
         version: "1.0.0",
         origin: "packaged",
         sha256: hashBuiltinFiles(skill().files),
+        executable: false,
+        active: true,
         updatedAt: "2026-01-01T00:00:00.000Z",
       },
     ]);
@@ -108,7 +118,7 @@ describe("materializeBuiltinAssets", () => {
     assert.equal(manifest.assets[0]?.version, "2.0.0");
   });
 
-  it("缺必需文件时拒绝物化，保留上一版并出诊断", () => {
+  it("缺必需文件时拒绝物化：内容与状态清单都保留上一版", () => {
     const builtinDir = makeDir();
     materializeBuiltinAssets({ builtinDir, assets: [skill()] });
     const broken = skill({ files: { "SKILL.md": "新正文", "references/api.md": "文档" } });
@@ -129,8 +139,18 @@ describe("materializeBuiltinAssets", () => {
       ],
     });
 
-    assert.equal(result.written, 1, "只更新状态清单，不写半个技能");
+    assert.equal(result.written, 0, "既不写半个技能，也不动上一版的状态记录");
     assert.match(result.diagnostics[0] ?? "", /缺少必需文件 references\/api\.md/);
+    const manifest = JSON.parse(readFileSync(join(builtinDir, "manifest.json"), "utf8")) as {
+      assets: { id: string; version: string; sha256: string; active: boolean }[];
+    };
+    assert.equal(manifest.assets.length, 1, "上一版记录仍在");
+    assert.equal(
+      manifest.assets[0]?.sha256,
+      hashBuiltinFiles({ "SKILL.md": "完整版", "references/api.md": "文档" }),
+      "记录指向仍在盘上的那一版内容",
+    );
+    assert.equal(manifest.assets[0]?.active, true);
     assert.equal(
       readFileSync(join(builtinDir, "skills", "demo-skill", "SKILL.md"), "utf8"),
       "完整版",

@@ -106,6 +106,9 @@ export const commandAssetPaths = (input: CommandAssetPathInput): CommandAssetPat
     ...projectConfigSubdirs(PROMPTS_DIRNAME, "project"),
     { path: resolve(appHome, PROMPTS_DIRNAME), source: "global" },
     ...pluginPaths(input.plugin?.prompts),
+    // 云端下发的内置提示词命令物化在 `$APP_HOME/app/builtin/prompts`：与合成命令同为最低档，
+    // 磁盘 / 用户同名者胜出；这一档里的同名命令会让合成的内置命令自动让位
+    { path: resolve(appHome, APP_DIRNAME, BUILTIN_DIRNAME, PROMPTS_DIRNAME), source: "builtin" },
   ]);
 
   return { skills, prompts };
