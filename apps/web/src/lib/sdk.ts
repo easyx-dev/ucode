@@ -2,7 +2,7 @@
 import { sessionTokenStorageKey } from "@ucode/brand";
 import type { Translate } from "@ucode/sdk";
 import { createClient } from "@ucode/sdk";
-
+import { appBasePath } from "./base-path";
 import i18n from "./i18n";
 
 /** SDK 侧传的是动态 key，i18next 的 t 由中文 key 类型约束；此处收口一次断言 */
@@ -14,10 +14,14 @@ export const translate = i18n.t as unknown as Translate;
  */
 const readToken = (): string | null => window.localStorage.getItem(sessionTokenStorageKey);
 
+/** 挂在路径前缀下时（中继的 `/d/<设备 id>`），接口与页面同源但都要带前缀 */
+const basePath = appBasePath();
+
 export const client = createClient({
   translate,
   // 接口与页面同源（开发走 Vite、生产由服务托管）；终端输出流要 WebSocket，按同一来源换算即可
-  websocketBaseUrl: window.location.origin.replace(/^http/, "ws"),
+  baseUrl: basePath,
+  websocketBaseUrl: `${window.location.origin.replace(/^http/, "ws")}${basePath}`,
   getToken: readToken,
   onToken: (token) => {
     if (token) window.localStorage.setItem(sessionTokenStorageKey, token);

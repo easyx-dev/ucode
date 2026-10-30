@@ -26,6 +26,9 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+    // 资源路径相对化：页面可能被挂到中继给的路径前缀下（见 `src/lib/base-path.ts`），
+    // 写死根路径的资源会去找中继自己的 `/assets/*`；绝对前缀由服务端注入的 `<base href>` 决定。
+    base: "./",
     plugins: [
       devtools({
         // 只保留源码位置注入，关掉其余联动，避免改写 console 行为、另起事件总线端口

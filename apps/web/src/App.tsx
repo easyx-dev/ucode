@@ -19,12 +19,15 @@ import { isSettingsSectionId, type SettingsSectionId } from "@ucode/ui/utils/set
 import { ServerOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-
+import { withAppBasePath } from "./lib/base-path";
 import { redeemConnectCode } from "./lib/pairing";
 
 const SESSION_KEY = "session";
 const SETTINGS_KEY = "settings";
-const LOGIN_PATH = "/login";
+
+/** 站内路径都带挂载前缀：经中继按路径访问时页面不在 origin 根上（见 `lib/base-path`） */
+const LOGIN_PATH = withAppBasePath("/login");
+const HOME_PATH = withAppBasePath("/");
 
 /** 导航状态：会话 id 与设置分区，分别写进 `?session=` 与 `?settings=` */
 type Nav = { sessionId: string | null; settingsSection: SettingsSectionId | null };
@@ -53,13 +56,13 @@ const writeQuery = (next: Nav, mode: "push" | "replace"): void => {
 
 /** 登录后回跳目标：只接受本源的站内路径，挡掉 `//evil.com` 这类协议相对地址 */
 const resolveNext = (raw: string | null): string => {
-  if (!raw) return "/";
+  if (!raw) return HOME_PATH;
   try {
     const url = new URL(raw, window.location.origin);
-    if (url.origin !== window.location.origin) return "/";
+    if (url.origin !== window.location.origin) return HOME_PATH;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return "/";
+    return HOME_PATH;
   }
 };
 
