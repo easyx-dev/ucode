@@ -79,6 +79,35 @@
   写 `.orphaned_at` 标记后保留 **14 天**（正在跑的会话可能还握着旧路径），到期的副本在下次
   安装 / 重拉 / 卸载时被清掉；一个插件都没装时不清扫。要立刻回收空间就卸载时勾「清理缓存」。
 
+## 内置资产的云端下发
+
+随包的内置技能与提示词命令可以由中继下发更新，不必等产品发版。方向是**本机主动出站拉取**：
+中继不可达只是「拿不到更新」，不影响服务启动与装配（拉取在启动后异步跑，登录中继后也会补拉一次，
+失败只记日志与诊断）。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `GET /builtin/manifest` | 清单：`id` / `kind` / `version` / 逐文件 `sha256` / 相对下载路径 |
+| `GET /builtin/assets/<id>/<version>` | 内容包（JSON，文本 utf8、二进制 base64），逐文件 sha256 |
+
+鉴权用设备身份（`Authorization: Bearer <deviceToken>`，与隧道同一套）。方案与阶段见
+[`plans/hub.md`](../plans/hub.md) 的「内置资产云同步」，中继侧的存放布局、发布脚本与可执行内容判据见
+[`builtin-assets`](../hub/docs/builtin-assets.md)。
+
+- **比对**：按 `id` + 版本比本地状态清单（`$APP_HOME/app/builtin/manifest.json`），缺失或版本不同才下载。
+- **校验**：逐文件 sha256 与体积，以中继清单登记值为准，不匹配即整条丢弃；下载地址只按配置的中继域解析，
+  清单里给的绝对地址或换域链接一律拒绝。
+- **生效**：技能写进 `$APP_HOME/app/builtin/skills/<id>/`、提示词写进 `$APP_HOME/app/builtin/prompts/<id>.md`，
+  这两处就在会话装配的扫描列表里（恒为最低档，全局 / 项目 / 插件里的同名项胜出），**对新会话生效**。
+- **生效边界**：只有纯文本与声明式内容（技能正文、提示词）会激活。含可执行内容（`hooks` / `bin` / MCP /
+  TS 扩展）的资产只落到 `$APP_HOME/app/builtin/quarantine/<id>/<版本>/` 备查，并记一条
+  「已下载但未生效（含可执行内容，需显式信任）」的诊断——**来源是运营方也不放宽**，
+  签名加显式信任是后续加固项。
+- **来源与版本**：状态清单里记 `origin`（`packaged` / `cloud`）与 `fetchedAt`；已被云端接管的 id，
+  随包那份不会再被写回（否则每次启动都会与云端内容来回翻）。
+- **撤回要手工清**：本机只按「缺失或版本不同」下载，中继清单里把某个资产删掉不会让本机回退——
+  已生效的那份留在 `app/builtin/` 里继续用；要清就删目录并把它在 `manifest.json` 里的记录一并删掉。
+
 ## 数据落在哪
 
 ```
@@ -86,5 +115,8 @@ $APP_HOME/plugins/cache/<市场>/<插件>/<版本>/   # 安装副本（本地目
 $APP_HOME/plugins/marketplaces/<市场>/          # 市场清单缓存 / 克隆副本
 $APP_HOME/plugins/data/<插件 id>/               # 插件自己的持久数据，跨版本保留
 $APP_HOME/app/plugins.json                      # 登记表与配置（0600）
-$APP_HOME/app/builtin/                          # 随包内置资产物化
+$APP_HOME/app/builtin/skills/<id>/              # 内置技能（随包物化与云端下发共用这个目录）
+$APP_HOME/app/builtin/prompts/<id>.md           # 云端下发的内置提示词命令
+$APP_HOME/app/builtin/quarantine/<id>/<版本>/   # 已下载但未生效的云端资产（含可执行内容）
+$APP_HOME/app/builtin/manifest.json             # 内置资产状态：版本 / 哈希 / 来源 / 是否生效
 ```

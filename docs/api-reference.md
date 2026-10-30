@@ -27,6 +27,10 @@
 | POST | `/api/v1/auth/pairing/redeem` | 兑换一次性配对码，成功返回会话与 token |
 | GET | `/api/v1/service/info` | 当前监听地址配置与是否需重启生效 |
 | POST | `/api/v1/service/host` | 修改监听地址（127.0.0.1 仅本机 / 0.0.0.0 局域网，需重启生效） |
+| GET | `/api/v1/hub/status` | 中继接入状态（地址 / 账号 / 设备标识与隧道运行态） |
+| POST | `/api/v1/hub/login` | 登录中继并把本机登记为设备（成功即重建隧道，返回登录后的状态） |
+| POST | `/api/v1/hub/logout` | 退出中继：清掉本机设备绑定与登录凭证、断开隧道，并尽力吊销中继侧设备（保留地址） |
+| POST | `/api/v1/hub/provider` | 把中继的模型端点写成本机 provider（固定 id relay，模型清单现拉中继的 /v1/models） |
 | POST | `/api/v1/models/list` | 供应商目录（内置 + 自定义）与各自的模型、接入状态 |
 | POST | `/api/v1/models/refresh` | 按当前配置重建运行时后返回最新目录 |
 | POST | `/api/v1/config/info` | 当前配置（apiKey 脱敏）与运行时状态 |
@@ -325,6 +329,89 @@
 | --- | --- | --- | --- |
 | `host` | string | 是 | — |
 | `restartRequired` | boolean | 是 | — |
+
+## 中继（`hub`）
+
+### GET /api/v1/hub/status
+
+中继接入状态（地址 / 账号 / 设备标识与隧道运行态）
+
+**请求参数**
+
+无参数
+
+**响应类型**：`HubStatusResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `configured` | boolean | 是 | 地址与设备令牌齐备，具备连隧道的条件 |
+| `url` | string \| null | 是 | 中继服务地址（含部署预置的缺省值）；未配置为 null |
+| `username` | string \| null | 是 | 当前登录的中继账号；未登录为 null |
+| `deviceId` | string \| null | 是 | 本机在中继上的设备标识；未登记为 null |
+| `deviceName` | string \| null | 是 | 登记设备时用的本机名（主机名） |
+| `running` | boolean | 是 | 当前是否持有隧道连接 |
+| `runtime` | [HubRuntimeView](#hubruntimeview) | 是 | 隧道的连接态与最近一次失败原因 |
+
+### POST /api/v1/hub/login
+
+登录中继并把本机登记为设备（成功即重建隧道，返回登录后的状态）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `url` | string | 否 | — | 中继服务地址；省略时用本机已保存的地址（都没有则报「未配置中继地址」） |
+| `username` | string（长度 1–100） | 是 | — | 中继上的登录账号（管理端或客户端账号都认） |
+| `password` | string（长度 1–200） | 是 | — | — |
+
+**响应类型**：`HubLoginResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `configured` | boolean | 是 | 地址与设备令牌齐备，具备连隧道的条件 |
+| `url` | string \| null | 是 | 中继服务地址（含部署预置的缺省值）；未配置为 null |
+| `username` | string \| null | 是 | 当前登录的中继账号；未登录为 null |
+| `deviceId` | string \| null | 是 | 本机在中继上的设备标识；未登记为 null |
+| `deviceName` | string \| null | 是 | 登记设备时用的本机名（主机名） |
+| `running` | boolean | 是 | 当前是否持有隧道连接 |
+| `runtime` | [HubRuntimeView](#hubruntimeview) | 是 | 隧道的连接态与最近一次失败原因 |
+
+### POST /api/v1/hub/logout
+
+退出中继：清掉本机设备绑定与登录凭证、断开隧道，并尽力吊销中继侧设备（保留地址）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`HubLogoutResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `configured` | boolean | 是 | 地址与设备令牌齐备，具备连隧道的条件 |
+| `url` | string \| null | 是 | 中继服务地址（含部署预置的缺省值）；未配置为 null |
+| `username` | string \| null | 是 | 当前登录的中继账号；未登录为 null |
+| `deviceId` | string \| null | 是 | 本机在中继上的设备标识；未登记为 null |
+| `deviceName` | string \| null | 是 | 登记设备时用的本机名（主机名） |
+| `running` | boolean | 是 | 当前是否持有隧道连接 |
+| `runtime` | [HubRuntimeView](#hubruntimeview) | 是 | 隧道的连接态与最近一次失败原因 |
+
+### POST /api/v1/hub/provider
+
+把中继的模型端点写成本机 provider（固定 id relay，模型清单现拉中继的 /v1/models）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`HubProviderResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `providerId` | string | 是 | 写入的 provider id（固定 `relay`） |
+| `baseUrl` | string | 是 | 写入的端点根地址：`<中继地址>/v1`，对话与模型清单都在它下面 |
+| `models` | string[] | 是 | 一并写入的模型 id 清单；中继没有可用模型时直接报错，所以至少一个 |
+| `outcome` | "created" \| "overwritten" \| "updated" | 是 | 本次写入与已有配置的关系 |
 
 ## 模型目录（`models`）
 
@@ -2165,6 +2252,15 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `expiresAt` | string | 是 | 过期时间（ISO 8601 UTC） |
 | `lastSeenAt` | string | 是 | 最近一次使用时间（ISO 8601 UTC） |
 | `label` | string | 是 | 会话标签（设备名 / 备注） |
+
+### HubRuntimeView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `connected` | boolean | 是 | 隧道是否已握手完成 |
+| `connectedAt` | string \| null | 是 | 本次上线时刻（ISO）；未连接为 null |
+| `lastError` | string \| null | 是 | 最近一次失败原因（中文，可直接展示）；已连上时为 null |
+| `reconnectAttempt` | number | 是 | 已发起的重连次数；连上后归零 |
 
 ### CatalogProvider
 

@@ -14,6 +14,13 @@
 - **请求参数只放 body，不进路径**：路径只表达「域 + 动作」（`attachments` 的 `<id>` 例外，见「附件」）
 - `Content-Type: application/json`；无参数的接口也要发 `{}`（对应的 schema 是 `emptyInputSchema`）
 - 事件流 `/events` 是 SSE、附件路由收发原始字节，都不适用上面的 JSON 约定，见各自小节
+- **经中继（hub）进来的请求带来源标记**：`x-hub-source`（`tunnel`）/ `x-hub-device` / `x-hub-client`，
+  由 UCode 侧的中继客户端转发时注入；它只进请求日志与统计，**不参与鉴权**——鉴权仍只看本地凭证
+  （`serviceToken` / 会话）。因此转发方必须自己把关：经它到达 UCode 的请求等价于本机 owner 身份
+  （见「鉴权 · 边界」）
+- **按路径挂载时另带 `x-hub-base-path`**（如 `/d/<设备 id>`）：中继把设备界面挂在它自己域名的路径下时注入，
+  服务端据此改写 `index.html` 的 `<base href>`——构建产物里的资源是相对路径，浏览器要靠这一行才能把它们
+  解析到前缀下；缺省即按「挂在 origin 根上」返回。与来源标记同理，它只描述挂载形态，不参与鉴权
 
 ## 响应封套
 
@@ -216,6 +223,7 @@
   客户端据此重取列表；代次推进会让相关会话按新装配重装）、
   `{ type: "projects_changed", projects: ProjectListResponse }`（项目改名或写回最近的会话参数）
 - 心跳为 `: heartbeat` 注释行，间隔 `EVENTS_HEARTBEAT_MS`
+- 事件流是长连接：**承载它的任何转发层都不得缓冲、不得设请求超时**，且必须边收边发（首帧即时到达）
 - 订阅者队列满时服务端直接断流，由客户端重连 + 快照补齐，服务端不无限缓冲
 
 ## 终端（terminal）

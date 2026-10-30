@@ -150,6 +150,43 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
 
   {
+    domain: "hub",
+    action: "status",
+    method: "GET",
+    input: null,
+    requestType: null,
+    output: "HubStatusResponse",
+    summary: "中继接入状态（地址 / 账号 / 设备标识与隧道运行态）",
+  },
+  {
+    domain: "hub",
+    action: "login",
+    method: "POST",
+    input: "hubLoginInputSchema",
+    requestType: "HubLoginInput",
+    output: "HubLoginResponse",
+    summary: "登录中继并把本机登记为设备（成功即重建隧道，返回登录后的状态）",
+  },
+  {
+    domain: "hub",
+    action: "logout",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "HubLogoutResponse",
+    summary: "退出中继：清掉本机设备绑定与登录凭证、断开隧道，并尽力吊销中继侧设备（保留地址）",
+  },
+  {
+    domain: "hub",
+    action: "provider",
+    method: "POST",
+    input: "hubProviderInputSchema",
+    requestType: "HubProviderInput",
+    output: "HubProviderResponse",
+    summary: "把中继的模型端点写成本机 provider（固定 id relay，模型清单现拉中继的 /v1/models）",
+  },
+
+  {
     domain: "models",
     action: "list",
     method: "POST",

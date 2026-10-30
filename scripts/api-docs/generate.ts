@@ -19,6 +19,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   status: "运行时状态",
   auth: "鉴权",
   service: "服务",
+  hub: "中继",
   models: "模型目录",
   config: "配置",
   sessions: "会话",
