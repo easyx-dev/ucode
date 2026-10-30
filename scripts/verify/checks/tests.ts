@@ -6,31 +6,11 @@
  * 这里把它变成显式失败：有 `__tests__` 就必须有 `test` 脚本。
  * 约定见 AGENTS.md「验证命令」。
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { listFiles } from "../files.ts";
-
-/** 工作区包目录（与 pnpm-workspace.yaml 对应）：server / apps/* / packages/* */
-const workspaceDirs = (root: string): string[] => {
-  const dirs: string[] = [];
-
-  for (const top of ["server", "apps", "packages"]) {
-    const dir = join(root, top);
-    if (!existsSync(dir)) continue;
-    if (existsSync(join(dir, "package.json"))) {
-      dirs.push(top);
-      continue;
-    }
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory() && existsSync(join(dir, entry.name, "package.json"))) {
-        dirs.push(`${top}/${entry.name}`);
-      }
-    }
-  }
-
-  return dirs;
-};
+import { workspaceDirs } from "../workspace.ts";
 
 export const run = (root: string): string[] => {
   const problems: string[] = [];

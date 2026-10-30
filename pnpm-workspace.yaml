@@ -12,36 +12,38 @@ catalog:
   "@hono/node-ws": ^1.3.1
   "@hono/zod-validator": ^0.9.1
   "@tailwindcss/vite": ^4.3.3
+  "@tanstack/devtools-vite": ^0.8.5
   "@types/node": ^24.10.1
   "@types/react": ^19.2.0
   "@types/react-dom": ^19.2.0
   "@vitejs/plugin-react": ^6.1.1
-  "concurrently": ^10.0.5
-  "esbuild": ^0.28.2
-  "execa": ^10.1.0
-  "fflate": ^0.8.3
-  "fuzzysort": ^4.0.2
-  "hono": ^4.13.10
-  "i18next": ^26.4.2
-  "lucide-react": ^0.545.0
-  "node-pty": ^1.1.0
-  "pino": ^10.3.1
-  "playwright-core": ^1.64.1
-  "react": ^19.3.0
-  "react-dom": ^19.3.0
-  "react-i18next": ^17.0.15
-  "shadcn": ^4.21.0
-  "sonner": ^2.0.8
-  "tailwindcss": ^4.3.3
-  "tar": ^7.5.22
-  "tsx": ^4.23.15
-  "turndown": ^7.2.4
-  "tw-animate-css": ^1.4.0
-  "typebox": ^1.3.27
-  "typescript": ^7.0.2
-  "vite": ^8.3.1
-  "ws": ^8.22.0
-  "zod": ^4.6.5
+  class-variance-authority: ^0.7.1
+  concurrently: ^10.0.5
+  esbuild: ^0.28.2
+  execa: ^10.1.0
+  fflate: ^0.8.3
+  fuzzysort: ^4.0.2
+  hono: ^4.13.10
+  i18next: ^26.4.2
+  lucide-react: ^0.545.0
+  node-pty: ^1.1.0
+  pino: ^10.3.1
+  playwright-core: ^1.64.1
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  react-i18next: ^17.0.15
+  shadcn: ^4.21.0
+  sonner: ^2.0.8
+  tailwindcss: ^4.3.3
+  tar: ^7.5.22
+  tsx: ^4.23.15
+  turndown: ^7.2.4
+  tw-animate-css: ^1.4.0
+  typebox: ^1.3.27
+  typescript: ^7.0.2
+  vite: ^8.3.1
+  ws: ^8.22.0
+  zod: ^4.6.5
 
 # 用 pnpm 自带的 JS shell 执行脚本：脚本里的行内环境变量赋值（`NODE_ENV=production …`）
 # 在 Windows 的 cmd.exe 下不成立，而本项目把 Windows 当目标平台
@@ -54,9 +56,11 @@ allowBuilds:
   protobufjs: true
   "@earendil-works/photon-node": true
   electron: true
+  es5-ext: true
   # 原生模块：安装脚本负责「有预编译二进制就用、没有才本地编译」
   node-pty: true
 
+# 这些版本不进 age 门槛：本仓直接锁定上游刚发布的版本，等不到「已发布 N 天」
 minimumReleaseAgeExclude:
   - hono@4.13.10
   - '@earendil-works/chord@1.0.2'
@@ -67,4 +71,5 @@ minimumReleaseAgeExclude:
   - '@earendil-works/pi-mcp@1.0.2'
   - '@earendil-works/pi-telemetry@1.0.2'
   - '@earendil-works/pi-tui@1.0.2'
+  - i18next@26.4.5
   - playwright-core@1.64.1

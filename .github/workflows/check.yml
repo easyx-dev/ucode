@@ -15,6 +15,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # hub 是独立仓库（submodule）：`pnpm verify` 的 hub-protocol 项要靠它比对两侧的协议副本
+          submodules: recursive
       # 版本取自 package.json 的 packageManager
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4

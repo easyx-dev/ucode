@@ -1,6 +1,6 @@
 /**
  * 约定校验入口：migrations / contracts / api-docs / plugin-docs / layers / tokens / design / themes /
- * appearance / brand / i18n / session-entries / manifest / tests / ui-exports / changelog。
+ * appearance / brand / i18n / session-entries / manifest / hub-protocol / tests / ui-exports / changelog。
  *
  * 由根 `pnpm check` 调用（`biome check . && pnpm -r typecheck && pnpm -r test && tsx scripts/verify/index.ts`）。
  * 任一检查不通过即非零退出，输出处会用「文件:行」定位。
@@ -14,6 +14,7 @@ import { run as runAppearance } from "./checks/appearance.ts";
 import { run as runChangelog } from "./checks/changelog.ts";
 import { run as runContracts } from "./checks/contracts.ts";
 import { run as runDesign } from "./checks/design.ts";
+import { run as runHubProtocol } from "./checks/hub-protocol.ts";
 import { run as runI18n } from "./checks/i18n.ts";
 import { run as runLayers } from "./checks/layers.ts";
 import { run as runManifest } from "./checks/manifest.ts";
@@ -41,6 +42,7 @@ const CHECKS: Array<{ name: string; run: (root: string) => string[] }> = [
   { name: "i18n", run: runI18n },
   { name: "session-entries", run: runSessionEntries },
   { name: "manifest", run: runManifest },
+  { name: "hub-protocol", run: runHubProtocol },
   { name: "tests", run: runTests },
   { name: "ui-exports", run: runUiExports },
   { name: "changelog", run: runChangelog },
