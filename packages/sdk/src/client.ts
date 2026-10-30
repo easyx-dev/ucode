@@ -11,6 +11,7 @@ import { createAuthStore } from "./stores/auth";
 import { createCommandsStore } from "./stores/commands";
 import { createConfigStore } from "./stores/config";
 import { createGoalStore } from "./stores/goal";
+import { createHubStore } from "./stores/hub";
 import { createInteractionsStore } from "./stores/interactions";
 import { createMcpStore } from "./stores/mcp";
 import { createMessagesStore } from "./stores/messages";
@@ -39,6 +40,7 @@ export const createClient = (options: ClientOptions = {}) => {
   const goal = createGoalStore({ apis, events });
   const models = createModelsStore({ apis, events });
   const status = createStatusStore({ apis, events });
+  const hub = createHubStore({ apis });
   const commands = createCommandsStore({ apis });
   const usage = createUsageStore({ apis, events });
   const config = createConfigStore({ apis, events });
@@ -57,6 +59,7 @@ export const createClient = (options: ClientOptions = {}) => {
     goal,
     models,
     status,
+    hub,
     commands,
     usage,
     config,

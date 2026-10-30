@@ -51,6 +51,11 @@ import type {
   GoalBudgetRequest,
   GoalResponse,
   GoalSetRequest,
+  HubLoginInput,
+  HubLoginResponse,
+  HubLogoutResponse,
+  HubProviderResponse,
+  HubStatusResponse,
   InteractionListResponse,
   InteractionRespondRequest,
   InteractionRespondResponse,
@@ -209,6 +214,24 @@ export const createApis = (options: ApisOptions = {}) => {
       info: () => transport.get<ServiceInfoResponse>("service/info"),
       setHost: (host: ServiceHostRequest["host"]) =>
         transport.post<ServiceHostResponse>("service/host", { host }),
+    },
+    hub: {
+      /** 中继接入状态：地址、登录账号、设备绑定与隧道运行态 */
+      status: () => transport.get<HubStatusResponse>("hub/status"),
+      /** 登录中继并把本机登记为设备（同名设备在中继侧轮换令牌） */
+      login: (body: HubLoginInput) => transport.post<HubLoginResponse>("hub/login", body),
+      /** 解绑本机：清掉设备与登录凭证，保留地址这一部署项 */
+      logout: () => transport.post<HubLogoutResponse>("hub/logout", {}),
+      /** 把中继的模型端点写成本机的普通 provider（固定 id `relay`，重复调用只刷新模型清单） */
+      addProvider: () =>
+        transport.post<HubProviderResponse>(
+          "hub/provider",
+          {},
+          {
+            // 要走去中继拉模型清单，慢是正常的
+            timeoutMs: 60_000,
+          },
+        ),
     },
     models: {
       list: () => transport.post<ModelsResponse>("models/list"),
