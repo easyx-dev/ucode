@@ -49,7 +49,7 @@ function ZoomToolbar({ viewport }: { viewport: ZoomableViewport }) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={viewport.fit}>{t("适配窗口")}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={viewport.fitContent}>{t("适配窗口")}</DropdownMenuItem>
           <DropdownMenuItem onSelect={viewport.reset}>{t("重置缩放")}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

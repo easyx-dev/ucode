@@ -7,7 +7,8 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**"]
+    "includes": ["**", "!**/routeTree.gen.ts", "!hub/**"],
+    "experimentalScannerIgnores": ["hub"]
   },
   "formatter": {
     "enabled": true,
@@ -30,8 +31,30 @@
       "security": {
         "noDangerouslySetInnerHtml": "warn"
       }
+    },
+    "domains": {
+      "react": "recommended",
+      "tailwind": "recommended",
+      "drizzle": "recommended",
+      "test": "recommended"
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noThenProperty": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double",

@@ -86,7 +86,7 @@ export type ZoomableViewport = {
   transformStyle: { transform: string };
   /** 当前比例（百分比整数），给下拉按钮显示 */
   zoomPercent: number;
-  fit: () => void;
+  fitContent: () => void;
   reset: () => void;
   zoomBy: (factor: number) => void;
   zoomTo: (scale: number) => void;
@@ -124,7 +124,7 @@ export function useZoomableViewport({
     return bounds ? { content: bounds, viewport: viewport.getBoundingClientRect() } : null;
   }, []);
 
-  const fit = useCallback(() => {
+  const fitContent = useCallback(() => {
     const measured = measure();
     if (!measured) {
       setTransform(IDENTITY);
@@ -143,7 +143,7 @@ export function useZoomableViewport({
     );
   }, [measure]);
 
-  /** 重置回到 1:1 并居中：比 fit 更贴近「看清原始尺寸」的诉求 */
+  /** 重置回到 1:1 并居中：比 fitContent 更贴近「看清原始尺寸」的诉求 */
   const reset = useCallback(() => {
     const measured = measure();
     if (!measured) {
@@ -179,15 +179,15 @@ export function useZoomableViewport({
   // 打开即适配：等一帧让弹层完成布局，否则量到的是 0 尺寸；内容晚到（图片）时再适配一次
   useEffect(() => {
     if (!viewportNode || !contentReady) return;
-    const frame = window.requestAnimationFrame(fit);
+    const frame = window.requestAnimationFrame(fitContent);
     return () => window.cancelAnimationFrame(frame);
-  }, [contentReady, fit, viewportNode]);
+  }, [contentReady, fitContent, viewportNode]);
 
   useEffect(() => {
-    const handleResize = (): void => fit();
+    const handleResize = (): void => fitContent();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [fit]);
+  }, [fitContent]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
@@ -287,7 +287,7 @@ export function useZoomableViewport({
 
   return {
     contentRef,
-    fit,
+    fitContent,
     onPointerDown,
     onPointerMove,
     onPointerUp,

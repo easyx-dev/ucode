@@ -67,7 +67,10 @@ const assertAllowedUrl = (url: string): void => {
 };
 
 /** 工具调用期间标记实例为「在用」：空闲回收不会把正在跑的动作关掉 */
-const useSession = async <T>(session: BrowserSession, run: () => Promise<T>): Promise<T> => {
+const withBrowserSession = async <T>(
+  session: BrowserSession,
+  run: () => Promise<T>,
+): Promise<T> => {
   session.beginUse();
   try {
     return await run();
@@ -146,7 +149,7 @@ const openTool = (browser: BrowserHooks, settings: () => BrowserConfig) =>
         ...(params.executablePath ? { executablePath: params.executablePath } : {}),
         ...(params.headless === undefined ? {} : { headless: params.headless }),
       });
-      const opened = await useSession(session, () => session.open({ url: params.url }));
+      const opened = await withBrowserSession(session, () => session.open({ url: params.url }));
       const kept =
         session.mode === "desktop"
           ? "在桌面端面板的那个浏览器标签里打开（数据用的是该标签自己的 cookie），它不会关闭你的标签"
@@ -202,7 +205,7 @@ const snapshotTool = (browser: BrowserHooks) =>
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const session = browser.current(ctx.sessionManager.getSessionId());
-      const result = await useSession(session, () =>
+      const result = await withBrowserSession(session, () =>
         session.snapshot({ diff: params.diff ?? false, compact: params.compact ?? false }),
       );
       return {
@@ -238,7 +241,7 @@ const actTool = (browser: BrowserHooks) =>
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const session = browser.current(ctx.sessionManager.getSessionId());
-      const result = await useSession(session, () => session.act(params));
+      const result = await withBrowserSession(session, () => session.act(params));
       const moved = result.navigated ? "（页面已跳转，之前的元素编号已失效，需要重新快照）" : "";
       return {
         content: [{ type: "text", text: `${result.summary}${moved}；当前地址：${result.url}` }],
@@ -263,7 +266,7 @@ const screenshotTool = (browser: BrowserHooks) =>
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const session = browser.current(ctx.sessionManager.getSessionId());
-      const shot = await useSession(session, () =>
+      const shot = await withBrowserSession(session, () =>
         session.screenshot({
           fullPage: params.fullPage ?? false,
           ...(params.ref ? { ref: params.ref } : {}),

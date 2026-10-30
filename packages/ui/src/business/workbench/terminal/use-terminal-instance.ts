@@ -3,7 +3,7 @@
  *
  * 实例只建一次——重建会把屏幕内容一起丢掉，所以字号与主题走 `options` 更新，不重新 new。
  * 尺寸必须上报：PTY 的行列决定换行位置与全屏程序的布局，不报的话 `vim` 这类会画错。
- * 上报挂在 xterm 自己的 `onResize` 上：`fit()` 会改终端尺寸并触发它，所以容器变化、字号变化
+ * 上报挂在 xterm 自己的 `onResize` 上：`refit()` 会改终端尺寸并触发它，所以容器变化、字号变化
  * 走的是同一个出口，不必在调用点各记一次。
  */
 
@@ -56,8 +56,8 @@ export function useTerminalInstance(input: {
       // 与核心同版本发布，为了让中文扩展字符与 emoji 的列宽算得准，这里显式放行
       allowProposedApi: true,
     });
-    const fit = new FitAddon();
-    instance.loadAddon(fit);
+    const fitAddon = new FitAddon();
+    instance.loadAddon(fitAddon);
     // 默认是 Unicode 6 的宽度规则：中文扩展字符与 emoji 会算错列宽导致行内错位。
     // 这一步失败只影响宽度精度，绝不能让它把整个视图带崩（loadAddon 会同步抛）
     try {
@@ -67,8 +67,8 @@ export function useTerminalInstance(input: {
       // 降级：用默认宽度规则继续跑
     }
     instance.open(element);
-    fitRef.current = fit;
-    fit.fit();
+    fitRef.current = fitAddon;
+    fitAddon.fit();
     instance.focus();
     setTerminal(instance);
 
@@ -80,7 +80,7 @@ export function useTerminalInstance(input: {
   }, []);
 
   /** 量一次尺寸：容器变化与字号变化都要走（触发 `onResize`，上报在下个 effect 里） */
-  const fit = useCallback(() => {
+  const refit = useCallback(() => {
     fitRef.current?.fit();
   }, []);
 
@@ -92,24 +92,24 @@ export function useTerminalInstance(input: {
     const family = terminalFontFamily();
     if (terminal.options.fontFamily !== family) terminal.options.fontFamily = family;
     // 字号与字体都会改变列数，改完重新量一次
-    fit();
-  }, [terminal, input.fontSize, input.theme, prefs.terminalFont, fit]);
+    refit();
+  }, [terminal, input.fontSize, input.theme, prefs.terminalFont, refit]);
 
   useEffect(() => {
     const element = containerRef.current;
     if (!element || !terminal) return undefined;
-    fit();
-    const observer = new ResizeObserver(fit);
+    refit();
+    const observer = new ResizeObserver(refit);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [terminal, fit]);
+  }, [terminal, refit]);
 
-  // 尺寸的唯一上报出口。挂载时先主动对齐一次：初始 `fit()` 发生在监听挂上之前，
+  // 尺寸的唯一上报出口。挂载时先主动对齐一次：初始 `refit()` 发生在监听挂上之前，
   // 而 xterm 只在值变化时触发 `onResize`——等它来报，服务端会一直在创建时的初值上。
   useEffect(() => {
     if (!terminal) return undefined;
     const report = (cols: number, rows: number): void => {
-      // 容器还没布局时 fit 会算出 0 列，那不是合法尺寸，不发（服务端也会拒）
+      // 容器还没布局时 refit 会算出 0 列，那不是合法尺寸，不发（服务端也会拒）
       if (cols < TERMINAL_COLS_MIN || rows < TERMINAL_ROWS_MIN) return;
       void client.apis.terminal
         .resize({ terminalId: input.terminalId, cols, rows })
