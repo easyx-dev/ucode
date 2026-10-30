@@ -105,6 +105,7 @@
 | [`docs/session-entries.md`](./docs/session-entries.md) | 会话条目（JSONL）：条目类型、payload、进不进模型上下文、界面是否展示 |
 | [`docs/markdown-dialect.md`](./docs/markdown-dialect.md) | 输入方言（UCode Markdown）：容器围栏、`@` 引用、附件 scheme、转义与写错时的表现 |
 | [`docs/browser.md`](./docs/browser.md) | 浏览器工具集：工具与快照语义、profile 与数据、桌面端内置浏览器面板、安全边界、已知限制、与 agent-browser 的对拍结论 |
+| [`docs/hub.md`](./docs/hub.md) | 中继（hub）：是什么、怎么接入、隧道与 ingress 的行为与限制、安全边界、对外接口 |
 | [`docs/components.md`](./docs/components.md) | 组件：分层、公开面、props、状态覆盖、可访问性、组合模式 |
 | [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md) | 助手模式（build / plan / ask）与权限：权限引擎、审批、权限档位、安全边界 |
 
@@ -117,7 +118,7 @@
 | --- | --- |
 | `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍 |
 | `pnpm check:fast` | 中途收窄：只查工作区改动的文件（biome）+ 全部包 typecheck + 约定校验，跳过测试（约 11 秒，全量约 22 秒） |
-| `pnpm test` | 各包单元测试（Node 内置 `node:test`，经 tsx 直接跑 TS） |
+| `pnpm test` | 各包单元测试（server / apps / packages 用 Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（各项见 `scripts/verify/checks/`；可 `--only` 只跑指定项） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit` |
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
@@ -127,6 +128,9 @@
 | `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
 | `pnpm -F @ucode/server browser:parity` | 与真 agent-browser 的对拍（`server/scripts/browser-parity.ts`）：同一批本地页面比元素覆盖与动作语义，报告写 `.tmp/browser-parity-report.md`。**依赖本机装了 agent-browser**，差异是信息不是失败 |
 | `pnpm -F @ucode/server browser:smoke` | 浏览器工具集端到端冒烟（`server/scripts/browser-smoke.ts`）：本地起静态页跑 open / snapshot / act（含 eval）/ 截图 / 遮挡失败 / 导航失效 / close。**需要本机有浏览器**，因此不进 `pnpm test` |
+| `pnpm dev:hub` | 中继（hub）的开发服务器（vite dev `:3009`；库是 SQLite 单文件，首次启动自动建，不需要数据库服务；只监听 `[::1]`，用 `http://localhost:3009`）。hub 是独立仓库（submodule），见「hub（中继服务）」 |
+| `pnpm build:hub` / `pnpm start:hub` | 中继的生产构建与跑产物（产物在 `hub/app/.output`） |
+| `cd hub && docker build -t hub .` | 构建中继的生产镜像（**上下文是 hub 仓库根**，Dockerfile 在 hub 仓库根下） |
 | `pnpm dev` | server（端口取 `.env` 的 `APP_PORT`，`APP_HOME` 由脚本固定为 `.tmp/.ucode`）+ web `:5173` 同时启动 |
 | `pnpm dev:desktop` | 只起 Electron 桌面端（渲染层固定 `:5174`，`strictPort`；`/api/*` 由 Vite 代理转给 `.env` 里的 `APP_PORT`）。服务需另行启动，不需要为桌面端配 `APP_CORS_ORIGIN`。开发形态会独立开一窗 DevTools，`⌘⌥I` / `F12` 切换（生产不自动开）。端口被占时渲染层直接报错、electron 随之退出（`concurrently -k`），不会再连上别的 dev server |
 | `pnpm start:desktop` | 构建桌面端后由 Electron 以应用内协议 `app://desktop` 加载产物（不起渲染层服务、与接口同源；`NODE_ENV=production` → 读 `.env.prod` 连生产实例）；服务需另行启动 |
@@ -292,6 +296,28 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 - 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
 - 日志统一走 `platform/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
 
+### hub（中继服务）
+
+`hub/` 是**裁切自 `easyx-dev/fsdx` 基座**的中继服务工程（每企业一套部署），以 **git submodule** 挂在本仓
+（独立仓库 `https://github.com/lvyueyang/ucode-hub`）。它自带 `pnpm-workspace.yaml`、锁文件、`biome.json`
+与 CI，也有自己的 [`hub/AGENTS.md`](./hub/AGENTS.md)（工程内部约定）与 [`hub/UPSTREAM.md`](./hub/UPSTREAM.md)
+（上游基线与刻意偏离）；方案与阶段见 [`plans/hub.md`](./plans/hub.md)。
+
+- **不在本仓的安装与检查范围内**：`pnpm install` / `pnpm check` 不碰 `hub/`。改 hub 要先进 `hub/` 跑
+  `pnpm install && pnpm check`；根侧的 `pnpm dev:hub` / `build:hub` / `start:hub` 只是切到那里转发，
+  同样要求 hub 内已安装。submodule 未初始化时这些命令会失败，用 `git submodule update --init` 补上。
+- **两套栈并存、无共享代码**：hub 是 TanStack Start + SQLite + antd 的双端应用，与 UCode 的
+  Hono + node:sqlite 不共享代码；两者只通过 HTTP 打交道（hub 出站 WS 隧道 + UCode 侧中继客户端
+  带本地 `serviceToken` 转发）。
+- **协议两份**：隧道协议在 `packages/hub-protocol`（本仓）与 `hub/packages/protocol`（hub 仓）各留一份，
+  协议本体必须一致——`pnpm verify` 的 `hub-protocol` 项逐文件比对（`__tests__` 除外：两侧测试框架不同）。
+  CI 以 `submodules: recursive` 检出，本地 submodule 没初始化时跳过并提示。**改协议要同时改两份**。
+- **产物与镜像归 hub**：`hub/app/.output` 与 hub 的镜像都不在 UCode 的生产边界内（改它们不影响运行中的实例）。
+- **hub 的测试脚本自带 `NODE_ENV=test`**：本机与生产 shell 常见 `NODE_ENV=production`，那会让 react
+  走 production 构建、`@testing-library` 的 `act` 失效，所以显式声明，不靠环境。
+- **请求来源头**：经 hub 到达服务层的请求带 `x-hub-source` / `x-hub-device` / `x-hub-client`
+  （常量在 `server/src/constants/hub.ts`），只进请求日志与统计，不参与鉴权。
+
 ### 目录与临时文件
 
 - `packages/contracts/`（`@ucode/contracts`）是接口契约的单一事实源：请求 zod schema、响应类型、封套与跨端常量，
@@ -347,12 +373,21 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 `biome.json` 有意保持**纯 JSON**：带注释会让 Biome 静默回退到默认配置（缩进变 tab、排除规则失效），
 所以非默认设置的理由记在这里，不要在配置文件里加注释：
 
-- **没有排除任何路径**（`files.includes: ["**"]`）——CSS 与内联脚本都已消除掉触发 lint 的写法。
+- **只排除生成文件与 submodule**（`files.includes: ["**", "!**/routeTree.gen.ts", "!hub/**"]`）：
+  `routeTree.gen.ts` 是 TanStack Router 生成的路由树（在 hub 仓库里），生成代码是约定认可的例外类型；
+  `hub/**` 是独立仓库（submodule），自带一份 `biome.json`，父仓不重复 lint。**只写 `includes` 不够**：
+  hub 的 `biome.json` 会被判成「nested root configuration」让 `biome check` 直接报错退，
+  必须再用 `files.experimentalScannerIgnores: ["hub"]` 让扫描器根本不进那个目录。
+  除此之外没有排除任何路径——CSS 与内联脚本都已消除掉触发 lint 的写法。
 - `css.parser.tailwindDirectives: true`：Biome 的 CSS parser 默认**关闭** Tailwind 语法，关闭时
   `@theme` / `@custom-variant` / `@apply` 会被判为语法错误并中止格式化。
 - `useExhaustiveDependencies` 关闭 `reportUnnecessaryDependencies`：有几处 effect 的依赖是「触发条件」
   而不是在效果体内直接读取。
 - `security.noDangerouslySetInnerHtml` 降级为 `warn`：保留提示但不阻断构建。
+- `linter.domains` 显式开 `react` / `tailwind` / `drizzle` / `test`：Biome 靠包清单里的**字面版本**识别框架，
+  而这些依赖改由 `catalog:` 声明后它就认不出来了——不显式开域，对应规则会**静默失效**
+  （开了以后才发现四处 `noArrayIndexKey` 与四处被误判为 Hook 的服务端 `useSession`）。
+  以后把新的「驱动规则域」的依赖纳入 catalog（如 `@playwright/test`）时，同步在这里补域。
 
 ### 组件来源
 
