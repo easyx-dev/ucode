@@ -18,6 +18,7 @@ import { SettingsMcp } from "./mcp/settings-mcp";
 import { SettingsModels } from "./models/settings-models";
 import { SettingsAppearance } from "./pages/settings-appearance";
 import { SettingsDefaults } from "./pages/settings-defaults";
+import { SettingsHub } from "./pages/settings-hub";
 import { SettingsMemory } from "./pages/settings-memory";
 import { SettingsRemoteAccess } from "./pages/settings-remote-access";
 import { SettingsWebsearch } from "./pages/settings-websearch";
@@ -225,6 +226,16 @@ function SectionContent({
           trailing={saveActions}
         >
           <SettingsRemoteAccess />
+        </SettingsPage>
+      );
+    case "hub":
+      return (
+        <SettingsPage
+          title={meta.hub.label}
+          description={t("把本机接入中继：登录后由服务维持隧道，中继侧的请求转给本机服务。")}
+          trailing={saveActions}
+        >
+          <SettingsHub />
         </SettingsPage>
       );
   }

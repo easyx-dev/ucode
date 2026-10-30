@@ -10,6 +10,7 @@ import {
   Package,
   Palette,
   Plug,
+  RadioTower,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -35,5 +36,6 @@ export const useSettingsSectionMeta = (): Record<SettingsSectionId, SettingsSect
     mcp: { label: t("MCP 服务器"), icon: Plug },
     plugins: { label: t("插件"), icon: Package },
     remote: { label: t("远程访问"), icon: Network },
+    hub: { label: t("中继"), icon: RadioTower },
   };
 };
