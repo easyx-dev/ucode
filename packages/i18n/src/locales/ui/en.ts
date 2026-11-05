@@ -631,6 +631,8 @@ export default {
   本轮结束后依次送出: "Sent one after another when this turn ends",
   下一轮结束时依次送出: "Sent one after another when the next turn ends",
   本轮结束后送出: "Queued: sent when this turn ends",
+  停止或发送: "Stop or send",
+  中断这一轮: "Abort the current turn",
   已关闭: "Off",
   "读取中…": "Loading…",
   "读不到这条记忆。": "This memory could not be read.",

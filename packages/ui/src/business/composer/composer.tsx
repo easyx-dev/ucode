@@ -3,17 +3,24 @@
 import { brand } from "@ucode/brand";
 import { type DocNode, isDocEmpty, textToDoc } from "@ucode/markdown";
 import { cn } from "cn";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, ChevronUp, Square } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { IconButton } from "../../base/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../base/dropdown-menu";
 import type {
   CatalogProvider,
   PermissionMode,
   ThinkingLevel,
   ThinkingPreference,
 } from "../../types";
+import { isTouchInput } from "../../utils/platform";
 import { formatBytes } from "../../utils/preview";
 import { AddMenu } from "./add-menu";
 import { BUILTIN_COMMANDS, type BuiltinCommandId, builtinCommandIdOf } from "./builtin-commands";
@@ -27,6 +34,7 @@ import { filesOf, useComposerAttachments } from "./editor/use-composer-attachmen
 import { ModePicker } from "./picker/mode-picker";
 import { ModelPicker } from "./picker/model-picker";
 import { PermissionPicker } from "./picker/permission-picker";
+import { usePickerCloseFocus } from "./picker/picker-options";
 import { ThinkingPicker } from "./picker/thinking-picker";
 import { ProjectRow } from "./project/project-row";
 import { useCommands } from "./use-commands";
@@ -141,6 +149,8 @@ export function Composer({
    * 那种情况下焦点归用户点的那个东西。
    */
   const focusEditor = useCallback(() => editorHandle.current?.focus(), []);
+  /** 生成中那个上拉菜单（触屏）关掉后同样把焦点交回输入区，与工具栏其余弹层同一个口径 */
+  const stopOrSendFocus = usePickerCloseFocus(focusEditor);
 
   /** 把编辑器切到给定文档：重挂载并记下已同步内容 */
   const resetEditor = useCallback(
@@ -493,27 +503,68 @@ export function Composer({
                   onRefocus={focusEditor}
                 />
 
-                {/* 生成中两个键都在：「停止」中断本轮，「发送」排进队列（本轮结束后送出） */}
-                {streaming ? (
+                {/*
+                  一个键位：空闲时是「发送」，生成中是「停止」——要往队列里发直接回车
+                  （见 `submit`）。触屏没有回车，生成中改成一个上拉菜单把两个动作都放进去。
+                */}
+                {streaming && isTouchInput() ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton
+                        label={t("停止或发送")}
+                        size="icon"
+                        variant="default"
+                        tooltip={t("停止或发送")}
+                      >
+                        <ArrowUp className="size-icon-base" />
+                        <ChevronUp className="size-icon-xs" />
+                      </IconButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      side="top"
+                      align="end"
+                      className="w-52"
+                      {...stopOrSendFocus}
+                    >
+                      <DropdownMenuItem className="items-start" onSelect={handleStop}>
+                        <Square className="mt-0.5 size-icon-sm" />
+                        <span className="min-w-0">
+                          <span className="block">{t("停止生成")}</span>
+                          <span className="block text-xs text-foreground-subtle">
+                            {t("中断这一轮")}
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="items-start"
+                        disabled={hasPendingUploads()}
+                        onSelect={() => submit()}
+                      >
+                        <ArrowUp className="mt-0.5 size-icon-sm" />
+                        <span className="min-w-0">
+                          <span className="block">{t("发送")}</span>
+                          <span className="block text-xs text-foreground-subtle">
+                            {t("本轮结束后送出")}
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
                   <IconButton
-                    label={t("停止生成")}
+                    disabled={!streaming && uploading}
+                    label={streaming ? t("停止生成") : t("发送")}
                     size="icon"
-                    variant="outline"
-                    onClick={handleStop}
+                    variant="default"
+                    onClick={streaming ? handleStop : submit}
                   >
-                    <Square className="size-icon-sm" />
+                    {streaming ? (
+                      <Square className="size-icon-sm" />
+                    ) : (
+                      <ArrowUp className="size-icon-base" />
+                    )}
                   </IconButton>
-                ) : null}
-                <IconButton
-                  disabled={uploading}
-                  label={t("发送")}
-                  tooltip={streaming ? t("本轮结束后送出") : undefined}
-                  size="icon"
-                  variant="default"
-                  onClick={submit}
-                >
-                  <ArrowUp className="size-icon-base" />
-                </IconButton>
+                )}
               </div>
             </div>
           </div>
