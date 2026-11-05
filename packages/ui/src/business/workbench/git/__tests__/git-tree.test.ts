@@ -93,4 +93,22 @@ describe("buildChangeTree", () => {
       ["added"],
     );
   });
+
+  it("同名文件与目录共存：子模块指针条目在自己身上，内部文件在子节点里", () => {
+    const tree = buildChangeTree([file("hub", "modified"), file("hub/app/x.ts", "deleted")]);
+    const hub = tree.children[0];
+    assert.ok(hub);
+    assert.equal(hub.name, "hub");
+    assert.equal(hub.file?.path, "hub", "指针变更那一条留在节点自身");
+    assert.deepEqual(
+      hub.children.map((node) => node.name),
+      ["app"],
+    );
+    assert.equal(countFiles(hub), 2, "自身的指针条目与子模块内的文件都算");
+    assert.deepEqual(
+      marksOf(hub, (item) => item.status),
+      ["modified", "deleted"],
+      "目录标记汇总自身与子节点",
+    );
+  });
 });

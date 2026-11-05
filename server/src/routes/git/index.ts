@@ -35,6 +35,7 @@ import { readDiffContents } from "../../services/git/contents";
 import { parseFileDiff } from "../../services/git/diff";
 import { readCommit, readLog } from "../../services/git/log";
 import { readRepositoryStatus } from "../../services/git/status";
+import { resolveGitTarget } from "../../services/git/submodules";
 
 /** 未跟踪文件的 diff 需要 `--no-index` 与一个「空文件」参照；git 在 Windows 上也认 /dev/null */
 const NULL_PATH = "/dev/null";
@@ -60,11 +61,6 @@ const fileDiff = async (input: GitDiffInput): Promise<GitDiffResponse> => {
   const file = resolveRepoPath(repoRoot, input.file);
   const unified = `-U${input.context}`;
 
-  if (input.source === "staged") {
-    const result = await runDiff(repoRoot, ["diff", "--cached", unified, "--", file]);
-    return parseFileDiff(file, result.stdout);
-  }
-
   if (input.source === "commit") {
     if (!input.commit) {
       throw new AppError(
@@ -75,25 +71,34 @@ const fileDiff = async (input: GitDiffInput): Promise<GitDiffResponse> => {
         { path: input.file },
       );
     }
+    // 提交属于主仓库历史：子模块在其中只记指针，不会出现子模块内的路径
     const ref = assertGitRef(input.commit);
     const result = await runDiff(repoRoot, ["show", unified, "--format=", ref, "--", file]);
     return parseFileDiff(file, result.stdout);
   }
 
-  const result = await runDiff(repoRoot, ["diff", unified, "--", file]);
+  // 子模块内的文件要在子模块仓库里比，主仓库只记得到指针；回给客户端的仍是主仓库相对路径
+  const target = await resolveGitTarget(repoRoot, file);
+
+  if (input.source === "staged") {
+    const result = await runDiff(target.root, ["diff", "--cached", unified, "--", target.path]);
+    return parseFileDiff(file, result.stdout);
+  }
+
+  const result = await runDiff(target.root, ["diff", unified, "--", target.path]);
   if (result.stdout.trim() !== "") return parseFileDiff(file, result.stdout);
 
   // 工作区 diff 为空：已跟踪的文件就是真的没有差异（例如刚被提交 / 还原），
   // 只有未被跟踪的新文件才需要换个比法——`git diff` 对它什么都不输出
-  if (await isTracked(repoRoot, file)) return parseFileDiff(file, "");
-  if (!existsSync(join(repoRoot, file))) return parseFileDiff(file, "");
-  const untracked = await runDiff(repoRoot, [
+  if (await isTracked(target.root, target.path)) return parseFileDiff(file, "");
+  if (!existsSync(join(target.root, target.path))) return parseFileDiff(file, "");
+  const untracked = await runDiff(target.root, [
     "diff",
     unified,
     "--no-index",
     "--",
     NULL_PATH,
-    join(repoRoot, file),
+    join(target.root, target.path),
   ]);
   return parseFileDiff(file, untracked.stdout, { status: "added" });
 };

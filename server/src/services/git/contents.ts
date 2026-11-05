@@ -22,6 +22,7 @@ import { FS_BINARY_SNIFF_BYTES, FS_READ_TEXT_MAX_BYTES } from "../../constants/t
 import { AppError } from "../../platform/response";
 import { readFileContent } from "../files";
 import { assertGitRef, runGit } from "./";
+import { type GitTarget, resolveGitTarget } from "./submodules";
 
 /** 对比的一侧取自哪里：git 对象（index / HEAD / 某次提交）或工作区磁盘 */
 type SideSpec = { kind: "git"; rev: string } | { kind: "worktree" };
@@ -104,10 +105,15 @@ export const readDiffContents = async (
   repoRoot: string,
   input: GitContentsInput,
 ): Promise<GitContentsResponse> => {
+  // 提交属于主仓库历史（子模块在其中只记指针），另外两个来源要进子模块仓库里读
+  const target: GitTarget =
+    input.source === "commit"
+      ? { root: repoRoot, path: input.file }
+      : await resolveGitTarget(repoRoot, input.file);
   const sides = sidesOf(input.source, input.commit, input.file);
   const [oldVersion, newVersion] = await Promise.all([
-    readSide(repoRoot, sides.old, input.file),
-    readSide(repoRoot, sides.new, input.file),
+    readSide(target.root, sides.old, target.path),
+    readSide(target.root, sides.new, target.path),
   ]);
 
   return {

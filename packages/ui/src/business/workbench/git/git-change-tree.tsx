@@ -3,6 +3,9 @@
  *
  * 分组只有「已暂存」与「未暂存」两组——未跟踪与冲突都归进未暂存，靠字母标记区分
  * （未跟踪 U、冲突 !），免得用户在四段列表里来回找。目录行给出其下出现过的状态标记与文件数。
+ *
+ * 子模块路径既是指针变更的条目、又是它内部文件的父目录，折树后落在同一个节点上，因此这种节点
+ * 按目录渲染，展开后第一行才是它自己。
  */
 import type { GitStatusResponse } from "@ucode/contracts";
 import { cn } from "cn";
@@ -10,7 +13,7 @@ import { ChevronRight, Folder } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ContextMenu, ContextMenuTrigger } from "../../../base/context-menu";
-import { joinPath } from "../../../utils/path";
+import { baseName, joinPath } from "../../../utils/path";
 import { PathContextMenu } from "../file/path-context-menu";
 import { GitCounts, GitStatusMark } from "./git-change-marks";
 import { countChanges, type GitChangeGroup, groupChanges } from "./git-groups";
@@ -55,6 +58,30 @@ export function GitChangeTree({
     });
   };
 
+  /** 文件行：点它打开该文件的 diff；子模块路径既有自己那一条、又是父目录，两处共用 */
+  const renderFile = (
+    item: GitChangeEntry,
+    depth: number,
+    group: GitChangeGroup,
+  ): React.ReactNode => (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <button
+          type="button"
+          style={{ paddingLeft: `${depth * 14 + 10}px` }}
+          className="group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
+          title={item.path}
+          onClick={() => onSelect({ file: item.path, staged: group.staged })}
+        >
+          <GitStatusMark mark={markOf(item)} />
+          <span className="min-w-0 flex-1 truncate">{baseName(item.path)}</span>
+          <GitCounts additions={item.file.additions} deletions={item.file.deletions} />
+        </button>
+      </ContextMenuTrigger>
+      <PathContextMenu path={joinPath(repoRoot, item.path)} root={repoRoot} />
+    </ContextMenu>
+  );
+
   /** 折叠键按「分组 + 目录」组合：两个分组各自渲染同一批路径，共用键会连带折叠别的分组 */
   const renderNode = (
     node: ChangeTreeNode<GitChangeEntry>,
@@ -62,25 +89,10 @@ export function GitChangeTree({
     group: GitChangeGroup,
   ): React.ReactNode => {
     const entry = node.file;
-    if (entry) {
-      return (
-        <ContextMenu key={node.path}>
-          <ContextMenuTrigger asChild>
-            <button
-              type="button"
-              style={{ paddingLeft: `${depth * 14 + 10}px` }}
-              className="group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-foreground-subtle hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-selected data-[state=open]:text-foreground"
-              title={node.path}
-              onClick={() => onSelect({ file: entry.path, staged: group.staged })}
-            >
-              <GitStatusMark mark={markOf(entry)} />
-              <span className="min-w-0 flex-1 truncate">{node.name}</span>
-              <GitCounts additions={entry.file.additions} deletions={entry.file.deletions} />
-            </button>
-          </ContextMenuTrigger>
-          <PathContextMenu path={joinPath(repoRoot, entry.path)} root={repoRoot} />
-        </ContextMenu>
-      );
+
+    // 叶子即文件；既是文件又有子节点的只有子模块路径，那种要当目录渲染
+    if (node.children.length === 0) {
+      return entry ? <div key={node.path}>{renderFile(entry, depth, group)}</div> : null;
     }
 
     const collapseKey = `${group.id}:${node.path}`;
@@ -115,7 +127,12 @@ export function GitChangeTree({
           </ContextMenuTrigger>
           <PathContextMenu path={joinPath(repoRoot, node.path)} root={repoRoot} />
         </ContextMenu>
-        {open ? node.children.map((child) => renderNode(child, depth + 1, group)) : null}
+        {open ? (
+          <>
+            {entry ? renderFile(entry, depth + 1, group) : null}
+            {node.children.map((child) => renderNode(child, depth + 1, group))}
+          </>
+        ) : null}
       </div>
     );
   };

@@ -4,6 +4,9 @@
  * 不做「单子目录合并成 `a/b/c`」这种压缩——改动集通常不大，压了反而看不出层级。
  * 排序固定为目录在前、各自按名称，与服务端 `fs/list` 以及 git 自己的输出同口径。
  * 条目类型交给调用方：工作区变更带来源桶，提交里的文件没有。
+ *
+ * 同一个节点可以既是文件又有子节点：子模块路径 `hub` 是指针变更的条目，`hub/app/x.ts` 是它内部的
+ * 改动，两者折到同一个节点上（渲染见 `git-change-tree`）。
  */
 import { GIT_MARK_ORDER, type GitMark } from "./git-marks";
 
@@ -42,7 +45,8 @@ export const buildChangeTree = <T extends { path: string }>(
         child = { name: segment, path, children: [] };
         node.children.push(child);
       }
-      // 同名目录与文件不会在同一个仓库里共存，因此最后一段一定属于这个文件
+      // 同名文件与目录可能共存（子模块路径既是指针条目、又是它内部文件的父目录），
+      // 所以最后一段既属于这个文件，也可能已经有子节点
       if (isLeaf) child.file = file;
       node = child;
     });
@@ -56,10 +60,10 @@ export const buildChangeTree = <T extends { path: string }>(
   return root;
 };
 
-/** 目录下的变更文件数（目录节点用；文件节点为 0） */
+/** 节点下的变更文件数：自身是文件的算一个，目录按子节点汇总 */
 export const countFiles = <T>(node: ChangeTreeNode<T>): number => {
-  if (node.file) return 0;
-  return node.children.reduce((total, child) => total + (child.file ? 1 : countFiles(child)), 0);
+  const self = node.file === undefined ? 0 : 1;
+  return node.children.reduce((total, child) => total + countFiles(child), self);
 };
 
 /** 目录下出现过的标记：去重后按展示顺序排；文件节点只给自己那一个 */

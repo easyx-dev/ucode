@@ -92,5 +92,8 @@ export const GIT_DIFF_MAX_LINES = 5_000;
 /** git/status 返回的变更条目上限 */
 export const GIT_STATUS_MAX_FILES = 1_000;
 
+/** 变更列表里最多展开这么多个子模块；超出的按 git 自己的报告呈现，避免仓库挂了几十个子模块时拖慢 status */
+export const GIT_SUBMODULE_MAX = 20;
+
 /** git/show 返回的文件条数上限 */
 export const GIT_SHOW_MAX_FILES = 500;
