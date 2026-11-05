@@ -1,0 +1,63 @@
+name: release
+
+# 只在打 tag 时发布：tag 名必须是 `v` + package.json 的 version（如 v0.3.0）。
+# 发布不可逆（同一个版本号不能重发，删掉也不能复用），所以这里先过四道闸：
+#   1. tag 与清单版本一致——版本不匹配时发出去的包和 tag 对不上；
+#   2. 该版本还没在 registry 上——提前失败，好过注册表报 403；
+#   3. 这个提交上 `pnpm check` 全过——tag 可以打在任意提交上，不能只信分支上的绿灯；
+#   4. `pnpm pack:check` 的必需条目齐全——`files` 漏项不会让发布失败，只会让装出来的包缺界面。
+# 需要仓库 Secrets 里有 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  # npm provenance：让 registry 记下「这个 tarball 由这个提交的这个工作流构建」
+  id-token: write
+
+# 同一时间只发一个版本；排队的等前一个跑完，不取消（取消可能停在「已发一半」的状态）
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # hub 是独立仓库（submodule）：`pnpm verify` 的 hub-protocol 项要靠它比对两侧的协议副本
+          submodules: recursive
+      # 版本取自 package.json 的 packageManager
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          # 往 ~/.npmrc 写 registry 与 `${NODE_AUTH_TOKEN}` 占位
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci-env.mjs
+      - name: 校验 tag 与清单版本一致
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "${expected}" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} 与 package.json 的版本 ${expected} 不一致" >&2
+            exit 1
+          fi
+      - name: 校验该版本尚未发布
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if npm view "@easyx-dev/ucode@${version}" version >/dev/null 2>&1; then
+            echo "@easyx-dev/ucode@${version} 已经在 registry 上；先改版本再打 tag" >&2
+            exit 1
+          fi
+      - run: pnpm check
+      - run: pnpm build
+      - run: pnpm pack:check
+      - name: 发布到 npm
+        run: pnpm publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

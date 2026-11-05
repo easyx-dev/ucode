@@ -223,6 +223,9 @@ UI 改动**按需**在真实浏览器里看，不是每个改动都要看——�
 - **`node dist/ucode.js` 不被 watch**，编辑源码不会重启它——这正是「用 UCode 开发 UCode」时避免打断会话的
   关键；改完显式 `pnpm build && pnpm restart` 停旧起新（`service restart` 按注册文件核对实例身份，
   对不上就跳过）。见 README「生产启动与自迭代」。
+- **发布走 tag**：`v*` tag 触发 `.github/workflows/release.yml`，校验 tag 与清单版本一致、该版本未发布、
+  这个提交上 `pnpm check` 全过、打包条目齐全，再 `pnpm publish`（依赖 Secrets 的 `NPM_TOKEN`）。
+  手工发布与首次发布的前置见 README「发布到 npm」。
 
 ### 接口规范（server）
 

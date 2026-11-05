@@ -102,15 +102,28 @@ pnpm restart -- --open        # 重启并打开浏览器
 ### 发布到 npm
 
 包名 `@easyx-dev/ucode`，发布的就是仓库根的 `package.json`（`bin` 指向构建产物，`files` 白名单收
-`dist/ucode.js` + `apps/web/dist` + `defaults` + postinstall 脚本；sourcemap 只给仓库内调试用，不进包）。发布前需要：npm 上拥有 `easyx-dev` 组织并
-`npm login`；`pnpm-workspace.yaml` 的 `publishBranch` 是发布分支（默认 `v0`）。
+`dist/ucode.js` + `apps/web/dist` + `defaults` + postinstall 脚本；sourcemap 只给仓库内调试用，不进包）。
+`postinstall` 只修 `node-pty` 的执行位，不依赖它：部分安装器不跑依赖的构建脚本，服务启动时会再幂等修一次。
+
+**正常路径是打 tag**：`.github/workflows/release.yml` 只在 `v*` tag 上触发，tag 名必须是 `v` + `package.json`
+的版本（`v0.3.0`）。job 先过四道闸——tag 与清单版本一致、该版本还没在 registry 上、这个提交上 `pnpm check`
+全过、`pnpm pack:check` 的必需条目齐全——再 `pnpm publish --access public` 并附 npm provenance（构建来源可验证）。
+需要仓库 Secrets 里的 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）；**首次发布**得先手工发一次
+（token 有），之后可换成 npm 的 trusted publishing（OIDC，不再存 token）。
 
 ```bash
-pnpm build && pnpm pack:check    # 构建后把 tarball 打到 .tmp/（catalog: 已改写成真实版本），核对文件清单
-pnpm publish --access public     # pnpm 负责把 catalog: 改写成真实版本
+# 发布：改版本号与 CHANGELOG → 提交 → 打 tag
+git tag v0.3.1 && git push origin v0.3.1
+
+# 本地核对（不发）：tarball 打到 .tmp/，catalog: 已改写成真实版本，并校验必需条目
+pnpm build && pnpm pack:check
+
+# 手工发布（CI 不可用时）：需要 npm 上拥有 easyx-dev 组织并 npm login
+pnpm build && pnpm publish --access public
 ```
 
-`postinstall` 只修 `node-pty` 的执行位，不依赖它：部分安装器不跑依赖的构建脚本，服务启动时会再幂等修一次。
+`pnpm-workspace.yaml` 的 `publishBranch`（`v0`）只约束手工发布的 `pnpm publish`；CI 里 checkout 是 detached
+HEAD，故命令带上 `--no-git-checks`。
 
 ### 桌面端（Electron）
 
