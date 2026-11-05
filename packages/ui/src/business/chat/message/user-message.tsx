@@ -1,8 +1,10 @@
 /**
- * 用户消息：句子里的引用 chip 与图片 / 附件 token + 句子外的技能与命令 chip + 气泡与底部操作行。
+ * 用户消息：句子里的引用 chip 与图片 / 附件 token，句子开头是技能与命令 chip。
  *
+ * 命令与技能与正文同排（技能按注入顺序、命令最后，中间各跟一个空格）：这与输入框、编辑重发的
+ * `entryToDoc` 是同一套顺序与形状——用户看到的就是自己写下的那段话。
  * 引用、图片与附件是句子成分，因此在用户写的那句里就地渲染（引用点开右侧工作台预览，
- * 图片开弹层看原图，附件下载），位置就是用户当初放的位置；技能与命令不属于任何句子，排在气泡上方。
+ * 图片开弹层看原图，附件下载），位置就是用户当初放的位置。
  * 时刻与操作（分叉 / 编辑 / 复制）落在气泡下方，常驻占位、悬停才现，出现时不顶动内容。
  *
  * 气泡走反色面：深浅两模式都是深底浅字（见 `inverse` token 对），让它直接铺在面板底上的 assistant 正文一眼分得开。
@@ -30,7 +32,10 @@ import { useAttachmentUrl } from "../../attachment/use-attachment-url";
 import { MessageEditForm } from "./message-edit-form";
 import { ForkAction } from "./message-footer";
 
-/** chip 共用一套外观：句子外的技能 / 命令与句子里的引用都长这样 */
+/**
+ * chip 共用一套外观：开头的技能 / 命令与句子里的引用同一套（反色气泡上照原取法）。
+ * 句子开头的 chip 后面跟一个空格，否则正文里的参数会贴上去。
+ */
 const CHIP_CLASS =
   "inline-flex items-center gap-1 rounded-xs bg-muted px-2 py-0.5 text-xs text-foreground-subtle";
 
@@ -191,19 +196,6 @@ export function UserMessage({
 
   return (
     <div className="group ml-auto flex w-fit max-w-[85%] flex-col items-end gap-1">
-      {hasChips ? (
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {parsed.skills.map((skill, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: 技能按注入顺序排列，同一个技能可以出现两次
-            <span key={`${skill.name}-${index}`} className={CHIP_CLASS} title={t("技能")}>
-              <Sparkles className="size-icon-xs shrink-0" />
-              {skill.name}
-            </span>
-          ))}
-          {parsed.command ? <span className={CHIP_CLASS}>{`/${parsed.command.name}`}</span> : null}
-        </div>
-      ) : null}
-
       {mediaBlocks.length > 0 ? (
         <div className="flex flex-wrap justify-end gap-2">
           {mediaBlocks.map((block, index) =>
@@ -226,7 +218,7 @@ export function UserMessage({
         </div>
       ) : null}
 
-      {segments.length > 0 ? (
+      {segments.length > 0 || hasChips ? (
         <div
           className={cn(
             // 反色面：深浅两模式都是深底浅字（与 tooltip 同一对 token）；右下收一档，读起来像说话的一角
@@ -243,6 +235,23 @@ export function UserMessage({
               expanded || !overflowing ? undefined : BODY_FADE,
             )}
           >
+            {parsed.skills.map((skill, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: 技能按注入顺序排列，同一个技能可以出现两次
+              <span key={`${skill.name}-${index}`}>
+                <span className={CHIP_CLASS} title={t("技能")}>
+                  <Sparkles className="size-icon-xs shrink-0" />
+                  {skill.name}
+                </span>{" "}
+              </span>
+            ))}
+            {parsed.command ? (
+              <span>
+                <span
+                  className={CHIP_CLASS}
+                  title={t("命令")}
+                >{`/${parsed.command.name}`}</span>{" "}
+              </span>
+            ) : null}
             {segments.map((segment, index) =>
               segment.type === "text" ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: 分段由文本顺序决定，没有自然 id
