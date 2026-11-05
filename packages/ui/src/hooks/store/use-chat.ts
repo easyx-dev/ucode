@@ -13,10 +13,12 @@ import { useClient } from "../../provider";
 import { useErrorText } from "../use-error-text";
 import { useSessionStream } from "./use-session-stream";
 
-/** 发送结果：消息投给哪个会话（`null` 表示连会话都没建出来），以及是否已被受理 */
+/** 发送结果：消息投给哪个会话（`null` 表示连会话都没建出来）、是否已被受理，以及是否排进了队列 */
 export type SendResult = {
   sessionId: string | null;
   admitted: boolean;
+  /** 生成中投递：这条输入排进了队列，等当前这轮结束再送出 */
+  queued: boolean;
 };
 
 export type ChatController = {
@@ -26,6 +28,8 @@ export type ChatController = {
   /** 本会话观测到的后台服务（bash 起的服务，按端口一条） */
   services: BackgroundService[];
   streaming: boolean;
+  /** 队列里的输入条数（生成中投递、还没轮到的那些） */
+  queued: number;
   /** 本轮进行的是上下文压缩：尾部提示据此换文案 */
   compacting: boolean;
   /** 模型此刻在做什么（等响应 / 等首帧 / 生成 / 跑工具）：尾部提示据此换文案与计时起点；拿不到时为空 */
@@ -39,6 +43,8 @@ export type ChatController = {
   edit: (entryId: string, payload: EditMessagePayload) => Promise<boolean>;
   /** 中断当前生成 */
   stop: () => Promise<void>;
+  /** 撤回排队中的输入（生成中发出去、还没轮到的那些），返回被撤掉的条数 */
+  dequeue: () => Promise<number>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: () => Promise<void>;
   /** 压缩的结果提示（正常拒绝 / 自动压缩失败）；不是错误，界面弹过轻提示后调 ack 清掉 */
@@ -80,11 +86,14 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
 
   const send = useCallback(
     async (payload: ComposerPayload, seed: SessionCreateRequest = {}): Promise<SendResult> => {
-      if (sessionId) return { sessionId, admitted: await sendTo(payload, sessionId) };
+      if (sessionId) {
+        const { admitted, queued } = await sendTo(payload, sessionId);
+        return { sessionId, admitted, queued };
+      }
 
-      // 首发：先把草稿提升成真会话，拿到 id 再投递
+      // 首发：先把草稿提升成真会话，拿到 id 再投递（还没有会话就不存在排队，直接开首轮）
       const created: SessionSummary | null = await client.sessions.create(seed);
-      if (!created) return { sessionId: null, admitted: false };
+      if (!created) return { sessionId: null, admitted: false, queued: false };
 
       // 先登记为「已知空历史」再切过去：乐观插入立刻落在新会话自己的 store 上可见，
       // 又不会触发一次可能覆盖乐观消息的空快照
@@ -92,8 +101,8 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
       onSessionCreatedRef.current?.(created.id);
       const admitted = await sendTo(payload, created.id);
       // 受理后补一次快照：把首条用户消息换成带 pi 条目 id 的权威版本（编辑 / 分叉需要它）
-      if (admitted) client.messages.refresh(created.id);
-      return { sessionId: created.id, admitted };
+      if (admitted.admitted) client.messages.refresh(created.id);
+      return { sessionId: created.id, admitted: admitted.admitted, queued: admitted.queued };
     },
     [client, sendTo, sessionId],
   );
@@ -109,6 +118,11 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
   const stop = useCallback(async (): Promise<void> => {
     if (!sessionId) return;
     await client.messages.interrupt(sessionId);
+  }, [client, sessionId]);
+
+  const dequeue = useCallback(async (): Promise<number> => {
+    if (!sessionId) return 0;
+    return client.messages.dequeue(sessionId);
   }, [client, sessionId]);
 
   const compact = useCallback(async (): Promise<void> => {
@@ -145,6 +159,7 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     services: stream.services,
     // 在途的三种情况合并成一个「进行中」：列表尾部据此显示进行中提示
     streaming: stream.running || sending || stream.pending,
+    queued: stream.queued,
     compacting: stream.compacting,
     phase: stream.phase,
     error,
@@ -152,6 +167,7 @@ export function useChat(sessionId: string | null, options: ChatOptions = {}): Ch
     send,
     edit,
     stop,
+    dequeue,
     compact,
     compactionNotice: stream.compactionNotice,
     ackCompactionNotice,

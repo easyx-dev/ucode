@@ -45,6 +45,8 @@ type ComposerProps = {
    * 不传时卡与以前一致。
    */
   topBar?: ReactNode;
+  /** 卡内的上沿一条（排队中）：挂在目标栏下方、编辑器之前 */
+  queuedBar?: ReactNode;
   /** 发送：带上当时那份文档，投递被拒时外层用它原样填回输入框 */
   onSend: (payload: ComposerPayload, doc: DocNode) => void;
   onStop: () => void;
@@ -80,6 +82,7 @@ export function Composer({
   initialDoc,
   editorKey,
   topBar,
+  queuedBar,
   onDocChange,
   onSend,
   onStop,
@@ -199,8 +202,9 @@ export function Composer({
   );
 
   const submit = useCallback(() => {
-    // 附件还在上传时不发：否则会把还没拿到 id 的占位漏掉，上传完成后又留在草稿里
-    if (streaming || hasPendingUploads()) return;
+    // 附件还在上传时不发：否则会把还没拿到 id 的占位漏掉，上传完成后又留在草稿里。
+    // 生成中照发不误：服务端会把它排进队列，本轮结束后依次送出（见「排队中」条）
+    if (hasPendingUploads()) return;
     const doc = docRef.current;
     if (isDocEmpty(doc)) return;
 
@@ -242,7 +246,7 @@ export function Composer({
     }
     onSend(payload, doc);
     focusEditor();
-  }, [commands, focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, streaming, t]);
+  }, [commands, focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, t]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -401,6 +405,8 @@ export function Composer({
           >
             {topBar}
 
+            {queuedBar}
+
             {attachmentError ? (
               <p className="px-3 pt-2 text-xs text-destructive">
                 {t("无法添加附件：{{names}}", { names: attachmentError })}
@@ -487,6 +493,7 @@ export function Composer({
                   onRefocus={focusEditor}
                 />
 
+                {/* 生成中两个键都在：「停止」中断本轮，「发送」排进队列（本轮结束后送出） */}
                 {streaming ? (
                   <IconButton
                     label={t("停止生成")}
@@ -496,17 +503,17 @@ export function Composer({
                   >
                     <Square className="size-icon-sm" />
                   </IconButton>
-                ) : (
-                  <IconButton
-                    disabled={uploading}
-                    label={t("发送")}
-                    size="icon"
-                    variant="default"
-                    onClick={submit}
-                  >
-                    <ArrowUp className="size-icon-base" />
-                  </IconButton>
-                )}
+                ) : null}
+                <IconButton
+                  disabled={uploading}
+                  label={t("发送")}
+                  tooltip={streaming ? t("本轮结束后送出") : undefined}
+                  size="icon"
+                  variant="default"
+                  onClick={submit}
+                >
+                  <ArrowUp className="size-icon-base" />
+                </IconButton>
               </div>
             </div>
           </div>

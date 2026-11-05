@@ -37,6 +37,11 @@ export type SessionStreamState = {
   items: ChatItem[];
   running: boolean;
   /**
+   * 队列里的输入条数（生成中再发的那些）：只报条数，内容只存在于服务端内存。
+   * 客户端拿它校对「排队中」条——本端记的那几条被送出后就应该少一条。
+   */
+  queued: number;
+  /**
    * 正在压缩上下文：压缩不产出消息，进度只能靠独立标记表达（列表尾部据此换文案）
    */
   compacting: boolean;
@@ -90,6 +95,7 @@ type StreamTiming = {
 export const EMPTY_STATE: SessionStreamState = {
   items: [],
   running: false,
+  queued: 0,
   compacting: false,
   compactionNotice: null,
   pending: false,
@@ -168,6 +174,14 @@ export const applyChildFrame = (
       : { ...stream, items: reduceEvent(stream.items, frame.type, frame.data) },
   );
 };
+
+/**
+ * 排队条数：`queue_update` 的载荷是两份输入正文的数组（pi 的口径），只数长度。
+ * 载荷不可信，非数组一律按 0——缺字段即当「不在排队」比留着旧条数更安全。
+ */
+const queueCountOf = (data: Record<string, unknown>): number =>
+  (Array.isArray(data.steering) ? data.steering.length : 0) +
+  (Array.isArray(data.followUp) ? data.followUp.length : 0);
 
 /**
  * 全量服务清单（事件帧与快照共用）：载荷不可信，非数组或缺失一律当作「没有服务」。
@@ -286,9 +300,17 @@ export const applyFrame = (engine: Engine, frame: ServerEventPayload): void => {
       compacting: false,
       compactionNotice: null,
       pending: false,
+      // 排队条数**不动**：pi 的队列不随本轮结束清空（中断后剩下的那几条会在下一轮结束时送出），
+      // 条数只由 `queue_update` 帧与快照决定
       items: settle(state.items),
       subagents,
     });
+    return;
+  }
+
+  // 排队情况：条数变了就刷新「排队中」条；内容只存在于服务端内存（见 `MessageListResponse.queued`）
+  if (frame.type === "queue_update") {
+    patch(engine, { queued: queueCountOf(asRecord(frame.data)) });
     return;
   }
 

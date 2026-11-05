@@ -3,6 +3,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   ERROR_CODES,
   type MessageApprovePlanResponse,
+  type MessageDequeueResponse,
   type MessageIgnorePlanResponse,
   type MessageInterruptResponse,
   type MessageListResponse,
@@ -70,6 +71,8 @@ export const createMessagesRoute = (services: Services) => {
         cwd: record ? resolveSessionCwd(record) : "",
         persisted: Boolean(record?.sourcePath),
         running: services.pool.isActive(sessionId),
+        // 生成中投递的输入条数：队列只存在于服务端内存（实例被回收即无队列）
+        queued: services.pool.get(sessionId)?.pendingMessageCount ?? 0,
         // 嵌套进度不落盘：断流重连后客户端靠这份清单收敛（快照里没有的即已结束）
         subagents: services.pool.runningSubagentsOf(sessionId),
         // 后台服务同样只是运行态：快照里没有的即已不再可连（重探发生在 bash 结算与落定时）
@@ -91,9 +94,13 @@ export const createMessagesRoute = (services: Services) => {
   // 只做受理：真正的生成在服务端后台推进，结果统一走 /events
   router.post("/prompt", jsonBody(promptInputSchema), async (c) => {
     const input = c.req.valid("json");
-    await admitPrompt(services, input);
+    const { queued } = await admitPrompt(services, input);
     return c.json(
-      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+      ok({
+        sessionId: input.sessionId,
+        admitted: true,
+        queued,
+      } satisfies PromptAdmittedResponse),
     );
   });
 
@@ -102,8 +109,34 @@ export const createMessagesRoute = (services: Services) => {
     const input = c.req.valid("json");
     await admitEdit(services, input);
     return c.json(
-      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+      ok({
+        sessionId: input.sessionId,
+        admitted: true,
+        // 编辑会改变本轮起点，只能在空闲时受理，不排队
+        queued: false,
+      } satisfies PromptAdmittedResponse),
     );
+  });
+
+  /**
+   * 撤回排队中的输入（「生成中发消息」刚排进去的那些）。
+   *
+   * pi 的 `clearQueue()` 只能整清，没有逐条移除的口子，所以这里一次退全部；
+   * 返回条数给客户端核对「撤掉了几条」。清空后 pi 自己会发一帧 `queue_update`，不必再补。
+   */
+  router.post("/dequeue", jsonBody(sessionIdInputSchema), async (c) => {
+    const { sessionId } = c.req.valid("json");
+    const record = services.sessions.find(sessionId);
+    if (!record || record.deletedAt) {
+      throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
+        path: sessionId,
+      });
+    }
+
+    // 队列只在会话实例的内存里：实例已被回收时就没有可撤的东西
+    const cleared = services.pool.get(sessionId)?.clearQueue();
+    const queued = (cleared?.steering.length ?? 0) + (cleared?.followUp.length ?? 0);
+    return c.json(ok({ sessionId, queued } satisfies MessageDequeueResponse));
   });
 
   router.post("/interrupt", jsonBody(sessionIdInputSchema), async (c) => {
@@ -172,7 +205,12 @@ export const createMessagesRoute = (services: Services) => {
     const input = c.req.valid("json");
     await admitCompact(services, input);
     return c.json(
-      ok({ sessionId: input.sessionId, admitted: true } satisfies PromptAdmittedResponse),
+      ok({
+        sessionId: input.sessionId,
+        admitted: true,
+        // 压缩不排队：忙碌时直接 409
+        queued: false,
+      } satisfies PromptAdmittedResponse),
     );
   });
 

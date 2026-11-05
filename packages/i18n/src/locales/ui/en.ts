@@ -627,6 +627,10 @@ export default {
   本机与项目: "This machine and project",
   "{{count}} 项": "{{count}}",
   "{{count}} 条": "{{count}}",
+  排队中: "Queued",
+  本轮结束后依次送出: "Sent one after another when this turn ends",
+  下一轮结束时依次送出: "Sent one after another when the next turn ends",
+  本轮结束后送出: "Queued: sent when this turn ends",
   已关闭: "Off",
   "读取中…": "Loading…",
   "读不到这条记忆。": "This memory could not be read.",
@@ -647,6 +651,9 @@ export default {
     "With memory on, each finished turn is reviewed in the background and saved; you can also just ask the assistant to remember something.",
   "这个目录已不在项目记录里：内容还在磁盘上，但对应不到具体项目。":
     "This directory is no longer in the project list: the content is still on disk, but it cannot be matched to a project.",
+  撤回: "Withdraw",
+  "另有 {{count}} 条（刷新前发出的，取不回内容）":
+    "{{count}} more (sent before this page loaded; their content can't be recovered)",
   插件与内置: "From plugins and built-ins",
   "本机与项目里还没有自定义项。": "No custom entry here yet.",
   "有无法解析的文件：": "Files that could not be parsed:",

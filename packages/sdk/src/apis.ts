@@ -76,6 +76,7 @@ import type {
   MemoryUpdateRequest,
   MessageApprovePlanResponse,
   MessageCompactRequest,
+  MessageDequeueResponse,
   MessageEditRequest,
   MessageIgnorePlanResponse,
   MessageInterruptResponse,
@@ -430,6 +431,14 @@ export const createApis = (options: ApisOptions = {}) => {
         transport.post<PromptAdmittedResponse>("messages/edit", body),
       interrupt: (sessionId: string) =>
         transport.post<MessageInterruptResponse>("messages/interrupt", {
+          sessionId,
+        } satisfies SessionIdRequest),
+      /**
+       * 撤回排队中的输入：`messages/prompt` 在生成中受理的那些。
+       * pi 的队列只能整清，所以一次退全部；返回撤掉的条数。
+       */
+      dequeue: (sessionId: string) =>
+        transport.post<MessageDequeueResponse>("messages/dequeue", {
           sessionId,
         } satisfies SessionIdRequest),
       /** 手动压缩上下文；进度走 compaction_* 事件 */

@@ -3,8 +3,9 @@
 import { type DocNode, docToDialect, relativizeContextRefs, textToDoc } from "@ucode/markdown";
 import { cn } from "cn";
 import { Bot } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "../../base/button";
 import type { ChatController } from "../../hooks/store/use-chat";
 import { useProjects } from "../../hooks/store/use-projects";
@@ -23,11 +24,14 @@ import {
   type ThinkingPreference,
   type UsageTotals,
 } from "../../types";
+import { errorText } from "../../utils/error-text";
 import type { BuiltinCommandId } from "../composer/builtin-commands";
 import { Composer } from "../composer/composer";
 import { composerKeyOf, emptyDraft } from "../composer/document/composer-draft";
 import type { ComposerPayload } from "../composer/document/composer-payload";
 import { draftSeedOf, projectLabel, projectOf } from "../composer/project/project";
+import { QueuedBar } from "../composer/queued-bar";
+import { joinQueuedDocs, type QueuedPrompt, queuedPromptOf } from "../composer/queued-prompt";
 import type { ComposerDraftsController } from "../composer/use-composer-drafts";
 import { GoalBar } from "../goal/goal-bar";
 import { type GoalCommand, parseGoalCommand } from "../goal/goal-command";
@@ -205,6 +209,28 @@ export function ChatPanel({
   const draft = composer.drafts[draftKey] ?? emptyDraft();
 
   /**
+   * 排队中的输入：生成中发出去、还没轮到送出的那几条。
+   *
+   * 它们在被送出前没有会话条目（只在服务端内存队列里），所以本端按自己发出时的载荷与文档记一行；
+   * 条数用 `chat.queued`（服务端权威）校对：有一条被送出，就从头部少一条。
+   * 刷新 / 切走会丢掉内容——那时就只剩条数（见「排队中」条上的「另有 n 条」）。
+   */
+  const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
+  const queuedSeq = useRef(0);
+  const sessionKey = session?.id ?? null;
+  useEffect(() => {
+    // 换会话：上一个会话的排队条不归这里管
+    setQueuedPrompts([]);
+  }, [sessionKey]);
+  useEffect(() => {
+    // 条数变小 = 有排队输入被送出（或整清）：排队是先进先出，从头部摘掉对应的几条。
+    // 中断不清空队列，所以这时条数不变、条也不该消失——它们会在下一轮收尾时送出
+    setQueuedPrompts((prev) =>
+      prev.length > chat.queued ? prev.slice(prev.length - chat.queued) : prev,
+    );
+  }, [chat.queued]);
+
+  /**
    * 草稿里的编辑器文档：优先用存下来的 doc；只有旧 `text` 的按单段落还原。
    * 切换会话 / 失败回填会让编辑器重挂载，因此这里作为「初始文档」传入。
    */
@@ -238,9 +264,15 @@ export function ChatPanel({
       // 正文里的引用标记是编辑器插入的绝对路径，发送前换成相对工作目录的写法：
       // 句子读起来就是用户写的那句，且与展开块上的 `path` 同口径（编辑器只在有目录时可插引用）
       const sent = relativizeContextRefs(payload, session?.cwd ?? draft.cwd);
-      void chat.send(sent, seed).then(({ sessionId: target, admitted }) => {
+      void chat.send(sent, seed).then(({ sessionId: target, admitted, queued }) => {
         // 受理即把视口交回最新一行；未受理（回填草稿）时不能动视口
         if (admitted) {
+          // 排进队列的那几条不落消息区，改记到「排队中」条上
+          if (queued) {
+            queuedSeq.current += 1;
+            const id = `queued-${queuedSeq.current}`;
+            setQueuedPrompts((prev) => [...prev, queuedPromptOf(id, payload, doc)]);
+          }
           setSentTick((tick) => tick + 1);
           return;
         }
@@ -264,6 +296,29 @@ export function ChatPanel({
     },
     [onEdit],
   );
+
+  /**
+   * 撤回排队中的输入：pi 的队列只能整清，所以一次退全部，再把内容还回输入框
+   * （本端记着的那几条在前、输入框里已有的草稿在后，空行分隔）。
+   *
+   * 失败要说清（会话已在别处归档、服务重启）：那时条子与队列都没动，用户再点一次就好；
+   * 静默失败会让人以为点到了、实际什么都没退。
+   */
+  const withdrawQueued = useCallback((): void => {
+    if (!session || queuedPrompts.length === 0) return;
+    const pending = queuedPrompts;
+    void chat
+      .dequeue()
+      .then((removed) => {
+        if (removed === 0) return;
+        setQueuedPrompts([]);
+        const docs = [...pending.map((item) => item.doc), ...(initialDoc ? [initialDoc] : [])];
+        const restored = joinQueuedDocs(docs);
+        if (!restored) return;
+        composer.update(draftKey, { doc: restored, text: docToDialect(restored, {}) });
+      })
+      .catch((error: unknown) => toast.error(errorText(t, error)));
+  }, [chat, composer, draftKey, initialDoc, queuedPrompts, session, t]);
 
   // 未绑定目录的会话不暴露 `workspace/<uuid>` 这串路径，直接标成「助理区」
   const inWorkspace = Boolean(
@@ -409,6 +464,19 @@ export function ChatPanel({
                     onBudget={onGoalBudget}
                   />
                 ) : null
+              }
+              // 排队中：本期记全了服务端队列里那几条时才给「撤回」（否则撤了没处归还）
+              queuedBar={
+                <QueuedBar
+                  streaming={chat.streaming}
+                  items={queuedPrompts}
+                  extra={Math.max(0, chat.queued - queuedPrompts.length)}
+                  onWithdraw={
+                    queuedPrompts.length > 0 && chat.queued <= queuedPrompts.length
+                      ? withdrawQueued
+                      : undefined
+                  }
+                />
               }
               onDocChange={(doc) => composer.update(draftKey, { doc, text: docToDialect(doc, {}) })}
               onSend={submit}

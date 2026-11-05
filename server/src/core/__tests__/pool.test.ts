@@ -177,6 +177,23 @@ describe("SessionPool.recycleForPluginChange", () => {
     assert.equal(internals.pluginRevision, 4, "插件代次被记下，供装配期比对");
   });
 
+  it("队列里还有输入时不回收：那几条只存在实例内存里", () => {
+    const { pool, internals } = createPoolWithInteractions(() => false);
+    internals.entries.set("queued", {
+      stale: false,
+      session: { pendingMessageCount: 1 },
+    } as never);
+
+    pool.recycleForPluginChange(2);
+
+    assert.equal(internals.entries.get("queued")?.stale, true, "有排队输入的会话不被打回");
+    assert.equal(
+      (pool as unknown as { recycleIfStale: (id: string) => boolean }).recycleIfStale("queued"),
+      false,
+    );
+    assert.equal(internals.entries.has("queued"), true, "实例留着，队列里的那几条才不会丢");
+  });
+
   it("标脏后的挂起态会话在答完前一直不被回收", () => {
     const { pool, internals } = createPoolWithInteractions((id) => id === "waiting");
     pool.recycleForPluginChange(1);

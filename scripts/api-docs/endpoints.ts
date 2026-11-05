@@ -436,6 +436,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "messages",
+    action: "dequeue",
+    method: "POST",
+    input: "sessionIdInputSchema",
+    requestType: "SessionIdRequest",
+    output: "MessageDequeueResponse",
+    summary: "撤回排队中的输入（整清，返回撤掉的条数）",
+  },
+  {
+    domain: "messages",
     action: "ignore-plan",
     method: "POST",
     input: "sessionIdInputSchema",

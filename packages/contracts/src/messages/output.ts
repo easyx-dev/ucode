@@ -130,6 +130,13 @@ export type MessageListResponse = SessionScoped & {
   cwd: string;
   /** 是否有活跃生成（进程内的 run 或流式会话） */
   running: boolean;
+  /**
+   * 队列里的输入条数（生成中投递、还没轮到的那些）。
+   *
+   * 只报条数：排队的输入只存在于服务端内存与 pi 的队列里，展开后的正文也不适合回显；
+   * 客户端自己记着发出过哪几条，拿这个数校对即可（页面刷新后就只剩这个数）。
+   */
+  queued: number;
   /** 仍在进行的子智能体；断流重连后客户端据此重建/收敛嵌套进度 */
   subagents: SubagentSnapshot[];
   /** 本会话当前可连的后台服务；断流重连后客户端以它为准替换本地清单 */
@@ -155,6 +162,16 @@ export type MessageServicesResponse = SessionScoped & {
 /** prompt 的受理回执：生成本身由服务端后台推进，与本请求无关 */
 export type PromptAdmittedResponse = SessionScoped & {
   admitted: boolean;
+  /**
+   * 会话正在生成：这条输入已进队列，等当前这轮（含工具调用）结束再送出。
+   * 只有 `messages/prompt` 可能为 true——编辑与压缩不排队，它们要么当场生效要么报 409。
+   */
+  queued: boolean;
+};
+
+export type MessageDequeueResponse = SessionScoped & {
+  /** 被撤掉并退回的排队输入条数；没有排队时为 0 */
+  queued: number;
 };
 
 export type MessageInterruptResponse = SessionScoped & {

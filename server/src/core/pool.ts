@@ -1225,15 +1225,17 @@ export class SessionPool {
   }
 
   /**
-   * 是否「不能立刻丢」：生成中 / 正在处理落定动作 / 有待答交互 / 有待确认的计划。
-   * 后两种都没有实例在跑，但打回它们等于把用户正看着的审批与计划清掉。
+   * 是否「不能立刻丢」：生成中 / 正在处理落定动作 / 有待答交互 / 有待确认的计划 / 队列里还有输入。
+   * 后三种都没有实例在跑，但打回它们等于把用户正看着的审批、计划与排队输入清掉——
+   * 队列只存在于实例内存里（`pendingMessageCount` 取自 pi），丢掉实例就是丢掉那几条消息。
    */
   private isProtected(sessionId: string): boolean {
     return (
       this.isActive(sessionId) ||
       this.settling.has(sessionId) ||
       this.permissions.interactions.list(sessionId).length > 0 ||
-      this.isPlanPending(sessionId)
+      this.isPlanPending(sessionId) ||
+      (this.get(sessionId)?.pendingMessageCount ?? 0) > 0
     );
   }
 

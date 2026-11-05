@@ -9,6 +9,7 @@ import type {
   BackgroundService,
   MessageDTO,
   MessageListResponse,
+  PromptAdmittedResponse,
   ServerEventPayload,
 } from "@ucode/contracts";
 import type { Apis } from "../../../apis";
@@ -34,12 +35,13 @@ const userMessageOf = (id: string): MessageDTO =>
   ({ id, role: "user", blocks: [{ type: "text", text: "看图" }] }) as MessageDTO;
 
 /** 快照序号：缺省 0 表示服务端到这时候一帧还没发过（下面的帧都用更大的序号） */
-const snapshotOf = (services: BackgroundService[], seq = 0): MessageListResponse => ({
+const snapshotOf = (services: BackgroundService[], seq = 0, queued = 0): MessageListResponse => ({
   sessionId: "s1",
   messages: [],
   persisted: false,
   cwd: "/w",
   running: false,
+  queued,
   subagents: [],
   services,
   seq,
@@ -54,6 +56,12 @@ const tick = (): Promise<void> =>
 const createHarness = (
   snapshot: MessageListResponse,
   refreshed: BackgroundService[],
+  /** `messages/prompt` 的受理回执；缺省即「开了新的一轮」 */
+  prompt: () => Promise<PromptAdmittedResponse> = async () => ({
+    sessionId: snapshot.sessionId,
+    admitted: true,
+    queued: false,
+  }),
 ): {
   store: ReturnType<typeof createMessagesStore>;
   emit: (frame: ServerEventPayload) => void;
@@ -69,6 +77,7 @@ const createHarness = (
     messages: {
       list: async () => snapshot,
       services: async () => ({ sessionId: snapshot.sessionId, services: refreshed }),
+      prompt: async () => prompt(),
     },
   } as unknown as Apis;
 
@@ -260,5 +269,124 @@ describe("乐观区块", () => {
 
   it("什么都没有时不给空块", () => {
     assert.deepEqual(optimisticBlocks(payloadOf({})), []);
+  });
+});
+
+/**
+ * 生成中再发：服务端把它排进队列，送出前没有会话条目——
+ * 所以这里不插乐观气泡，排队条数取自快照与 `queue_update` 帧。
+ */
+describe("会话流 · 排队", () => {
+  const payloadOf: PromptPayload = { text: "顺便看下日志", contexts: [], attachments: [] };
+
+  it("服务端确认排队时不插乐观气泡，返回 queued", async () => {
+    const { store } = createHarness(snapshotOf([]), [], async () => ({
+      sessionId: "s1",
+      admitted: true,
+      queued: true,
+    }));
+    store.activate("s1");
+    await tick();
+
+    const result = await store.send("s1", payloadOf);
+
+    assert.deepEqual(result, { admitted: true, queued: true });
+    assert.equal(store.get("s1").getState().items.length, 0);
+  });
+
+  it("空闲发送照旧乐观插入并起表", async () => {
+    const { store } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    const result = await store.send("s1", payloadOf);
+
+    const state = store.get("s1").getState();
+    assert.deepEqual(result, { admitted: true, queued: false });
+    assert.equal(state.items.length, 1);
+    assert.equal(state.items[0]?.live, true);
+    assert.equal(state.pending, true);
+  });
+
+  it("竞态：本端以为空闲、服务端却排了队，撤掉刚插的乐观气泡", async () => {
+    const { store } = createHarness(snapshotOf([]), [], async () => ({
+      sessionId: "s1",
+      admitted: true,
+      queued: true,
+    }));
+    store.activate("s1");
+    await tick();
+
+    await store.send("s1", payloadOf);
+
+    const state = store.get("s1").getState();
+    assert.equal(state.items.length, 0);
+    assert.equal(state.pending, false);
+  });
+
+  it("queue_update 只数正文数组的条数，本轮落定不清空队列", async () => {
+    const { store, emit } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    emit(frameOf("queue_update", { steering: [], followUp: ["一条", "两条"] }));
+    assert.equal(store.get("s1").getState().queued, 2);
+
+    emit(frameOf("queue_update", { steering: ["插入"], followUp: ["一条"] }));
+    assert.equal(store.get("s1").getState().queued, 2);
+
+    // 中断（或本轮结束）后排队的那几条仍在队列里，会在下一轮收尾时送出：条数只由帧与快照决定
+    emit(frameOf("agent_settled", {}));
+    assert.equal(store.get("s1").getState().queued, 2);
+
+    emit(frameOf("queue_update", { steering: [], followUp: [] }));
+    assert.equal(store.get("s1").getState().queued, 0);
+  });
+
+  it("载荷不可信时按 0 算，不留旧条数", async () => {
+    const { store, emit } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    emit(frameOf("queue_update", { steering: ["一条"], followUp: [] }));
+    emit(frameOf("queue_update", { followUp: "坏载荷" }));
+
+    assert.equal(store.get("s1").getState().queued, 0);
+  });
+
+  it("快照带上排队条数（刷新后仍知道有几条在排队）", async () => {
+    const { store } = createHarness(snapshotOf([], 0, 1), []);
+    store.activate("s1");
+    await tick();
+
+    assert.equal(store.get("s1").getState().queued, 1);
+  });
+
+  it("快照缺 queued（旧服务 / 异常响应）时按 0 处理", async () => {
+    const snapshot = { ...snapshotOf([], 0), queued: undefined } as unknown as MessageListResponse;
+    const { store } = createHarness(snapshot, []);
+    store.activate("s1");
+    await tick();
+
+    assert.equal(store.get("s1").getState().queued, 0);
+  });
+
+  it("排队只改条数：跑的途中不动运行态，空闲时整清也不点亮「工作中」", async () => {
+    const { store, emit } = createHarness(snapshotOf([]), []);
+    store.activate("s1");
+    await tick();
+
+    emit(frameOf("step_start", {}));
+    emit(frameOf("queue_update", { steering: [], followUp: ["一条"] }));
+    const running = store.get("s1").getState();
+    assert.equal(running.running, true);
+    assert.equal(running.queued, 1);
+
+    // 中断后队列里还剩一条：那一帧到的时候本轮已经结束，不该把界面点成「生成中」
+    emit(frameOf("agent_settled", {}));
+    emit(frameOf("queue_update", { steering: [], followUp: ["中断前发的一条"] }));
+    const settled = store.get("s1").getState();
+    assert.equal(settled.running, false);
+    assert.equal(settled.queued, 1);
   });
 });

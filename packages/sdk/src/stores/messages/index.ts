@@ -29,6 +29,12 @@ export type { SessionStreamState } from "./engine";
 export type { PhaseKind, StepSegmentRow, StepSegments, StreamPhase } from "./phase";
 export { createPhase, stepBreakdown } from "./phase";
 
+/** 一次发送的结果：是否被受理，以及这条输入是排进了队列还是开了新的一轮 */
+export type SendResult = {
+  admitted: boolean;
+  queued: boolean;
+};
+
 export type MessagesStore = {
   /** 取某个会话的 store；sessionId 为 null 时返回共享的空 store */
   get: (sessionId: string | null) => Store<SessionStreamState>;
@@ -43,12 +49,20 @@ export type MessagesStore = {
    * 走单独的轻量接口，不重取整段消息历史。
    */
   refreshServices: (sessionId: string) => Promise<void>;
-  /** 发送一条消息并乐观插入；返回是否被服务端受理 */
-  send: (sessionId: string, payload: PromptPayload) => Promise<boolean>;
+  /**
+   * 发送一条消息：空闲时乐观插入并起一轮，生成中则只排队。
+   * 返回是否被服务端受理、以及这条输入是排进了队列（等当前这轮结束后送出）还是开了新的一轮。
+   */
+  send: (sessionId: string, payload: PromptPayload) => Promise<SendResult>;
   /** 编辑一条用户消息并重发；引用与附件一并带上，刷新由 transcript_reset 事件驱动 */
   edit: (sessionId: string, entryId: string, payload: EditMessagePayload) => Promise<boolean>;
   /** 中断当前生成 */
   interrupt: (sessionId: string) => Promise<void>;
+  /**
+   * 撤回排队中的输入（生成中发出去、还没轮到送出的那些），返回被撤掉的条数。
+   * pi 的队列只能整清（没有逐条移除的口子），调用方负责把内容还给输入框。
+   */
+  dequeue: (sessionId: string) => Promise<number>;
   /** 手动压缩上下文；进度走 compaction_* 事件 */
   compact: (sessionId: string, instructions?: string) => Promise<void>;
   /** 压缩被正常拒绝的提示已展示：清掉标记，避免重连或重渲染时重复弹 */
@@ -129,6 +143,9 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
           };
         }),
         running: snapshot.running,
+        // 队列条数只能从快照与帧里拿（排队的输入只存在于服务端内存）；
+        // 缺字段（旧服务 / 异常响应）按 0 处理，别把 undefined 当条数传到界面上
+        queued: snapshot.queued ?? 0,
         subagents: runningSubagents,
         // 服务清单是全量运行态：快照里没有的即已停止，直接以快照为准
         services: asServices(snapshot.services),
@@ -255,17 +272,21 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
 
     async send(sessionId, payload) {
       const engine = ensure(sessionId);
-      patch(engine, { error: null });
-      const optimistic = appendUserItem(engine.store.getState().items, optimisticBlocks(payload));
-      // 立刻给出反馈：首个 token 都算在这段等待里；阶段同时起表，界面才能把「等模型响应」那一段报出来
+      // 本端以为空闲就先插一条乐观气泡（首个 token 都算在这段等待里，阶段同时起表）；
+      // 生成中再发则只等队列——排队的输入还没落成条目，先插进列表会卡在上一轮输出的中间
+      const busy = engine.store.getState().running || engine.store.getState().pending;
+      const optimistic = busy
+        ? null
+        : appendUserItem(engine.store.getState().items, optimisticBlocks(payload));
       patch(engine, {
-        items: optimistic.items,
-        pending: true,
-        phase: createPhase(Date.now()),
+        error: null,
+        ...(optimistic
+          ? { items: optimistic.items, pending: true, phase: createPhase(Date.now()) }
+          : {}),
       });
 
       try {
-        await deps.apis.messages.prompt({
+        const { queued } = await deps.apis.messages.prompt({
           sessionId,
           text: payload.text,
           ...(payload.command ? { command: payload.command } : {}),
@@ -275,15 +296,24 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
             ? { attachments: payload.attachments.map((attachment) => ({ id: attachment.id })) }
             : {}),
         });
-        return true;
+        // 竞态：本端以为空闲，服务端却排进了队列——撤掉刚插的乐观气泡，改由「排队中」条表达
+        if (queued && optimistic) {
+          patch(engine, {
+            items: removeUserItem(engine.store.getState().items, optimistic.id),
+            pending: false,
+          });
+        }
+        return { admitted: true, queued };
       } catch (error) {
         // 没投出去就别在消息区留一条发不出去的消息（调用方会把原文还回输入框）
         patch(engine, {
-          items: removeUserItem(engine.store.getState().items, optimistic.id),
+          items: optimistic
+            ? removeUserItem(engine.store.getState().items, optimistic.id)
+            : engine.store.getState().items,
           error: asApiError(error),
           pending: false,
         });
-        return false;
+        return { admitted: false, queued: false };
       }
     },
 
@@ -305,6 +335,12 @@ export const createMessagesStore = (deps: MessagesDeps): MessagesStore => {
       } catch {
         // 忽略：中断失败时服务端仍会继续上报事件
       }
+    },
+
+    async dequeue(sessionId) {
+      const { queued } = await deps.apis.messages.dequeue(sessionId);
+      // 条数以清空后的 `queue_update` 帧为准（pi 自己会发），这里只把结果告诉调用方
+      return queued;
     },
 
     async compact(sessionId, instructions) {

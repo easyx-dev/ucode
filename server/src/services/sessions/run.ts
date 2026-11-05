@@ -169,10 +169,31 @@ const assemblePrompt = (
 };
 
 /**
+ * 把一条输入排进 pi 的队列：返回它**真的进了队列**（而不是被扩展当成指令消费掉）。
+ * 报文里 `queued` 直接用它——客户端据此决定给不给「排队中」条，猜错会留下一条撤不回的假条目。
+ */
+const enqueue = async (
+  session: AgentSession,
+  body: string,
+  images: PromptImage[] | undefined,
+  behavior: PromptInput["behavior"],
+): Promise<boolean> => {
+  const disposition =
+    behavior === "steer" ? await session.steer(body, images) : await session.followUp(body, images);
+  return disposition === "queued";
+};
+
+/**
  * 受理一条输入：空闲则开新一轮并立即返回，生成中则按 behavior 排队。
  * 只 await「取会话」与「入队」这类短操作，不 await 整轮生成。
+ *
+ * 返回值告诉调用方这条输入是**开了新的一轮**还是**排进了队列**：客户端据此决定给不给乐观气泡
+ * （排队的要等送出时才落成真消息，先插进列表会卡在上一轮输出的中间）。
  */
-export const admitPrompt = async (services: Services, input: PromptInput): Promise<void> => {
+export const admitPrompt = async (
+  services: Services,
+  input: PromptInput,
+): Promise<{ queued: boolean }> => {
   const { sessionId, text, behavior, command } = input;
   const contexts = input.contexts ?? [];
   const attachments = input.attachments ?? [];
@@ -219,18 +240,26 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
 
   if (!services.pool.isRunning(sessionId) && !session.isStreaming) {
     beginTurn();
-    return;
+    return { queued: false };
   }
 
+  const images = content.length > 0 ? content : undefined;
   if (await waitForBusy(session, () => services.pool.isRunning(sessionId))) {
-    const images = content.length > 0 ? content : undefined;
-    if (behavior === "steer") await session.steer(body, images);
-    else await session.followUp(body, images);
-    return;
+    return { queued: await enqueue(session, body, images, behavior) };
+  }
+
+  /**
+   * 占位还在但 pi 已经不是流式：要么首帧还没到（慢端点 / 上传），要么这一轮正在收尾。
+   * 这时 `beginTurn` 会被占位挡住、报 409 把用户的话弹回输入框——排进队列更贴近意图
+   * （它会在这一轮或下一轮的收尾处送出），撤回入口也已经在队列条上。
+   */
+  if (services.pool.isRunning(sessionId)) {
+    return { queued: await enqueue(session, body, images, behavior) };
   }
 
   // 占位者已经结束（可能失败）：退化成新的一轮
   beginTurn();
+  return { queued: false };
 };
 
 /**
