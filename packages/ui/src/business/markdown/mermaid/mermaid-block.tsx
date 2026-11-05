@@ -3,14 +3,18 @@
  *
  * 回落刻意不做错误面板——流式未闭合、粘进来的非标准语法都是常态，为一张图弹一次错误提示会打断阅读，
  * 而源码本身仍然可读。尺寸由 mermaid 给定，宽图在块内横向滚动，不缩字。
+ *
+ * 操作区与表格同一口径：悬停或聚焦时在右上角出现（图本身不带标题行，所以不像表格那样另起一行）。
  */
 import { cn } from "cn";
-import { Loader2, Maximize2 } from "lucide-react";
+import { Code, Download, Loader2, Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../../base/button";
+import { IconButton } from "../../../base/button";
 import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
 import { openDialog } from "../../dialog/queue";
+import { downloadMermaidSvg } from "./mermaid-export";
 import { MermaidPreviewDialog } from "./mermaid-preview-dialog";
+import { openMermaidSourceDialog } from "./mermaid-source-dialog";
 import { useMermaidSvg } from "./use-mermaid-svg";
 
 export function MermaidBlock({ code, deferred }: { code: string; deferred?: boolean }) {
@@ -39,20 +43,30 @@ export function MermaidBlock({ code, deferred }: { code: string; deferred?: bool
             dangerouslySetInnerHTML={{ __html: svg }}
           />
         </div>
-        <Button
-          aria-label={t("全屏查看")}
+        <div
           className={cn(
             HOVER_ACTION_CLASS,
-            "absolute top-2 right-2 bg-card/80 backdrop-blur-sm transition group-hover/mermaid:opacity-100 focus-visible:opacity-100",
+            "absolute top-2 right-2 flex items-center gap-0.5 rounded-md bg-card/80 p-0.5 backdrop-blur-sm group-hover/mermaid:opacity-100 focus-within:opacity-100",
           )}
-          onClick={openPreview}
-          size="icon-xs"
-          title={t("全屏查看")}
-          type="button"
-          variant="ghost"
         >
-          <Maximize2 />
-        </Button>
+          <IconButton
+            label={t("下载图片")}
+            onClick={() => downloadMermaidSvg(svg, t("图表"))}
+            size="icon-xs"
+          >
+            <Download />
+          </IconButton>
+          <IconButton
+            label={t("查看原代码")}
+            onClick={() => openMermaidSourceDialog(code)}
+            size="icon-xs"
+          >
+            <Code />
+          </IconButton>
+          <IconButton label={t("全屏查看")} onClick={openPreview} size="icon-xs">
+            <Maximize2 />
+          </IconButton>
+        </div>
       </div>
     );
   }

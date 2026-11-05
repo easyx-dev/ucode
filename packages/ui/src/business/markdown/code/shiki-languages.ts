@@ -39,6 +39,7 @@ export const LANGS: Record<string, () => Promise<unknown>> = {
   lua: () => import("@shikijs/langs/lua"),
   make: () => import("@shikijs/langs/make"),
   markdown: () => import("@shikijs/langs/markdown"),
+  mermaid: () => import("@shikijs/langs/mermaid"),
   nginx: () => import("@shikijs/langs/nginx"),
   perl: () => import("@shikijs/langs/perl"),
   php: () => import("@shikijs/langs/php"),

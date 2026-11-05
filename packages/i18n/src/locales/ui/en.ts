@@ -245,6 +245,11 @@ export default {
   图片不可用: "Image unavailable",
   附件不可用: "Attachment unavailable",
   图表: "Diagram",
+  下载图片: "Download image",
+  查看原代码: "View source",
+  图表原代码: "Diagram source",
+  "这张图由下面这段 mermaid 源渲染，可直接复制。":
+    "This diagram is rendered from the mermaid source below; copy it as needed.",
   表格: "Table",
   "图表渲染中…": "Rendering diagram…",
   图表预览: "Diagram preview",
