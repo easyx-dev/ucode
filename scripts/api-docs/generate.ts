@@ -23,6 +23,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   models: "模型目录",
   config: "配置",
   sessions: "会话",
+  memory: "记忆",
   messages: "消息",
   events: "事件流",
   interactions: "交互请求",

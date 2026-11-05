@@ -626,6 +626,27 @@ export default {
     "Prompt commands: changes go to disk and apply to new sessions.",
   本机与项目: "This machine and project",
   "{{count}} 项": "{{count}}",
+  "{{count}} 条": "{{count}}",
+  已关闭: "Off",
+  "读取中…": "Loading…",
+  "读不到这条记忆。": "This memory could not be read.",
+  "索引里还没有条目。": "No entries in the index yet.",
+  还没有项目记忆: "No project memory yet",
+  本机上的项目记忆: "Project memory on this machine",
+  编辑记忆: "Edit memory",
+  删除记忆: "Delete memory",
+  标题: "Title",
+  正文: "Content",
+  "文件 {{file}}": "File {{file}}",
+  "标题会写进索引行，正文是给模型看的事实；保存在本机，新会话与重装后的会话会带上它。":
+    "The title goes into the index line, the content is the fact the model reads. Stored locally; new sessions and re-assembled sessions pick it up.",
+  "删除这条记忆？": "Delete this memory?",
+  "「{{title}}」会从磁盘上删掉，索引行一并移除，之后不会再带进上下文。":
+    "“{{title}}” will be removed from disk together with its index line and will no longer be loaded into context.",
+  "开启记忆后，每轮对话结束会在后台回顾并保存；也可以直接让助理「记住」某件事。":
+    "With memory on, each finished turn is reviewed in the background and saved; you can also just ask the assistant to remember something.",
+  "这个目录已不在项目记录里：内容还在磁盘上，但对应不到具体项目。":
+    "This directory is no longer in the project list: the content is still on disk, but it cannot be matched to a project.",
   插件与内置: "From plugins and built-ins",
   "本机与项目里还没有自定义项。": "No custom entry here yet.",
   "有无法解析的文件：": "Files that could not be parsed:",

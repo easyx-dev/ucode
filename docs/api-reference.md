@@ -48,6 +48,10 @@
 | POST | `/api/v1/projects/list` | 项目列表（按 cwd 归口的展示名与最近的会话参数） |
 | POST | `/api/v1/projects/update` | 重命名项目（name 传 null 即清空，界面回落目录末段） |
 | POST | `/api/v1/projects/reorder` | 重排项目（paths 是侧栏从上到下的目录次序） |
+| POST | `/api/v1/memory/list` | 列出有记忆的项目与条目（只读） |
+| POST | `/api/v1/memory/read` | 读一条记忆的正文（按记忆目录名 + 事实文件名寻址） |
+| POST | `/api/v1/memory/update` | 改一条记忆的标题与正文（文件名不变） |
+| POST | `/api/v1/memory/delete` | 删一条记忆（文件与索引行一起删） |
 | POST | `/api/v1/messages/list` | 会话历史快照（compaction 感知，带接续 seq） |
 | POST | `/api/v1/messages/services` | 会话的后台服务清单（响应前重探一次，供活动面板用） |
 | POST | `/api/v1/messages/prompt` | 投递一轮生成，返回受理 ack；结果走 /events |
@@ -878,6 +882,84 @@
 | --- | --- | --- | --- |
 | `total` | number | 是 | — |
 | `projects` | [ProjectSummary](#projectsummary)[] | 是 | — |
+
+## 记忆（`memory`）
+
+### POST /api/v1/memory/list
+
+列出有记忆的项目与条目（只读）
+
+**请求参数**
+
+无参数（body 传 `{}`）
+
+**响应类型**：`MemoryListResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `total` | number | 是 | — |
+| `projects` | [MemoryProjectView](#memoryprojectview)[] | 是 | 有记忆的项目，按记忆目录名排序 |
+
+### POST /api/v1/memory/read
+
+读一条记忆的正文（按记忆目录名 + 事实文件名寻址）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `dir` | string（长度 1–128） | 是 | — | — |
+| `file` | string（长度 1–128） | 是 | — | — |
+
+**响应类型**：`MemoryFactView`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `dir` | string | 是 | — |
+| `file` | string | 是 | — |
+| `title` | string | 是 | — |
+| `content` | string | 是 | 事实文件全文（含首行的标题与结尾换行） |
+
+### POST /api/v1/memory/update
+
+改一条记忆的标题与正文（文件名不变）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `dir` | string（长度 1–128） | 是 | — | — |
+| `file` | string（长度 1–128） | 是 | — | — |
+| `title` | string（长度 1–120） | 是 | — | — |
+| `content` | string（长度 1–20000） | 是 | — | — |
+
+**响应类型**：`MemoryFactView`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `dir` | string | 是 | — |
+| `file` | string | 是 | — |
+| `title` | string | 是 | — |
+| `content` | string | 是 | 事实文件全文（含首行的标题与结尾换行） |
+
+### POST /api/v1/memory/delete
+
+删一条记忆（文件与索引行一起删）
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `dir` | string（长度 1–128） | 是 | — | — |
+| `file` | string（长度 1–128） | 是 | — | — |
+
+**响应类型**：`MemoryDeleteResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `dir` | string | 是 | — |
+| `file` | string | 是 | — |
+| `removed` | boolean | 是 | 是否命中并删除；目标已不存在时为 false |
 
 ## 消息（`messages`）
 
@@ -2382,6 +2464,16 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `createdAt` | string | 是 | — |
 | `updatedAt` | string | 是 | — |
 
+### MemoryProjectView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `dir` | string | 是 | 记忆目录名（位于 `memory/projects` 下），后续 `read` 按它寻址 |
+| `path` | string \| null | 是 | 反查到的项目目录；反查不到时为 null |
+| `name` | string \| null | 是 | 项目展示名（用户在侧栏改过的名字）；没有项目行时为 null |
+| `enabled` | boolean | 是 | 该项目当下是否生效：项目级覆盖优先，未设过时跟随全局开关 |
+| `entries` | [MemoryEntryView](#memoryentryview)[] | 是 | — |
+
 ### MessageDTO
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -2876,6 +2968,14 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `reason` | string | 是 | — |
 | `nextStep` | string | 是 | — |
 | `at` | string | 是 | 校验时间（ISO 8601） |
+
+### MemoryEntryView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `file` | string | 是 | 事实文件名（仅文件名，与索引同目录） |
+| `title` | string | 是 | — |
+| `description` | string | 是 | 索引里那一行末尾的描述；空串表示没写 |
 
 ### MessageBlock
 

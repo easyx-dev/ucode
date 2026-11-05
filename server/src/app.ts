@@ -30,6 +30,7 @@ import { createInfoRoute } from "./routes/info";
 import { createInteractionsRoute } from "./routes/interactions";
 import { createMarketplaceRoute } from "./routes/marketplace";
 import { createMcpRoute } from "./routes/mcp";
+import { createMemoryRoute } from "./routes/memory";
 import { createMessagesRoute } from "./routes/messages";
 import { createModelsRoute } from "./routes/models";
 import { createPluginsRoute } from "./routes/plugins";
@@ -130,6 +131,7 @@ export const createApp = (
   v1.route("/config", createConfigRoute(services));
   v1.route("/sessions", createSessionsRoute(services));
   v1.route("/projects", createProjectsRoute(services));
+  v1.route("/memory", createMemoryRoute(services));
   v1.route("/goals", createGoalsRoute(services));
   v1.route("/stats", createStatsRoute(services));
   v1.route("/messages", createMessagesRoute(services));

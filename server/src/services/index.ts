@@ -35,6 +35,7 @@ import { startBuiltinCloudSync } from "./builtin";
 import { createConfigService } from "./config";
 import { createHubService, type HubService } from "./hub";
 import { createLifecycle } from "./lifecycle";
+import { MemoryLibrary } from "./memory";
 import { createPluginService, type PluginService, PluginStateStore } from "./plugins";
 import { createMarketplaceService, type MarketplaceService } from "./plugins/marketplace";
 import { ProjectService } from "./projects";
@@ -48,6 +49,8 @@ export type Services = {
   attachments: AttachmentRepository;
   /** 项目偏好：按 cwd 归口的展示名与最近的会话参数 */
   projects: ProjectService;
+  /** 项目级记忆的浏览（只读）：列出有记忆的项目与条目、读单条正文 */
+  memory: MemoryLibrary;
   runtime: PiRuntime;
   pool: SessionPool;
   /** 会话事件总线：/events 的唯一数据源 */
@@ -112,8 +115,9 @@ export const createServices = async (registration: ServiceRegistration): Promise
     writeImage: (id, bytes, mimeType) =>
       materializeAttachment(id, bytes, mimeType, { repo: attachments }),
   });
+  const projectRepository = new ProjectRepository(db);
   const projects = new ProjectService({
-    repository: new ProjectRepository(db),
+    repository: projectRepository,
     isModelUsable: (ref) => Boolean(runtime.resolveModelRef(ref)),
     // 自定义 primary 角色随项目目录走，故可用性判定要按该项目的 cwd 读一次角色注册表
     hasMode: (cwd, mode) => hasPrimaryMode(mode, loadAgentRegistry({ cwd, appHome: env.homeDir })),
@@ -170,6 +174,14 @@ export const createServices = async (registration: ServiceRegistration): Promise
     // 项目级覆盖：与全局开关同一处收口，装配期按会话 cwd 求值
     (cwd) => projects.memoryOverrideOf(cwd),
   );
+  // 浏览用的记忆视图与装配期那份分开：前者只读文件与项目表，不参与会话装配
+  const memoryLibrary = new MemoryLibrary({
+    sessions,
+    repository: projectRepository,
+    config,
+    // 记忆在会话装配时读入索引：改完要让已建好的会话按新内容重装（与改开关同一条路径）
+    onChange: () => pool.recycleForConfigChange(),
+  });
   const goals = new GoalService(sessions, usage, events);
   // 插件在池之前建：池的装配需要它的资产目录；而它的变更回收又用回池，两边都是延迟取值
   const pluginState = new PluginStateStore();
@@ -245,6 +257,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
     sessions,
     attachments,
     projects,
+    memory: memoryLibrary,
     runtime,
     pool,
     events,

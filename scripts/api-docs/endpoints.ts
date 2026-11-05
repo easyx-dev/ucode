@@ -344,6 +344,43 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
 
   {
+    domain: "memory",
+    action: "list",
+    method: "POST",
+    input: null,
+    requestType: null,
+    output: "MemoryListResponse",
+    summary: "列出有记忆的项目与条目（只读）",
+  },
+  {
+    domain: "memory",
+    action: "read",
+    method: "POST",
+    input: "memoryReadInputSchema",
+    requestType: "MemoryReadInput",
+    output: "MemoryFactView",
+    summary: "读一条记忆的正文（按记忆目录名 + 事实文件名寻址）",
+  },
+  {
+    domain: "memory",
+    action: "update",
+    method: "POST",
+    input: "memoryUpdateInputSchema",
+    requestType: "MemoryUpdateInput",
+    output: "MemoryFactView",
+    summary: "改一条记忆的标题与正文（文件名不变）",
+  },
+  {
+    domain: "memory",
+    action: "delete",
+    method: "POST",
+    input: "memoryDeleteInputSchema",
+    requestType: "MemoryDeleteInput",
+    output: "MemoryDeleteResponse",
+    summary: "删一条记忆（文件与索引行一起删）",
+  },
+
+  {
     domain: "messages",
     action: "list",
     method: "POST",

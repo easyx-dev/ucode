@@ -8,7 +8,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
-import { MEMORY_INDEX_FILENAME } from "../../../constants/dirs";
+import {
+  MEMORY_DIRNAME,
+  MEMORY_INDEX_FILENAME,
+  MEMORY_PROJECTS_DIRNAME,
+} from "../../../constants/dirs";
 import { MEMORY_DESCRIPTION_MAX_LENGTH, MEMORY_SLUG_MAX_LENGTH } from "../../../constants/memory";
 import { memoryIndexPath, memoryProjectDir } from "./paths";
 
@@ -72,9 +76,13 @@ const renderIndex = (entries: readonly MemoryIndexEntry[]): string =>
     }),
   ].join("\n")}\n`;
 
-/** 读索引；文件不存在或没有合法条目时返回空数组 */
-export const readIndex = (cwd: string, appDir: string): MemoryIndexEntry[] => {
-  const path = memoryIndexPath(cwd, appDir);
+/** 记忆项目根目录：`$APP_HOME/app/memory/projects`，下面一个项目一个目录 */
+export const memoryProjectsRoot = (appDir: string): string =>
+  resolve(appDir, MEMORY_DIRNAME, MEMORY_PROJECTS_DIRNAME);
+
+/** 读某个记忆目录下的索引；文件不存在或没有合法条目时返回空数组 */
+export const readIndexInDir = (dir: string): MemoryIndexEntry[] => {
+  const path = resolve(dir, MEMORY_INDEX_FILENAME);
   if (!existsSync(path)) return [];
 
   const entries: MemoryIndexEntry[] = [];
@@ -88,24 +96,41 @@ export const readIndex = (cwd: string, appDir: string): MemoryIndexEntry[] => {
   return entries;
 };
 
+/** 读某条事实的正文；文件名不合法（带目录 / 非 `.md`）或文件不存在时给空串 */
+export const readFactInDir = (dir: string, file: string): string => {
+  const name = safeFileName(file);
+  if (!name) return "";
+  const path = resolve(dir, name);
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+};
+
+/** 读索引；文件不存在或没有合法条目时返回空数组 */
+export const readIndex = (cwd: string, appDir: string): MemoryIndexEntry[] =>
+  readIndexInDir(memoryProjectDir(cwd, appDir));
+
 /** 供上下文注入的索引正文；没有条目时返回 null，让装配层干脆不注入 */
 export const readIndexText = (cwd: string, appDir: string): string | null => {
   const entries = readIndex(cwd, appDir);
   return entries.length > 0 ? renderIndex(entries) : null;
 };
 
-const writeIndex = (cwd: string, appDir: string, entries: readonly MemoryIndexEntry[]): void => {
-  const dir = memoryProjectDir(cwd, appDir);
+const writeIndexInDir = (dir: string, entries: readonly MemoryIndexEntry[]): void => {
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, MEMORY_INDEX_FILENAME), renderIndex(entries), "utf8");
 };
 
-const readFactContent = (cwd: string, appDir: string, file: string): string => {
-  const name = safeFileName(file);
-  if (!name) return "";
-  const path = resolve(memoryProjectDir(cwd, appDir), name);
-  return existsSync(path) ? readFileSync(path, "utf8") : "";
+const writeIndex = (cwd: string, appDir: string, entries: readonly MemoryIndexEntry[]): void => {
+  writeIndexInDir(memoryProjectDir(cwd, appDir), entries);
 };
+
+/** 写一条事实文件：首行是 `# 标题`，其余是正文 */
+const writeFactInDir = (dir: string, file: string, title: string, content: string): void => {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, file), `# ${title}\n\n${content}\n`, "utf8");
+};
+
+const readFactContent = (cwd: string, appDir: string, file: string): string =>
+  readFactInDir(memoryProjectDir(cwd, appDir), file);
 
 /** slug 撞名时顺延编号；同名标题走替换而非新增 */
 const uniqueFileName = (entries: readonly MemoryIndexEntry[], slug: string): string => {
@@ -132,14 +157,57 @@ export const rememberFact = (
   const entry: MemoryIndexEntry = { file, title, description: describe(content) };
 
   const dir = memoryProjectDir(cwd, appDir);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(resolve(dir, file), `# ${title}\n\n${content}\n`, "utf8");
+  writeFactInDir(dir, file, title, content);
   writeIndex(
     cwd,
     appDir,
     existing ? entries.map((item) => (item.file === file ? entry : item)) : [...entries, entry],
   );
   return entry;
+};
+
+/**
+ * 按记忆目录改一条已有事实：标题与正文整体替换，**文件名不变**——
+ * 文件名是记忆回顾记录（`MEMORY_REVIEW_RECORD_CUSTOM_TYPE`）指向这条记忆的凭据，改名会让那些回溯记录悬空。
+ *
+ * 只改索引里已有的条目（不在索引里返回 null）：界面上没有「新建」，别把这里当写入入口用。
+ */
+export const updateFactInDir = (
+  dir: string,
+  file: string,
+  input: MemoryFactInput,
+): MemoryIndexEntry | null => {
+  const name = safeFileName(file);
+  if (!name) return null;
+  const entries = readIndexInDir(dir);
+  if (!entries.some((item) => item.file === name)) return null;
+
+  const title = sanitizeTitle(input.title);
+  const content = input.content.trim();
+  const entry: MemoryIndexEntry = { file: name, title, description: describe(content) };
+  writeFactInDir(dir, name, title, content);
+  writeIndexInDir(
+    dir,
+    entries.map((item) => (item.file === name ? entry : item)),
+  );
+  return entry;
+};
+
+/**
+ * 按记忆目录删一条事实：文件与索引行一起删；索引空了连索引一起删。
+ * 目标不在索引里时返回 false（已删过 / 名字对不上）。
+ */
+export const deleteFactInDir = (dir: string, file: string): boolean => {
+  const name = safeFileName(file);
+  if (!name) return false;
+  const entries = readIndexInDir(dir);
+  const kept = entries.filter((item) => item.file !== name);
+  if (kept.length === entries.length) return false;
+
+  rmSync(resolve(dir, name), { force: true });
+  if (kept.length === 0) rmSync(resolve(dir, MEMORY_INDEX_FILENAME), { force: true });
+  else writeIndexInDir(dir, kept);
+  return true;
 };
 
 /**

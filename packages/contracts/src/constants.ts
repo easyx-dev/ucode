@@ -628,6 +628,16 @@ export const ASSET_NAME_MAX_LENGTH = 64;
 /** 资产正文（frontmatter 之外的部分）的字符上限；服务端另有文件字节上限兜底 */
 export const ASSET_BODY_MAX_LENGTH = 200_000;
 
+/**
+ * 一条项目记忆的标题与正文长度上限。
+ *
+ * 标题要能塞进索引行（`- [标题](文件)：描述`），太长会把整行读成一团；正文是给模型看的事实，
+ * 也不该比一份 AGENTS.md 还大。两者只约束**界面上改 / 存**的路径，模型侧工具走自己的截断。
+ */
+export const MEMORY_TITLE_MAX_LENGTH = 120;
+
+export const MEMORY_BODY_MAX_LENGTH = 20_000;
+
 /** 接口版本；破坏性变更时递增，路径前缀与 health 的 apiVersion 都取自它 */
 export const API_VERSION = "v1";
 

@@ -36,6 +36,8 @@ export * from "./marketplace/input";
 export * from "./marketplace/output";
 export * from "./mcp/input";
 export * from "./mcp/output";
+export * from "./memory/input";
+export * from "./memory/output";
 export * from "./messages/boundary";
 export * from "./messages/input";
 export * from "./messages/markers";

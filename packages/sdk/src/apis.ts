@@ -68,6 +68,12 @@ import type {
   McpListResponse,
   McpUpsertRequest,
   McpWriteResponse,
+  MemoryDeleteRequest,
+  MemoryDeleteResponse,
+  MemoryFactView,
+  MemoryListResponse,
+  MemoryReadRequest,
+  MemoryUpdateRequest,
   MessageApprovePlanResponse,
   MessageCompactRequest,
   MessageEditRequest,
@@ -278,6 +284,17 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 全局使用统计；`days` 缺省为全部时间 */
       summary: (body: StatsSummaryRequest = {}) =>
         transport.post<StatsSummaryResponse>("stats/summary", body),
+    },
+    memory: {
+      /** 列出有记忆的项目与条目；没有记忆时给空清单 */
+      list: () => transport.post<MemoryListResponse>("memory/list", {}),
+      /** 读一条记忆的正文 */
+      read: (body: MemoryReadRequest) => transport.post<MemoryFactView>("memory/read", body),
+      /** 改一条记忆的标题与正文；文件名不变 */
+      update: (body: MemoryUpdateRequest) => transport.post<MemoryFactView>("memory/update", body),
+      /** 删一条记忆（文件与索引行一起删） */
+      remove: (body: MemoryDeleteRequest) =>
+        transport.post<MemoryDeleteResponse>("memory/delete", body),
     },
     projects: {
       /** 项目列表：按 cwd 归口的展示名与最近一次选择的会话参数；次序就是侧栏里的次序 */
