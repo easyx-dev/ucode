@@ -84,6 +84,9 @@ export class TitleService {
     const prompt = firstPromptExchange(userText);
     const entry: PendingTitle = { attempts: 0, promptText: prompt.userText, settleSeen: false };
     this.pending.set(sessionId, entry);
+    // 空料不问模型：它只会把「空会话」这类词当标题写死。登记待命名即可，
+    // 落定后的补试手上有完整交流，那一问才算有料
+    if (prompt.userText.length === 0) return;
     this.attempt(sessionId, session, model, prompt, entry);
   }
 
@@ -109,7 +112,9 @@ export class TitleService {
   private exchangeOf(session: AgentSession, entry: PendingTitle): TitleExchange | null {
     const exchange = firstExchange(session.messages);
     if (exchange) return exchange;
-    return isTitleWindowOpen(session.messages) ? firstPromptExchange(entry.promptText) : null;
+    // 投递时那句也是空的（连调用名都没有）：没有可概括的料，不再问模型
+    if (entry.promptText.length === 0 || !isTitleWindowOpen(session.messages)) return null;
+    return firstPromptExchange(entry.promptText);
   }
 
   /** 前置条件：不在途、会话仍存在且未被删除、不是子会话、用户还没自己命名 */

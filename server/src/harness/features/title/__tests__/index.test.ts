@@ -100,6 +100,52 @@ describe("TitleService.generateForPrompt", () => {
     assert.equal(calls, 0);
   });
 
+  it("料为空时（连调用名也没有）不调模型，登记待命名后由落定补试", async () => {
+    let calls = 0;
+    const messages: SessionMessage[] = [];
+    const session = makeSession(messages, () => {
+      calls += 1;
+      return Promise.resolve(answer("代码审查"));
+    });
+    const { service, settle } = setup({ live: session });
+
+    service.generateForPrompt("s1", session, "");
+    await tick();
+    assert.equal(calls, 0);
+
+    // 落定后仍没有可概括的正文：不该拿空料再问一次
+    messages.push(user(""), assistant(""));
+    settle("s1");
+    await tick();
+    assert.equal(calls, 0);
+  });
+
+  it("首轮被中断时用投递时那句补试（纯命令调用也能起名）", async () => {
+    const appended: string[] = [];
+    const messages: SessionMessage[] = [];
+    let attempt = 0;
+    const session = makeSession(
+      messages,
+      () => {
+        attempt += 1;
+        // 并行那次拿到的是调用名，故意不产出；落定那次才给标题
+        return Promise.resolve(attempt === 1 ? answer("") : answer("代码审查"));
+      },
+      appended,
+    );
+    const { service, settle } = setup({ live: session });
+
+    service.generateForPrompt("s1", session, "/review");
+    await tick();
+    // 首轮被中断：只有用户消息、没有助手正文，但料不为空
+    messages.push(user('<command name="review"/>'));
+    settle("s1");
+    await tick();
+
+    assert.equal(attempt, 2);
+    assert.deepEqual(appended, ["代码审查"]);
+  });
+
   it("子会话、用户已命名或已删除的会话都不发起", async () => {
     let calls = 0;
     const complete = (): Promise<unknown> => {

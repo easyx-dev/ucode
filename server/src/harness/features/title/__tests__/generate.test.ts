@@ -16,6 +16,7 @@ import {
   isFirstTurn,
   isTitleWindowOpen,
   parseSessionTitle,
+  titleMaterialOf,
 } from "../generate";
 
 type SessionMessage = AgentSession["messages"][number];
@@ -91,6 +92,60 @@ describe("firstPromptExchange", () => {
   it("超预算按码点截断", () => {
     const exchange = firstPromptExchange("🙂".repeat(TITLE_INPUT_MAX_CHARS));
     assert.equal([...exchange.userText].length, Math.floor(TITLE_INPUT_MAX_CHARS / 2));
+  });
+});
+
+describe("titleMaterialOf", () => {
+  it("优先取命令参数与正文", () => {
+    assert.equal(
+      titleMaterialOf({
+        prefix: "",
+        text: "看下登录模块",
+        command: { name: "review", args: "看下登录" },
+        skills: [],
+      }),
+      "看下登录\n\n看下登录模块",
+    );
+  });
+
+  it("普通消息带 `@` 引用时给引用块", () => {
+    const material = titleMaterialOf({
+      prefix: '<context path="a.ts">…</context>',
+      text: "",
+      skills: [],
+    });
+    assert.equal(material, '<context path="a.ts">…</context>');
+  });
+
+  it("命令带引用但没写正文时，调用名与引用块一起给", () => {
+    assert.equal(
+      titleMaterialOf({
+        prefix: '<context path="a.ts">…</context>',
+        text: "",
+        command: { name: "review", args: "" },
+        skills: [],
+      }),
+      '/review\n\n<context path="a.ts">…</context>',
+    );
+  });
+
+  it("纯命令调用（无参、无正文）退回调用名，不给空料", () => {
+    assert.equal(
+      titleMaterialOf({ prefix: "", text: "", command: { name: "review", args: "" }, skills: [] }),
+      "/review",
+    );
+  });
+
+  it("纯技能调用退回技能名，技能排在命令之前", () => {
+    assert.equal(
+      titleMaterialOf({
+        prefix: "",
+        text: "",
+        command: { name: "review", args: "" },
+        skills: [{ name: "pdf" }, { name: "api" }],
+      }),
+      "/skill:pdf /skill:api /review",
+    );
   });
 });
 

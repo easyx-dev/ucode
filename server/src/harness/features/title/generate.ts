@@ -105,6 +105,42 @@ export const firstPromptExchange = (userText: string): TitleExchange => ({
   userText: clip(userText, TEXT_BUDGET),
 });
 
+/** 待投递的输入里与起标题有关的那几项（`services/sessions/run` 的 `PreparedPrompt` 的结构子集） */
+export type TitleMaterialInput = {
+  /** 前置展开块：`@` 引用读到的内容与附件引用行 */
+  prefix?: string;
+  /** 用户正文 */
+  text: string;
+  /** 本条输入是一条命令调用时的名字与参数 */
+  command?: { name: string; args: string };
+  /** 本条输入用到的技能 */
+  skills: readonly { name: string }[];
+};
+
+/**
+ * 投递给标题模型的那段料：优先取「用户那句」（命令参数 + 正文 + 前置引用块），
+ * 因为命令展开出来的模板正文会把标题带偏（见 `title/index.ts` 的调用点）。
+ *
+ * 用户没写正文时分两种情况：连引用也没有（`/review` 这类无参、无正文的纯命令或纯技能调用）
+ * 退回调用名——空料会让模型回「空会话」「无内容」这类词并被当成合法标题写死，而 `/review`
+ * 至少能概括出「代码审查」；有引用则把调用名一起给（`/review @a.ts` 只喂文件内容的话，
+ * 标题会起成「a.ts 的内容」而不是「审查 a.ts」）。
+ */
+export const titleMaterialOf = (input: TitleMaterialInput): string => {
+  const body = [input.command?.args, input.text]
+    .filter((part): part is string => Boolean(part && part.length > 0))
+    .join("\n\n");
+  const invocation = [
+    ...input.skills.map((skill) => `/skill:${skill.name}`),
+    ...(input.command ? [`/${input.command.name}`] : []),
+  ].join(" ");
+
+  const material = [body.length > 0 ? undefined : invocation, input.prefix, body]
+    .filter((part): part is string => Boolean(part && part.length > 0))
+    .join("\n\n");
+  return material.length > 0 ? material : invocation;
+};
+
 /**
  * 会话里还没有带正文的用户侧输入：即将投递的这条就是首轮。
  * 没有正文的用户消息（纯附件）不占这一轮，否则标题永远没有可概括的料。

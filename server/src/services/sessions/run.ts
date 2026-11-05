@@ -21,6 +21,7 @@ import { expandContexts } from "../../harness/features/context";
 import { resolveEditableUserEntry } from "../../harness/features/edit";
 import { buildPlanApproval } from "../../harness/features/goal/prompt";
 import { type PromptImage, toPromptImage } from "../../harness/features/image";
+import { titleMaterialOf } from "../../harness/features/title/generate";
 import { expandPromptInvocation, expandSkillInvocation } from "../../harness/setup/assets/expand";
 import { AppError } from "../../platform/response";
 import { sleep } from "../../utils/time";
@@ -121,10 +122,6 @@ const preparePrompt = (
   };
 };
 
-/** 前置展开块 + 正文拼成一段；两段都空时给空串 */
-const composeText = (prefix: string, text: string): string =>
-  [prefix, text].filter((part) => part.length > 0).join("\n\n");
-
 /** 名字对不上清单（模板被删、技能文件读不出来）时报错，理由见 `assemblePrompt` */
 const unknownInvocation = (kind: "命令" | "技能", name: string): AppError =>
   new AppError(ERROR_CODES.invalidRequest, `${kind}不存在或不可用：${name}`, 400, undefined, {
@@ -215,15 +212,8 @@ export const admitPrompt = async (services: Services, input: PromptInput): Promi
    * 标题取用户那句：命令展开出来的模板正文会把标题带偏。
    */
   const beginTurn = (): void => {
-    // 标题取用户那句：命令的参数 + 正文（模板正文会把标题带偏）
-    const titleMaterial = [prepared.command?.args, prepared.text]
-      .filter((part) => Boolean(part))
-      .join("\n\n");
-    services.titles.generateForPrompt(
-      sessionId,
-      session,
-      composeText(prepared.prefix, titleMaterial),
-    );
+    // 标题取用户那句（命令参数 / 正文 / 引用块）；都没有时由 `titleMaterialOf` 退回调用名
+    services.titles.generateForPrompt(sessionId, session, titleMaterialOf(prepared));
     startRun(services, sessionId, session, body, content);
   };
 
