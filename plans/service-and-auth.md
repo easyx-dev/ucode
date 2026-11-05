@@ -41,7 +41,7 @@
 {
   "host": "127.0.0.1",              // 127.0.0.1 = 仅本机；0.0.0.0 = 允许局域网
   "port": 19688,                     // 0 表示自选可用端口，启动后写回真实端口
-  "pid": 12345,                      // 服务进程 pid；供 `--restart` 精确结束旧实例，优雅退出清空
+  "pid": 12345,                      // 服务进程 pid；供 `service restart` 精确结束旧实例，优雅退出清空
   "serviceToken": "…",               // 本机原生客户端的免交互凭证
   "password": "…",                   // 超管密码，明文；首次启动自动生成
   "createdAt": "…",
@@ -162,6 +162,9 @@
 
 - 服务运行时作为独立安装位（客户端依赖、不独占）：桌面端整包含它，TUI 只带客户端。
 - **Web UI 随服务同源托管**（`serveStatic` 保持默认开启）：单独部署 Web UI 没有实际意义，不做「服务与 Web UI 解耦」。
+- **npm 全局安装已落地**（2026-11-05）：发布仓库根包（`@easyx-dev/ucode`）为整包服务——`bin` 指向构建产物
+  `dist/ucode.js`，随包带 web 产物与一份兜底配置；§2.3 的生命周期入口就是 `ucode service start|restart|stop|status`。
+  仍未做：桌面端安装包（内置服务运行时）。
 
 ## 6. 分阶段落地顺序
 
@@ -284,10 +287,12 @@
 - **已完成**：阶段 1（服务注册 / 回环默认 / `serviceToken`）、阶段 2（鉴权中间件、会话 Cookie、登录页、
   health / info / status 拆分、CORS 白名单）、阶段 3（一次性配对 + 「远程访问」面板）、
   阶段 4 的 `/api/v1/info` 与多客户端交互归属文档。
+- **已落地（npm 包，2026-11-05）**：`npm install -g @easyx-dev/ucode` 装上整包服务，`ucode service` 管后台实例
+  （README「快速开始」与「发布到 npm」）。
 - **已落地（桌面端，2026-10-06）**：`apps/desktop`（Electron）按 §3.3a 免登录——主进程读
   `service.json`，对发往服务 `/api/v1` 的请求注入 `serviceToken`（fetch / SSE / 附件图片都带上），
   凭证不进渲染层。本轮仅开发运行，见 README「桌面端」。
 - **待客户端包就绪**：阶段 4 的服务发现与 `ensure`、`resolveEndpoint()`、按 `compatRange` 做兼容决策，
   以及桌面端的安装包（阶段 5，内置服务运行时）。
-- **另立项**：阶段 5 打包（仓库外）；阶段 6 中继（[`hub.md`](./hub.md)）。
+- **另立项**：阶段 5 剩余的桌面端安装包（仓库外）；阶段 6 中继（[`hub.md`](./hub.md)）。
 - **已定不做**：服务与 Web UI 解耦——Web UI 随服务同源托管。

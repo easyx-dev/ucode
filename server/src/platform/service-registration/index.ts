@@ -39,7 +39,7 @@ const registrationSchema = z.object({
   host: z.string(),
   /** 监听端口：0 表示自选可用端口，启动后回写真实端口 */
   port: z.number().int().min(0).max(65535),
-  /** 服务进程 pid，供 `--restart` 精确结束旧实例；优雅退出时清空，崩溃后为陈旧值 */
+  /** 服务进程 pid，供 `service restart` 精确结束旧实例；优雅退出时清空，崩溃后为陈旧值 */
   pid: z.number().int().nullable(),
   /**
    * 本次启动的实例标识，与 `GET /api/v1/health` 回报的一致。
@@ -141,7 +141,7 @@ export const ensureServiceRegistration = (
     instanceId,
   };
   // 不动 pid、不动 instanceId：绑定失败（如端口占用、改了 host 后重起）时注册文件里的旧实例信息
-  // 必须保持不变，否则会把正在运行的实例的身份改成即将退出的本进程的，让它的 `--restart` 永远核对不上
+  // 必须保持不变，否则会把正在运行的实例的身份改成即将退出的本进程的，让它的 `service restart` 永远核对不上
   const registration: ServiceRegistration = {
     ...base,
     host: options.host,

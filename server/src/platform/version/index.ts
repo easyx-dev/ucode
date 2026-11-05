@@ -1,4 +1,4 @@
-/** 服务端版本：启动时从包清单读一次，供 /health、/info 与兼容判定复用 */
+/** 服务端版本：启动时从包清单读一次，供 /health、/info、兼容判定与 CLI 的版本输出复用 */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

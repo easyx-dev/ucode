@@ -5,12 +5,18 @@ import { createApp, webBuildExists } from "./app";
 import { env } from "./env";
 import { instanceId } from "./platform/instance";
 import { logger } from "./platform/logger";
+import { ensureSpawnHelperExecutable } from "./platform/node-pty";
 import {
   ensureServiceRegistration,
   writeServicePid,
   writeServiceRegistration,
 } from "./platform/service-registration";
 import { createServices } from "./services";
+
+// 工作台终端靠 node-pty：安装时没跑 postinstall（如 pnpm 全局安装）的话，这里补一次执行位
+for (const helper of ensureSpawnHelperExecutable()) {
+  logger.info(`node-pty：spawn-helper 已设为可执行（${helper}）`);
+}
 
 // 服务注册：复用已有凭证，首次启动生成 serviceToken 与登录密码（权限 0600）
 // 必须在 createServices 之前，鉴权对象要绑定同一份凭证

@@ -17,6 +17,28 @@
 
 ## 快速开始
 
+### 用 npm 全局安装（使用者的路径）
+
+```bash
+npm install -g @easyx-dev/ucode     # 需要 Node ≥ 24
+ucode service start                 # 后台常驻，终端关掉也不停
+ucode service status                # 运行中打印地址与 pid（退出码 0），否则 1
+ucode service restart               # 换版本后：npm install -g @easyx-dev/ucode && ucode service restart
+ucode service stop                  # 结束后台实例
+```
+
+首次 `service start` 会在 `~/.ucode/app/service.json` 生成凭证并回显一次登录密码（忘了就看那个文件），
+之后打开 `http://127.0.0.1:19688` 登录即可；日志追加到 `~/.ucode/app/service.log`（超过 5 MB 时下次
+`start` / `restart` 会把它挪成 `service.log.1`，只留最近两份）。
+安装包自带默认配置（`defaults/default.conf`：主目录 `~/.ucode`、端口 `19688`、仅回环）：
+放在运行目录（或其祖先目录）下的 `.env.prod` 会盖过它，同名环境变量优先级最高。
+
+> Linux 上装的时候多给一步：工作台终端用的 `node-pty` 只发布 macOS / Windows 的预编译二进制，Linux 要现场编译，
+> 而 npm 11 默认不给依赖跑安装脚本——`npm install -g --allow-scripts=node-pty @easyx-dev/ucode`。
+> 缺它的表现是启动即 `Cannot find module 'node-pty'`。
+
+### 从源码跑（开发者的路径）
+
 ```bash
 pnpm install
 
@@ -43,19 +65,24 @@ server 打成单文件 `dist/ucode.js`，`pnpm start` 即 `node dist/ucode.js`�
 只在你显式重启时才生效——避开开发环境存盘即重启打断会话的问题。
 
 ```bash
-pnpm build                         # 构建 web + server 产物
-pnpm start                         # 前台启动（默认 19688）
-pnpm build && pnpm start -- --restart   # 重建后端到端重启：停旧实例 → 起新版本
+pnpm build                        # 构建 web + server 产物
+pnpm start                        # 前台启动（默认 19688）
+pnpm build && pnpm restart        # 重建后端到端重启：停旧实例 → 起新版本
+pnpm status                       # 查询后台实例（运行中退出码 0）
+pnpm stop                         # 结束后台实例
 ```
 
-`pnpm start` 后的参数原样透传给 `server/src/cli.ts`：
+`pnpm start` / `pnpm restart` 后的参数原样透传给 `server/src/cli.ts`：
 
 ```bash
 pnpm start -- --port 0        # 自选可用端口
 pnpm start -- --open          # 启动后打开浏览器
-pnpm start -- --status        # 只查询是否在运行（运行中退出码 0）
-pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
+pnpm restart -- --open        # 重启并打开浏览器
 ```
+
+命令行本身是 `命令 + 选项` 的形式（`pnpm *` 脚本只是常用写法的快捷方式）：`serve`（默认）前台启动，
+`service start | restart | stop | status` 管后台实例（`--port` / `--host` / `--open` 都认）。
+后台实例与前台跑的是同一个产物，只是脱离终端、输出进 `$APP_HOME/app/service.log`。
 
 - 产物运行时从**仓库根**的 `node_modules` 解析第三方依赖（esbuild 里设为 external），
   故根 `package.json` 的 `dependencies` 必须覆盖 `server` 的第三方运行时依赖——由 `scripts/verify`
@@ -65,11 +92,25 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
   会拦下重复写版本与 catalog 里的死条目。
 - 生产（`NODE_ENV=production`）读 **`.env.prod`**（模板 `.env.prod.example`），从 cwd 向上查找；
   `.env.prod` 声明 `APP_HOME=~/.ucode`、端口 `19688`，与开发（`.env` → `.tmp/.ucode`）的数据目录隔离。
-  缺失必需项会直接报错退出，代码不带默认值。
+  缺失必需项会直接报错退出，代码不带默认值；**npm 安装的包**没有 `.env.prod`，由包内
+  `defaults/default.conf` 兜底（优先级最低，见「环境变量」）。
 - 需要 Node ≥ 24（`node:sqlite`）。macOS / Linux / Windows 都是目标平台，CI（`.github/workflows/check.yml`）
   在 ubuntu 与 windows 上各跑一遍 `pnpm check`。Windows 上 `bash` 工具需要 Git for Windows，另有 `powershell`
   工具可用（见 [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md)）；桌面端的无标题栏窗口只在
-  macOS 生效，其他平台保留系统边框。全局命令 / npm 包 / 安装包分发尚未做，留待发布阶段。
+  macOS 生效，其他平台保留系统边框。安装包（含桌面端安装包）尚未做，留待发布阶段。
+
+### 发布到 npm
+
+包名 `@easyx-dev/ucode`，发布的就是仓库根的 `package.json`（`bin` 指向构建产物，`files` 白名单收
+`dist/ucode.js` + `apps/web/dist` + `defaults` + postinstall 脚本；sourcemap 只给仓库内调试用，不进包）。发布前需要：npm 上拥有 `easyx-dev` 组织并
+`npm login`；`pnpm-workspace.yaml` 的 `publishBranch` 是发布分支（默认 `v0`）。
+
+```bash
+pnpm build && pnpm pack:check    # 构建后把 tarball 打到 .tmp/（catalog: 已改写成真实版本），核对文件清单
+pnpm publish --access public     # pnpm 负责把 catalog: 改写成真实版本
+```
+
+`postinstall` 只修 `node-pty` 的执行位，不依赖它：部分安装器不跑依赖的构建脚本，服务启动时会再幂等修一次。
 
 ### 桌面端（Electron）
 
@@ -104,6 +145,8 @@ pnpm start -- --restart       # 结束注册文件里的旧实例后再启动
 `pnpm dev` 与测试读 `.env`（开发），`pnpm start` 读 `.env.prod`（生产）；两者都从 cwd
 向上查找，模板见 [`.env.example`](./.env.example) 与 [`.env.prod.example`](./.env.prod.example)
 （`.env` / `.env.prod` 为本地文件，不入库）。
+优先顺序是「显式环境变量 > 从 cwd 向上找到的环境文件 > 随包的 `defaults/default.conf`」；最后一档只在
+npm 安装形态下加载——源码树里漏写环境文件时直接报错，而不是静默落到本机的主目录（那往往正是生产目录）。
 **模型 / 端点 / API Key 不在这里**，而是通过接口写入 `$APP_HOME/app/config.json`：
 
 | 变量 | 必填 | 说明 |
@@ -479,7 +522,7 @@ packages/ui/               # @ucode/ui：web 与桌面端共享的 UI
   src/styles/theme.css     # 设计 token、base 层与 markdown 样式
   components.json          # shadcn CLI 配置
 server/src/
-  cli.ts                   # 命令行入口：参数解析 / --restart / --status / --open，再交给 index
+  cli.ts                   # 命令行入口：serve / service 子命令解析，前台启动交给 main、后台交给 services/service-control
   env.ts                   # 环境变量解析：定位并加载 .env(.prod)、取值校验、派生全部路径
   app.ts                   # createApp：中间件、鉴权、路由挂载、静态托管
   main.ts                  # 入口：服务注册、监听端口、优雅退出
@@ -506,7 +549,9 @@ server/src/
     lifecycle/             # 启动对账、定时清理、退出收尾
     config/                # 配置用例：applyConfig / reload
     auth/ projects/ sessions/ files/ git/  # 鉴权、项目偏好、会话用例、文件读取、只读 git
+    service-control/       # 后台实例的起停查（CLI 的 service 子命令用它）
   platform/                # 进程基建：response / validate / logger / version / paths / resources / service-registration
+                           #   / app-home（环境文件与 $APP_HOME）/ node-pty（预编译 helper 的执行位）
   utils/                   # 跨模块通用的纯函数（object / time）
   routes/                  # HTTP 域：health / models / config / sessions / messages / events / …
   scripts/                 # 不经 HTTP 的冒烟与评测

@@ -1,4 +1,4 @@
-/** platform/instance：实例身份核对（`--restart` 据此决定要不要结束一个进程） */
+/** platform/instance：实例身份核对（`service restart` 据此决定要不要结束一个进程） */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 

@@ -122,7 +122,9 @@
 | `pnpm verify` | 只跑约定校验（各项见 `scripts/verify/checks/`；可 `--only` 只跑指定项） |
 | `pnpm typecheck` | 各包各自 `tsc --noEmit` |
 | `pnpm build` | 构建 web 到 `apps/web/dist`，再由 esbuild 把 server 打成单文件 `dist/ucode.js` |
-| `pnpm start` | `node dist/ucode.js`：跑构建产物（需先 `pnpm build`）；参数透传如 `pnpm start -- --restart` |
+| `pnpm start` | `node dist/ucode.js`：**前台**跑构建产物（需先 `pnpm build`）；命令与选项见下 |
+| `pnpm restart` / `pnpm stop` / `pnpm status` | `node dist/ucode.js service restart\|stop\|status`：管后台实例（等价于 `ucode service …`）；`ucode service start` 后台起一个新的 |
+| `pnpm pack:check` | `node scripts/pack-npm.mjs`：把发布用的 tarball 打到 `.tmp/`（含 `catalog:` 改写），核对文件清单（见 README「发布到 npm」） |
 | `pnpm smoke` | 不经 HTTP，用 pi SDK 直连模型端点冒烟（`server/scripts/smoke.ts`） |
 | `pnpm -F @ucode/server browser:desktop-smoke` | 桌面端驱动的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
 | `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
@@ -150,7 +152,7 @@
 **生产实例不可触碰**：`APP_HOME` 是 `~/.ucode`、从 `dist/ucode.js` 跑起来的那个实例就是生产服务，
 它的监听端口写在 `~/.ucode/app/service.json`。除非用户明确要求，否则：
 
-- **不结束它的进程**：不 `kill` / `pkill` / 重启 / 加 `--restart`；也不占用它监听的端口起临时实例——
+- **不结束它的进程**：不 `kill` / `pkill` / 重启（`ucode service restart` 就属于这一类）；也不占用它监听的端口起临时实例——
   起临时实例前先读 `~/.ucode/app/service.json` 的 `port` 避开（踩过一次：拿生产端口起了临时实例，
   随后又把两个监听该端口的进程当成自家残留杀掉）；
 - **不往生产写**：不改 `app/config.json` / `app/app.db` / `harness/sessions/*.jsonl`，
@@ -216,9 +218,10 @@ UI 改动**按需**在真实浏览器里看，不是每个改动都要看——�
 - **构建会覆写生产正在用的产物**：`apps/web/dist` 与 `dist/ucode.js` 既是构建输出、也是生产实例的静态根与入口
   （前端随刷新即生效，服务端要重启才生效）。生产运行时构建等于更新生产，见「验证命令」的生产边界。
 - **配置一律由环境变量声明，代码不带默认值**（缺失 / 非法即启动报错）：变量清单、`APP_HOME` 派生路径与
-  `APP_HOST` / `APP_PORT` 的取值顺序见 README「环境变量」。
+  `APP_HOST` / `APP_PORT` 的取值顺序见 README「环境变量」。唯一的例外是 npm 安装形态：
+  包里带一份 `defaults/default.conf` 作为最低优先级来源（只补缺失项，源码树里不加载）。
 - **`node dist/ucode.js` 不被 watch**，编辑源码不会重启它——这正是「用 UCode 开发 UCode」时避免打断会话的
-  关键；改完显式 `pnpm build && pnpm start -- --restart` 停旧起新（`--restart` 按注册文件核对实例身份，
+  关键；改完显式 `pnpm build && pnpm restart` 停旧起新（`service restart` 按注册文件核对实例身份，
   对不上就跳过）。见 README「生产启动与自迭代」。
 
 ### 接口规范（server）
@@ -240,15 +243,17 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 | 层 | 职责 | 判据 |
 | --- | --- | --- |
 | `routes/` | 协议适配：Hono 路由、zod 校验、封套、SSE | 只做 HTTP 适配，不写业务判断 |
-| `services/` | 业务与胶水：用例编排、进程生命周期、跨组件连线 | 被 routes 调用；`lifecycle.ts` / `config.ts` 是两个进程级入口 |
+| `services/` | 业务与胶水：用例编排、进程生命周期、跨组件连线 | 被 routes 调用；`lifecycle/` / `config/` 是服务内进程级入口，`service-control/` 是 CLI 的进程级入口（起停后台实例） |
 | `harness/plugins/` | 插件宿主：清单、组件解析、注册表与来源门控 | 接缝层，不被 `harness/{pi,features}`、`core`、`platform` 反向依赖（装配期的按值依赖是例外，见下） |
 | `core/` | 内核·会话运行态 | 持有 `AgentSession` 或进程内运行态（池、占位、挂起请求、事件流） |
 | `harness/` | 基于 pi 的能力 | 直接构造 / 转换 / 驱动 pi 的对象与数据结构 |
-| `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `service-registration` / `instance` / `file-permissions` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
+| `platform/` | 进程基建：`response` / `validate` / `logger` / `version` / `paths` / `resources` / `app-home` / `service-registration` / `instance` / `file-permissions` / `node-pty` | 无业务语义；只许依赖根部的 `env`（取日志级别），不得依赖其余各层 |
 | `utils/` | 纯函数：`object` / `time` | 无 IO、不引用任何 server 层 |
 
 - `platform/` 里的 `paths` 与 `resources` 是两回事：前者是**用户 / 会话给出的路径**的归一与校验
   （纯变换，入参决定结果），后者是**本进程自己的随包资源根**（由模块位置推出的常量）。
+  `app-home` 在 `resources` 之上解析环境文件与 `$APP_HOME`：CLI 的 `service` 子命令只要注册文件，
+  不该被端口 / 日志级别这类缺失拦住退出，所以这份基础与其余配置校验（`env.ts`）分开。
 
 - 路径形态：根目录只放入口与装配（`main.ts` / `cli.ts` / `app.ts` / `env.ts`）；`routes/`、`services/`、
   `platform/` 下一级一律是文件夹（域目录里只放 `index.ts` 与 `__tests__`，不直接放 `.ts`）；
@@ -322,6 +327,9 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 
 - `packages/contracts/`（`@ucode/contracts`）是接口契约的单一事实源：请求 zod schema、响应类型、封套与跨端常量，
   server 与 web 共用；改动对外接口时先改这里。
+- `defaults/default.conf` 是 npm 安装形态的兜底配置（dotenv 格式，扩展名避开 `.env`）：安装包里没有
+  `.env(.prod)`，由它给出主目录、端口等必需项，且只在安装包形态下加载——源码树里漏写环境文件仍直接报错。
+  `files` 白名单必须带上 `defaults/`，否则装完起不来。
 - `packages/brand/`（`@ucode/brand`）是品牌名与 logo / favicon 的单一事实源，B 端定制只改 `src/brand.ts`
   与 `assets/`（资源引用在 `src/assets.ts`，换格式改 import 扩展名即可）；默认数据目录名 `appHomeDirname`
   也由它派生（`~/.<slug>`），server 用包的 node 入口 `@ucode/brand/values` 取值。

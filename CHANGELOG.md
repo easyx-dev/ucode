@@ -14,6 +14,9 @@
 
 ### 变更
 
+- **环境文件的优先级多了一档**：显式环境变量 > 从 cwd 向上找到的 `.env(.prod)` > 随包的
+  `defaults/default.conf`；最后一档只在 npm 安装形态下生效（源码树里漏写环境文件仍然直接报错），
+  于是装完就能跑，不用自己写配置。
 - **中继（hub）改用 SQLite**：不再需要数据库容器，数据落在中继的应用数据卷里（`volumes/app/data.db`），
   备份与恢复按整文件处理；根侧的 `pnpm db:hub:up` / `pnpm db:hub:down` 随之移除，`pnpm dev:hub`
   首次启动自动建库文件。中继侧的其余行为变化（会话有效期 24 小时、登出即作废该账号其它会话、
@@ -21,6 +24,13 @@
 
 ### 新增
 
+- **可以装成全局命令**：`npm install -g @easyx-dev/ucode` 后拿到 `ucode` 命令（服务、Web UI 与随包技能
+  整个装好），不需要再 clone 仓库。
+- **`ucode service start | restart | stop | status`**：后台启动并脱离终端，日志追加到
+  `$APP_HOME/app/service.log`（超过 5 MB 时下次启动轮转成 `service.log.1`，只留最近两份）；
+  `start` 首次回显登录密码、已在运行时不重复起，`restart` 用来换版本后接着跑，`status` 以退出码区分是否在运行。
+- **旧的 `--status` / `--restart` 参数移除**：改由 `ucode service status | restart` 承担，仓库里的快捷写法是
+  `pnpm status` / `pnpm restart`（`pnpm start` 仍是前台启动）。
 - **工作台的改动列表覆盖 submodule**：子模块内的改动按「子模块路径/文件」与主仓库的文件同列，指针变更仍单独一条；
   文件 diff 与「全部改动」都在子模块仓库里对比（展开未变更区域也能取到原文）。
 - **工作台终端与内置浏览器面板可经中继使用**：隧道协议升到 v2（`request.upgrade` 把一条流转成 WebSocket，

@@ -3,6 +3,8 @@
  * 于是 `pty.spawn` 会以 `posix_spawnp failed` 失败——它把 helper 交给 posix_spawn 去执行。
  *
  * 补上执行位即可；没有预编译的平台（Linux）由 node-gyp 编译，产物本来就可执行，这里也无害。
+ * 安装脚本不是所有安装器都会跑（`pnpm add -g` 默认不跑依赖的构建脚本，`--ignore-scripts` 更不用说），
+ * 所以服务启动时还有一次同样的幂等修正：`platform/node-pty`。
  */
 import { chmodSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";

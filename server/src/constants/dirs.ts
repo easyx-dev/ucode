@@ -21,6 +21,9 @@ export const CONFIG_FILENAME = "config.json";
 /** 服务注册文件（位于 app 目录下）：host / port / 凭证，由服务独占写、客户端只读 */
 export const SERVICE_FILENAME = "service.json";
 
+/** 后台实例的输出日志（位于 app 目录下）：`service start` 把子进程的 stdout / stderr 都追加到这里 */
+export const SERVICE_LOG_FILENAME = "service.log";
+
 /** pi 的 MCP 服务器配置（用户级），位于 agent 目录下，由本服务读写 */
 export const MCP_CONFIG_FILENAME = "mcp.json";
 

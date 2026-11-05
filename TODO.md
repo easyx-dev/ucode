@@ -37,6 +37,11 @@ UCode 侧 `docs/hub.md`）：裁切、单进程数据面验证、设备域、隧
 
 ## 暂缓
 
+- **终端能力缺依赖时应当降级而不是拖垮服务**：`node-pty` 只发布 darwin / win32 的预编译二进制，Linux 要现场编译，
+  而 npm 11 默认拦截依赖的安装脚本；`services/index.ts` 静态引 `services/terminal/terminals.ts`，它缺失即启动崩溃
+  （现在只在 README 里写清楚要 `--allow-scripts=node-pty`，`platform/node-pty` 只能补执行位、补不出二进制）。
+  想做的是把终端面板变成可选能力。（等明确指令再启动）
+
 - **桌面端浏览器的两件延伸**：① 照 Chrome 的登录态一键导入（读本机 Cookies 库 + Keychain 解密，安全面大，
   需单独拍板）；② 多窗口——现在 agent 只驱动「当前激活的标签」，且通道按「最新一条连接」独占，
   第二个桌面端窗口接上会把第一个顶掉（4409）。（等明确指令再启动）

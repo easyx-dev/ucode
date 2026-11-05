@@ -1,9 +1,39 @@
 {
-  "name": "ucode",
+  "name": "@easyx-dev/ucode",
   "version": "0.3.0",
-  "private": true,
+  "description": "UCode —— 带对话界面与本机工具集的开发助手：服务与 Web UI 整包安装，一条命令后台常驻",
+  "keywords": [
+    "ai",
+    "agent",
+    "coding-agent",
+    "cli",
+    "ucode"
+  ],
+  "homepage": "https://github.com/easyx-dev/ucode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/easyx-dev/ucode.git"
+  },
   "type": "module",
   "packageManager": "pnpm@12.6.0",
+  "resourceRoot": true,
+  "bin": {
+    "ucode": "dist/ucode.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "dist/ucode.js",
+    "apps/web/dist",
+    "defaults",
+    "scripts/postinstall.mjs",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "APP_HOME=.tmp/.ucode concurrently -n server,web -c cyan,magenta \"pnpm -F @ucode/server dev\" \"pnpm -F @ucode/web dev\"",
     "dev:desktop": "pnpm -F @ucode/desktop dev",
@@ -14,6 +44,10 @@
     "build": "pnpm build:web && pnpm build:server",
     "postinstall": "node scripts/postinstall.mjs",
     "start": "node dist/ucode.js",
+    "restart": "node dist/ucode.js service restart",
+    "stop": "node dist/ucode.js service stop",
+    "status": "node dist/ucode.js service status",
+    "pack:check": "node scripts/pack-npm.mjs",
     "start:desktop": "NODE_ENV=production pnpm -F @ucode/desktop start",
     "start:hub": "pnpm --dir hub run start",
     "typecheck": "pnpm -r typecheck",

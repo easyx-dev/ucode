@@ -1,6 +1,6 @@
 /** HTTP 应用装配：全局中间件、鉴权、各域路由挂载、静态托管与错误封套 */
 import { existsSync, readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createNodeWebSocket, type NodeWebSocket } from "@hono/node-ws";
 import { API_BASE_PATH, ERROR_CODES } from "@ucode/contracts";
@@ -154,7 +154,8 @@ export const createApp = (
   // 注册在 API 路由之后：dev server / 桌面端走各自的端口，这里只管生产同源托管
   // 根路径先自己接：`serveStatic` 会直接把 index.html 原样发出去，跳过按挂载前缀的改写
   app.get("/", renderWebIndex);
-  app.use("*", serveStatic({ root: relative(process.cwd(), env.webDistDir) || "." }));
+  // 静态根给绝对路径：相对 cwd 写法只在仓库内成立，安装成全局命令后 cwd 与产物无关（`join` 语义不变）
+  app.use("*", serveStatic({ root: env.webDistDir }));
 
   app.notFound((c) => {
     const path = c.req.path;

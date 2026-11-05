@@ -7,6 +7,7 @@
  *    漏一个就表现为 `pnpm start` 启动即 `Cannot find module`。工作区包由 esbuild 打进产物，不需要声明。
  * 2. 版本落点：跨包共用的依赖版本只写 `pnpm-workspace.yaml` 的 `catalog:`，各处写 `"catalog:"` 引用。
  *    谁又把版本写回自己包里、以及 catalog 里没人引用的死条目，都在这里拦下。
+ * 3. 资源根标记：根清单的 `resourceRoot` 被清掉时，产物还能跑、源码运行会静默跑偏（见下面那条）。
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -22,6 +23,7 @@ const DEPENDENCY_FIELDS = [
 
 type Manifest = {
   name?: string;
+  resourceRoot?: unknown;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -98,7 +100,20 @@ const catalogProblems = (root: string): string[] => {
   return problems;
 };
 
+/**
+ * 资源根标记：`platform/resources` 靠根清单里的 `resourceRoot` 定位随包资源（web 产物、包清单）。
+ * 字段丢了不会当场报错：打包产物恰好能靠上一级回落对，源码运行则静默跑偏（版本号变 0.0.0、
+ * 内置默认配置不加载）——正是这种「不报错的错」要在校验里拦住。
+ */
+const resourceRootProblems = (rootManifest: Manifest): string[] =>
+  rootManifest.resourceRoot === true
+    ? []
+    : [
+        "package.json：缺少 resourceRoot: true（platform/resources 靠它定位随包资源根，见该模块注释）",
+      ];
+
 export const run = (root: string): string[] => [
+  ...resourceRootProblems(readManifest(root, ".")),
   ...mirrorProblems(readManifest(root, "."), readManifest(root, "server")),
   ...catalogProblems(root),
 ];
