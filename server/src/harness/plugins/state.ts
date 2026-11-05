@@ -45,13 +45,13 @@ export const OFFICIAL_PLUGIN_MARKETPLACE_ID = `${brand.slug}-plugins-official`;
 /**
  * 开箱内置的市场。两个都不是强依赖：刷新失败只落 `lastError`，不弹用户可见错误。
  *
- * 我们自己的官方市场用 git 仓（`lvyueyang/<slug>-plugins-official`）而不是 CDN 直链：
+ * 我们自己的官方市场用 git 仓（`easyx-dev/<slug>-plugins-official`）而不是 CDN 直链：
  * 仓里放 `marketplace.json` 与插件目录即可，改完 push 就能发版，也不需要额外的 CDN 与 seed 分片。
  */
 export const DEFAULT_PLUGIN_MARKETPLACES: readonly PluginMarketplaceRecord[] = [
   {
     name: OFFICIAL_PLUGIN_MARKETPLACE_ID,
-    source: { source: "github", repo: `lvyueyang/${OFFICIAL_PLUGIN_MARKETPLACE_ID}` },
+    source: { source: "github", repo: `easyx-dev/${OFFICIAL_PLUGIN_MARKETPLACE_ID}` },
     builtin: true,
     trust: "official",
     refreshedOk: false,

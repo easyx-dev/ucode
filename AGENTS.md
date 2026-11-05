@@ -299,7 +299,7 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 ### hub（中继服务）
 
 `hub/` 是**裁切自 `easyx-dev/fsdx` 基座**的中继服务工程（每企业一套部署），以 **git submodule** 挂在本仓
-（独立仓库 `https://github.com/lvyueyang/ucode-hub`）。它自带 `pnpm-workspace.yaml`、锁文件、`biome.json`
+（独立仓库 `https://github.com/easyx-dev/ucode-hub`）。它自带 `pnpm-workspace.yaml`、锁文件、`biome.json`
 与 CI，也有自己的 [`hub/AGENTS.md`](./hub/AGENTS.md)（工程内部约定）与 [`hub/UPSTREAM.md`](./hub/UPSTREAM.md)
 （上游基线与刻意偏离）；方案与阶段见 [`plans/hub.md`](./plans/hub.md)。
 
