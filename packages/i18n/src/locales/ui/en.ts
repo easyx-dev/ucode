@@ -1020,6 +1020,7 @@ export default {
     "This folder is not inside a git repository, so there are no changes to show",
   已暂存: "Staged",
   未暂存: "Unstaged",
+  分离头指针: "Detached HEAD",
   工作区没有改动: "No changes in the working tree",
   "变更过多，仅列出前一部分": "Too many changes; only the first part is listed",
   还没有提交: "No commits yet",

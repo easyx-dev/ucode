@@ -112,6 +112,20 @@ describe("git 底座与解析", { skip: !GIT_AVAILABLE }, () => {
     );
   });
 
+  it("状态：分离头指针报空分支，还没有提交的仓库则整项缺省", async (t) => {
+    t.after(() => git("checkout", "-q", "main"));
+    // 分离头指针时 `rev-parse --abbrev-ref HEAD` 报的是 `HEAD`，契约要求空串
+    git("checkout", "-q", "--detach");
+    assert.equal((await readRepositoryStatus(repo)).branch, "");
+
+    const unborn = realpathSync(mkdtempSync(join(tmpdir(), "git-unborn-")));
+    t.after(() => rmSync(unborn, { recursive: true, force: true }));
+    execFileSync("git", ["init", "-q"], { cwd: unborn });
+    const empty = await readRepositoryStatus(unborn);
+    assert.equal(empty.isRepo, true);
+    assert.equal(empty.branch, undefined, "HEAD 不存在时整项缺省，不报成分离头指针");
+  });
+
   it("diff：解析 hunk、行号与增删计数", () => {
     const raw = [
       "diff --git a/a.txt b/a.txt",

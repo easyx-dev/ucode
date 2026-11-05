@@ -1201,7 +1201,7 @@
 | --- | --- | --- | --- |
 | `isRepo` | boolean | 是 | 目标目录是否在 git 仓库内；false 时其余字段缺省 |
 | `repoRoot` | string | 否 | 仓库根绝对路径 |
-| `branch` | string | 否 | 当前分支名；分离头指针时为空字符串 |
+| `branch` | string | 否 | 当前分支名；分离头指针时为空字符串，仓库还没有提交时整项缺省 |
 | `upstream` | string | 否 | 上游跟踪分支（如 `origin/main`），未设置时缺省 |
 | `ahead` | number | 否 | 相对上游领先 / 落后的提交数；无上游时缺省 |
 | `behind` | number | 否 | — |

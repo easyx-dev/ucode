@@ -21,14 +21,22 @@ export function GitStatusMark({ mark, className }: { mark: GitMark; className?: 
 /** 增删行数；两个都为 null（未跟踪 / 重命名 / 二进制）时不显示 */
 export function GitCounts({
   additions,
+  className,
   deletions,
 }: {
   additions: number | null;
+  /** 追加类名（如分组标题里改用正文字体） */
+  className?: string;
   deletions: number | null;
 }) {
   if (additions === null && deletions === null) return null;
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 font-mono text-xs tabular-nums">
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 font-mono text-xs tabular-nums",
+        className,
+      )}
+    >
       {additions !== null && additions > 0 ? (
         <span className="text-success">+{additions}</span>
       ) : null}

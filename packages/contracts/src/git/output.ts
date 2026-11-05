@@ -20,7 +20,7 @@ export type GitStatusResponse = {
   isRepo: boolean;
   /** 仓库根绝对路径 */
   repoRoot?: string;
-  /** 当前分支名；分离头指针时为空字符串 */
+  /** 当前分支名；分离头指针时为空字符串，仓库还没有提交时整项缺省 */
   branch?: string;
   /** 上游跟踪分支（如 `origin/main`），未设置时缺省 */
   upstream?: string;

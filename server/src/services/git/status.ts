@@ -10,7 +10,7 @@ import type { GitFileChange, GitFileStatus, GitStatusResponse } from "@ucode/con
 
 import { GIT_STATUS_MAX_FILES } from "../../constants/tools";
 import { logger } from "../../platform/logger";
-import { runDiff, runGit } from "./";
+import { type GitRunResult, runDiff, runGit } from "./";
 
 type Counts = { additions: number | null; deletions: number | null };
 
@@ -154,6 +154,16 @@ const readUpstream = async (
   }
 };
 
+/**
+ * 分支名收敛成契约口径：分离头指针时 `rev-parse` 报的是 `HEAD`，按契约给空串；
+ * 仓库还没有提交时 HEAD 不存在、命令非零退出，整项缺省——界面据此区分这两种情形。
+ */
+const branchNameOf = (result: GitRunResult): string | undefined => {
+  if (result.code !== 0) return undefined;
+  const branch = result.stdout.trim();
+  return branch === "HEAD" ? "" : branch || undefined;
+};
+
 export const readRepositoryStatus = async (repoRoot: string): Promise<GitStatusResponse> => {
   const [branchResult, statusResult, stagedCounts, unstagedCounts] = await Promise.all([
     runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]),
@@ -162,8 +172,7 @@ export const readRepositoryStatus = async (repoRoot: string): Promise<GitStatusR
     readCounts(repoRoot, ["diff"]),
   ]);
 
-  // 空仓库（还没有任何提交）时 HEAD 不存在，`rev-parse` 以非零码退出，分支按空串报
-  const branch = branchResult.stdout.trim();
+  const branch = branchNameOf(branchResult);
   const buckets = parseChanges(statusResult.stdout, stagedCounts, unstagedCounts);
 
   const total =
@@ -177,7 +186,7 @@ export const readRepositoryStatus = async (repoRoot: string): Promise<GitStatusR
   return {
     isRepo: true,
     repoRoot,
-    branch,
+    ...(branch === undefined ? {} : { branch }),
     ...(await readUpstream(repoRoot)),
     staged: limit(buckets.staged),
     unstaged: limit(buckets.unstaged),

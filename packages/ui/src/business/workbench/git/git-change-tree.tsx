@@ -13,7 +13,7 @@ import { ContextMenu, ContextMenuTrigger } from "../../../base/context-menu";
 import { joinPath } from "../../../utils/path";
 import { PathContextMenu } from "../file/path-context-menu";
 import { GitCounts, GitStatusMark } from "./git-change-marks";
-import { type GitChangeGroup, groupChanges } from "./git-groups";
+import { countChanges, type GitChangeGroup, groupChanges } from "./git-groups";
 import { type GitChangeEntry, markLetter, markOf, markTone } from "./git-marks";
 import { buildChangeTree, type ChangeTreeNode, countFiles, marksOf } from "./git-tree";
 
@@ -126,7 +126,11 @@ export function GitChangeTree({
         <section key={group.id} className="py-1">
           <p className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-foreground-subtle">
             <span>{translate(GROUP_TITLE[group.id])}</span>
-            <span className="tabular-nums text-foreground-subtlest">{group.entries.length}</span>
+            {/* 标题行整行走正文字体：行内的等宽数字与汉字的字面高不同，混在一起看着不齐 */}
+            <span className="font-sans tabular-nums text-foreground-subtlest">
+              {group.entries.length}
+            </span>
+            <GitCounts {...countChanges(group.entries)} className="font-sans" />
           </p>
           {buildChangeTree(group.entries).children.map((node) => renderNode(node, 0, group))}
         </section>

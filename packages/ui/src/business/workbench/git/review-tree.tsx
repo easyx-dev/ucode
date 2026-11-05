@@ -5,7 +5,6 @@
  * 侧栏只负责列出来，所以这里不持选中态。
  */
 import { GitBranch, Layers, RefreshCw } from "lucide-react";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, IconButton } from "../../../base/button";
@@ -13,9 +12,7 @@ import { Empty } from "../../../base/empty";
 import { SegmentedControl } from "../../../base/segmented-control";
 import { Spinner } from "../../../base/spinner";
 import { useWorkbench } from "../../../provider/workbench";
-import { GitCounts } from "./git-change-marks";
 import { GitChangeTree } from "./git-change-tree";
-import { countChanges, groupChanges } from "./git-groups";
 import { CommitHistory } from "./git-history";
 import type { GitReview } from "./use-git-review";
 
@@ -30,14 +27,8 @@ export function ReviewTree({
   const { t } = useTranslation();
   const workbench = useWorkbench();
   const status = review.status;
-  // 变更合计：与堆叠视图同一口径（未跟踪没有行数，算 0）
-  const totals = useMemo(
-    () =>
-      countChanges(
-        (status.data ? groupChanges(status.data) : []).flatMap((group) => group.entries),
-      ),
-    [status.data],
-  );
+  // 只有在仓库内才有分支名；分离头指针时是空串，没有提交时整项缺省（不显示标签）
+  const branch = status.data?.isRepo ? status.data.branch : undefined;
 
   return (
     <div className="@container flex h-full min-h-0 w-full flex-col">
@@ -52,10 +43,11 @@ export function ReviewTree({
           ]}
           onChange={review.selectView}
         />
-        {review.view === "changes" && status.data?.isRepo ? (
-          // 侧栏拖窄时先让出合计的位置（分段控件与图标都不应被压缩）
-          <span className="hidden min-w-0 shrink @[14rem]:flex">
-            <GitCounts additions={totals.additions} deletions={totals.deletions} />
+        {review.view === "changes" && branch !== undefined ? (
+          // 侧栏拖窄时先让出分支名的位置（分段控件与图标都不应被压缩）
+          <span className="hidden min-w-0 shrink items-center gap-1 text-xs text-foreground-subtle @[14rem]:flex">
+            <GitBranch className="size-icon-sm shrink-0" />
+            <span className="truncate">{branch || t("分离头指针")}</span>
           </span>
         ) : null}
         <span className="ml-auto" />
