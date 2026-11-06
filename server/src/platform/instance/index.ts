@@ -1,9 +1,9 @@
 /**
- * 服务实例的身份：本进程自己是谁，以及「端口上的服务是不是注册文件描述的那个进程」。
+ * 服务实例的身份：本进程自己是谁，「端口上的服务是不是注册文件描述的那个进程」，以及它跑的是哪个版本。
  *
  * `instanceId` 写进服务注册文件、也在 `GET /api/v1/health` 上回报，`service restart` 据此确认要结束的
  * 进程仍是我们服务的一个实例，而不是「pid 已被系统复用给了无关进程」。
- * 放在 `platform` 是因为服务注册（落盘）、健康探针（回报）与 CLI（核对）都要读它，且不含业务语义。
+ * 放在 `platform` 是因为服务注册（落盘）、健康探针（回报）与 CLI（核对 / 版本一致性）都要读它，且不含业务语义。
  */
 import { randomUUID } from "node:crypto";
 
@@ -24,4 +24,27 @@ export const matchesInstance = (expected: string | null, payload: unknown): bool
   const data = (payload as HealthProbe | null)?.data;
   if (expected === null) return data?.up === true;
   return data?.instanceId === expected;
+};
+
+/** 探测实例版本的超时：CLI 的 `status` / `doctor` 靠这条请求判断「跑的是不是本机这个版本」 */
+const INSTANCE_INFO_TIMEOUT_MS = 1500;
+
+/** `GET /api/v1/info` 的载荷：同样只取用得到的字段 */
+type InfoProbe = { data?: { version?: unknown } };
+
+/**
+ * 探端口上那份实例的版本（未认证可访问）。探不到回传 null：
+ * 调用方据此区分「版本未知」与「版本已知且不一致」，不会把一次网络失败当成版本不符。
+ */
+export const readInstanceVersion = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(`${url}/api/v1/info`, {
+      signal: AbortSignal.timeout(INSTANCE_INFO_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as InfoProbe;
+    return typeof payload.data?.version === "string" ? payload.data.version : null;
+  } catch {
+    return null;
+  }
 };

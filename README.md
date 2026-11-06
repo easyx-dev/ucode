@@ -21,15 +21,32 @@
 
 ```bash
 npm install -g @easyx/ucode          # 需要 Node ≥ 24
-ucode service start                 # 后台常驻，终端关掉也不停
-ucode service status                # 运行中打印地址与 pid（退出码 0），否则 1
-ucode service restart               # 换版本后：npm install -g @easyx/ucode && ucode service restart
-ucode service stop                  # 结束后台实例
+ucode start                         # 后台常驻，终端关掉也不停（等价于 ucode service start）
+ucode status                        # 运行中打印地址与 pid（退出码 0），否则 1
+ucode restart                       # 换版本后：npm install -g @easyx/ucode && ucode restart
+ucode stop                          # 结束后台实例
+ucode logs -f                       # 跟日志（默认最近 200 行，Ctrl-C 退出）
+ucode doctor                        # 起不来时先跑它：逐项给出结论与修复建议
+ucode password                      # 登录密码忘了时打印出来
+ucode update                        # 查 npm 上有没有新版本（只提示，不自动安装）
 ```
 
-首次 `service start` 会在 `~/.ucode/app/service.json` 生成凭证并回显一次登录密码（忘了就看那个文件），
-之后打开 `http://127.0.0.1:19688` 登录即可；日志追加到 `~/.ucode/app/service.log`（超过 5 MB 时下次
-`start` / `restart` 会把它挪成 `service.log.1`，只留最近两份）。
+命令行是 `命令 + 选项` 的形式，`ucode help` 列出全部命令与选项，`ucode help <命令>` 看单项
+（等同 `<命令> --help`）；`ucode service start | restart | stop | status` 与上面前四个等价，两种写法都认。
+写脚本时用 `ucode status --json` 拿结构化结果，`ucode doctor --json` 的输出可以直接贴给维护者。
+
+shell 补全（可选，按自己用的 shell 选一行）：
+
+```bash
+eval "$(ucode completion bash)"                                      # ~/.bashrc
+eval "$(ucode completion zsh)"                                       # ~/.zshrc（先 compinit）
+ucode completion fish > ~/.config/fish/completions/ucode.fish        # fish
+```
+
+首次 `ucode start` 会在 `~/.ucode/app/service.json` 生成凭证并回显一次登录密码（忘了跑 `ucode password`，
+或直接看那个文件），之后打开 `http://127.0.0.1:19688` 登录即可。日志追加到 `~/.ucode/app/service.log`
+（超过 5 MB 时下次 `start` / `restart` 会把它挪成 `service.log.1`，只留最近两份；`ucode logs -n 50 -f`
+直接读这两份）。
 安装包自带默认配置（`defaults/default.conf`：主目录 `~/.ucode`、端口 `19688`、仅回环）：
 放在运行目录（或其祖先目录）下的 `.env.prod` 会盖过它，同名环境变量优先级最高。
 
@@ -80,8 +97,10 @@ pnpm start -- --open          # 启动后打开浏览器
 pnpm restart -- --open        # 重启并打开浏览器
 ```
 
-命令行本身是 `命令 + 选项` 的形式（`pnpm *` 脚本只是常用写法的快捷方式）：`serve`（默认）前台启动，
-`service start | restart | stop | status` 管后台实例（`--port` / `--host` / `--open` 都认）。
+命令行本身是 `命令 + 选项` 的形式（`pnpm *` 脚本只是常用写法的快捷方式）：`serve`（默认）前台启动；
+`start | restart | stop | status` 管后台实例（`--port` / `--host` / `--open` 都认），也可写成
+`service start | restart | stop | status`；`logs` / `open` / `doctor` / `password` / `update` / `completion`
+给日常运维与排障用，都不改环境（`logs -f` 只是会一直挂着，Ctrl-C 退出）。
 后台实例与前台跑的是同一个产物，只是脱离终端、输出进 `$APP_HOME/app/service.log`。
 
 - 产物运行时从**仓库根**的 `node_modules` 解析第三方依赖（esbuild 里设为 external），

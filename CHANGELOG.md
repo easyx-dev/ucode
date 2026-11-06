@@ -40,6 +40,13 @@
 
 ## [未发布]
 
+### 新增
+
+- `ucode` 补齐标准命令：`help`（含子命令说明）、`-v` / `version`、`logs`（`-f` 跟随、跟得上轮转）、`open`、
+  `doctor`（安装与环境自检）、`password`、`update`（查 npm 最新版，不自动安装）、`completion`（bash / zsh / fish）；
+  `start | stop | restart | status` 可省去 `service` 前缀（`service …` 仍可用），`status` / `doctor` / `update`
+  支持 `--json`。
+
 ## [0.5.0] - 2026-11-06
 
 本版收录 40 条（新增 17 条 / 变更 12 条 / 修复 10 条 / 移除 1 条），

@@ -87,9 +87,9 @@ const loadQuietly = (path: string): void => {
 };
 
 /** `APP_HOME` 支持 `~` 与相对路径（相对环境文件所在目录） */
-const resolveAppHome = (baseDir: string): string => {
+const resolveAppHomeQuietly = (baseDir: string): string | null => {
   const raw = process.env.APP_HOME?.trim();
-  if (!raw) return dieConfig("缺少环境变量 APP_HOME");
+  if (!raw) return null;
   const expanded = expandHome(raw);
   return isAbsolute(expanded) ? expanded : resolve(baseDir, expanded);
 };
@@ -107,22 +107,68 @@ export type AppHome = {
 
 let cached: AppHome | undefined;
 
-/** 解析并缓存主目录相关配置；第一次调用时定下加载哪份环境文件 */
-export const loadAppHome = (): AppHome => {
-  if (cached) return cached;
+export type ConfigSources = {
+  /** 当前形态应加载的环境文件名（`.env.prod` / `.env`） */
+  envFile: string;
+  /** 从 cwd 向上找到的环境文件；没找到为 null */
+  foundEnvFile: string | null;
+  /** 待加载的文件，靠前的优先 */
+  files: string[];
+  /** 随包默认配置文件 */
+  defaultsPath: string;
+  /** 是否跑在源码树里 */
+  sourceTree: boolean;
+  /** 声明着的 `APP_HOME` 原值（可能带 `~` 或为相对路径）；查看时取，故反映调用当下的状态 */
+  appHomeRaw: string | null;
+  /** 相对路径的解析基准：找到的环境文件所在目录，否则 cwd */
+  baseDir: string;
+};
 
+/**
+ * 只查询「配置从哪来」，不加载也不退出：CLI 的自检要把「缺什么」全部汇报出来，
+ * 而 `loadAppHome` 撞上第一处缺失就结束了进程。
+ */
+export const inspectConfigSources = (cwd = process.cwd()): ConfigSources => {
   const envFile = envFileName();
-  // 先快照：CLI 参数（--host/--port）与 shell 变量在任何文件之前就已就位
-  const presetKeys = new Set(Object.keys(process.env));
   const plan = planEnvFiles({
-    cwd: process.cwd(),
+    cwd,
     envFile,
     sourceTree: isSourceTree,
     defaultsPath: PACKAGED_DEFAULT_ENV_PATH,
   });
-  for (const file of plan.files) loadQuietly(file);
+  return {
+    envFile,
+    foundEnvFile: plan.envFile,
+    files: plan.files,
+    defaultsPath: PACKAGED_DEFAULT_ENV_PATH,
+    sourceTree: isSourceTree,
+    appHomeRaw: process.env.APP_HOME?.trim() || null,
+    baseDir: plan.envFile ? dirname(plan.envFile) : cwd,
+  };
+};
 
-  const homeDir = resolveAppHome(plan.envFile ? dirname(plan.envFile) : process.cwd());
+export type AppHomeProbe =
+  | { ok: true; home: AppHome }
+  /** 缺 `APP_HOME`：调用方决定是报错退出（`loadAppHome`）还是当作自检的一条失败项 */
+  | { ok: false; reason: string };
+
+/**
+ * 解析并缓存主目录，缺失时不退出：第一次调用时定下加载哪份环境文件。
+ * 显式环境变量的快照必须在加载之前取——加载之后就分不出「用户给的」与「文件里默认的」了。
+ */
+export const probeAppHome = (cwd = process.cwd()): AppHomeProbe => {
+  if (cached) return { ok: true, home: cached };
+
+  const presetKeys = new Set(Object.keys(process.env));
+  const sources = inspectConfigSources(cwd);
+  for (const file of sources.files) loadQuietly(file);
+
+  const homeDir = resolveAppHomeQuietly(sources.baseDir);
+  if (!homeDir) {
+    const loaded = sources.files.length > 0 ? sources.files.join("、") : "无环境文件";
+    return { ok: false, reason: `缺少环境变量 APP_HOME（已加载：${loaded}）` };
+  }
+
   const appDir = resolve(homeDir, APP_DIRNAME);
   cached = {
     homeDir,
@@ -130,5 +176,11 @@ export const loadAppHome = (): AppHome => {
     servicePath: resolve(appDir, SERVICE_FILENAME),
     wasPreset: (name) => presetKeys.has(name),
   };
-  return cached;
+  return { ok: true, home: cached };
+};
+
+/** 解析并缓存主目录相关配置；缺失即按配置错误退出 */
+export const loadAppHome = (): AppHome => {
+  const probe = probeAppHome();
+  return probe.ok ? probe.home : dieConfig("缺少环境变量 APP_HOME");
 };

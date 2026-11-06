@@ -6,19 +6,11 @@
  * 呈现交给调用方——同一套动作被脚本调用时不该绑死在某套中文提示上。
  */
 import { spawn } from "node:child_process";
-import {
-  closeSync,
-  fstatSync,
-  mkdirSync,
-  openSync,
-  readSync,
-  renameSync,
-  rmSync,
-  statSync,
-} from "node:fs";
+import { closeSync, mkdirSync, openSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { matchesInstance } from "../../platform/instance";
+import { readLogTail, rotateLog } from "../../platform/service-log";
 import {
   readServiceRegistration,
   type ServiceRegistration,
@@ -33,11 +25,9 @@ const READY_POLL_INTERVAL_MS = 150;
 /** 结束实例：先礼后兵 */
 const GRACEFUL_STOP_TIMEOUT_MS = 5000;
 const FORCED_STOP_TIMEOUT_MS = 2000;
-/** 失败时带出的日志尾部：行数与字节上限，长驻实例的日志不能整份读进来 */
+/** 失败时带出的日志尾部：只取最后几行，长驻实例的日志不能整份读进来 */
 const LOG_TAIL_LINES = 15;
 const LOG_TAIL_BYTES = 4096;
-/** 日志轮转上限：超过就在下次启动前换成 `service.log.1` */
-const LOG_ROTATE_BYTES = 5 * 1024 * 1024;
 
 export type ServiceStatus = {
   /** 端口上确实跑着注册文件描述的那个实例 */
@@ -179,44 +169,6 @@ export const stopService = async (options: {
 };
 
 /**
- * 日志尾部：子进程起不来时，线索全在它自己的输出里。
- * 只读末尾一小段——常驻实例的日志可能有几百 MB，整份读进来本身就是一次事故。
- */
-const tailLog = (logPath: string): string => {
-  let fd: number | undefined;
-  try {
-    fd = openSync(logPath, "r");
-    const size = fstatSync(fd).size;
-    const length = Math.min(size, LOG_TAIL_BYTES);
-    const buffer = Buffer.alloc(length);
-    const filled = readSync(fd, buffer, 0, length, size - length);
-    const lines = buffer.subarray(0, filled).toString("utf8").trimEnd().split("\n");
-    // 从中间读起时首行是半截的（甚至切在多字节字符上），去掉它
-    if (size > length) lines.shift();
-    return lines.slice(-LOG_TAIL_LINES).join("\n");
-  } catch {
-    return "";
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-  }
-};
-
-/**
- * 日志轮转：每个请求一行、实例常驻数月，没有上限就不是「日志」而是「积压」。
- * 只在启动前轮转：那时旧实例刚被停掉，没有别的进程还在往这个文件里写。
- */
-const rotateLog = (logPath: string): void => {
-  try {
-    if (statSync(logPath).size < LOG_ROTATE_BYTES) return;
-    // Windows 上 rename 不覆盖已存在的目标，先删掉上一份
-    rmSync(`${logPath}.1`, { force: true });
-    renameSync(logPath, `${logPath}.1`);
-  } catch {
-    // 文件不存在 / 挪不动都不阻断启动
-  }
-};
-
-/**
  * 起后台实例：脱离终端的独立进程组，输出进日志文件。
  * 子进程环境必须带上调用方解析好的 `APP_HOME`，否则它按自己的 cwd 重新解析一遍，可能落到别处。
  * 日志目录先建：首次启动时 `$APP_HOME/app/` 还不存在（建目录本来由 env 干，而这里刻意不加载 env）。
@@ -270,7 +222,10 @@ export const startService = async (options: ServiceStartOptions): Promise<Servic
   const status = await waitReady(options, child.pid);
   if (status) return { started: true, status };
 
-  const tail = tailLog(options.logPath);
+  const tail = readLogTail(options.logPath, {
+    lines: LOG_TAIL_LINES,
+    maxBytes: LOG_TAIL_BYTES,
+  });
   return {
     started: false,
     reason: "failed",
