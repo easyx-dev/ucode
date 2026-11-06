@@ -123,7 +123,7 @@ pnpm build && pnpm pack:check
 pnpm build && pnpm publish --access public
 ```
 
-`pnpm-workspace.yaml` 的 `publishBranch`（`v0`）只约束手工发布的 `pnpm publish`；CI 里 checkout 是 detached
+`pnpm-workspace.yaml` 的 `publishBranch`（`main`）只约束手工发布的 `pnpm publish`；CI 里 checkout 是 detached
 HEAD，故命令带上 `--no-git-checks`。
 
 ### 桌面端（Electron）

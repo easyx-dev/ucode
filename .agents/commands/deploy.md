@@ -12,8 +12,8 @@ description: 落版、打 tag 并推送，触发 npm 发布
 
 ## 步骤
 
-1. **前置核对**：`git fetch origin` 后确认四件事——在 `v0`（`pnpm-workspace.yaml` 的 `publishBranch`）上、
-   不是分离头指针、工作区干净、本地未落后于 `origin/v0`。任一条不满足就停下说明原因与建议的下一步
+1. **前置核对**：`git fetch origin` 后确认四件事——在 `main`（`pnpm-workspace.yaml` 的 `publishBranch`）上、
+   不是分离头指针、工作区干净、本地未落后于 `origin/main`。任一条不满足就停下说明原因与建议的下一步
    （落后时由用户决定合并还是变基），不要自动 stash / merge / rebase。
 2. **落版**：`CHANGELOG.md` 的 `## [未发布]` 改成 `## [<版本>] - <YYYY-MM-DD>`，按文件顶部的规模上限与
    归档规则处理明细（达到阈值就整体移入 `docs/changelog/<年份>.md`，主文件只留 ≤ 16 条摘要 + 一行链接）；
