@@ -1,11 +1,12 @@
 name: release
 
-# 只在打 tag 时发布：tag 名必须是 `v` + package.json 的 version（如 v0.3.0）。
-# 发布不可逆（同一个版本号不能重发，删掉也不能复用），所以这里先过四道闸：
+# 只在打 tag 时发布：tag 名必须是 `v` + package.json 的 version（如 v0.4.0）。
+# 发布不可逆（同一个版本号不能重发，删掉也不能复用），所以这里先过三道闸：
 #   1. tag 与清单版本一致——版本不匹配时发出去的包和 tag 对不上；
 #   2. 该版本还没在 registry 上——提前失败，好过注册表报 403；
-#   3. 这个提交上 `pnpm check` 全过——tag 可以打在任意提交上，不能只信分支上的绿灯；
-#   4. `pnpm pack:check` 的必需条目齐全——`files` 漏项不会让发布失败，只会让装出来的包缺界面。
+#   3. `pnpm pack:check` 的必需条目齐全——`files` 漏项不会让发布失败，只会让装出来的包缺界面。
+# 代码检查不在这里重复：check.yml 已经在每个 push / PR（含 tag push）上跑完整的 `pnpm check`，
+# 这个 job 只管构建与打包。
 # 需要仓库 Secrets 里有 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）。
 on:
   push:
@@ -27,9 +28,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          # hub 是独立仓库（submodule）：`pnpm verify` 的 hub-protocol 项要靠它比对两侧的协议副本
-          submodules: recursive
       # 版本取自 package.json 的 packageManager
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -54,7 +52,6 @@ jobs:
             echo "@easyx-dev/ucode@${version} 已经在 registry 上；先改版本再打 tag" >&2
             exit 1
           fi
-      - run: pnpm check
       - run: pnpm build
       - run: pnpm pack:check
       - name: 发布到 npm

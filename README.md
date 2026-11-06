@@ -106,8 +106,9 @@ pnpm restart -- --open        # 重启并打开浏览器
 `postinstall` 只修 `node-pty` 的执行位，不依赖它：部分安装器不跑依赖的构建脚本，服务启动时会再幂等修一次。
 
 **正常路径是打 tag**：`.github/workflows/release.yml` 只在 `v*` tag 上触发，tag 名必须是 `v` + `package.json`
-的版本（`v0.3.0`）。job 先过四道闸——tag 与清单版本一致、该版本还没在 registry 上、这个提交上 `pnpm check`
-全过、`pnpm pack:check` 的必需条目齐全——再 `pnpm publish --access public` 并附 npm provenance（构建来源可验证）。
+的版本（`v0.4.0`）。job 先过三道闸——tag 与清单版本一致、该版本还没在 registry 上、`pnpm pack:check` 的
+必需条目齐全——再 `pnpm publish --access public` 并附 npm provenance（构建来源可验证）。代码检查不在这里重复：
+`check.yml` 已在每个 push / PR（含 tag push）上跑完整 `pnpm check`，发布 job 只管构建与打包。
 需要仓库 Secrets 里的 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）；**首次发布**得先手工发一次
 （token 有），之后可换成 npm 的 trusted publishing（OIDC，不再存 token）。
 
