@@ -26,7 +26,7 @@ description: 落版、打 tag 并推送，触发 npm 发布
    `chore(release): <版本>`，不用 `--amend`，不夹带其它改动，不手工 `pnpm publish`（本地发布没有
    provenance，正常路径就是打 tag）。
 6. **打 tag**：`git tag v<版本>`。同名 tag 在本地或 `origin` 上已存在就停下报告，不删除、不覆盖。
-   该版本已在 registry 上（`npm view @easyx-dev/ucode@<版本> version` 确实打印出版本号）就换一个版本，
+   该版本已在 registry 上（`npm view @easyx/ucode@<版本> version` 确实打印出版本号）就换一个版本，
    不强行发；命令本身失败（离线 / 未登录）按「查不到」处理，交给 CI 的第一道闸兜底。
    唯一例外：同名 tag 存在、但该版本尚未发布，且 tag 上那次发布从未成功（在 checkout / 构建 / 发布中途
    失败）——此时可以 `git tag -f` 重打到当前提交并 `git push --force origin v<版本>`，把发布流程自身的

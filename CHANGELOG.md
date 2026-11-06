@@ -53,7 +53,7 @@
   清单拿不到就报错而不写占位模型。
 - **内置技能与提示词命令可从中继下发更新**：启动时与登录中继后按 `id` + 版本拉清单，逐文件 sha256 校验后
   物化到 `$APP_HOME/app/builtin/`、对新会话生效；含可执行内容（hooks / bin / MCP / TS 扩展）的只落盘不生效。
-- **可以装成全局命令**：`npm install -g @easyx-dev/ucode` 拿到 `ucode`，后台实例由
+- **可以装成全局命令**：`npm install -g @easyx/ucode` 拿到 `ucode`，后台实例由
   `ucode service start | restart | stop | status` 管（旧的 `--status` / `--restart` 移除）。
 - **工作台终端与内置浏览器面板可经中继使用**：隧道协议升到 v2（`request.upgrade` 转 WebSocket、`close` 帧
   回传关闭码），只在按路径访问（`/d/<设备 id>/`）时可用；中继前台「我的设备」点设备可直接打开那台设备的 UCode。

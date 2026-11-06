@@ -162,7 +162,7 @@
 
 - 服务运行时作为独立安装位（客户端依赖、不独占）：桌面端整包含它，TUI 只带客户端。
 - **Web UI 随服务同源托管**（`serveStatic` 保持默认开启）：单独部署 Web UI 没有实际意义，不做「服务与 Web UI 解耦」。
-- **npm 全局安装已落地**（2026-11-05）：发布仓库根包（`@easyx-dev/ucode`）为整包服务——`bin` 指向构建产物
+- **npm 全局安装已落地**（2026-11-05）：发布仓库根包（`@easyx/ucode`）为整包服务——`bin` 指向构建产物
   `dist/ucode.js`，随包带 web 产物与一份兜底配置；§2.3 的生命周期入口就是 `ucode service start|restart|stop|status`。
   仍未做：桌面端安装包（内置服务运行时）。
 
@@ -287,7 +287,7 @@
 - **已完成**：阶段 1（服务注册 / 回环默认 / `serviceToken`）、阶段 2（鉴权中间件、会话 Cookie、登录页、
   health / info / status 拆分、CORS 白名单）、阶段 3（一次性配对 + 「远程访问」面板）、
   阶段 4 的 `/api/v1/info` 与多客户端交互归属文档。
-- **已落地（npm 包，2026-11-05）**：`npm install -g @easyx-dev/ucode` 装上整包服务，`ucode service` 管后台实例
+- **已落地（npm 包，2026-11-05）**：`npm install -g @easyx/ucode` 装上整包服务，`ucode service` 管后台实例
   （README「快速开始」与「发布到 npm」）。
 - **已落地（桌面端，2026-10-06）**：`apps/desktop`（Electron）按 §3.3a 免登录——主进程读
   `service.json`，对发往服务 `/api/v1` 的请求注入 `serviceToken`（fetch / SSE / 附件图片都带上），

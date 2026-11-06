@@ -20,10 +20,10 @@
 ### 用 npm 全局安装（使用者的路径）
 
 ```bash
-npm install -g @easyx-dev/ucode     # 需要 Node ≥ 24
+npm install -g @easyx/ucode          # 需要 Node ≥ 24
 ucode service start                 # 后台常驻，终端关掉也不停
 ucode service status                # 运行中打印地址与 pid（退出码 0），否则 1
-ucode service restart               # 换版本后：npm install -g @easyx-dev/ucode && ucode service restart
+ucode service restart               # 换版本后：npm install -g @easyx/ucode && ucode service restart
 ucode service stop                  # 结束后台实例
 ```
 
@@ -34,7 +34,7 @@ ucode service stop                  # 结束后台实例
 放在运行目录（或其祖先目录）下的 `.env.prod` 会盖过它，同名环境变量优先级最高。
 
 > Linux 上装的时候多给一步：工作台终端用的 `node-pty` 只发布 macOS / Windows 的预编译二进制，Linux 要现场编译，
-> 而 npm 11 默认不给依赖跑安装脚本——`npm install -g --allow-scripts=node-pty @easyx-dev/ucode`。
+> 而 npm 11 默认不给依赖跑安装脚本——`npm install -g --allow-scripts=node-pty @easyx/ucode`。
 > 缺它的表现是启动即 `Cannot find module 'node-pty'`。
 
 ### 从源码跑（开发者的路径）
@@ -101,7 +101,7 @@ pnpm restart -- --open        # 重启并打开浏览器
 
 ### 发布到 npm
 
-包名 `@easyx-dev/ucode`，发布的就是仓库根的 `package.json`（`bin` 指向构建产物，`files` 白名单收
+包名 `@easyx/ucode`，发布的就是仓库根的 `package.json`（`bin` 指向构建产物，`files` 白名单收
 `dist/ucode.js` + `apps/web/dist` + `defaults` + postinstall 脚本；sourcemap 只给仓库内调试用，不进包）。
 `postinstall` 只修 `node-pty` 的执行位，不依赖它：部分安装器不跑依赖的构建脚本，服务启动时会再幂等修一次。
 

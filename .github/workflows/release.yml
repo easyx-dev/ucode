@@ -48,8 +48,8 @@ jobs:
       - name: 校验该版本尚未发布
         run: |
           version="$(node -p "require('./package.json').version")"
-          if npm view "@easyx-dev/ucode@${version}" version >/dev/null 2>&1; then
-            echo "@easyx-dev/ucode@${version} 已经在 registry 上；先改版本再打 tag" >&2
+          if npm view "@easyx/ucode@${version}" version >/dev/null 2>&1; then
+            echo "@easyx/ucode@${version} 已经在 registry 上；先改版本再打 tag" >&2
             exit 1
           fi
       - run: pnpm build
