@@ -40,12 +40,13 @@
 
 ## [未发布]
 
-### 新增
+## [0.6.0] - 2026-11-06
 
-- `ucode` 补齐标准命令：`help`（含子命令说明）、`-v` / `version`、`logs`（`-f` 跟随、跟得上轮转）、`open`、
-  `doctor`（安装与环境自检）、`password`、`update`（查 npm 最新版，不自动安装）、`completion`（bash / zsh / fish）；
-  `start | stop | restart | status` 可省去 `service` 前缀（`service …` 仍可用），`status` / `doctor` / `update`
-  支持 `--json`。
+本版收录 1 条（新增 1 条），明细归档在 [docs/changelog/2026.md](docs/changelog/2026.md)。主线：
+
+- **命令行补齐标准命令**：`start | stop | restart | status` 可省去 `service` 前缀（`service …` 仍可用），
+  另新增 `help` / `logs` / `open` / `doctor` / `password` / `update` / `completion` / `version`；`logs -f`
+  跟得上轮转，`status` / `doctor` / `update` 支持 `--json`。
 
 ## [0.5.0] - 2026-11-06
 
@@ -105,20 +106,4 @@
 - **hub 删掉基座自带的示例业务**：`news` 与 `/admin/demo` 示例页一并删除，管理端菜单随之少掉「业务示例」
   「测试页」两组。
 
-## [0.3.0] - 2026-10-14
-
-0.2.0 之后的开发累积，共 342 条（新增 88 条 / 变更 196 条 / 修复 46 条 / 移除 12 条），
-明细整体归档在 [docs/changelog/2026.md](docs/changelog/2026.md)。主线：
-
-- **插件平台**：契约与宿主内核、登记表与装配、内置与第三方市场、hooks 注入、插件变量与插件 MCP、
-  项目级作用域（只做开关）。
-- **工作台**：VSCode 式的活动栏 + 侧栏 + 编辑器区、文件树与文件预览、改动与历史、标签条。
-- **助手模式与权限**：目标模式收口、三处等用户决策统一成决策面板、只读模式与权限档位口径。
-- **外观与设计系统**：设计 token 四层、反色面 token 对、外观参数（字号 / 密度 / 字体）、配色主题机制。
-- **会话与上下文**：会话条目登记表与校验、压缩触发点、会话标题并行生成、步级耗时归因与用量统计。
-- **平台与工程**：Windows / Linux 纳入目标平台、`@ucode/ui` 按域重排与公开面收口、桌面端改同源、
-  `scripts/verify` 的校验项补齐。
-- **工程流程**：变更日志改为「发布时明细整体入 `docs/changelog/<年份>.md`，主文件只留摘要与链接」，
-  明细不再堆在 `[未发布]` 里。
-
-0.2.0 与 0.1.0 的明细见 [docs/changelog/2026.md](docs/changelog/2026.md)。
+0.3.0、0.2.0 与 0.1.0 的明细见 [docs/changelog/2026.md](docs/changelog/2026.md)。
