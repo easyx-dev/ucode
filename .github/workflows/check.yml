@@ -1,10 +1,11 @@
 name: check
 
-# Windows 与 Linux 都是目标平台，而开发机只有一个：跨平台回归只能靠这里兜住。
-# 两个平台各跑一遍完整的 pnpm check（biome + typecheck + test + verify）。
+# 只在打 tag 时跑：发布前那棵树必须两个平台的绿灯。Windows 与 Linux 都是目标平台，而开发机只有一个，
+# 跨平台回归只能靠这里兜住；分支与 PR 的 push 不跑（省 runner，本地用 `pnpm check` 自查）。
+# tag 一推它与 release 并行启动，两者互不阻塞——check 失败只是记在 run 上，拦不住那次发布。
 on:
   push:
-  pull_request:
+    tags: ["v*"]
 
 jobs:
   check:

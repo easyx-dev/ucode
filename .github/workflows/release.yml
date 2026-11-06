@@ -5,7 +5,7 @@ name: release
 #   1. tag 与清单版本一致——版本不匹配时发出去的包和 tag 对不上；
 #   2. 该版本还没在 registry 上——提前失败，好过注册表报 403；
 #   3. `pnpm pack:check` 的必需条目齐全——`files` 漏项不会让发布失败，只会让装出来的包缺界面。
-# 代码检查不在这里重复：check.yml 已经在每个 push / PR（含 tag push）上跑完整的 `pnpm check`，
+# 代码检查不在这里重复：check.yml 会在这个 tag 上跑完整的 `pnpm check`（与这个 job 并行，互不阻塞），
 # 这个 job 只管构建与打包。
 # 需要仓库 Secrets 里有 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）。
 on:

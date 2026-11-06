@@ -95,7 +95,7 @@ pnpm restart -- --open        # 重启并打开浏览器
   缺失必需项会直接报错退出，代码不带默认值；**npm 安装的包**没有 `.env.prod`，由包内
   `defaults/default.conf` 兜底（优先级最低，见「环境变量」）。
 - 需要 Node ≥ 24（`node:sqlite`）。macOS / Linux / Windows 都是目标平台，CI（`.github/workflows/check.yml`）
-  在 ubuntu 与 windows 上各跑一遍 `pnpm check`。Windows 上 `bash` 工具需要 Git for Windows，另有 `powershell`
+  **只在打 tag 时**在 ubuntu 与 windows 上各跑一遍 `pnpm check`（分支与 PR 不跑，本地自查用 `pnpm check`）。Windows 上 `bash` 工具需要 Git for Windows，另有 `powershell`
   工具可用（见 [`docs/modes-and-permissions.md`](./docs/modes-and-permissions.md)）；桌面端的无标题栏窗口只在
   macOS 生效，其他平台保留系统边框。安装包（含桌面端安装包）尚未做，留待发布阶段。
 
@@ -108,7 +108,7 @@ pnpm restart -- --open        # 重启并打开浏览器
 **正常路径是打 tag**：`.github/workflows/release.yml` 只在 `v*` tag 上触发，tag 名必须是 `v` + `package.json`
 的版本（`v0.4.0`）。job 先过三道闸——tag 与清单版本一致、该版本还没在 registry 上、`pnpm pack:check` 的
 必需条目齐全——再 `pnpm publish --access public` 并附 npm provenance（构建来源可验证）。代码检查不在这里重复：
-`check.yml` 已在每个 push / PR（含 tag push）上跑完整 `pnpm check`，发布 job 只管构建与打包。
+`check.yml` 会在同一个 tag 上并行跑完整 `pnpm check`，发布 job 只管构建与打包。
 需要仓库 Secrets 里的 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）；**首次发布**得先手工发一次
 （token 有），之后可换成 npm 的 trusted publishing（OIDC，不再存 token）。
 

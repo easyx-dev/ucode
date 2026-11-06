@@ -116,7 +116,7 @@
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）在 ubuntu 与 windows 上各跑一遍 |
+| `pnpm check` | 强制入口，**一轮里只跑一次**：`biome check .` + `pnpm -r typecheck` + `pnpm test` + `pnpm verify`。CI（`.github/workflows/check.yml`）只在打 tag 时、在 ubuntu 与 windows 上各跑一遍 |
 | `pnpm check:fast` | 中途收窄：只查工作区改动的文件（biome）+ 全部包 typecheck + 约定校验，跳过测试（约 11 秒，全量约 22 秒） |
 | `pnpm test` | 各包单元测试（server / apps / packages 用 Node 内置 `node:test`，经 tsx 直接跑 TS） |
 | `pnpm verify` | 只跑约定校验（各项见 `scripts/verify/checks/`；可 `--only` 只跑指定项） |
