@@ -179,6 +179,19 @@ export const probeAppHome = (cwd = process.cwd()): AppHomeProbe => {
   return { ok: true, home: cached };
 };
 
+/**
+ * 只留下「显式给出」的变量：加载环境文件后 `process.env` 里多出来的那些不算显式。
+ *
+ * 后台实例必须拿这一份：整份 `process.env` 传给子进程时，从环境文件补进来的 `APP_HOST` 会被子进程
+ * 当成显式设置，压过 `service.json`（设置页的「局域网访问」写在那里），`start` / `restart` 后监听地址
+ * 就被重置回环境文件的默认值。子进程会从同一个 cwd 读到同一份环境文件，无需父进程代传。
+ */
+export const toExplicitEnv = (
+  source: NodeJS.ProcessEnv,
+  isPreset: (name: string) => boolean,
+): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(source).filter(([name]) => isPreset(name)));
+
 /** 解析并缓存主目录相关配置；缺失即按配置错误退出 */
 export const loadAppHome = (): AppHome => {
   const probe = probeAppHome();

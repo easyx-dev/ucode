@@ -15,7 +15,7 @@ import { parseArgs } from "node:util";
 import { brand } from "@ucode/brand/values";
 
 import { SERVICE_LOG_FILENAME } from "./constants/dirs";
-import { type AppHome, loadAppHome } from "./platform/app-home";
+import { type AppHome, loadAppHome, toExplicitEnv } from "./platform/app-home";
 import { readInstanceVersion } from "./platform/instance";
 import { followLog, readServiceLogTail } from "./platform/service-log";
 import { readServiceRegistration, toUrlHost } from "./platform/service-registration";
@@ -231,12 +231,15 @@ const runServe = async (rest: readonly string[], options: CliOptions): Promise<v
   if (options.open) await openBrowser(url);
 };
 
-/** 后台实例的启动参数：把解析好的 APP_HOME 显式传给子进程，避免它按自己的 cwd 重新解析 */
+/**
+ * 后台实例的启动参数：环境只带显式变量，外加解析好的 APP_HOME（子进程按自己的 cwd 重新解析会落到别处）。
+ * `--host` / `--port` 走参数，不靠环境传递。
+ */
 const startOptions = (options: CliOptions, home: AppHome): ServiceStartOptions => ({
   servicePath: home.servicePath,
   logPath: resolve(home.appDir, SERVICE_LOG_FILENAME),
   entryPath: entryPathOf(),
-  env: { ...process.env, APP_HOME: home.homeDir },
+  env: { ...toExplicitEnv(process.env, home.wasPreset), APP_HOME: home.homeDir },
   cwd: process.cwd(),
   ...(options.port ? { port: options.port } : {}),
   ...(options.host ? { host: options.host } : {}),

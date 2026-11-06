@@ -1,4 +1,4 @@
-/** platform/app-home：环境文件的选取顺序与随包默认配置的完整性 */
+/** platform/app-home：环境文件的选取顺序、随包默认配置的完整性与显式变量的提取 */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { resourceRoot } from "../../resources";
-import { planEnvFiles } from "..";
+import { planEnvFiles, toExplicitEnv } from "..";
 
 const created: string[] = [];
 
@@ -67,6 +67,28 @@ describe("planEnvFiles", () => {
 
     assert.equal(plan.envFile, null);
     assert.deepEqual(plan.files, [DEFAULTS]);
+  });
+});
+
+describe("toExplicitEnv", () => {
+  it("环境文件补进来的 APP_HOST 不算显式：后台实例才不会把 service.json 里的 host 盖掉", () => {
+    const preset = new Set(["PATH"]);
+    const source = { PATH: "/usr/bin", APP_HOST: "127.0.0.1", APP_PORT: "19688" };
+
+    assert.deepEqual(
+      toExplicitEnv(source, (name) => preset.has(name)),
+      { PATH: "/usr/bin" },
+    );
+  });
+
+  it("启动前就有的变量原样保留：`APP_HOST=0.0.0.0 start` 仍然生效", () => {
+    const preset = new Set(["PATH", "APP_HOST"]);
+    const source = { PATH: "/usr/bin", APP_HOST: "0.0.0.0" };
+
+    assert.deepEqual(
+      toExplicitEnv(source, (name) => preset.has(name)),
+      source,
+    );
   });
 });
 

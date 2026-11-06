@@ -48,7 +48,10 @@ export type ServiceStartOptions = {
   logPath: string;
   /** 服务入口：CLI 交来的构建产物，用同一个 node 可执行文件起子进程 */
   entryPath: string;
-  /** 子进程环境：调用方必须带上解析好的 APP_HOME，否则后台实例会按自己的 cwd 重新解析 */
+  /**
+   * 子进程环境：调用方必须带上解析好的 `APP_HOME`（否则后台实例会按自己的 cwd 重新解析），
+   * 且只带显式变量——环境文件里的值由子进程自己读，代传会被它当成显式设置。
+   */
   env: NodeJS.ProcessEnv;
   /** 子进程 cwd（即调用方的 cwd）：环境文件的向上查找从这里开始 */
   cwd?: string;
