@@ -40,6 +40,12 @@
 
 ## [未发布]
 
+### 变更
+
+- **hub 生产部署独立成仓**：部署配置与运维脚本从 hub 仓的 `deploy/` 迁到独立仓 `ucode-hub-deploy`（本仓以 `hub-deploy`
+  子模块挂载），生产只拉该仓检出到 `/opt/hub` 后执行 `./deploy.sh`；镜像由 hub 仓 CI 在 `v*` tag 上构建推到
+  `ghcr.io/easyx-dev/ucode-hub`。
+
 ## [0.6.1] - 2026-11-06
 
 本版收录 1 条（修复 1 条），明细归档在 [docs/changelog/2026.md](docs/changelog/2026.md)。主线：

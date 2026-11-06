@@ -33,7 +33,7 @@ app/移动端 ──只登 hub──▶ [hub 服务] ══隧道══▶ [UCod
 | 唯一门 | hub 的入口鉴权是唯一门（app 持 hub 会话、校验设备归属）；经 hub 到 UCode 即 owner（可跑 `bash`） |
 | 协议边界 | v1 不支持 `Upgrade`（终端、内置浏览器面板不经 hub），返回明确错误码 |
 | 工具链 | hub 与 ucode 统一：同一份 `biome` 配置、依赖版本走根 `catalog:`（含 `typescript ^7.0.2`） |
-| 部署目录 | `hub/deploy/` 是仓内普通目录，**不使用 submodule**；容器名 / 镜像名 / 路径全部按 hub 重写 |
+| 部署目录 | 生产部署独立成仓 `hub-deploy`（submodule，仓库 `ucode-hub-deploy`）：生产只拉该仓检出到 `/opt/hub` 跑 `deploy.sh`，容器名 / 镜像名 / 路径全部按 hub 重写 |
 | 客户端前台 | 保留前台 SSR 线，新增「我的设备」页：自己的设备信息 + 已连接的 UCode 列表 |
 | 后续 | 用量统计（前台按用户、后台按运营）、模型端点、内置资产云同步 |
 
@@ -59,7 +59,7 @@ app/移动端 ──只登 hub──▶ [hub 服务] ══隧道══▶ [UCod
 - **邮箱验证码**：CSPRNG 生成、同码错误 5 次即作废、发新码作废旧码；未确认邮箱不能用作恢复通道，「忘记密码」失败文案统一。
 - **超管保护**：非 root 只能重置自己；角色分配与角色权限写入不得超出自己已有权限（`**` 只有 root 能授）。
 - **自助注册默认关闭**（`client_register_enabled`），注册页与入口随开关。
-- **入口限速与安全头**：`deploy/nginx.conf.example` 给出四档 `limit_req`、HSTS / `X-Frame-Options` / `nosniff` / `Referrer-Policy`、TLS 1.2+，并把「控制面来源收敛」写成建议（`/health` 与 `/api/metrics` 本身不鉴权）。
+- **入口限速与安全头**：部署仓的 `nginx.conf.example` 给出四档 `limit_req`、HSTS / `X-Frame-Options` / `nosniff` / `Referrer-Policy`、TLS 1.2+，并把「控制面来源收敛」写成建议（`/health` 与 `/api/metrics` 本身不鉴权）。
 - **移除 `custom_head_config`**：它等于「配置编辑权 = 可执行公共站点任意脚本」。
 
 **本轮明确不做**（记录在案）：设备面独立 origin（同源合租）、`/file/r/$id` 的公开读取、管理端富文本渲染面、`config:edit` 其余能力、内置资产清单签名（仍未决，是「中继被攻破 → 全网下发」这条链上唯一未断的点）。
@@ -109,7 +109,7 @@ GET /builtin/assets/<id>/<version>     # 内容（二进制或 JSON），逐文�
 | 4 · 隧道与 ingress | 协议包 `@ucode/hub-protocol`（帧 / 多路复用 / 背压 / 限额）、hub 隧道宿主与 ingress、UCode 侧中继客户端；**六项端到端已验**（经隧道调 UCode 状态与事件流、未认证 401、设备离线 502、重启后自愈、30MB 经隧道上传 200），见 `hub/docs/tunnel.md`（**已完成**） |
 | 5 · UCode 侧 | 中继客户端服务层 + `/api/v1/hub/{status,login,logout}` 路由与契约 + SDK `hub` store + 设置页「中继」一节 + i18n / 错误码映射 + `docs/hub.md`；**端到端已验**（未鉴权 401、登录后 `configured/deviceId` 就位、隧道 `connected:true`、经隧道访问 200、登出后 502、地址不可达给 `hub_unreachable`）（**已完成**） |
 | 6 · 后置 | 中继模型端点 + 用量统计（后台按运营、**前台「我的用量」按用户**）+ 内置资产云同步；**端到端已验**：假上游转发 200 / 流式逐帧带 usage / 用量落库 / 未鉴权 401 / 限流第 61 次起 429（换设备额度独立）/ `/admin/usage` 与 `/usage` 页可达 / 发布→清单→拉取→物化→二次拉取 skipped / 一键注入的 relay provider 被运行时认作默认模型且凭据可用（**已完成**） |
-| 7 · 交付 | `deploy/` 内联 + `nginx.conf.example`（TLS / WS 升级 / 事件流不缓冲 / 泛子域 ingress）+ 逐企业部署说明（含「先 init 再开域名」）（**已完成**） |
+| 7 · 交付 | 部署内容（compose、部署 / 备份脚本、`nginx.conf.example`：TLS / WS 升级 / 事件流不缓冲 / 泛子域 ingress）+ 逐企业部署说明（含「先 init 再开域名」）（**已完成**；后于 2026-11-06 从 hub 仓的 `deploy/` 迁到独立仓，以 `hub-deploy` submodule 挂载到本仓） |
 | 8 · 隧道 WebSocket | 协议 v2：`request.upgrade` + `close` 帧 + 数据帧文本变体；hub 侧路径寻址的 WS 终结、UCode 侧桥接本机 WebSocket（工作台终端、内置浏览器面板）。两端单测与「升级请求被判给专用 route、普通 GET 仍回灌」已实测，真机走查待验证 |
 
 ## 待定

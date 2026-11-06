@@ -320,6 +320,10 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
 - **不在本仓的安装与检查范围内**：`pnpm install` / `pnpm check` 不碰 `hub/`。改 hub 要先进 `hub/` 跑
   `pnpm install && pnpm check`；根侧的 `pnpm dev:hub` / `build:hub` / `start:hub` 只是切到那里转发，
   同样要求 hub 内已安装。submodule 未初始化时这些命令会失败，用 `git submodule update --init` 补上。
+- **生产部署在 `hub-deploy`**：`hub-deploy/` 是另一个 submodule（独立仓库 `https://github.com/easyx-dev/ucode-hub-deploy`），
+  放 compose、`deploy.sh` / `backup.sh` / `restore.sh` / `preflight-migrations.sh`、`nginx.conf.example` 与变量模板。
+  生产只拉该仓、检出到 `/opt/hub` 后执行 `./deploy.sh`（检出目录即部署目录），不拉 hub 源码仓；改部署脚本去那个仓，
+  本仓只记它的挂载。它同样不在本仓的安装与检查范围内。
 - **两套栈并存、无共享代码**：hub 是 TanStack Start + SQLite + antd 的双端应用，与 UCode 的
   Hono + node:sqlite 不共享代码；两者只通过 HTTP 打交道（hub 出站 WS 隧道 + UCode 侧中继客户端
   带本地 `serviceToken` 转发）。

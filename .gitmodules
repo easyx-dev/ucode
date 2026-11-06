@@ -1,3 +1,6 @@
 [submodule "hub"]
 	path = hub
 	url = https://github.com/easyx-dev/ucode-hub.git
+[submodule "hub-deploy"]
+	path = hub-deploy
+	url = https://github.com/easyx-dev/ucode-hub-deploy.git
