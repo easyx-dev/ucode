@@ -1,6 +1,6 @@
 {
   "name": "@easyx-dev/ucode",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "UCode —— 带对话界面与本机工具集的开发助手：服务与 Web UI 整包安装，一条命令后台常驻",
   "keywords": [
     "ai",
