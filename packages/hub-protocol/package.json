@@ -9,7 +9,7 @@
   },
   "types": "./src/index.ts",
   "scripts": {
-    "test": "node --import tsx --test --test-force-exit \"src/**/__tests__/**/*.test.ts\"",
+    "test": "node --v8-pool-size=0 --import tsx --test --test-force-exit \"src/**/__tests__/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

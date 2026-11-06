@@ -177,6 +177,12 @@
 （如 `server/src/db/__tests__/session-repository.test.ts`）；测试脚本只匹配 `src/**/__tests__/**/*.test.ts`，
 写在别处不会被执行。断言用 `node:assert/strict`，不引第三方测试框架。
 
+每个包的 `test` 脚本都带 `--v8-pool-size=0`：Node 退出阶段有个偶发死锁（
+[nodejs/node#54918](https://github.com/nodejs/node/issues/54918)，仍是 open 的 confirmed-bug）——V8 后台编译线程
+卡在 GC 屏障上，主线程在 `process.exit()` 的 `uv_thread_join` 里等它们，`--test-force-exit` 正好把窗口放大。
+关掉后台线程池就没有这条路径；代价只有测试稍慢（本仓全套仍在 10 秒内）。CI 侧另有 `timeout-minutes` 兜底，
+真卡住也是分钟级失败而不是挂到上限。
+
 根 `pnpm test` 走 `pnpm -r test`，只跑声明了 `test` 脚本的包；给某个包加了测试就要一并补脚本，
 否则 `scripts/verify` 的 tests 校验会报错（用例不会被静默跳过）。
 

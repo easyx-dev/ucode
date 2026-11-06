@@ -8,6 +8,8 @@ on:
 
 jobs:
   check:
+    # 卡住就是真卡住（见下面测试脚本里的 `--v8-pool-size=0`）：宁可失败得快，也不要白占 runner 几小时
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
