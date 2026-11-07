@@ -527,7 +527,7 @@ export function Composer({
                       {...stopOrSendFocus}
                     >
                       <DropdownMenuItem className="items-start" onSelect={handleStop}>
-                        <Square className="mt-0.5 size-icon-sm" />
+                        <Square className="mt-0.5 size-icon-sm fill-current" />
                         <span className="min-w-0">
                           <span className="block">{t("停止生成")}</span>
                           <span className="block text-xs text-foreground-subtle">
@@ -559,7 +559,8 @@ export function Composer({
                     onClick={streaming ? handleStop : submit}
                   >
                     {streaming ? (
-                      <Square className="size-icon-sm" />
+                      // 实心方块：lucide 的 Square 只有描边版，描边在深色按钮上会被读成一圈空框
+                      <Square className="size-icon-sm fill-current" />
                     ) : (
                       <ArrowUp className="size-icon-base" />
                     )}
