@@ -41,7 +41,6 @@
 | POST | `/api/v1/sessions/create` | 新建会话（首次回复后才落盘） |
 | POST | `/api/v1/sessions/info` | 会话详情 + 用量 + 当前目标 |
 | POST | `/api/v1/sessions/update` | 重命名 / 换模型 / 换推理等级 / 换模式 / 换权限档位 / 置顶 |
-| POST | `/api/v1/sessions/transcript` | 会话原始记录（JSONL 文本），供导出 / 复制使用 |
 | POST | `/api/v1/sessions/archive` | 归档会话（软删：从列表隐藏，文件保留） |
 | POST | `/api/v1/sessions/read` | 标记会话已读（写上次打开时间） |
 | POST | `/api/v1/sessions/fork` | 从某个条目分叉出新会话 |
@@ -716,23 +715,6 @@
 | `pinnedAt` | string \| null | 是 | 置顶时间；非空表示置顶，排序时置顶项排在组内最前 |
 | `lastReadAt` | string \| null | 是 | 上次打开（标记已读）时间；用于判定未读：`updatedAt` 晚于它即未读 |
 | `deletedAt` | string \| null | 是 | 归档时间；非空表示已归档（软删），列表默认过滤 |
-
-### POST /api/v1/sessions/transcript
-
-会话原始记录（JSONL 文本），供导出 / 复制使用
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-
-**响应类型**：`SessionTranscriptResponse`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `sessionId` | string | 是 | — |
-| `content` | string | 是 | 会话文件的原始文本（UTF-8） |
 
 ### POST /api/v1/sessions/archive
 

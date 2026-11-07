@@ -369,7 +369,6 @@ export function WorkspaceLayout({
                     onRenameSession={
                       activeSession ? () => actions.requestRename(activeSession) : undefined
                     }
-                    onLoadTranscript={activeId ? actions.loadTranscript : undefined}
                     onFork={actions.forkFrom}
                     onEdit={editMessage}
                     forkedFromName={forkSourceName}

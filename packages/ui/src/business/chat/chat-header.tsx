@@ -2,7 +2,9 @@
 import { cn } from "cn";
 import type { TFunction } from "i18next";
 import {
+  Check,
   ChevronLeft,
+  Copy,
   Gauge,
   GitFork,
   PanelLeftClose,
@@ -16,11 +18,11 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../base/badge";
 import { Button, IconButton } from "../../base/button";
+import { useCopyFeedback } from "../../base/copy-action";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../base/tooltip";
 import type { ContextUsage, ModelsResponse, SessionSummary, UsageTotals } from "../../types";
 import { contextPercentLabel } from "../../utils/usage";
 import { sessionTitle } from "../session/session";
-import { CopyTranscriptAction } from "./copy-transcript-action";
 import { type SessionTone, sessionToneOf } from "./session-tone";
 
 /**
@@ -87,9 +89,19 @@ type ChatHeaderProps = {
   onRenameSession?: () => void;
   /** 本端是否正在接流：服务端状态还没跟上时用它点亮「生成中」底色 */
   streaming?: boolean;
-  /** 取本会话的原始记录（JSONL 文本）用于复制；不传则不显示这个入口 */
-  onLoadTranscript?: () => Promise<string>;
 };
+
+/** 复制会话 ID：贴给别人定位会话用，不必把整份记录（可达几 MB）搬进剪贴板 */
+function CopySessionIdAction({ sessionId }: { sessionId: string }) {
+  const { t } = useTranslation();
+  const { copied, copy } = useCopyFeedback();
+
+  return (
+    <IconButton label={copied ? t("已复制") : t("复制会话 ID")} onClick={() => copy(sessionId)}>
+      {copied ? <Check className="size-icon-sm" /> : <Copy className="size-icon-sm" />}
+    </IconButton>
+  );
+}
 
 /**
  * 会话标题：溢出时悬停给全名（没溢出就不挂提示，免得白占一个弹层），双击就地改名。
@@ -146,7 +158,6 @@ export function ChatHeader({
   workbenchOpen,
   onRenameSession,
   streaming = false,
-  onLoadTranscript,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
   const tone = sessionToneOf(session?.status ?? "idle", streaming);
@@ -244,7 +255,7 @@ export function ChatHeader({
           </>
         ) : null}
 
-        {onLoadTranscript ? <CopyTranscriptAction load={onLoadTranscript} /> : null}
+        {session ? <CopySessionIdAction sessionId={session.id} /> : null}
 
         <IconButton
           label={t("重建运行时")}

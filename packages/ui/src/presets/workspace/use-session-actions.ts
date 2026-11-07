@@ -1,11 +1,9 @@
 /**
  * 会话动作与草稿：新建 / 在目录新建 / 小助理、置顶、分叉、重命名（会话与项目）、已读、
- * 目录选择、拉取原始记录，以及模型 / 思考档位 / 模式 / 权限档位的选择（空态落草稿、有会话写服务端）。
+ * 目录选择，以及模型 / 思考档位 / 模式 / 权限档位的选择（空态落草稿、有会话写服务端）。
  */
 
-import { useCallback, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { useEffect } from "react";
 import {
   type ComposerDraft,
   composerKeyOf,
@@ -25,9 +23,7 @@ import { useConfig } from "../../hooks/store/use-config";
 import type { useProjects } from "../../hooks/store/use-projects";
 import type { useSessions } from "../../hooks/store/use-sessions";
 import type { useActiveSession } from "../../hooks/use-active-session";
-import { useClient } from "../../provider";
 import type { ChatItem, PermissionMode, SessionSummary, ThinkingPreference } from "../../types";
-import { errorText } from "../../utils/error-text";
 
 export type SessionActions = {
   startNewSession: () => void;
@@ -43,7 +39,6 @@ export type SessionActions = {
   toggleProjectMemory: (path: string) => void;
   /** 清掉项目级记忆覆盖，回到「跟随全局默认」（全局开关再次影响这个项目） */
   resetProjectMemory: (path: string) => void;
-  loadTranscript: () => Promise<string>;
   selectModel: (model: string) => void;
   selectThinkingLevel: (level: ThinkingPreference) => void;
   selectMode: (mode: string) => void;
@@ -67,8 +62,6 @@ export function useSessionActions({
   composer: ReturnType<typeof useComposerDrafts>;
   setActiveId: (sessionId: string | null) => void;
 }): SessionActions {
-  const { t } = useTranslation();
-  const client = useClient();
   // 项目记忆开关的默认值：全局配置（项目没设过覆盖时用它，与侧栏标记同一口径）
   const memoryDefault = useConfig()?.config.memory.enabled ?? false;
 
@@ -163,21 +156,6 @@ export function useSessionActions({
     void projects.setMemory(path, null);
   };
 
-  /**
-   * 取当前会话的原始记录（JSONL 文本）供复制。内容可能几 MB，所以只在点按钮时取。
-   * 失败要说清原因（记录过大、文件读不到），否则「复制出来是空的」看不出是失败。
-   */
-  const loadTranscript = useCallback(async (): Promise<string> => {
-    if (!activeId) return "";
-    try {
-      const result = await client.apis.sessions.transcript(activeId);
-      return result.content;
-    } catch (error) {
-      toast.error(errorText(t, error));
-      throw error;
-    }
-  }, [activeId, client, t]);
-
   // 打开会话即标记已读：内容新于上次已读、且不在生成中时才提交，避免自我循环
   useEffect(() => {
     if (!session || session.running) return;
@@ -217,7 +195,6 @@ export function useSessionActions({
     requestRenameProject,
     toggleProjectMemory,
     resetProjectMemory,
-    loadTranscript,
     selectModel,
     selectThinkingLevel,
     selectMode,

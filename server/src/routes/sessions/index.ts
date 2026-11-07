@@ -1,5 +1,5 @@
-/** /api/v1/sessions：会话的列表 / 新建 / 详情 / 更新 / 归档 / 分叉 / 原始记录导出 */
-import { readFileSync, rmSync } from "node:fs";
+/** /api/v1/sessions：会话的列表 / 新建 / 详情 / 更新 / 归档 / 分叉 */
+import { rmSync } from "node:fs";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
@@ -11,7 +11,6 @@ import {
   type SessionListInput,
   type SessionListResponse,
   type SessionSummary,
-  type SessionTranscriptResponse,
   type SessionUpdateInput,
   sessionCreateInputSchema,
   sessionForkInputSchema,
@@ -21,7 +20,6 @@ import {
   type ThinkingLevel,
 } from "@ucode/contracts";
 import { Hono } from "hono";
-import { TRANSCRIPT_MAX_BYTES, TRANSCRIPT_MAX_MB } from "../../constants/session";
 import { resolveSessionCwd } from "../../core/session-paths";
 import {
   describeSessionSummary,
@@ -297,42 +295,6 @@ const updateSession = (services: Services, patch: SessionUpdateInput): SessionSu
   return info.session;
 };
 
-/**
- * `/transcript`：返回会话文件的原始文本，供「复制 JSONL 内容」这类导出使用。
- *
- * 不回路径：服务端可能不在客户端这台机器上，路径在那边没有意义，也白多泄露一层目录结构。
- * 草稿会话（首轮回复完成前还没落盘）返回空串——那不是错误，界面复制到的就是空内容。
- */
-const sessionTranscript = (services: Services, sessionId: string): SessionTranscriptResponse => {
-  const record = services.sessions.find(sessionId);
-  if (!record) {
-    throw new AppError(ERROR_CODES.notFound, `会话不存在：${sessionId}`, 404, undefined, {
-      path: sessionId,
-    });
-  }
-  if (!record.sourcePath) return { sessionId, content: "" };
-
-  let content: string;
-  try {
-    content = readFileSync(record.sourcePath, "utf8");
-  } catch (error) {
-    // 文件被手工删掉 / 权限不对都走这条：如实回 not_found，而不是假装会话是空的
-    throw new AppError(ERROR_CODES.notFound, `读不到会话记录：${sessionId}`, 404, error, {
-      path: sessionId,
-    });
-  }
-  if (Buffer.byteLength(content, "utf8") > TRANSCRIPT_MAX_BYTES) {
-    throw new AppError(
-      ERROR_CODES.payloadTooLarge,
-      `会话记录超过 ${TRANSCRIPT_MAX_MB}MB，请直接查看服务端的会话文件`,
-      413,
-      undefined,
-      { limit: `${TRANSCRIPT_MAX_MB}MB` },
-    );
-  }
-  return { sessionId, content };
-};
-
 /** `/read`：标记会话已读（写上次打开时间），用于侧栏未读点消失 */
 const readSession = (services: Services, sessionId: string): SessionSummary => {
   const record = services.sessions.find(sessionId);
@@ -439,9 +401,6 @@ export const createSessionsRoute = (services: Services) => {
   );
   router.post("/fork", jsonBody(sessionForkInputSchema), (c) =>
     c.json(ok(forkSession(services, c.req.valid("json")))),
-  );
-  router.post("/transcript", jsonBody(sessionIdInputSchema), (c) =>
-    c.json(ok(sessionTranscript(services, c.req.valid("json").sessionId))),
   );
 
   return router;

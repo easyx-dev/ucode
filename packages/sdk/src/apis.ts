@@ -115,7 +115,6 @@ import type {
   SessionListRequest,
   SessionListResponse,
   SessionSummary,
-  SessionTranscriptResponse,
   SessionUpdateRequest,
   StatsSummaryRequest,
   StatsSummaryResponse,
@@ -271,11 +270,6 @@ export const createApis = (options: ApisOptions = {}) => {
           sessionId,
         } satisfies SessionIdRequest),
       fork: (body: SessionForkRequest) => transport.post<SessionSummary>("sessions/fork", body),
-      /** 会话原始记录（JSONL 文本）：给「复制 JSONL 内容」这类导出用 */
-      transcript: (sessionId: string) =>
-        transport.post<SessionTranscriptResponse>("sessions/transcript", {
-          sessionId,
-        } satisfies SessionIdRequest),
       archive: (sessionId: string) =>
         transport.post<SessionArchiveResponse>("sessions/archive", {
           sessionId,

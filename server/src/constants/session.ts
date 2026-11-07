@@ -60,14 +60,3 @@ export const PRUNE_PROTECTED_TOOLS = ["subagent", "edit", "write", "present_plan
  * 旧会话第一次清理可能命中几十上百条，这里切一刀，剩下的留给下一轮。
  */
 export const PRUNE_MAX_EDITS_PER_PASS = 50;
-
-/**
- * 会话原始记录（`sessions/transcript`）单次返回的上限。
- *
- * 一条会话增长得比想象得快（长对话的 JSONL 常见几 MB），内联回去的整段文本要经过 HTTP、
- * 客户端解析与剪贴板三道，再大就没有意义了；超限时如实回 `payload_too_large`，让用户自己去看文件。
- */
-export const TRANSCRIPT_MAX_BYTES = 8 * 1024 * 1024;
-
-/** 上面那个上限的展示形式（MB）：错误文案与 `payload_too_large` 的插值都用它 */
-export const TRANSCRIPT_MAX_MB = TRANSCRIPT_MAX_BYTES / (1024 * 1024);

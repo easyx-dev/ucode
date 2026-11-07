@@ -280,15 +280,6 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   },
   {
     domain: "sessions",
-    action: "transcript",
-    method: "POST",
-    input: "sessionIdInputSchema",
-    requestType: "SessionIdInput",
-    output: "SessionTranscriptResponse",
-    summary: "会话原始记录（JSONL 文本），供导出 / 复制使用",
-  },
-  {
-    domain: "sessions",
     action: "archive",
     method: "POST",
     input: "sessionIdInputSchema",
