@@ -24,6 +24,7 @@ import {
 } from "./chat-rows";
 import { MessageOutline, type OutlineEntry } from "./message-outline";
 import { MessageRow } from "./message-row";
+import { shouldAdjustScrollPositionOnItemSizeChange } from "./scroll-anchor";
 
 /** 首屏尚未测量时的行高估计；实测后由 ResizeObserver 校正，只影响未渲染行的滚动条长度 */
 const ESTIMATED_HEIGHT: Record<ChatRow["kind"], number> = {
@@ -138,6 +139,9 @@ export function MessageList({
     paddingStart: 16,
     paddingEnd: 32,
   });
+  // 补偿判定不是构造项，挂在实例上：`useVirtualizer` 不重建实例，赋一次就管用
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange =
+    shouldAdjustScrollPositionOnItemSizeChange;
 
   // 工具行里的子智能体入口：工具卡默认收起，入口不跟着藏——不展开也看得见它在跑。
   // 它有实时进度记录时点开活动面板并定位到那一条；没有记录的（历史条目）按结果里的 task_id 直接开小窗
@@ -184,11 +188,17 @@ export function MessageList({
   }, []);
 
   // 贴底跟随是自己发起的滚动：它引发的那一个 scroll 事件不能当作用户意图（那一刻的距离可能仍大于
-  // 阈值，新行高度刚实测完），否则「回到底部」会凭空亮起来。只豁免这一个事件，用户真的滚动（滚轮 /
-  // 触摸 / 拖滚动条）总会另外产生事件，不会被吞掉
-  const ownScrollRef = useRef(false);
+  // 阈值，新行高度刚实测完），否则「回到底部」会凭空亮起来。豁免只能活一帧：视口本来就在底部时这次
+  // 滚动不产生事件，挂着不放就会把用户下一次真正的向上滚动也吃掉——跟随停不下来，随后任何一次
+  // 行高修正或新行都会把视口拽回底部。
+  const ownScrollTokenRef = useRef(0);
   const scrollToLatest = useCallback(() => {
-    ownScrollRef.current = true;
+    ownScrollTokenRef.current += 1;
+    const token = ownScrollTokenRef.current;
+    requestAnimationFrame(() => {
+      // 期间又发起过一次就先留着：它那次的豁免还没到期
+      if (ownScrollTokenRef.current === token) ownScrollTokenRef.current = 0;
+    });
     virtualizer.scrollToEnd();
   }, [virtualizer]);
 
@@ -220,9 +230,14 @@ export function MessageList({
   }, [highlightKey, scrolling]);
 
   const handleScroll = () => {
-    const atEnd = virtualizer.isAtEnd(SCROLL_END_THRESHOLD);
-    if (ownScrollRef.current) {
-      ownScrollRef.current = false;
+    // 贴底与否直接量元素：虚拟列表的 scrollOffset 由它自己的监听维护，React 的 onScroll 可能先跑，
+    // 读到的是上一次的位置——用户第一次向上滚就会被当成「还在底部」而丢掉
+    const element = scrollRef.current;
+    const atEnd = element
+      ? element.scrollHeight - element.scrollTop - element.clientHeight <= SCROLL_END_THRESHOLD
+      : virtualizer.isAtEnd(SCROLL_END_THRESHOLD);
+    if (ownScrollTokenRef.current !== 0) {
+      ownScrollTokenRef.current = 0;
       // 自己这次滚动只能确认贴底，不能把用户「贴在底部」的状态降级
       if (atEnd) setFollowingBoth(true);
       return;
