@@ -30,6 +30,7 @@ import { DialogHost } from "../../business/dialog/dialog-host";
 import { useSessionNotices } from "../../business/notify/use-session-notices";
 import { useWindowTitle } from "../../business/notify/use-window-title";
 import { SessionSidebar } from "../../business/session/session-sidebar";
+import { ServiceDialog } from "../../business/settings/service/service-dialog";
 import { SettingsPanel } from "../../business/settings/settings-panel";
 import { CommandPalette } from "../../business/shell/command-palette";
 import { ErrorToaster } from "../../business/shell/error-toaster";
@@ -136,6 +137,8 @@ export function WorkspaceLayout({
   const chrome = useWorkspaceChrome({ titleBarInset });
   const panels = usePanelLayout("workspace", WORKSPACE_PANELS);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // 远程访问与中继的弹窗：不属于设置分区，也不进 URL，纯粹是本页的一次浮层
+  const [serviceOpen, setServiceOpen] = useState(false);
 
   /**
    * 当前工作目录：已有会话用它自己的工作目录；草稿态还没有会话，用草稿里选中的目录——
@@ -282,6 +285,7 @@ export function WorkspaceLayout({
     onOpenWorkspace: actions.pickDirectory,
     onOpenAutomation: () => toast.info(t("自动化功能即将推出")),
     onOpenMarketplace: () => toast.info(t("插件市场即将推出")),
+    onOpenService: () => setServiceOpen(true),
     onOpenSettings: openSettings,
   };
 
@@ -433,6 +437,10 @@ export function WorkspaceLayout({
                     actions.startInDirectory(path);
                     chrome.setSidebarOpen(false);
                   }}
+                  onOpenService={() => {
+                    chrome.setSidebarOpen(false);
+                    setServiceOpen(true);
+                  }}
                   onOpenSettings={() => {
                     chrome.setSidebarOpen(false);
                     openSettings();
@@ -455,6 +463,8 @@ export function WorkspaceLayout({
               context={sessionUsage.context}
               titleBarInset={titleBarInset}
             />
+
+            <ServiceDialog open={serviceOpen} onOpenChange={setServiceOpen} />
 
             {settingsSection ? (
               <SettingsPanel

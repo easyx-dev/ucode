@@ -1,4 +1,4 @@
-/** 远程访问设置：局域网开关、配对链接、活动会话与改密码 */
+/** 远程访问面板：局域网开关、配对链接、活动会话与改密码；由侧栏页脚的「远程访问与中继」弹窗承载 */
 import type { AuthSessionView, PairingCreateOutput } from "@ucode/contracts";
 import { Check, Copy } from "lucide-react";
 import QRCode from "qrcode";
@@ -90,13 +90,12 @@ function PairingPanel({
   return (
     <section className="space-y-3">
       <SettingsSectionHeader title={t("配对链接")} />
-      <div className="space-y-3 rounded-xl bg-popover p-4 ring-1 ring-border-strong">
-        <p className="text-sm leading-relaxed text-foreground-subtle">
-          {t("生成一条链接发给同一网络下的设备，打开即可接入；5 分钟内有效，且只能使用一次。")}
-        </p>
-
+      <div className="rounded-xl bg-popover p-4 ring-1 ring-border-strong">
         {pairing && remaining > 0 ? (
-          <>
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-foreground-subtle">
+              {t("生成一条链接发给同一网络下的设备，打开即可接入；5 分钟内有效，且只能使用一次。")}
+            </p>
             <PairingQrCode url={pairing.url} />
             <div className="flex items-center gap-2">
               <Input readOnly value={pairing.url} className="font-mono text-xs" />
@@ -108,19 +107,25 @@ function PairingPanel({
                 )}
               </Button>
             </div>
-            <p className="text-sm text-foreground-subtle">
+            <p className="text-center text-sm text-foreground-subtle">
               {t("剩余有效时间 {{time}}", { time: formatRemaining(remaining) })}
             </p>
-          </>
+          </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={busy} onClick={onCreate}>
-              {busy ? <Spinner className="size-icon-base" /> : null}
-              {t("生成配对链接")}
-            </Button>
-            {pairing && remaining === 0 ? (
-              <span className="text-sm text-foreground-subtle">{t("链接已过期")}</span>
-            ) : null}
+          /* 没链接时说明与按钮同排：这一段只放一个按钮会让整张卡看上去是一块空气 */
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground-subtle">
+              {t("生成一条链接发给同一网络下的设备，打开即可接入；5 分钟内有效，且只能使用一次。")}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={busy} onClick={onCreate}>
+                {busy ? <Spinner className="size-icon-base" /> : null}
+                {t("生成配对链接")}
+              </Button>
+              {pairing && remaining === 0 ? (
+                <span className="text-sm text-foreground-subtle">{t("链接已过期")}</span>
+              ) : null}
+            </div>
           </div>
         )}
       </div>
@@ -128,7 +133,7 @@ function PairingPanel({
   );
 }
 
-function SessionList({
+function ActiveSessionList({
   sessions,
   currentId,
   busy,
@@ -198,34 +203,38 @@ function PasswordForm() {
             void client.auth.changePassword({ currentPassword: current, newPassword: next });
         }}
       >
-        <div className="space-y-1">
-          <Label htmlFor="current-password">{t("当前密码")}</Label>
-          <Input
-            id="current-password"
-            type="password"
-            autoComplete="current-password"
-            value={current}
-            onChange={(event) => setCurrent(event.target.value)}
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="current-password">{t("当前密码")}</Label>
+            <Input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(event) => setCurrent(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="new-password">{t("新密码")}</Label>
+            <Input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+            />
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="new-password">{t("新密码")}</Label>
-          <Input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            value={next}
-            onChange={(event) => setNext(event.target.value)}
-          />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground-subtle">
+            {t("新密码至少 8 位；修改后所有设备都需要重新登录。")}
+          </p>
+          <Button type="submit" variant="outline" size="sm" disabled={!canSubmit}>
+            {auth.busy ? <Spinner className="size-icon-base" /> : null}
+            {t("修改密码")}
+          </Button>
         </div>
-        <p className="text-sm leading-relaxed text-foreground-subtle">
-          {t("新密码至少 8 位；修改后所有设备都需要重新登录。")}
-        </p>
         {errorText ? <p className="text-sm text-destructive">{errorText}</p> : null}
-        <Button type="submit" variant="outline" size="sm" disabled={!canSubmit}>
-          {auth.busy ? <Spinner className="size-icon-base" /> : null}
-          {t("修改密码")}
-        </Button>
       </form>
     </section>
   );
@@ -268,9 +277,8 @@ function LanAccess({ access }: { access: RemoteAccess }) {
   );
 }
 
-export function SettingsRemoteAccess() {
-  // 本页一挂载即拉取访问状态，离开设置页就停止
-  const access = useRemoteAccess(true);
+export function RemoteAccessPanel() {
+  const access = useRemoteAccess();
   const auth = useAuth();
   const errorText = useErrorText(access.error);
 
@@ -284,7 +292,7 @@ export function SettingsRemoteAccess() {
         busy={access.busy}
         onCreate={() => void access.createPairing()}
       />
-      <SessionList
+      <ActiveSessionList
         sessions={access.sessions}
         currentId={auth.session?.id ?? null}
         busy={access.busy}

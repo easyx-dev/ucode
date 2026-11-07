@@ -313,7 +313,7 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，窄屏把那 40px 宽的�
 
 **导航**（`business/settings/settings-nav.tsx`）
 
-- 桌面端 `w-60` + `border-r border-border`：顶部「← 返回工作区」，中间是分组（基础设置 / Agent 能力 / 服务）与条目，
+- 桌面端 `w-60` + `border-r border-border`：顶部「← 返回工作区」，中间是分组（基础设置 / Agent 能力）与条目，
   底部是用户身份行（`business/local-user-row.tsx`，与侧栏页脚共用同一份实现）。
 - 分组标题 `text-xs font-medium text-foreground-subtle`；条目 `h-8 rounded-lg px-2 text-sm`，图标 `size-icon-base`，
   选中 `bg-state-selected font-medium`。
@@ -358,3 +358,18 @@ VSCode 式的「活动栏 + 侧栏 + 编辑器区」，窄屏把那 40px 宽的�
 - 外观分区例外：它读写的是设备本地偏好（`localStorage`），改动即时生效并落本地，不进草稿。
 - 外观分区的控件选型：配色主题与深浅模式、界面密度、语言用分段控件；界面字号用滑块（14–22px，右侧显示当前值）；
   界面字体用下拉（等宽固定为系统栈，不给设置项）。
+
+## 远程访问与中继（侧栏页脚弹窗）
+
+两块「把本机服务接到外部」的配置不进设置分区，而是合成一个弹窗，入口是侧栏页脚身份行右侧的两颗图标按钮之一
+（`RadioTower`，设置按钮在它右边；`business/session/session-sidebar.tsx`）。
+
+- 容器 `business/settings/service/service-dialog.tsx`：`flex max-h-[88vh] flex-col` + `sm:max-w-3xl`，
+  底色用外壳色（`bg-background`）——弹窗色与卡片色同为 `popover`，卡片就只剩一根描边、立不起来；
+  页头 `px-6 pt-5 pb-4` + `border-b border-border`（标题与分段控件同一行、说明在下一行），正文独立滚动、`px-6 py-5`。
+- 分段控件切「远程访问 / 中继」，**一次只挂载一块面板**：切走即卸载，取数与中继状态轮询随之停止。
+- 宽屏下单行控件并排（修改密码的两个字段、中继登录的账号与密码），说明行与按钮同行（配对链接、修改密码），
+  避免卡片里只剩一大块空白。
+- 页头的说明随分段换（就是原来设置里那两页的页头说明，含「通过鉴权等于本机 owner」这条安全提示），
+  挂 `DialogDescription`。
+- 两块面板沿用设置页的卡片与行（`SettingsGroup` / `SettingsRow` / `SettingsSectionHeader`），排布与控件选型不变。

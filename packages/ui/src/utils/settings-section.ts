@@ -16,13 +16,11 @@ export const SETTINGS_SECTION_IDS = [
   "browser",
   "mcp",
   "plugins",
-  "remote",
-  "hub",
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
 
-export const SETTINGS_GROUP_IDS = ["basics", "agent", "service"] as const;
+export const SETTINGS_GROUP_IDS = ["basics", "agent"] as const;
 
 export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number];
 
@@ -30,7 +28,6 @@ export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number];
 export const SETTINGS_GROUP_SECTIONS: Record<SettingsGroupId, readonly SettingsSectionId[]> = {
   basics: ["appearance", "models", "defaults"],
   agent: ["agents", "skills", "commands", "memory", "websearch", "browser", "mcp", "plugins"],
-  service: ["remote", "hub"],
 };
 
 /** 打开设置（侧栏、空态与命令面板入口）时默认落在哪一页 */

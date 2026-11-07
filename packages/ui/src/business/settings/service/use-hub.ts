@@ -1,7 +1,7 @@
 /**
- * 中继设置页的状态：接入状态、隧道阶段与登录 / 登出 / 写 provider，页面只管渲染。
+ * 中继面板的状态：接入状态、隧道阶段与登录 / 登出 / 写 provider，面板只管渲染。
  *
- * 隧道运行态（连接 / 重连 / 最近错误）不在事件流里，也没有变更通知：页面打开期间按间隔轮询，
+ * 隧道运行态（连接 / 重连 / 最近错误）不在事件流里，也没有变更通知：面板挂载期间按间隔轮询，
  * 另给一个手动刷新入口兜住「刚断线想立刻看结果」的场景。
  */
 import type { HubProviderResponse, HubStatusResponse } from "@ucode/contracts";
@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useStore } from "../../../hooks/use-store";
 import { useClient } from "../../../provider";
 
-/** 页面打开期间的轮询间隔：中继连接态的变化不频繁，够快也够省 */
+/** 面板打开期间的轮询间隔：中继连接态的变化不频繁，够快也够省 */
 const HUB_STATUS_POLL_MS = 5_000;
 
 /** 隧道在界面上的阶段：`ready` 展示为「已连接」，`halted` 是「被拒后停手」（重试无用） */
@@ -82,7 +82,7 @@ export function useHub(): Hub {
     }
   }, [client]);
 
-  // 挂载即取一次：状态只有这一页在看
+  // 挂载即取一次：状态只有这块面板在看
   useEffect(() => {
     void refresh();
   }, [refresh]);

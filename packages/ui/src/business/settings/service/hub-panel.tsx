@@ -1,5 +1,5 @@
 /**
- * 中继设置：登录 / 登出中继，查看设备绑定与隧道运行态，把它的模型端点写成本机的普通 provider。
+ * 中继面板：登录 / 登出中继，查看设备绑定与隧道运行态，把它的模型端点写成本机的普通 provider。
  *
  * 已接入时把「本机连中继用的地址」与「公网访问入口」分开说：后者由中继侧部署决定，本机推不出来，不拼。
  */
@@ -67,25 +67,27 @@ function LoginForm({ hub, defaultUrl }: { hub: Hub; defaultUrl: string }) {
           </p>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="hub-username">{t("账号")}</Label>
-          <Input
-            id="hub-username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="hub-username">{t("账号")}</Label>
+            <Input
+              id="hub-username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="hub-password">{t("密码")}</Label>
-          <Input
-            id="hub-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="space-y-1">
+            <Label htmlFor="hub-password">{t("密码")}</Label>
+            <Input
+              id="hub-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
         </div>
 
         <Button type="submit" size="sm" disabled={!canSubmit}>
@@ -281,7 +283,7 @@ function ConnectedView({ hub, data }: { hub: Hub; data: HubStatusResponse }) {
   );
 }
 
-export function SettingsHub() {
+export function HubPanel() {
   const { t } = useTranslation();
   const hub = useHub();
   const errorText = useErrorText(hub.error);

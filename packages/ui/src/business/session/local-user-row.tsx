@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "../../base/avatar";
 
 type LocalUserRowProps = {
-  /** 行尾动作，如侧栏的「设置」按钮；不传则只做身份展示 */
+  /** 行尾动作，如侧栏的「远程访问与中继」「设置」按钮；不传则只做身份展示 */
   action?: ReactNode;
   className?: string;
 };

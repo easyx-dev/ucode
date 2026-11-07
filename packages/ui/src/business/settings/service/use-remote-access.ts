@@ -17,7 +17,7 @@ export type RemoteAccess = {
   revoke: (id: string) => Promise<void>;
 };
 
-export function useRemoteAccess(open: boolean): RemoteAccess {
+export function useRemoteAccess(): RemoteAccess {
   const client = useClient();
   const [info, setInfo] = useState<ServiceInfoResponse | null>(null);
   const [sessions, setSessions] = useState<AuthSessionView[]>([]);
@@ -48,11 +48,10 @@ export function useRemoteAccess(open: boolean): RemoteAccess {
     });
   }, [client, run]);
 
+  // 面板挂载即取一次；弹窗关掉面板随之卸载，取数与二维码倒计时一并停止
   useEffect(() => {
-    if (!open) return;
-    setPairing(null);
     void refresh();
-  }, [open, refresh]);
+  }, [refresh]);
 
   return {
     info,

@@ -49,7 +49,6 @@ export default {
   返回工作区: "Back to workspace",
   基础设置: "Basics",
   "Agent 能力": "Agent capabilities",
-  服务: "Service",
   外观: "Appearance",
   模型设置: "Models",
   默认值: "Defaults",
@@ -843,6 +842,7 @@ export default {
 
   // Remote access
   远程访问: "Remote access",
+  远程访问与中继: "Remote access & relay",
   局域网访问: "LAN access",
   仅本机: "This device only",
   局域网: "LAN",

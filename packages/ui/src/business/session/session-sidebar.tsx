@@ -1,7 +1,7 @@
 /** 会话侧栏：品牌头、顶部功能菜单、项目 / 助理分类列表与底部身份区 */
 import { brand } from "@ucode/brand";
 import { cn } from "cn";
-import { Settings2 } from "lucide-react";
+import { RadioTower, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../base/brand-logo";
 import { Button } from "../../base/button";
@@ -44,6 +44,8 @@ type SessionSidebarProps = {
   onOpenWorkspace: () => void;
   onOpenAutomation: () => void;
   onOpenMarketplace: () => void;
+  /** 远程访问与中继：两者都是「把本机服务接到外部」的配置，共用一个弹窗 */
+  onOpenService: () => void;
   onOpenSettings: () => void;
 };
 
@@ -69,6 +71,7 @@ export function SessionSidebar({
   onOpenWorkspace,
   onOpenAutomation,
   onOpenMarketplace,
+  onOpenService,
   onOpenSettings,
 }: SessionSidebarProps) {
   const { t } = useTranslation();
@@ -122,9 +125,26 @@ export function SessionSidebar({
       <LocalUserRow
         className="shadow-edge"
         action={
-          <Button variant="ghost" size="icon-sm" title={t("设置")} onClick={onOpenSettings}>
-            <Settings2 className="size-icon-base" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title={t("远程访问与中继")}
+              aria-label={t("远程访问与中继")}
+              onClick={onOpenService}
+            >
+              <RadioTower className="size-icon-base" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title={t("设置")}
+              aria-label={t("设置")}
+              onClick={onOpenSettings}
+            >
+              <Settings2 className="size-icon-base" />
+            </Button>
+          </div>
         }
       />
     </aside>

@@ -6,11 +6,9 @@ import {
   Brain,
   Globe,
   type LucideIcon,
-  Network,
   Package,
   Palette,
   Plug,
-  RadioTower,
   SlidersHorizontal,
   Sparkles,
   Terminal,
@@ -35,7 +33,5 @@ export const useSettingsSectionMeta = (): Record<SettingsSectionId, SettingsSect
     browser: { label: t("浏览器"), icon: AppWindow },
     mcp: { label: t("MCP 服务器"), icon: Plug },
     plugins: { label: t("插件"), icon: Package },
-    remote: { label: t("远程访问"), icon: Network },
-    hub: { label: t("中继"), icon: RadioTower },
   };
 };

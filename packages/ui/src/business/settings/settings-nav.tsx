@@ -89,7 +89,6 @@ function DesktopNav({ section, onSectionChange, onClose }: SettingsNavProps) {
   const groupLabels: Record<SettingsGroupId, string> = {
     basics: t("基础设置"),
     agent: t("Agent 能力"),
-    service: t("服务"),
   };
 
   return (

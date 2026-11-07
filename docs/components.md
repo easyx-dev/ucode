@@ -46,7 +46,8 @@ packages/ui/src/
     attachment/ dialog/ notify/
     shell/            # 应用外壳级：登录页、主题 Provider、错误提示、命令面板
     settings/         # 设置面板
-      pages/          # 单个设置分页（外观、默认值、记忆、联网、远程访问）与它们的 hook
+      pages/          # 单个设置分页（外观、默认值、记忆、联网）与它们的 hook
+      service/        # 远程访问与中继：两者合成的弹窗与各自面板（侧栏页脚入口）
       models/ plugins/ mcp/ assets/   # 模型与供应商 / 插件 / MCP / 角色·技能·命令三块
     workbench/        # 工作台：面板骨架 + git/（变更与 diff）+ file/（文件与编辑器）+ terminal/（终端）
     usage/            # 用量统计

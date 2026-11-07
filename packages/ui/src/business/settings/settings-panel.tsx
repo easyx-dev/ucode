@@ -18,9 +18,7 @@ import { SettingsMcp } from "./mcp/settings-mcp";
 import { SettingsModels } from "./models/settings-models";
 import { SettingsAppearance } from "./pages/settings-appearance";
 import { SettingsDefaults } from "./pages/settings-defaults";
-import { SettingsHub } from "./pages/settings-hub";
 import { SettingsMemory } from "./pages/settings-memory";
-import { SettingsRemoteAccess } from "./pages/settings-remote-access";
 import { SettingsWebsearch } from "./pages/settings-websearch";
 import { SettingsPlugins } from "./plugins/settings-plugins";
 import { SettingsNav } from "./settings-nav";
@@ -214,28 +212,6 @@ function SectionContent({
           trailing={saveActions}
         >
           <SettingsPlugins />
-        </SettingsPage>
-      );
-    case "remote":
-      return (
-        <SettingsPage
-          title={meta.remote.label}
-          description={t(
-            "让同一网络下的设备接入本服务。通过鉴权的设备等于本机 owner，可驱动 agent 读写文件、执行命令。",
-          )}
-          trailing={saveActions}
-        >
-          <SettingsRemoteAccess />
-        </SettingsPage>
-      );
-    case "hub":
-      return (
-        <SettingsPage
-          title={meta.hub.label}
-          description={t("把本机接入中继：登录后由服务维持隧道，中继侧的请求转给本机服务。")}
-          trailing={saveActions}
-        >
-          <SettingsHub />
         </SettingsPage>
       );
   }
