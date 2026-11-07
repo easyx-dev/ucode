@@ -2361,7 +2361,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `connected` | boolean | 是 | 隧道是否已握手完成 |
+| `phase` | "connecting" \| "halted" \| "idle" \| "ready" \| "reconnecting" | 是 | 隧道所处阶段 |
 | `connectedAt` | string \| null | 是 | 本次上线时刻（ISO）；未连接为 null |
 | `lastError` | string \| null | 是 | 最近一次失败原因（中文，可直接展示）；已连上时为 null |
 | `reconnectAttempt` | number | 是 | 已发起的重连次数；连上后归零 |

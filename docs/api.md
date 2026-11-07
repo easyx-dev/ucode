@@ -15,7 +15,7 @@
 - `Content-Type: application/json`；无参数的接口也要发 `{}`（对应的 schema 是 `emptyInputSchema`）
 - 事件流 `/events` 是 SSE、附件路由收发原始字节，都不适用上面的 JSON 约定，见各自小节
 - **经中继（hub）进来的请求带来源标记**：`x-hub-source`（`tunnel`）/ `x-hub-device` / `x-hub-client`，
-  由 UCode 侧的中继客户端转发时注入；它只进请求日志与统计，**不参与鉴权**——鉴权仍只看本地凭证
+  由**中继的 ingress** 注入（UCode 侧只透传，不自己造）；它只进请求日志与统计，**不参与鉴权**——鉴权仍只看本地凭证
   （`serviceToken` / 会话）。因此转发方必须自己把关：经它到达 UCode 的请求等价于本机 owner 身份
   （见「鉴权 · 边界」）
 - **按路径挂载时另带 `x-hub-base-path`**（如 `/d/<设备 id>`）：中继把设备界面挂在它自己域名的路径下时注入，

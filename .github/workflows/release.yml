@@ -6,7 +6,8 @@ name: release
 #   2. 该版本还没在 registry 上——提前失败，好过注册表报 403；
 #   3. `pnpm pack:check` 的必需条目齐全——`files` 漏项不会让发布失败，只会让装出来的包缺界面。
 # 代码检查不在这里重复：check.yml 会在这个 tag 上跑完整的 `pnpm check`（与这个 job 并行，互不阻塞），
-# 这个 job 只管构建与打包。
+# 这个 job 只管构建与打包。**唯一的例外是隧道协议副本**：它在 hub 子仓库里，而 check.yml 与这里并行，
+# 所以这里自己比一次——两份不一致会让新旧版本互相握手失败，不能等到装完才发现。
 # 需要仓库 Secrets 里有 `NPM_TOKEN`（granular token，只勾这一个包的 read/write）。
 on:
   push:
@@ -28,6 +29,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 协议副本在 hub 子仓库里：不检出就无从比对（verify 会跳过该项并视为通过）
+          submodules: recursive
       # 版本取自 package.json 的 packageManager
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -38,6 +42,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: node scripts/ci-env.mjs
+      - run: pnpm verify -- --only hub-protocol
       - name: 校验 tag 与清单版本一致
         run: |
           expected="v$(node -p "require('./package.json').version")"

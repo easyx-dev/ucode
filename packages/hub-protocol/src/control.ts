@@ -6,8 +6,29 @@
  */
 import { z } from "zod";
 
+import { TUNNEL_ERROR_CODE_VALUES } from "./constants";
+
 const streamIdSchema = z.number().int().positive();
-const headerMapSchema = z.record(z.string(), z.string());
+
+/**
+ * 头的值：同名多值时是数组，单值时是字符串。
+ *
+ * 多值不是可选优化——`set-cookie` 按 RFC 不能逗号合并（`Expires` 自带逗号），
+ * 压成一条会让浏览器把多条 cookie 当一条并把属性吞掉。
+ */
+export type HeaderValue = string | string[];
+
+/** 一条消息的头表：键名保持发送方原样的大小写（转发侧按小写判定） */
+export type HeaderMap = Record<string, HeaderValue>;
+
+export const headerMapSchema = z.record(
+  z.string().min(1),
+  z.union([z.string(), z.array(z.string())]),
+);
+
+/** 头表的序列化字节数：两端用同一口径判定 `MAX_HEADER_BYTES` */
+export const headerBytes = (headers: HeaderMap): number =>
+  new TextEncoder().encode(JSON.stringify(headers)).byteLength;
 
 /** 客户端首帧：声明协议版本与自身信息 */
 export const helloFrameSchema = z.object({
@@ -26,10 +47,10 @@ export const welcomeFrameSchema = z.object({
   serverTime: z.string().min(1),
 });
 
-/** hub 拒绝握手（版本不匹配、设备未登记等） */
+/** hub 拒绝握手（版本不匹配、设备未登记、被接管等） */
 export const rejectFrameSchema = z.object({
   t: z.literal("reject"),
-  code: z.string().min(1),
+  code: z.enum(TUNNEL_ERROR_CODE_VALUES),
   message: z.string(),
 });
 
@@ -70,11 +91,14 @@ export const responseFrameSchema = z.object({
 /** 客户端 → hub：响应体发完 */
 export const responseEndFrameSchema = z.object({ t: z.literal("responseEnd"), id: streamIdSchema });
 
-/** 任一端：该流的失败（hub 侧转成 502 / 客户端侧记录后结束该流） */
+/**
+ * 任一端：该流的失败（hub 侧转成 502 / 客户端侧记录后结束该流）。
+ * `code` 取自协议词表——两端对同一份码表编程，不必猜对方的字符串。
+ */
 export const errorFrameSchema = z.object({
   t: z.literal("error"),
   id: streamIdSchema,
-  code: z.string().min(1),
+  code: z.enum(TUNNEL_ERROR_CODE_VALUES),
   message: z.string(),
 });
 

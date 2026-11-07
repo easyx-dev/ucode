@@ -23,7 +23,7 @@ const CONNECTED: HubStatusResponse = {
   deviceName: "dev-mac",
   running: true,
   runtime: {
-    connected: true,
+    phase: "ready",
     connectedAt: "2026-10-20T03:00:00.000Z",
     lastError: null,
     reconnectAttempt: 0,

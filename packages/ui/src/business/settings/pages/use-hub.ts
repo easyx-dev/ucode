@@ -14,8 +14,8 @@ import { useClient } from "../../../provider";
 /** 页面打开期间的轮询间隔：中继连接态的变化不频繁，够快也够省 */
 const HUB_STATUS_POLL_MS = 5_000;
 
-/** 隧道所处的阶段：已上线 / 握手中 / 退避重连中 / 没连 */
-export type HubPhase = "connected" | "connecting" | "reconnecting" | "offline";
+/** 隧道在界面上的阶段：`ready` 展示为「已连接」，`halted` 是「被拒后停手」（重试无用） */
+export type HubPhase = "connected" | "connecting" | "reconnecting" | "halted" | "offline";
 
 /** 登录表单：地址留空即沿用部署预置值，由这里收口成契约里的可选字段 */
 export type HubLoginForm = {
@@ -48,12 +48,24 @@ export type Hub = {
   addProvider: () => Promise<HubProviderResponse | null>;
 };
 
-/** 由两个布尔位推阶段：握手完成才算上线；「没运行但记着重连次数」即退避等待中 */
+/**
+ * 服务端的阶段直接映射到界面：`ready` 是「已连接」，`idle` 是「未连接」。
+ * 不再靠「连接布尔 + 重连次数」反推——`halted` 反推不出来。
+ */
 const phaseOf = (data: HubStatusResponse | null): HubPhase => {
   if (!data) return "offline";
-  if (data.runtime.connected) return "connected";
-  if (data.running) return "connecting";
-  return data.runtime.reconnectAttempt > 0 ? "reconnecting" : "offline";
+  switch (data.runtime.phase) {
+    case "ready":
+      return "connected";
+    case "connecting":
+      return "connecting";
+    case "reconnecting":
+      return "reconnecting";
+    case "halted":
+      return "halted";
+    default:
+      return "offline";
+  }
 };
 
 export function useHub(): Hub {

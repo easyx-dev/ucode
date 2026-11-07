@@ -9,6 +9,7 @@ import {
   HUB_DEVICE_REVOKE_PATH,
   HUB_HTTP_TIMEOUT_MS,
   HUB_LOGIN_PATH,
+  HUB_TUNNEL_TICKET_PATH,
 } from "../../constants/hub";
 
 export const HUB_CLIENT_ERROR_CODES = {
@@ -246,6 +247,24 @@ export const hubRegisterDevice = async (
   if (!device || !deviceToken) throw invalid("中继登记响应缺少 device 或 token");
 
   return { device, token: deviceToken };
+};
+
+/**
+ * 换一张隧道票据：用长期设备令牌换短时票据，隧道握手只认票据。
+ *
+ * 分这一步的意义在边界：签票由控制面查库（设备在册且未吊销），隧道只验签。
+ * 所以隧道那一侧不认识设备表，也没法绕过吊销做别的事。
+ */
+export const hubRequestTunnelTicket = async (url: string, deviceToken: string): Promise<string> => {
+  const payload = await callHub({
+    url,
+    path: HUB_TUNNEL_TICKET_PATH,
+    method: "POST",
+    token: deviceToken,
+  });
+  const ticket = readString(recordOf(payload)?.ticket);
+  if (!ticket) throw invalid("中继换票响应缺少 ticket");
+  return ticket;
 };
 
 /** 吊销设备：中继侧令牌立即失效，本机在登出时顺手调它（失败也不阻本机解绑） */

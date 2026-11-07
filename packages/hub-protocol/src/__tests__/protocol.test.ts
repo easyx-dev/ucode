@@ -129,4 +129,35 @@ describe("控制帧", () => {
     assert.equal(decodeControlFrame(JSON.stringify({ t: "request", id: 0 })), null);
     assert.equal(decodeControlFrame(JSON.stringify({ t: "error", id: 2, code: "x" })), null);
   });
+
+  it("头的同名多值原样保留（set-cookie 不能被逗号合并）", () => {
+    const response = decodeControlFrame(
+      encodeControlFrame({
+        t: "response",
+        id: 7,
+        status: 200,
+        headers: {
+          "content-type": "text/plain",
+          "set-cookie": ["a=1; Expires=Wed, 21 Oct 2025 07:28:00 GMT", "b=2; Path=/"],
+        },
+      }),
+    );
+    if (response?.t !== "response") assert.fail("应解析成响应帧");
+    assert.deepEqual(response.headers["set-cookie"], [
+      "a=1; Expires=Wed, 21 Oct 2025 07:28:00 GMT",
+      "b=2; Path=/",
+    ]);
+    assert.equal(response.headers["content-type"], "text/plain");
+  });
+
+  it("错误码只认协议词表", () => {
+    const frame = decodeControlFrame(
+      encodeControlFrame({ t: "error", id: 2, code: "device_offline", message: "离线" }),
+    );
+    assert.equal(frame?.t, "error");
+    assert.equal(
+      decodeControlFrame(JSON.stringify({ t: "error", id: 2, code: "made_up_code", message: "x" })),
+      null,
+    );
+  });
 });

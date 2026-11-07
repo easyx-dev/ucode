@@ -8,7 +8,7 @@
 import { env } from "../../env";
 import { pullCloudBuiltinAssets } from "../../harness/plugins/builtin/cloud";
 import { logger } from "../../platform/logger";
-import { getHubConfig, subscribeHubConfig } from "../hub/state";
+import { getHubConfig, subscribeHubConfig } from "../hub/config";
 
 const MODULE = "plugins.builtin";
 

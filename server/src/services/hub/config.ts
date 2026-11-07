@@ -1,10 +1,9 @@
 /**
- * 中继（hub）的配置与运行态。
+ * 中继（hub）的配置：地址、设备绑定与登录凭证。
  *
- * 配置落 `$APP_HOME/app/service.json` 的 `relay` 字段：它与本机 `serviceToken` / 登录密码同一份 0600 文件，
+ * 落 `$APP_HOME/app/service.json` 的 `relay` 字段——它与本机 `serviceToken` / 登录密码同一份 0600 文件，
  * 所以 `deviceToken` 与登录令牌同样明文存放（「读得到文件」就是本机身份证明，不必多一层哈希）。
  * 读写一律现读现写整份文件、不缓存副本：pid / host / port 由别的路径写同一个文件，缓存会让两边互相覆盖。
- * 运行态（连接与否、最近错误、重连次数）只在进程内存：重启后按配置重连，没有要持久化的东西。
  */
 import { deployment } from "@ucode/brand/values";
 
@@ -32,25 +31,6 @@ export type HubConfig = {
 
 /** 局部更新：字段为 `undefined` 表示不动它，为 `null` 表示清空 */
 export type HubConfigPatch = Partial<HubConfig>;
-
-/** 中继运行态：状态接口与界面据此显示「连没连上、上次为什么失败」 */
-export type HubRuntimeState = {
-  /** 隧道是否已握手完成 */
-  connected: boolean;
-  /** 本次上线时刻（ISO）；未连接为 null */
-  connectedAt: string | null;
-  /** 最近一次失败原因（中文，供界面直接显示）；已连上时为 null */
-  lastError: string | null;
-  /** 已发起的重连次数；连上后归零 */
-  reconnectAttempt: number;
-};
-
-const DISCONNECTED: HubRuntimeState = {
-  connected: false,
-  connectedAt: null,
-  lastError: null,
-  reconnectAttempt: 0,
-};
 
 /** 去掉末尾斜杠：地址要与固定路径拼接，留着会拼出 `//api/v1/...` */
 const normalizeUrl = (url: string | null | undefined): string | null => {
@@ -122,31 +102,3 @@ export const clearHubConfig = (): HubConfig =>
     token: null,
     username: null,
   });
-
-let runtimeState: HubRuntimeState = { ...DISCONNECTED };
-const stateListeners = new Set<(state: HubRuntimeState) => void>();
-
-export const getHubRuntimeState = (): HubRuntimeState => runtimeState;
-
-/** 更新运行态并广播；四个字段都没变时不广播（重连期间每秒一次的重复状态没必要推给订阅者） */
-export const setHubRuntimeState = (patch: Partial<HubRuntimeState>): HubRuntimeState => {
-  const next = { ...runtimeState, ...patch };
-  const unchanged =
-    next.connected === runtimeState.connected &&
-    next.connectedAt === runtimeState.connectedAt &&
-    next.lastError === runtimeState.lastError &&
-    next.reconnectAttempt === runtimeState.reconnectAttempt;
-  runtimeState = next;
-  if (unchanged) return next;
-
-  for (const listener of stateListeners) listener(next);
-  return next;
-};
-
-/** 订阅运行态（状态接口与界面据此更新）；返回取消订阅 */
-export const subscribeHubState = (listener: (state: HubRuntimeState) => void): (() => void) => {
-  stateListeners.add(listener);
-  return () => {
-    stateListeners.delete(listener);
-  };
-};

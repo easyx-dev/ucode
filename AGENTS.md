@@ -230,7 +230,8 @@ UI 改动**按需**在真实浏览器里看，不是每个改动都要看——�
   关键；改完显式 `pnpm build && pnpm restart` 停旧起新（`service restart` 按注册文件核对实例身份，
   对不上就跳过）。见 README「生产启动与自迭代」。
 - **发布走 tag**：`v*` tag 触发 `.github/workflows/release.yml`，校验 tag 与清单版本一致、该版本未发布、
-  这个提交上 `pnpm check` 全过、打包条目齐全，再 `pnpm publish`（依赖 Secrets 的 `NPM_TOKEN`）。
+  隧道协议两份副本一致、打包条目齐全，再 `pnpm publish`（依赖 Secrets 的 `NPM_TOKEN`）。
+  代码检查由 `check.yml` 在同一个 tag 上**并行**执行，不阻塞发布；因此发布 job 自己也跑一遍协议副本比对。
   手工发布与首次发布的前置见 README「发布到 npm」。
 
 ### 接口规范（server）
@@ -328,8 +329,10 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   Hono + node:sqlite 不共享代码；两者只通过 HTTP 打交道（hub 出站 WS 隧道 + UCode 侧中继客户端
   带本地 `serviceToken` 转发）。
 - **协议两份**：隧道协议在 `packages/hub-protocol`（本仓）与 `hub/packages/protocol`（hub 仓）各留一份，
-  协议本体必须一致——`pnpm verify` 的 `hub-protocol` 项逐文件比对（`__tests__` 除外：两侧测试框架不同）。
-  CI 以 `submodules: recursive` 检出，本地 submodule 没初始化时跳过并提示。**改协议要同时改两份**。
+  协议本体必须一致——`pnpm verify` 的 `hub-protocol` 项逐文件比对，**含注释逐字**（`__tests__` 除外：
+  两侧测试框架不同），所以改注释也要同步两份。本地 submodule 没初始化时该项跳过（先
+  `git submodule update --init`），`release.yml` 会以 `submodules: recursive` 检出并单独跑这一项。
+  **改协议要同时改两份，并升 `PROTOCOL_VERSION`**：线上可见的帧结构、头表达力、错误码词表都算不兼容变更。
 - **产物与镜像归 hub**：`hub/app/.output` 与 hub 的镜像都不在 UCode 的生产边界内（改它们不影响运行中的实例）。
 - **hub 的测试脚本自带 `NODE_ENV=test`**：本机与生产 shell 常见 `NODE_ENV=production`，那会让 react
   走 production 构建、`@testing-library` 的 `act` 失效，所以显式声明，不靠环境。

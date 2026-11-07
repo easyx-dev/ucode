@@ -42,9 +42,28 @@
 
 ### 变更
 
+- **对话区头部只复制会话 ID**：原来的「复制会话记录」（拉整份 JSONL 文本）改成复制会话标识，
+  不再现取几 MB 内容。
+- **隧道协议 v3**：响应头支持同名多值（`set-cookie` 不再被逗号合并）、线上错误码收成统一词表、
+  并发上限只由中继侧判定。两端需同时升级（协议版本不匹配会明确拒绝握手）。
+- **中继状态分阶段**：`/api/v1/hub/status` 的 `runtime` 由 `connected` 布尔改为 `phase`
+  （`idle` / `connecting` / `ready` / `reconnecting` / `halted`），并新增「被中继拒绝后停手」这一态。
+
 - **hub 生产部署独立成仓**：部署配置与运维脚本从 hub 仓的 `deploy/` 迁到独立仓 `ucode-hub-deploy`（本仓以 `hub-deploy`
   子模块挂载），生产只拉该仓检出到 `/opt/hub` 后执行 `./deploy.sh`；镜像由 hub 仓 CI 在 `v*` tag 上构建推到
   `ghcr.io/easyx-dev/ucode-hub`。
+
+### 修复
+
+- **对话消息列表上翻时视口不再自己跳**：图表、图片、代码高亮落定带来的行高修正，以及贴底跟随后
+  第一次上翻，都不会再把视口拽走或弹回底部。
+- **经中继访问时不再接受已撤销的登录令牌**：ingress 的准入补上令牌版本比对，登出 / 改密后被重置的
+  旧令牌不能再打穿到设备。
+
+### 移除
+
+- **会话原始记录接口下线**：`POST /api/v1/sessions/transcript` 与 SDK 的 `sessions.transcript` 移除；
+  要导出 JSONL 直接读 `$APP_HOME/harness/sessions/*.jsonl`。
 
 ## [0.6.1] - 2026-11-06
 

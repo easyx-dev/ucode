@@ -15,7 +15,7 @@ const statusOf = (patch: Partial<HubStatusResponse> = {}): HubStatusResponse => 
   deviceId: null,
   deviceName: null,
   running: false,
-  runtime: { connected: false, connectedAt: null, lastError: null, reconnectAttempt: 0 },
+  runtime: { phase: "idle", connectedAt: null, lastError: null, reconnectAttempt: 0 },
   ...patch,
 });
 
@@ -27,7 +27,7 @@ const CONNECTED = statusOf({
   deviceName: "mac",
   running: true,
   runtime: {
-    connected: true,
+    phase: "ready",
     connectedAt: "2026-01-01T00:00:00.000Z",
     lastError: null,
     reconnectAttempt: 0,

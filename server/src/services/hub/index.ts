@@ -12,13 +12,17 @@ import type { AppConfigPatchInput, HubProviderResponse, ProviderConfig } from "@
 import { logger } from "../../platform/logger";
 import { serviceVersion } from "../../platform/version";
 import { hubLogin, hubRegisterDevice, hubRevokeDevice } from "./client";
+import { clearHubConfig, getHubConfig, saveHubConfig } from "./config";
+import { resolveEndpoint } from "./endpoint";
 import { createHubProviderInjector } from "./provider";
-import { clearHubConfig, getHubConfig, getHubRuntimeState, saveHubConfig } from "./state";
+import { getHubRuntimeState } from "./runtime";
 import { createHubTunnel } from "./tunnel";
 
 export type { HubDevice } from "./client";
-export type { HubConfig, HubRuntimeState } from "./state";
-export { getHubConfig, getHubRuntimeState, subscribeHubState } from "./state";
+export type { HubConfig } from "./config";
+export { getHubConfig } from "./config";
+export type { HubRuntimeState } from "./runtime";
+export { getHubRuntimeState, subscribeHubState } from "./runtime";
 
 /** 对外状态：界面据此显示「接了哪台中继、登的谁、隧道通没通」 */
 export type HubStatus = {
@@ -84,7 +88,8 @@ export const createHubService = (deps: HubServiceDeps): HubService => {
   const statusOf = (): HubStatus => {
     const config = getHubConfig();
     return {
-      configured: Boolean(config.url && config.deviceId && config.deviceToken),
+      // 与「能不能连」同源：地址与设备令牌齐备即可，设备 id 只用于日志
+      configured: resolveEndpoint(config).kind === "ready",
       url: config.url,
       username: config.username,
       deviceId: config.deviceId,

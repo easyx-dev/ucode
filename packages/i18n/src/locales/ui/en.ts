@@ -900,12 +900,15 @@ export default {
   隧道: "Tunnel",
   已连接: "Connected",
   重连中: "Reconnecting",
+  已停止: "Stopped",
   未连接: "Not connected",
   "本机已与中继建立隧道，中继上的请求可以转给本机服务。":
     "The tunnel to the relay is up; requests on the relay can be forwarded to this service.",
   "正在与中继建立隧道连接。": "Establishing the tunnel to the relay.",
   "连接已断开，正在按退避重试；重连成功前请求无法转给本机。":
     "The connection dropped and is being retried with backoff; until it reconnects, requests can't be forwarded to this machine.",
+  "中继拒绝了本机设备，重试无用：请重新登录中继，或检查两端的隧道协议版本。":
+    "The relay rejected this device and retrying won't help: sign in to the relay again, or check the tunnel protocol versions on both ends.",
   "当前没有隧道连接。": "There is no tunnel connection right now.",
   上线时间: "Online since",
   最近错误: "Last error",
@@ -949,9 +952,8 @@ export default {
     "The system didn't deliver the notification — check the system notification settings (unsigned apps are blocked on macOS).",
   "当前环境不支持系统通知。": "This environment doesn't support system notifications.",
 
-  // Session transcript（会话原始记录导出）
-  复制会话记录: "Copy session log",
-  "复制中…": "Copying…",
+  // Session ID（复制会话 ID）
+  "复制会话 ID": "Copy session ID",
 
   // Usage steps（步级耗时）
   步级耗时: "Per-step timings",

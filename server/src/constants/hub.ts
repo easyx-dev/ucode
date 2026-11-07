@@ -26,6 +26,9 @@ export const HUB_LOGIN_PATH = "/api/v1/auth/login";
 export const HUB_DEVICE_REGISTER_PATH = "/api/v1/devices/register";
 export const HUB_DEVICE_REVOKE_PATH = "/api/v1/devices/revoke";
 
+/** 换隧道票据：设备令牌换一张短时票据，隧道握手只认票据（见 hub 的 `tunnel-ticket.server`） */
+export const HUB_TUNNEL_TICKET_PATH = "/api/v1/devices/tunnel-ticket";
+
 /** 中继 HTTP 调用（登录与设备接口）的单次超时：登录要连带查库与比对 bcrypt，比内网接口慢 */
 export const HUB_HTTP_TIMEOUT_MS = 15_000;
 

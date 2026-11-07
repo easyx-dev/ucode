@@ -1,9 +1,19 @@
 /** hub 域的响应模型：中继接入状态（状态查询、登录与登出回的是同一份结构） */
 
-/** 隧道运行态：状态接口与界面据此显示「连没连上、上次为什么失败」 */
+/**
+ * 隧道所处阶段：
+ * - `idle`：未启用或缺少地址 / 设备令牌，没有可连的东西；
+ * - `connecting`：正在连或正在握手；
+ * - `ready`：已握手完成，中继可以往这条隧道上开流；
+ * - `reconnecting`：退避等待下一次尝试；
+ * - `halted`：中继明确拒绝（凭据无效、协议不兼容），重试无用，等配置变化或进程重启。
+ */
+export type HubRuntimePhase = "idle" | "connecting" | "ready" | "reconnecting" | "halted";
+
+/** 隧道运行态：状态接口与界面据此显示「连没连上、上次为什么失败、还能不能自己恢复」 */
 export type HubRuntimeView = {
-  /** 隧道是否已握手完成 */
-  connected: boolean;
+  /** 隧道所处阶段 */
+  phase: HubRuntimePhase;
   /** 本次上线时刻（ISO）；未连接为 null */
   connectedAt: string | null;
   /** 最近一次失败原因（中文，可直接展示）；已连上时为 null */

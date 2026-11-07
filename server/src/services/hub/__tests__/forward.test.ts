@@ -2,15 +2,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  buildDownstreamHeaders,
-  buildUpstreamHeaders,
-  forwardToLocal,
-  type LocalForwardFailure,
-  type LocalTarget,
-  resolveUpstreamUrl,
-  toHeaderRecord,
-} from "../forward";
+import { forwardToLocal, type LocalForwardFailure, type LocalTarget } from "../forward";
+import { buildDownstreamHeaders, buildUpstreamHeaders, toHeaderMap } from "../header-policy";
+import { resolveUpstreamUrl } from "../local-target";
 
 const TARGET: LocalTarget = { origin: "http://127.0.0.1:19688", serviceToken: "service-token" };
 
@@ -75,17 +69,17 @@ describe("buildDownstreamHeaders", () => {
   });
 });
 
-describe("toHeaderRecord", () => {
-  it("单值原样、多值按 HTTP 规则逗号连接、undefined 丢掉", () => {
-    const record = toHeaderRecord({
+describe("toHeaderMap", () => {
+  it("单值原样、多值保留数组（set-cookie 不能逗号合并）、undefined 丢掉", () => {
+    const map = toHeaderMap({
       "content-type": "application/json",
-      "set-cookie": ["a=1", "b=2"],
+      "set-cookie": ["a=1; Expires=Wed, 21 Oct 2025 07:28:00 GMT", "b=2; Path=/"],
       etag: undefined,
     });
 
-    assert.deepEqual(record, {
+    assert.deepEqual(map, {
       "content-type": "application/json",
-      "set-cookie": "a=1, b=2",
+      "set-cookie": ["a=1; Expires=Wed, 21 Oct 2025 07:28:00 GMT", "b=2; Path=/"],
     });
   });
 });

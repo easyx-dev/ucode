@@ -4,8 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-
-import type { RequestFrame } from "@ucode/hub-protocol";
+import type { HeaderMap, RequestFrame } from "@ucode/hub-protocol";
 
 import { forwardUpgradeToLocal, type UpgradeSocketLike } from "../ws-forward";
 
@@ -97,13 +96,13 @@ class FakeSocket implements UpgradeSocketLike {
 }
 
 const createHarness = (
-  connect?: (url: string, headers: Record<string, string>) => UpgradeSocketLike,
+  connect?: (url: string, headers: HeaderMap) => UpgradeSocketLike,
   options: { frame?: RequestFrame; onDataPending?: Promise<void> } = {},
 ) => {
   const socket = new FakeSocket();
   const frame = options.frame ?? FRAME;
   const onDataPending = options.onDataPending;
-  let seen: { url: string; headers: Record<string, string> } | null = null;
+  let seen: { url: string; headers: HeaderMap } | null = null;
   const events: string[] = [];
   const data: Uint8Array[] = [];
   const textFlags: boolean[] = [];

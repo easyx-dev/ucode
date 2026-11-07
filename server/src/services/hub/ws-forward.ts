@@ -7,10 +7,17 @@
  * 本机连接建好之前到达的上行字节先排队（`MAX_UPGRADE_BUFFER_BYTES` 封顶）：握手往返期间用户敲的键
  * 不能丢，但也不能无限攒。socket 由调用方注入，这样这条泵的逻辑可以脱网单测。
  */
-import { MAX_UPGRADE_BUFFER_BYTES, type RequestFrame } from "@ucode/hub-protocol";
+import {
+  type HeaderMap,
+  MAX_UPGRADE_BUFFER_BYTES,
+  type RequestFrame,
+  TUNNEL_ERROR_CODES,
+} from "@ucode/hub-protocol";
 import { type RawData, WebSocket } from "ws";
 
-import { HUB_FORWARD_ERROR_CODES, type LocalForwardFailure, type LocalTarget } from "./forward";
+import type { LocalForwardFailure, LocalTarget } from "./forward";
+import { buildHandshakeHeaders } from "./header-policy";
+import { resolveUpgradeUrl } from "./local-target";
 
 /** 本机连接：只声明用到的几件事，测试注入假的实现 */
 export type UpgradeSocketLike = {
@@ -94,41 +101,14 @@ export const truncateCloseReason = (reason: string | undefined): string | undefi
 };
 
 /**
- * 本机服务的 WebSocket 端点。路径形态与普通 HTTP 转发同一套判据（`forward.ts` 的
- * `resolveUpstreamUrl`）：非 `/` 开头会被解析成主机名的一部分（`ws://127.0.0.1:19688@other/x`
- * 的主机就是 `other`），凭证会跟着握手头送到那个主机上。
+ * 由本机客户端自己决定、不能从帧里带进来的头见 `header-policy.ts`：
+ * `sec-websocket-*` 由 `ws` 自己生成，`host` 与凭证由本侧重算。
  */
-export const resolveUpgradeUrl = (origin: string, path: string): string | null => {
-  if (!path.startsWith("/") || path.startsWith("//")) return null;
-  return `${origin.replace(/^http/, "ws")}${path}`;
-};
-
-/** 由本机客户端自己决定、不能从帧里带进来的头（与普通 HTTP 转发的剥头口径一致） */
-const REBUILT_HANDSHAKE_HEADERS = new Set(["host", "content-length", "cookie", "authorization"]);
-
-/**
- * 转发的头里只留业务相关的：WS 握手的 `sec-websocket-*` 由本机客户端自己生成
- * （原样带过去会和它生成的那份冲突），`host` 与凭证由本侧重算。
- */
-const handshakeHeaders = (
-  headers: Record<string, string>,
-  serviceToken: string,
-): Record<string, string> => {
-  const picked: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers)) {
-    const lower = name.toLowerCase();
-    if (lower.startsWith("sec-websocket-") || REBUILT_HANDSHAKE_HEADERS.has(lower)) continue;
-    picked[name] = value;
-  }
-  picked.authorization = `Bearer ${serviceToken}`;
-  return picked;
-};
-
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /** 默认连接：`ws` 客户端可以直接带自定义头（浏览器环境不行，这里是 Node） */
-const connectWebSocket = (url: string, headers: Record<string, string>): UpgradeSocketLike => {
+const connectWebSocket = (url: string, headers: HeaderMap): UpgradeSocketLike => {
   const socket = new WebSocket(url, { headers });
   return {
     onOpen: (listener) => socket.on("open", listener),
@@ -166,7 +146,7 @@ const INERT_HANDLE: UpgradeForwardHandle = {
 export const forwardUpgradeToLocal = (
   input: { frame: RequestFrame; target: LocalTarget },
   handlers: UpgradeForwardHandlers,
-  connect: (url: string, headers: Record<string, string>) => UpgradeSocketLike = connectWebSocket,
+  connect: (url: string, headers: HeaderMap) => UpgradeSocketLike = connectWebSocket,
 ): UpgradeForwardHandle => {
   const { frame, target } = input;
   /** 本机连接就绪前排队的上行块（带文本标记） */
@@ -195,10 +175,10 @@ export const forwardUpgradeToLocal = (
     handlers.onError(failure);
   };
 
-  const url = resolveUpgradeUrl(target.origin, frame.path);
+  const url = resolveUpgradeUrl(target, frame.path);
   if (!url) {
     fail({
-      code: HUB_FORWARD_ERROR_CODES.invalidRequest,
+      code: TUNNEL_ERROR_CODES.invalidRequest,
       message: `隧道升级请求的路径非法：${frame.path}`,
     });
     return INERT_HANDLE;
@@ -206,10 +186,10 @@ export const forwardUpgradeToLocal = (
 
   let socket: UpgradeSocketLike;
   try {
-    socket = connect(url, handshakeHeaders(frame.headers, target.serviceToken));
+    socket = connect(url, buildHandshakeHeaders(frame.headers, target.serviceToken));
   } catch (error) {
     fail({
-      code: HUB_FORWARD_ERROR_CODES.localUnreachable,
+      code: TUNNEL_ERROR_CODES.localUnreachable,
       message: `连不上本机服务：${reasonOf(error)}`,
     });
     return INERT_HANDLE;
@@ -236,7 +216,7 @@ export const forwardUpgradeToLocal = (
       },
       (error) =>
         fail({
-          code: HUB_FORWARD_ERROR_CODES.localFailed,
+          code: TUNNEL_ERROR_CODES.localFailed,
           message: `回传本机 WebSocket 数据失败：${reasonOf(error)}`,
         }),
     );
@@ -244,13 +224,13 @@ export const forwardUpgradeToLocal = (
   socket.onClose((code, reason) => settle(toSendableCloseCode(code), reason));
   socket.onError((error) =>
     fail({
-      code: HUB_FORWARD_ERROR_CODES.localFailed,
+      code: TUNNEL_ERROR_CODES.localFailed,
       message: `本机 WebSocket 出错：${reasonOf(error)}`,
     }),
   );
   socket.onUnexpectedResponse((status) =>
     fail({
-      code: HUB_FORWARD_ERROR_CODES.localRejected,
+      code: TUNNEL_ERROR_CODES.localRejected,
       message: `本机拒绝了 WebSocket 升级：HTTP ${status}`,
       httpStatus: status,
     }),
@@ -269,7 +249,7 @@ export const forwardUpgradeToLocal = (
         // 本机连不上而浏览器一直发：断开而不是把上行攒进内存
         socket.terminate();
         fail({
-          code: HUB_FORWARD_ERROR_CODES.localFailed,
+          code: TUNNEL_ERROR_CODES.localFailed,
           message: "本机 WebSocket 建连前上行数据超过缓冲上限",
         });
         return;

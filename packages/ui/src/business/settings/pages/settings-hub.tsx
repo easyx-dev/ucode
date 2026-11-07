@@ -106,12 +106,14 @@ function TunnelStatus({ data, phase }: { data: HubStatusResponse; phase: HubPhas
     connected: t("已连接"),
     connecting: t("连接中"),
     reconnecting: t("重连中"),
+    halted: t("已停止"),
     offline: t("未连接"),
   };
   const hints: Record<HubPhase, string> = {
     connected: t("本机已与中继建立隧道，中继上的请求可以转给本机服务。"),
     connecting: t("正在与中继建立隧道连接。"),
     reconnecting: t("连接已断开，正在按退避重试；重连成功前请求无法转给本机。"),
+    halted: t("中继拒绝了本机设备，重试无用：请重新登录中继，或检查两端的隧道协议版本。"),
     offline: t("当前没有隧道连接。"),
   };
 
