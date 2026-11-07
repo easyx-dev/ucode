@@ -110,7 +110,36 @@ GET /builtin/assets/<id>/<version>     # 内容（二进制或 JSON），逐文�
 | 5 · UCode 侧 | 中继客户端服务层 + `/api/v1/hub/{status,login,logout}` 路由与契约 + SDK `hub` store + 设置页「中继」一节 + i18n / 错误码映射 + `docs/hub.md`；**端到端已验**（未鉴权 401、登录后 `configured/deviceId` 就位、隧道 `connected:true`、经隧道访问 200、登出后 502、地址不可达给 `hub_unreachable`）（**已完成**） |
 | 6 · 后置 | 中继模型端点 + 用量统计（后台按运营、**前台「我的用量」按用户**）+ 内置资产云同步；**端到端已验**：假上游转发 200 / 流式逐帧带 usage / 用量落库 / 未鉴权 401 / 限流第 61 次起 429（换设备额度独立）/ `/admin/usage` 与 `/usage` 页可达 / 发布→清单→拉取→物化→二次拉取 skipped / 一键注入的 relay provider 被运行时认作默认模型且凭据可用（**已完成**） |
 | 7 · 交付 | 部署内容（compose、部署 / 备份脚本、`nginx.conf.example`：TLS / WS 升级 / 事件流不缓冲 / 泛子域 ingress）+ 逐企业部署说明（含「先 init 再开域名」）（**已完成**；后于 2026-11-06 从 hub 仓的 `deploy/` 迁到独立仓，以 `hub-deploy` submodule 挂载到本仓） |
-| 8 · 隧道 WebSocket | 协议 v2：`request.upgrade` + `close` 帧 + 数据帧文本变体；hub 侧路径寻址的 WS 终结、UCode 侧桥接本机 WebSocket（工作台终端、内置浏览器面板）。两端单测与「升级请求被判给专用 route、普通 GET 仍回灌」已实测，真机走查待验证 |
+| 8 · 隧道 WebSocket | 协议 v2：`request.upgrade` + `close` 帧 + 数据帧文本变体；hub 侧路径寻址的 WS 终结、UCode 侧桥接本机 WebSocket（工作台终端、内置浏览器面板）。两端单测与「升级请求被判给专用 route、普通 GET 仍回灌」已实测；真机走查已验，结论记在 UCode 侧 `docs/hub.md` 的限制表（协议 v3 下工作台终端与内置浏览器面板都可用，子域寻址回 501）（**已完成**） |
+| 9 · 收尾 | 见下节（**进行中**）：e2e 可运行、模型端点并发口径、资产来源进界面、文档补齐 |
+
+## 阶段 9 · 收尾（进行中，2026-11-07 复核）
+
+功能面已齐（0–8 全落地，hub 已发 v0.2.0），剩下的是「能不能验」与「口径一致」。已复现的阻塞排在前面。
+
+| 项 | 现象与落点 | 验收 |
+| --- | --- | --- |
+| E2E 端口 | `.env` 的 `PORT=3009` 压过 `--port 3100`（实测 `vite dev --port 3105` 仍绑 3010），而 `hub/app/playwright.config.ts` 的 `webServer.url` 等的是 `http://localhost:3100/health`——等不到，必然超时 | **已完成**：`webServer.env` 显式给 `PORT: "3100"`，并补 `JWT_SECRET` / `STORAGE_DIR`（产物启动不读 `.env`） |
+| E2E 起服务即崩 | 本机 `pnpm e2e` 与 `vite dev` 都中止于 `EMFILE: too many open files, watch` | **已完成**：e2e 改跑构建产物（`pnpm e2e:build` → `.tmp/e2e-output`，不覆盖本机实例的 `.output`），另给 `HUB_E2E_OUTPUT_DIR` 控制落点 |
+| E2E 用例与现有界面脱节 | 修完上面两条后暴露出来的存量漂移：① 注册类用例全部重定向到 `/login`（`client_register_enabled` 预设为 false）；② 忘记密码断言旧文案「该邮箱未注册」（服务端已统一为「该邮箱不可用于重置密码」防邮箱枚举）；③ 后台登录侧边栏断言撞上仪表盘 KPI（`getByText('客户端用户')` 命中 2 个） | **已完成**：seed 里落一条 `client_register_enabled=true`、断言改新文案、侧边栏断言限定在 `navigation` 内 |
+| **遗留：管理端列表页间歇性崩溃** | `Maximum update depth exceeded`（React #185）→ 错误边界「页面出错了」。后台列表页首次加载/交互时约 10% 命中（`pnpm e2e` 42 条里 2 条，`--repeat-each` 可复现）。栈在所有帧都是 React 内部（`checkForNestedUpdates` ← `forceStoreRerender` ← 订阅回调），即**某个 `useSyncExternalStore` 的 `getSnapshot` 每次返回新值**。已排除：`useTableBodyHeight` 的测量反馈（已改成滚动无关的偏移，仍会复现）。候选：`react-i18next` 的 `useTranslation`（快照缓存按 `namespaces` / `keyPrefix` 身份比对）与 TanStack Router 的 `useLoaderData` / `useRouterState` 选择器 | 复现：`pnpm e2e --repeat-each=3`（**不带 `--`**：多一个 `--` 会把选项当成位置过滤器吞掉，实测会直接跑全量而不是重复）；需要非生产 React 构建拿组件栈（`NODE_ENV=development vite build` 会把服务端构建弄坏，得单独造一个只给 client 用 dev React 的调试产物） |
+| 模型端点并发 | 只有按调用方每分钟 60 / 120（`hub/app/src/services/model-endpoint/rate-limit.ts:15,18`），代码注释明写不排队；而 ingress 的流是 64 条超限 429（`tunnel_busy`）。同一产品里两个面对并发的口径不一致 | **已拍板**：按设备加并发上限、超限立刻 429（与 ingress 同口径），待实现 |
+| 资产来源与版本 | `origin` / `fetchedAt` 只在服务端 manifest（`server/src/harness/plugins/builtin/manifest.ts:28,34`）；契约 `AssetView`（`packages/contracts/src/assets/output.ts:11`）没有这两个字段，设置页只显示「内置」档位（`packages/ui/src/business/settings/assets/asset-list-item.tsx:36`） | 云端下发一条资产后，设置页能看到来源与拉取时间；无中继时退回单个「内置」徽标 |
+| 文档与例子 | `hub/.agents/skills/i18n/SKILL.md:37` 的例子用设备名，而工程里真正接了翻译抽屉的是 `dict_item` / `system_config`；本文件的「待定」有 5 条悬着 | 例子换成真实接入的两张表；「待定」逐条落成结论或移进阶段 9 |
+| 子模块指针 | 父仓指针停在 `1e352f3`，hub 已 tag `v0.2.0`（`5d71a34`），`git status` 的 `M hub` 即此 | 单独一个 `chore(hub): 子模块指针跟到 v0.2.0` 提交 |
+
+### 需要拍板
+
+- **模型端点限并发**：A) 按设备加并发上限、超限立刻 429（与 ingress 同口径，推荐）；B) 排队等名额（客户端会变慢，且要定超时）；C) 维持现状并只补一句文档说明。
+- **内置资产是否签名**（原「待定」）：v1 只靠中继鉴权 + 逐文件 sha256，签名留作后续加固。
+- **存量页是否按 `app/src/routes/index.tsx` 重做**（消息中心等）：已迁到 antd + SPA 栈，剩文案与版式口径，属审美判断。
+- **TLS 终止位置**：v1 由中继终止（nginx 前置），是否要改到更前面。
+
+### 本轮不做
+
+- 短信通知渠道（`hub/app/src/shared-services/notify/sms.ts:12` 直接返回未实现）。
+- 子域寻址的 WebSocket 升级（回 501，已写进 UCode 侧限制表）。
+- 中继供应商强制注入：一直是显式动作，不自动写入配置。
 
 ## 待定
 
