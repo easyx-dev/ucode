@@ -11,6 +11,11 @@ import {
 export type ComposerDraftsController = {
   /** 全部草稿，按上下文键索引；读取方用 `emptyDraft()` 兜底 */
   drafts: Record<string, ComposerDraft>;
+  /**
+   * 读某个上下文的最新草稿（同步、读 ref）：同一个事件里连着追加两次时，
+   * 渲染期的 `drafts` 还没更新，只能靠它取到上一次刚写进去的内容。
+   */
+  read: (key: string) => ComposerDraft | undefined;
   /** 合并写入某个上下文的草稿并落盘 */
   update: (key: string, patch: Partial<ComposerDraft>) => void;
   /** 清掉某个上下文的草稿（发送成功 / 会话归档） */
@@ -27,6 +32,8 @@ export function useComposerDrafts(): ComposerDraftsController {
     writeComposerDrafts(next);
     setDrafts(next);
   }, []);
+
+  const read = useCallback((key: string) => draftsRef.current[key], []);
 
   const update = useCallback(
     (key: string, patch: Partial<ComposerDraft>) => {
@@ -45,5 +52,5 @@ export function useComposerDrafts(): ComposerDraftsController {
     [commit],
   );
 
-  return { drafts, update, clear };
+  return { drafts, read, update, clear };
 }

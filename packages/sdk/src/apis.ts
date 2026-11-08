@@ -30,6 +30,18 @@ import type {
   ConfigSnapshot,
   ConfigTestRequest,
   ConfigTestResponse,
+  DesignDocRequest,
+  DesignDocResponse,
+  DesignFilesRequest,
+  DesignFilesResponse,
+  DesignNodeDetail,
+  DesignNodeRequest,
+  DesignRender,
+  DesignRenderRequest,
+  DesignSelection,
+  DesignSelectRequest,
+  DesignSnapshot,
+  DesignSnapshotRequest,
   FsListRequest,
   FsListResponse,
   FsMkdirRequest,
@@ -300,6 +312,22 @@ export const createApis = (options: ApisOptions = {}) => {
       /** 重排项目：`paths` 是侧栏里从上到下的目录次序 */
       reorder: (body: ProjectReorderRequest) =>
         transport.post<ProjectListResponse>("projects/reorder", body),
+    },
+    design: {
+      /** 结构摘要：页面表、节点摘要、画布选中集与引用前缀 */
+      snapshot: (body: DesignSnapshotRequest) =>
+        transport.post<DesignSnapshot>("design/snapshot", body),
+      /** 整页 drawing；带上 `revision` 且与文档一致时 `svg` 为 null（画布据此跳过重绘） */
+      render: (body: DesignRenderRequest) => transport.post<DesignRender>("design/render", body),
+      /** 写回画布选中集 */
+      select: (body: DesignSelectRequest) => transport.post<DesignSelection>("design/select", body),
+      /** 文档级动作：flush / reset / setPage / createPage */
+      doc: (body: DesignDocRequest) => transport.post<DesignDocResponse>("design/doc", body),
+      /** 项目里的设计稿文件清单（「设计」视图侧栏） */
+      files: (body: DesignFilesRequest) =>
+        transport.post<DesignFilesResponse>("design/files", body),
+      /** 一个节点的完整属性（属性浮窗），读本会话当前在改的那份 */
+      node: (body: DesignNodeRequest) => transport.post<DesignNodeDetail>("design/node", body),
     },
     goals: {
       /** 设定 / 替换当前会话目标；由服务端起第一轮 */

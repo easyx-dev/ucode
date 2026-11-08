@@ -1,5 +1,12 @@
 /** 助手模式选择器：切换当前会话的能力三元组（工具 / 权限 / 提示词） */
-import { ClipboardList, Compass, Hammer, type LucideIcon, MessageSquare } from "lucide-react";
+import {
+  ClipboardList,
+  Compass,
+  Hammer,
+  LayoutTemplate,
+  type LucideIcon,
+  MessageSquare,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -27,11 +34,12 @@ type ModePickerProps = {
   onSelect: (mode: string) => void;
 };
 
-/** 模式图标：编码动手、计划列清单、问答只答疑 */
+/** 模式图标：编码动手、计划列清单、问答只答疑、设计出稿 */
 const ICONS: Record<string, LucideIcon> = {
   build: Hammer,
   plan: ClipboardList,
   ask: MessageSquare,
+  design: LayoutTemplate,
 };
 
 export function ModePicker({

@@ -31,6 +31,12 @@ export { type AssetsState, type AssetsStore, createAssetsStore } from "./stores/
 export { type AuthState, type AuthStore, createAuthStore } from "./stores/auth";
 export { type CommandAssets, type CommandsStore, createCommandsStore } from "./stores/commands";
 export { type ConfigState, type ConfigStore, createConfigStore } from "./stores/config";
+export {
+  createDesignStore,
+  type DesignCanvasState,
+  type DesignState,
+  type DesignStore,
+} from "./stores/design";
 export { createGoalStore, type GoalInput, type GoalState, type GoalStore } from "./stores/goal";
 export { createHubStore, type HubState, type HubStore } from "./stores/hub";
 export {

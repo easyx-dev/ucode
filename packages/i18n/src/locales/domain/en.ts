@@ -38,6 +38,8 @@ export default {
   "目录不在 git 仓库内：{{path}}": "Directory is not inside a git repository: {{path}}",
   "未找到 git 可执行文件": "No git executable found",
   "git 执行失败": "git command failed",
+  "设计稿里没有这个页面或节点：{{ref}}": "The design has no such page or node: {{ref}}",
+  "设计引用不匹配：{{ref}}": "Design reference does not match: {{ref}}",
   终端不存在或已结束: "The terminal does not exist or has already exited",
   终端数量已达上限: "Terminal limit reached for this directory",
   "图片无效：{{reason}}": "Invalid image: {{reason}}",

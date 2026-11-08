@@ -14,9 +14,15 @@
  * 编辑态复用输入区的编辑器（见 `message-edit-form`），改写后重发，旧分支留在会话文件里。
  */
 
-import { contextMarker, parseEntryText, userMessageText } from "@ucode/markdown";
+import {
+  contextMarker,
+  designAnchorLabel,
+  parseEntryText,
+  splitDesignAnchors,
+  userMessageText,
+} from "@ucode/markdown";
 import { cn } from "cn";
-import { Pencil, Sparkles } from "lucide-react";
+import { LayoutTemplate, Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "../../../base/button";
@@ -77,6 +83,27 @@ function ContextChip({ path }: { path: string }) {
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * 正文里的设计画布锚点。
+ *
+ * 锚点（`@design:<会话>/<页>/<节点>`）在方言里是字面文本——它不是文件引用，服务端不会去磁盘上找它，
+ * 所以也不会变成引用 chip。这里把它收成一枚 chip：正文里露出一长串 uuid 既难看又没法读。
+ *
+ * 不提供跳转：锚点可能属于别的会话，打开别人的设计稿是另一回事；悬停给原文，需要时自己复制。
+ */
+function DesignAnchorChip({ anchor, nodeId }: { anchor: string; nodeId: string }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className={`${CHIP_CLASS} mx-0.5 align-baseline font-mono`}
+      title={t("设计节点：{{label}}\n{{anchor}}", { label: designAnchorLabel(nodeId), anchor })}
+    >
+      <LayoutTemplate className="size-icon-xs shrink-0" aria-hidden />
+      {t("设计节点")} {designAnchorLabel(nodeId)}
+    </span>
   );
 }
 
@@ -255,7 +282,21 @@ export function UserMessage({
             {segments.map((segment, index) =>
               segment.type === "text" ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: 分段由文本顺序决定，没有自然 id
-                <span key={`${item.id}-seg-${index}`}>{segment.text}</span>
+                <span key={`${item.id}-seg-${index}`}>
+                  {splitDesignAnchors(segment.text).map((part, partIndex) =>
+                    part.type === "text" ? (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
+                      <span key={`${item.id}-seg-${index}-${partIndex}`}>{part.text}</span>
+                    ) : (
+                      <DesignAnchorChip
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
+                        key={`${item.id}-seg-${index}-${partIndex}`}
+                        anchor={part.anchor}
+                        nodeId={part.nodeId}
+                      />
+                    ),
+                  )}
+                </span>
               ) : segment.type === "context" ? (
                 <ContextChip
                   // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份

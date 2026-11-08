@@ -128,6 +128,7 @@ export function BrowserPanel({ tabId, active }: { tabId: string; active: boolean
       // null = 用户按了 Esc：什么都不做
       if (picked)
         insertPickedContext({
+          kind: "pageElement",
           // 芯片上给可访问名；没有就退成标签名，总比一枚空芯片强
           label: picked.name.trim() || `<${picked.tag}>`,
           text: elementSummaryText(picked, { url: currentUrl, title }),

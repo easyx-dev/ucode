@@ -324,6 +324,9 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
     services.permissions.clear(id);
     services.sessions.setGoal(id, null);
     services.pool.forgetServices(id);
+    // 设计稿的「当前在改哪份」是内存指针：归档后不会再被访问，这里显式丢掉
+    // （不能只靠 `pool.dispose`——从没进过池的会话在那里会早退）
+    services.design.forget(id);
     services.sessions.archive(id);
     // 先广播归档再清序号：客户端只按 type 处理，seq 不参与列表口径
     services.events.emitSessionArchived(id);

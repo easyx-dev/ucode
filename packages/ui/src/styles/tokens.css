@@ -196,6 +196,12 @@
     transparent
   );
 
+  /*
+   * 画布选中框：稿件自己的深浅与界面主题无关，所以不能用 primary / ring（两者都是中性色，
+   * 在深色稿上会消失）。固定一支饱和蓝，深底浅底都看得见。
+   */
+  --canvas-selection: var(--color-blue-500);
+
   /* 主色：浅色近黑、深色近白 */
   --primary: var(--theme-primary);
   --primary-foreground: var(--theme-primary-fg);
@@ -370,6 +376,7 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-ring: var(--ring);
+  --color-canvas-selection: var(--canvas-selection);
   --color-overlay: var(--overlay);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);

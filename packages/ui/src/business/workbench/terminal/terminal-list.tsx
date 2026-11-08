@@ -60,7 +60,7 @@ export function TerminalList() {
               <li
                 key={terminal.id}
                 className={cn(
-                  "group mx-1 flex h-7 items-center gap-1 rounded-md pr-1 pl-2 text-xs",
+                  "group flex h-7 items-center gap-1 pr-1 pl-2 text-xs",
                   active
                     ? "bg-state-selected text-foreground"
                     : "text-foreground-subtle hover:bg-state-hover hover:text-foreground",

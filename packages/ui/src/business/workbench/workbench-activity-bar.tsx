@@ -17,10 +17,12 @@ export function WorkbenchActivityBar() {
   const translate = t as (key: string) => string;
   const workbench = useWorkbench();
   if (!workbench) return null;
-  // 浏览器入口只在宿主注入了那一面时出现（web 端没有内置浏览器）
-  const views: WorkbenchView[] = workbench.browser
-    ? [...WORKBENCH_VIEWS, "browser"]
-    : [...WORKBENCH_VIEWS];
+  // 浏览器入口只在宿主注入了那一面时出现（web 端没有内置浏览器）；设计画布始终在列
+  const views: WorkbenchView[] = [
+    ...WORKBENCH_VIEWS,
+    ...(workbench.browser ? (["browser"] as const) : []),
+    "design",
+  ];
 
   return (
     <div

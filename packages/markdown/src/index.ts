@@ -12,6 +12,12 @@
 
 export type { ContainerFence } from "./containers.ts";
 export { scanContainers } from "./containers.ts";
+export type { DesignAnchorPart } from "./design-anchor.ts";
+export {
+  designAnchorLabel,
+  hasDesignAnchor,
+  splitDesignAnchors,
+} from "./design-anchor.ts";
 export type { MentionKind, PageElementContext } from "./doc-nodes.ts";
 export {
   appendNodesToDoc,
@@ -20,6 +26,8 @@ export {
   attachmentOrdinalInDoc,
   commandNode,
   contextNode,
+  DESIGN_NODE_NODE,
+  designNodeNode,
   isDocEmpty,
   PAGE_ELEMENT_NODE,
   pageElementNode,

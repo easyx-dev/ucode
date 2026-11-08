@@ -8,12 +8,13 @@
 import {
   appendNodesToDoc,
   type DocNode,
+  designNodeNode,
   docToDialect,
   pageElementNode,
   textToDoc,
 } from "@ucode/markdown";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../base/resizable";
@@ -47,7 +48,7 @@ import { useSessions } from "../../hooks/store/use-sessions";
 import { useStatus } from "../../hooks/store/use-status";
 import { useActiveSession } from "../../hooks/use-active-session";
 import { usePanelLayout } from "../../hooks/use-panel-layout";
-import { ComposerInsertProvider, type PickedPageContext } from "../../provider/composer-insert";
+import { type ComposerInsert, ComposerInsertProvider } from "../../provider/composer-insert";
 import type { WorkbenchBrowserSurface } from "../../provider/workbench";
 import { WorkbenchProvider } from "../../provider/workbench";
 import type { ChatItem, EditMessagePayload } from "../../types";
@@ -150,36 +151,35 @@ export function WorkspaceLayout({
   // 工作台显隐按项目记忆：助理工作区与草稿态没有项目，回落全局键
   const workbenchProjectId = projectOf(projects.projects, workbenchCwd)?.id ?? null;
   /**
-   * 把「从页面上选中的元素」落进当前输入框：宿主给摘要文本，这里追加到当前草稿的文档尾部并落盘
+   * 把「外部选中的内容」落进当前输入框：宿主给芯片名与正文载荷，这里追加到当前草稿的文档尾部并落盘
    * （与「编辑重发」「/命令填充」同一条路：改草稿的 doc，输入框自己会同步）。
+   *
+   * 两种来源只有载荷不同（页面元素是整段摘要、设计节点是一个锚点），落法一样：都是一枚行内芯片。
    */
   const insertPickedContext = useCallback(
-    (picked: PickedPageContext) => {
+    (item: ComposerInsert) => {
       const key = composerKeyOf(activeId);
-      const current = composer.drafts[key];
+      // 读 ref 而不是 `composer.drafts`：多选「加入对话（N 个）」会在同一个事件里连插 N 枚，
+      // 读渲染期的 state 会让每一次都从同一个空 base 出发，最后只剩最后一枚
+      const current = composer.read(key);
       const base =
         (current?.doc as DocNode | undefined) ??
         (current?.text ? textToDoc(current.text) : undefined);
+      const chip =
+        item.kind === "designNode"
+          ? designNodeNode({ label: item.label, anchor: item.anchor })
+          : pageElementNode({ label: item.label, summary: item.text, ...(item.meta ?? {}) });
       // 芯片是行内节点，得自己裹一个段落：直接落进 doc 顶层会被 schema 拒掉
-      const doc = appendNodesToDoc(base, [
-        {
-          type: "paragraph",
-          content: [
-            pageElementNode({
-              label: picked.label,
-              summary: picked.text,
-              ...(picked.meta ?? {}),
-            }),
-          ],
-        },
-      ]);
+      const doc = appendNodesToDoc(base, [{ type: "paragraph", content: [chip] }]);
       composer.update(key, { doc, text: docToDialect(doc, {}) });
     },
     [activeId, composer],
   );
 
+  const designMode = activeSession?.mode === "design";
   const workbench = useWorkbenchController({
     cwd: workbenchCwd,
+    sessionId: activeId,
     projectId: workbenchProjectId,
     isDesktop: chrome.isDesktop,
     setSheetOpen: chrome.setWorkbenchSheetOpen,

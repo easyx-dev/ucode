@@ -41,6 +41,7 @@ import {
   DEFAULT_BROWSER_SETTINGS,
   NOOP_BROWSER_HOOKS,
 } from "../harness/features/browser/hooks";
+import type { DesignHooks } from "../harness/features/design/hooks";
 import type { GoalService } from "../harness/features/goal";
 import { parseGoalState } from "../harness/features/goal/state";
 import type { PromptImage } from "../harness/features/image";
@@ -185,6 +186,11 @@ export class SessionPool {
       hooks: () => [],
       mcpServers: () => [],
     },
+    /**
+     * 设计画布入口：由 services 构造后注入。内核不认识文档实现，只把它转给装配层；
+     * 会话离池时落盘并释放引用（下一次访问重新读盘）。
+     */
+    private readonly design?: DesignHooks,
   ) {
     this.backgroundServices = new BackgroundServices(events);
     // 交互请求的出现与结算都改变会话状态（等待授权 / 等待回答），要补一帧摘要，
@@ -751,6 +757,7 @@ export class SessionPool {
       ...(isSubagent ? {} : { services: this.serviceWatchHooks(record) }),
       browser: this.browser,
       browserSettings: this.browserSettings,
+      ...(this.design ? { design: this.design.toolHooks({ sessionId, cwd }) } : {}),
       agentRegistry: registry,
       pluginAssets: this.plugin.commandAssets(cwd),
       pluginExtensionPaths: this.plugin.extensionPaths(cwd),
@@ -1163,6 +1170,9 @@ export class SessionPool {
     this.goals.forget(sessionId);
     // 浏览器实例按 profile 共享：离池只放掉引用，真正关掉交给空闲回收或最后一个引用者
     this.browser.release(sessionId);
+    // 设计稿按文件归口：离池只放掉文档引用（没人再看就落盘回收），会话的「当前在改哪份」留着——
+    // 画布还开着，出池（空闲 / 改配置 / 换模式）之后 agent 还要接着改同一份
+    this.design?.release(sessionId);
     // 挂起审批 / 提问按失败结算，避免回答打到已释放的实例：子会话的请求挂在父会话下
     // 并带 source 标注，主会话的请求就挂在自己名下
     const parentSessionId = this.repository.find(sessionId)?.parentSessionId ?? null;

@@ -49,7 +49,7 @@ packages/ui/src/
       pages/          # 单个设置分页（外观、默认值、记忆、联网）与它们的 hook
       service/        # 远程访问与中继：两者合成的弹窗与各自面板（侧栏页脚入口）
       models/ plugins/ mcp/ assets/   # 模型与供应商 / 插件 / MCP / 角色·技能·命令三块
-    workbench/        # 工作台：面板骨架 + git/（变更与 diff）+ file/（文件与编辑器）+ terminal/（终端）
+    workbench/        # 工作台：面板骨架 + git/（变更与 diff）+ file/（文件与编辑器）+ terminal/（终端）+ design/（设计画布、图层与属性浮窗）
     usage/            # 用量统计
   provider/           # UiProvider：注入应用层创建好的 client；外观偏好的事实源也在这里
   presets/workspace/  # 预置组合：入口 + 按关注点拆的 hook（外壳几何 / 工作台 / 会话动作 / 目标与计划 / 内置命令 / 快捷键）

@@ -22,6 +22,7 @@ import type { EditorProps } from "@tiptap/pm/view";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import type { DialectDiagnostic } from "@ucode/markdown";
 import {
+  DESIGN_NODE_NODE,
   escapeDialect,
   hasDialectSyntax,
   type InvocationCandidates,
@@ -32,6 +33,7 @@ import type { RefObject } from "react";
 import { isTouchInput } from "../../../utils/platform";
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
 import { findCommandMatch } from "./command-trigger";
+import { DesignNodeChipView } from "./design-node-chip";
 import { createDialectMarks } from "./dialect-marks";
 import { createDialectSuggestion } from "./dialect-suggestion";
 import { composerKeyIntentOf } from "./key-intent";
@@ -169,6 +171,31 @@ const PageElementMention = Mention.extend({
 });
 
 /**
+ * 设计画布上选出来的节点：与页面元素同形（芯片 + 只在正文里出锚点），
+ * 但不从键盘输入来，因此没有触发符、也就没有建议弹层。
+ */
+const DesignNodeMention = Mention.extend({
+  name: DESIGN_NODE_NODE,
+  addAttributes() {
+    return {
+      label: { default: null },
+      anchor: { default: null },
+    };
+  },
+  addProseMirrorPlugins() {
+    return [];
+  },
+  addKeyboardShortcuts() {
+    return {};
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(DesignNodeChipView);
+  },
+  /** 正文里的锚点由方言投影生成，序列化到剪贴板时不再夹带一份 */
+  renderText: () => "",
+});
+
+/**
  * `@`：任意位置，候选由 `contextItems` 给（异步检索文件）；`enabled` 为假则整个菜单停用
  */
 const createContextMention = (callbacks: ComposerCallbacks, enabled: boolean) =>
@@ -274,6 +301,7 @@ export const createComposerExtensions = (
   }),
   AttachmentMention,
   PageElementMention,
+  DesignNodeMention,
   Placeholder.configure({ placeholder: flags.placeholder }),
 ];
 

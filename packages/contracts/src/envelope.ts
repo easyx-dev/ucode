@@ -104,6 +104,11 @@ export const ERROR_CODES = {
   /** git 命令执行失败 */
   gitFailed: "git_failed",
 
+  /** 设计稿里没有这一页或这个节点 */
+  designNotFound: "design_not_found",
+  /** 设计引用锚点指向别的会话、别的页，或指向已删节点 */
+  designAnchorMismatch: "design_anchor_mismatch",
+
   /** 终端不存在或已结束 */
   terminalNotFound: "terminal_not_found",
   /** 该工作目录下的终端数已达上限 */

@@ -95,6 +95,19 @@ export const usesDefaultToolSet = (capability: ResolvedCapability): boolean =>
  */
 const READ_ONLY_FORBIDDEN_TOOLS = WRITE_TOOLS.filter((tool) => !isObservingBrowserTool(tool));
 
+/**
+ * 是否给这个会话挂「全权特征」的那批东西：记忆写入、目标结算、MCP 与 tool_search。
+ *
+ * 判据是能力而不是模式 slug：默认工具集（扩展可见）+ 没被规则断掉写盘 + 主会话。
+ * 这样 build / design 都算全权，plan / ask 与任何只读角色都不算，子会话也不替父会话做这些事
+ * （不必再逐处 `mode === "build"`，那是模式清单与能力清单两套事实源）。
+ */
+export const canWriteHarnessState = (
+  capability: ResolvedCapability,
+  profile: AgentProfile,
+): boolean =>
+  profile.kind === "primary" && usesDefaultToolSet(capability) && !isReadOnlyCapability(capability);
+
 export const isReadOnlyCapability = (capability: ResolvedCapability): boolean =>
   READ_ONLY_FORBIDDEN_TOOLS.every(
     (tool) => evaluateRules(capability.permissions, { tool, subject: "" }).action === "deny",

@@ -38,6 +38,8 @@ export const errorMessageKeys = {
   not_a_repository: "目录不在 git 仓库内：{{path}}",
   git_unavailable: "未找到 git 可执行文件",
   git_failed: "git 执行失败",
+  design_not_found: "设计稿里没有这个页面或节点：{{ref}}",
+  design_anchor_mismatch: "设计引用不匹配：{{ref}}",
   terminal_not_found: "终端不存在或已结束",
   terminal_limit: "终端数量已达上限",
   image_invalid: "图片无效：{{reason}}",

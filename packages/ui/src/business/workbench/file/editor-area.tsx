@@ -11,6 +11,7 @@ import { FilePlus2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Empty } from "../../../base/empty";
 import { useWorkbench } from "../../../provider/workbench";
+import { DesignCanvas } from "../design/design-canvas";
 import { ChangesStack } from "../git/changes-stack";
 import { GitFileDiff } from "../git/git-file-diff";
 import { CommitDetail } from "../git/git-history";
@@ -70,6 +71,8 @@ export function EditorArea({
               <ChangesStack path={doc.path} reloadToken={review.reloadToken} />
             ) : doc.kind === "commit" ? (
               <CommitDetail path={doc.path} commit={doc.commit} reloadToken={review.reloadToken} />
+            ) : doc.kind === "design" ? (
+              <DesignCanvas path={doc.path} />
             ) : (
               <TerminalView terminalId={doc.terminalId} />
             )}

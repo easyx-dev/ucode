@@ -19,6 +19,8 @@
     "@hono/node-server": "catalog:",
     "@hono/node-ws": "catalog:",
     "@hono/zod-validator": "catalog:",
+    "@open-pencil/core": "catalog:",
+    "@open-pencil/scene-graph": "catalog:",
     "@ucode/brand": "workspace:*",
     "@ucode/contracts": "workspace:*",
     "@ucode/hub-protocol": "workspace:*",

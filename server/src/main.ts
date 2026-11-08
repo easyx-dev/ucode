@@ -83,8 +83,11 @@ const shutdown = () => {
   logger.info("关闭中…");
   writeServicePid(env.servicePath, null);
   services.pool.disposeAll();
-  services.close();
-  server.close(() => process.exit(0));
+  // 先停收新请求，再等收尾（设计稿落盘 + 停库）落地才退：`process.exit` 不等未完成的 fs 写
+  const closing = services.close();
+  server.close(() => {
+    void closing.finally(() => process.exit(0));
+  });
   setTimeout(() => process.exit(0), 1500).unref();
 };
 

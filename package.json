@@ -67,6 +67,8 @@
     "@hono/node-server": "catalog:",
     "@hono/node-ws": "catalog:",
     "@hono/zod-validator": "catalog:",
+    "@open-pencil/core": "catalog:",
+    "@open-pencil/scene-graph": "catalog:",
     "execa": "catalog:",
     "fflate": "catalog:",
     "fuzzysort": "catalog:",

@@ -34,7 +34,12 @@ export type WorkbenchDoc =
    * 浏览器标签（仅桌面端有）。`tabId` 对 `@ucode/ui` 是不透明标识，由宿主拿去对应自己的 webview
    * （见 `WorkbenchBrowserSurface.renderTab`）；web 端不注入浏览器面，开不出这种标签。
    */
-  | { id: string; kind: "browser"; tabId: string };
+  | { id: string; kind: "browser"; tabId: string }
+  /**
+   * 设计画布。一份稿子就是一个文件，所以按**路径**开标签：同一个文件重复打开只激活已有的那个，
+   * 不同文件各占一格（和文本文件同一套习惯）。
+   */
+  | { id: string; kind: "design"; path: string };
 
 /** 同时打开的标签数上限；超出丢最早的那个 */
 export const MAX_WORKBENCH_DOCS = 8;
@@ -82,6 +87,15 @@ export const terminalDoc = (terminalId: string): WorkbenchDoc => ({
   id: terminalDocId(terminalId),
   kind: "terminal",
   terminalId,
+});
+
+export const designDocId = (path: string): string => `design:${path}`;
+
+/** 一份稿子一个标签；重复打开只激活已有的那个 */
+export const designDoc = (path: string): WorkbenchDoc => ({
+  id: designDocId(path),
+  kind: "design",
+  path,
 });
 
 export const browserDocId = (tabId: string): string => `browser:${tabId}`;

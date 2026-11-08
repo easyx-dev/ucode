@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Empty } from "../../base/empty";
 import { useWorkbench } from "../../provider/workbench";
+import { DesignFilesPanel } from "./design/design-files-panel";
 import { FileTree } from "./file/file-tree";
 import { buildGitMarks } from "./git/git-marks";
 import { ReviewTree } from "./git/review-tree";
@@ -31,8 +32,10 @@ export function WorkbenchSidebar({
   const marks = useMemo(() => buildGitMarks(review.status.data ?? null), [review.status.data]);
 
   if (!workbench) return null;
-  // 浏览器不依赖工作目录，所以排在「没有工作目录」的占位之前
+  // 浏览器与设计画布都不依赖工作目录，所以排在「没有工作目录」的占位之前
   if (workbench.view === "browser") return <>{workbench.browser?.sidebar ?? null}</>;
+  // 设计视图的侧栏是「项目里的稿子」，图层树在画布标签里（可隐藏）
+  if (workbench.view === "design") return <DesignFilesPanel />;
   if (!cwd) {
     return (
       <Empty

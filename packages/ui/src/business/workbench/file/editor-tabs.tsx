@@ -15,6 +15,7 @@ import {
   FileDiff,
   GitCommitHorizontal,
   Layers,
+  LayoutTemplate,
   PanelRightClose,
   SquareTerminal,
   X,
@@ -53,6 +54,7 @@ const titleOf = (
     return t("终端 {{index}}", { index: String(terminalSequence ?? 1) });
   }
   if (doc.kind === "browser") return t("浏览器 {{index}}", { index: doc.tabId.replace(/^t/, "") });
+  if (doc.kind === "design") return baseName(doc.path) || doc.path;
   return `${doc.commit.shortHash} ${doc.commit.subject}`.trim();
 };
 
@@ -62,6 +64,7 @@ const iconOf = (doc: WorkbenchDoc) => {
   if (doc.kind === "changes") return Layers;
   if (doc.kind === "terminal") return SquareTerminal;
   if (doc.kind === "browser") return AppWindow;
+  if (doc.kind === "design") return LayoutTemplate;
   return doc.kind === "diff" ? FileDiff : GitCommitHorizontal;
 };
 

@@ -155,6 +155,11 @@ const inlineTextOf = (nodes: readonly DocNode[], state: Projection): string => {
       text += kind === "skill" ? `/skill:${name}` : `/${name}`;
       continue;
     }
+    if (node.type === "designNodeMention") {
+      // 设计节点在方言里就是那个锚点：它自带会话、页与节点，工具侧能校验归属
+      text += asString(node.attrs?.anchor);
+      continue;
+    }
     if (node.type === "pageElementMention") {
       // 芯片在方言里落成完整摘要：模型看字段，芯片只是给人看的
       text += asString(node.attrs?.summary);

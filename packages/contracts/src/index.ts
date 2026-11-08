@@ -18,6 +18,8 @@ export * from "./common";
 export * from "./config/input";
 export * from "./config/output";
 export * from "./constants";
+export * from "./design/input";
+export * from "./design/output";
 export * from "./envelope";
 export * from "./events";
 export * from "./fs/input";

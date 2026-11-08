@@ -22,6 +22,7 @@ import {
   changeDoc,
   changesDoc,
   commitDoc,
+  designDoc,
   fileDoc,
   terminalDoc,
   terminalDocId,
@@ -54,6 +55,7 @@ export type WorkbenchController = {
 
 export function useWorkbenchController({
   cwd,
+  sessionId,
   projectId,
   isDesktop,
   setSheetOpen,
@@ -61,6 +63,8 @@ export function useWorkbenchController({
 }: {
   /** 相对路径的解析基准：当前会话工作目录（草稿态取草稿里选的目录） */
   cwd: string | null;
+  /** 当前会话 id：设计画布按它取稿 */
+  sessionId: string | null;
   /** 显隐记忆按项目走；null 表示没有项目（助理工作区 / 草稿态），回落全局键 */
   projectId: string | null;
   isDesktop: boolean;
@@ -149,6 +153,21 @@ export function useWorkbenchController({
   }, [cwd, docs.open, show]);
 
   const { open: openDoc, close: closeDocOf, closeOthers, closeAll } = docs;
+
+  /**
+   * 打开一份稿子的画布标签：切到设计视图（侧栏是稿子清单）、展开面板。
+   *
+   * 稿子按**文件**开标签，不再是「一个会话一张固定画布」——同一个文件重复打开只激活已有的那个。
+   */
+  const openDesign = useCallback(
+    (path: string) => {
+      docs.open(designDoc(path));
+      setView("design");
+      setSidebarVisible(true);
+      show();
+    },
+    [docs.open, show],
+  );
 
   /** 浏览器标签的编号：宿主只当它是不透明标识；换目录清标签后不回退，避免重复编号 */
   const browserTabSeq = useRef(0);
@@ -245,17 +264,24 @@ export function useWorkbenchController({
     else show();
   }, [applyOpen, isDesktop, open, setSheetOpen, show]);
 
-  /** 活动栏：点当前视图即收起侧栏，点另一个视图即切换并展开 */
+  /**
+   * 活动栏：点当前视图即收起侧栏，点另一个视图即切换并展开。
+   *
+   * 设计视图顺带确保画布标签在（不像终端那样「视图只列清单、标签自己开」）：设计视图的侧栏是图层树，
+   * 离开画布就只是一棵点不动的树。
+   */
   const selectView = useCallback(
     (next: WorkbenchView) => {
       setSidebarVisible((visible) => (next === view ? !visible : true));
       setView(next);
     },
-    [view],
+    [openDoc, view],
   );
 
   const api = useMemo<WorkbenchApi>(
     () => ({
+      sessionId,
+      openDesign,
       view,
       selectView,
       sidebarVisible,
@@ -294,6 +320,8 @@ export function useWorkbenchController({
       applyOpen,
       browser,
       closeAllDocs,
+      openDesign,
+      sessionId,
       closeDoc,
       closeOtherDocs,
       createTerminal,

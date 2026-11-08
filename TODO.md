@@ -80,11 +80,13 @@ web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分�
 
 - **已失效**：`core/pool.ts` 的 `bindExtensions` 现在对所有会话无条件调用（`:790`），扩展门控已改成
   能力谓词（`harness/setup/session-config.ts:203-208`）；`profiles.ts` 的行号是 75 不是 72。
-- **真正要改的服务端 7 处**：记忆工具（`session-config.ts:341-344` + `prompt/index.ts:39`，顺带修
-  「plan / ask 讲了记忆却不给工具」的不一致，`prompt/index.ts:69,84`）、目标（`routes/goals/index.ts:57`、
-  `harness/features/goal/index.ts:180`、`routes/sessions/index.ts:233`，另加已有的谓词
-  `session-config.ts:285-288`）、待确认计划（`core/pool.ts:1115` 的 slug 前置门）、清单收敛
-  （`routes/agents/index.ts:36,42`、`agents/custom.ts:257` 改用 `PRIMARY_PROFILES` 的键）。
+- **记忆工具已收口**（加设计模式时顺手做的）：`session-config.ts` 与 `prompt/index.ts` 不再各自判
+  `mode === "build"`，统一走 `capability.ts` 的 `canWriteHarnessState`（默认集 + 未断写盘 + 主会话）/
+  `isWritableMode`，plan / ask「讲了记忆却不给工具」的不一致也一并修掉。
+- **真正还要改的服务端 4 处**：目标（`routes/goals/index.ts:57`、`harness/features/goal/index.ts:180`、
+  `routes/sessions/index.ts:233`，另加已有的谓词 `session-config.ts:285-288`）、待确认计划
+  （`core/pool.ts` 的 slug 前置门）、清单收敛（`routes/agents/index.ts:36,42`、`agents/custom.ts:257`
+  改用 `PRIMARY_PROFILES` 的键）。
 - **界面 3 处**：`presets/workspace-layout.tsx:370,376`（后者把批准后的模式硬切到 `"build"`，
   自定义 plan 类角色会被掰走）、`business/mode-picker.tsx:14,53` 改吃 `agents/list`（该接口目前零调用点）、
   `chat-panel.tsx:423` 的硬编码 `"build"`。
@@ -129,10 +131,3 @@ web 端背景图已定口径「用纯色、不做图」（见 `DESIGN.md`「分�
 **待办**：接渲染器做客户端预览（pdf 与 docx 的库选型要单独评估体积与许可），本期明确不做；待确认。
 
 ---
-
-## 需求 · 设计功能与设计模式
-
-**现象**：希望新增一个「设计」功能，参考 `/Users/lyy/code/project/dsh-super/dsh-plus-plugin` 的实现；
-同时界面上要有一个「设计模式」，与现有「计划模式」并列。
-
-**待办**：待确认（参考实现的能力边界、设计模式与计划模式的权限差异、入口落点均未定）。

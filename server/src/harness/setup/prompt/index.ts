@@ -13,7 +13,13 @@
  */
 import { brand } from "@ucode/brand/values";
 import { MEMORY_TOOL_NAMES } from "../../features/memory/tools";
-import { type AgentProfile, primaryToolNames, type SubagentSlug } from "../agents";
+import {
+  type AgentProfile,
+  isReadOnlyCapability,
+  primaryCapability,
+  primaryToolNames,
+  type SubagentSlug,
+} from "../agents";
 import { WRITE_TOOLS } from "../tools/names";
 import { catalogFor, type PromptLocale } from "./locales";
 import { DEFAULT_PROMPT_VARIANT, type PromptCatalog, type PromptVariant } from "./types";
@@ -32,12 +38,18 @@ export type PromptBuildInput = {
   memoryEnabled?: boolean;
 };
 
+/**
+ * 该模式是否「全权」（未被规则收窄到只读）。记忆工具按它判：模型读不到自己拿不到的工具名，
+ * 这一段漏写就等于记忆写入在编码 / 设计模式里不生效。
+ */
+const isWritableMode = (mode: string): boolean => !isReadOnlyCapability(primaryCapability(mode));
+
 /** 当前可用工具名：优先用显式传入的（已与父能力取交集），否则按模式解析 */
 const promptToolNames = (input: PromptBuildInput): string[] => {
   const base = input.tools ? [...input.tools] : primaryToolNames(input.mode);
   return [
     ...base,
-    ...(input.memoryEnabled && input.mode === "build" ? [...MEMORY_TOOL_NAMES] : []),
+    ...(input.memoryEnabled && isWritableMode(input.mode) ? [...MEMORY_TOOL_NAMES] : []),
   ];
 };
 

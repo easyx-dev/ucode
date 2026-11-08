@@ -1,6 +1,7 @@
 /** 角色注册表与能力解析的统一出口。 */
 
 export {
+  canWriteHarnessState,
   effectiveToolNames,
   hasPrimaryMode,
   isReadOnlyCapability,

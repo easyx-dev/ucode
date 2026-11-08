@@ -428,12 +428,12 @@ export type CompactionNotice =
 
 /**
  * 会话模式：决定工具集、权限与提示词倾向（见 `docs/modes-and-permissions.md`）。
- * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答。
+ * `build` 编码（默认）/ `plan` 只出计划 / `ask` 只读问答 / `design` 在设计画布上出稿。
  *
  * 这里是**内置默认集合**：`sessions` 的 `mode` 是字符串 slug，允许自定义 primary agent
  * 覆盖同名内置项或另取新名，服务端按 agent 注册表校验（见 `plans/input-commands-skills.md`）。
  */
-export const SESSION_MODES = ["build", "plan", "ask"] as const;
+export const SESSION_MODES = ["build", "plan", "ask", "design"] as const;
 
 export type SessionMode = (typeof SESSION_MODES)[number];
 

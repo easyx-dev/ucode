@@ -20,10 +20,10 @@
 ## 会话模式
 
 模式是主会话角色（primary agent）的 slug，决定能力三元组（提示词片段 + 工具集 + 权限规则）。
-内置三个，声明在 `server/src/harness/setup/agents/profiles.ts`，工具名清单在 `server/src/harness/setup/tools/names.ts`。
+内置四个，声明在 `server/src/harness/setup/agents/profiles.ts`，工具名清单在 `server/src/harness/setup/tools/names.ts`。
 工具集里有两个条件注册项：记忆工具与目标结算工具（`goal_complete` / `goal_blocked`）只在**会话有 active 目标**
-时挂上，且仅限**未断写盘**的默认集会话（即 `build`；判定见 `isReadOnlyCapability`）——只读模式不该有
-「结算目标」这回事，子会话不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复
+时挂上，且仅限**未断写盘**的默认集主会话（`build` 与 `design`；判定 `canWriteHarnessState` =
+`usesDefaultToolSet` 且 `!isReadOnlyCapability`）——只读模式不该有「结算目标」这回事，子会话不该替父目标结算。目标工具因此不会在设完目标就立即生效：`goals/set` 与恢复
 会先把会话池里的实例重装一次（会话文件是权威，重建不丢上下文）。
 
 | 模式 | 界面文案 | 工具集 | 专属权限规则 | 推荐思考档位 | 用途 |
@@ -31,6 +31,13 @@
 | `build` | 编码 | 默认集：`read` / `bash` / `edit` / `write` / `grep` / `find` / `ls` + `codemode` + 自研工具（`webfetch` / `websearch` / `question` / `subagent` / 记忆工具 / `goal_complete` / `goal_blocked`）+ 浏览器工具（`browser_*`，只在默认集会话注册）；Windows 上另有 `powershell` | 无（只受全局默认规则约束） | `xhigh` | 正常编码与执行 |
 | `plan` | 计划 | 与 `build` 相同，另多 `present_plan`（提交计划的收尾工具） | `deny` `edit` / `write`；`bash` / `powershell` 兜底 `deny` + 放行被判定为只读的命令；`browser_act` 只在受管实例里放行；浏览器观察面按默认规则放行 | `max` | 先调研出方案；方案成型时才以 `present_plan` 收尾，前端弹决策表单，可批准 / 反馈 / 忽略（忽略只对这次计划生效） |
 | `ask` | 问答 | 与 `build` 相同（无 `present_plan`） | 与 `plan` 相同 | `medium` | 只读分析与回答 |
+| `design` | 设计 | 与 `build` 相同，另加设计画布那一组（`design_*`，17 个） | 无（与 `build` 同权限） | `xhigh` | 在右侧「设计画布」上出稿：`design_*` 工具读写本会话当前打开的那份稿子，画布只读、可点选并把节点带进对话，见 [`design-surfaces.md`](./design-surfaces.md)「设计画布」 |
+
+**设计模式为什么不按只读收窄**：只读的是「画布」，不是「会话」。设计稿是项目里的普通文件
+（`<cwd>/<项目配置目录>/design/<标题>.design`，也可以是项目里任何一份 `.design`），出稿之后常常要顺手把它落成前端代码，
+所以它与 `build` 同权限；画布本身不可编辑——所有改动都来自 `design_*` 工具调用。
+设计工具装在**会话**上而不是「当前页」上，子会话拿不到（在 `SUBAGENT_EXCLUDED_TOOLS` 里）：
+设计稿是项目里的普通文件（按路径归口），子会话替父画图会和父会话改同一份文档。
 
 ### 只读为什么不收窄工具集
 

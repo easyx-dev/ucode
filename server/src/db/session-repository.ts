@@ -72,6 +72,10 @@ export type SessionRecord = {
   forkedFromId: string | null;
   /** 会话目标的 JSON 状态；为空表示未设置目标 */
   goalState: string | null;
+  /**
+   * 设计稿的显式路径；为空表示走默认位置（项目配置目录下、按标题 + `meta.sessionId` 认领）。
+   * 非空表示用户把这个会话的画布指向了某个文件——它可以在项目里的任何位置。
+   */
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */

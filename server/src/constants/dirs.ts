@@ -42,6 +42,9 @@ export const PROMPTS_DIRNAME = "prompts";
 /** 项目级配置目录名（位于会话 cwd 及其祖先）：品牌 slug 加前导点，如 `.<slug>` */
 export const PROJECT_CONFIG_DIRNAME = `.${brand.slug}`;
 
+/** 设计稿目录名（位于项目配置目录下）：`<cwd>/.<slug>/design/<会话 id>.json` */
+export const DESIGN_DIRNAME = "design";
+
 /** 兼容生态的技能目录名（项目祖先或用户主目录下）：`.agents` */
 export const AGENTS_COMPAT_DIRNAME = ".agents";
 

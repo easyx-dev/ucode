@@ -76,6 +76,9 @@ const matchAttachment = (
   return { token: { kind: "attachment", id, schemeKind, name: label || null }, to: end + 1 };
 };
 
+/** 设计画布锚点的形状：`design:<会话>/<页>/<节点>`，三段都不含斜杠 */
+const DESIGN_ANCHOR = /^design:[^/\s]+\/[^/\s]+\/[^/\s]+$/;
+
 /** `@path#L1-L2` 或 `@[显示名](path#L1-L2)`：返回记号与消耗到的偏移，不成形返回 null */
 const matchContext = (
   source: string,
@@ -104,6 +107,11 @@ const matchContext = (
 
   const raw = source.slice(pathFrom, pathTo).replaceAll(/\\(.)/g, "$1");
   if (!raw) return null;
+
+  // 设计锚点（`@design:<会话>/<页>/<节点>`）长得像路径，但它不是文件引用：
+  // 它的归属校验在工具侧做（跨会话 / 跨页 / 已删都要报错），服务端不该去磁盘上找这个「文件」。
+  // 原样留在文本里——模型要拿到的就是这一串字面。
+  if (DESIGN_ANCHOR.test(raw)) return null;
 
   const range = LINE_RANGE_PATTERN.exec(raw);
   const path = range ? raw.slice(0, raw.length - range[0].length) : raw;

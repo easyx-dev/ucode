@@ -80,3 +80,7 @@ export const resolveFromCwd = (cwd: string | null | undefined, path: string): st
   const base = cwd.replace(/\/+$/, "");
   return `${base}/${trimmed.replace(/^\.\//, "")}`;
 };
+
+/** 相对 `cwd` 的写法（工作台里给人看的路径）；不在其下时原样返回绝对路径 */
+export const relativeToCwd = (cwd: string, path: string): string =>
+  isUnderPath(path, cwd) ? path.slice(normalizeSeparators(cwd).length + 1) : path;

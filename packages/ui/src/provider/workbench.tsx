@@ -14,11 +14,12 @@ import type { WorkbenchDoc } from "../business/workbench/workbench-docs";
 
 /**
  * 侧栏的视图。顺序即活动栏自上而下的排布：代码管理在最上（最常看），终端在文件之后。
- * `browser` 只在宿主注入了浏览器面时出现（见 `WorkbenchApi.browser`）。
+ * `browser` 只在宿主注入了浏览器面时出现（见 `WorkbenchApi.browser`）；`design` 始终在列——
+ * 入口藏起来等于让人先知道「有个设计模式」才能找到画布，而画布的空态本来就能说清怎么出稿。
  */
 export const WORKBENCH_VIEWS = ["changes", "files", "terminal"] as const;
 
-export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number] | "browser";
+export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number] | "browser" | "design";
 
 /**
  * 宿主提供的浏览器面（**仅桌面端**）：web 端没有内置浏览器，不传就没有这个视图、也开不出浏览器标签。
@@ -42,6 +43,10 @@ export type WorkbenchBrowserSurface = {
 export type ChangeTarget = { file: string; staged: boolean };
 
 export type WorkbenchApi = {
+  /** 当前会话 id；设计画布按它取稿（null 表示草稿态，还没有会话） */
+  sessionId: string | null;
+  /** 打开某个设计稿文件的画布标签（并切到设计视图、展开面板） */
+  openDesign: (path: string) => void;
   /** 侧栏当前视图 */
   view: WorkbenchView;
   selectView: (view: WorkbenchView) => void;

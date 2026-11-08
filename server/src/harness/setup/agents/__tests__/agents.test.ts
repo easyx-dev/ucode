@@ -20,6 +20,7 @@ import {
 import {
   type AgentRegistry,
   agentRules,
+  canWriteHarnessState,
   effectiveToolNames,
   isReadOnlyCapability,
   PRIMARY_PROFILES,
@@ -40,6 +41,22 @@ describe("角色注册表", () => {
       assert.equal(PRIMARY_PROFILES[mode].slug, mode);
       assert.equal(PRIMARY_PROFILES[mode].kind, "primary");
     }
+  });
+
+  it("design 声明设计工具、不额外收窄权限，且算「全权」会话", () => {
+    const selection = PRIMARY_PROFILES.design.capability.toolSelection;
+    assert.equal(selection.kind, "defaultTools");
+    if (selection.kind === "defaultTools") {
+      for (const name of ["design_get_tree", "design_create_shape", "design_export_svg"]) {
+        assert.ok(selection.defaultTools.includes(name), `design 工具集缺少 ${name}`);
+      }
+    }
+    const capability = primaryCapability("design");
+    // 与 build 同权限：设计稿落在会话工作目录里，出稿之后常常要顺手落成前端代码
+    assert.equal(isReadOnlyCapability(capability), false);
+    assert.equal(canWriteHarnessState(capability, PRIMARY_PROFILES.design), true);
+    // 规划 / 问答不挂记忆写入与目标结算这类「全权特征」
+    assert.equal(canWriteHarnessState(primaryCapability("plan"), PRIMARY_PROFILES.plan), false);
   });
 
   it("plan / ask 与 build 用同一套工具声明，只读性落在规则上", () => {

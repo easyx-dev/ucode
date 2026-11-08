@@ -20,6 +20,7 @@ import { createAuthRoute } from "./routes/auth";
 import { createBrowserRoute } from "./routes/browser";
 import { createCommandsRoute } from "./routes/commands";
 import { createConfigRoute } from "./routes/config";
+import { createDesignRoute } from "./routes/design";
 import { createEventsRoute } from "./routes/events";
 import { createFsRoute } from "./routes/fs";
 import { createGitRoute } from "./routes/git";
@@ -147,6 +148,7 @@ export const createApp = (
   v1.route("/agents", createAgentsRoute(services));
   v1.route("/assets", createAssetsRoute(services));
   v1.route("/browser", createBrowserRoute(services, upgradeWebSocket));
+  v1.route("/design", createDesignRoute(services));
   v1.route("/terminal", createTerminalRoute(services, upgradeWebSocket));
 
   app.route(API_BASE_PATH, v1);

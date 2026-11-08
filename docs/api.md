@@ -290,6 +290,38 @@ agent 用的那组浏览器工具（`browser_open` / `browser_snapshot` / `brows
 数据落在 `$APP_HOME/app/browser/profiles/<name>`，权限 `0700`（里面有 cookie 与 localStorage，属凭证面）。
 名字是**单段**、小写字母或数字开头（`^[a-z0-9][a-z0-9._-]{0,63}`），拼路径前校验，挡路径穿越。
 
+## 设计画布（design）
+
+agent 用的那组设计工具（`design_*`，17 个）是**会话内的工具调用**，不走 HTTP。这里只有画布的数据面——
+一律按会话寻址、不认路径（文档位置由会话工作目录派生），所以画布只能问「这个会话的设计稿」：
+
+- `POST /api/v1/design/snapshot`：`{ sessionId, pageId? }` → 结构摘要——`revision` / `pageId` /
+  `pages` / `nodes`（扁平节点摘要，含页面坐标）/ `selection` / `mentionPrefix`，文档读不懂时另有 `warning`。
+- `POST /api/v1/design/render`：`{ sessionId, pageId?, revision? }` → 整页 drawing
+  （`svg` / `boxes` / `bounds`）。**带上画布手里那版 `revision` 且与文档一致时 `svg` 为 `null`**，
+  画布据此跳过重绘；画面与命中框出自同一次遍历，所以一个封套下发。
+- `POST /api/v1/design/select`：`{ sessionId, ids }` → `{ sessionId, selection }`。不存在的 id 被过滤掉
+  （画布的错误状态不该变成模型的错误认知）。选中集不参与 `revision`。
+- `POST /api/v1/design/doc`：`{ sessionId, action: "flush" | "reset" | "setPage" | "createPage" | "open", pageId?, name?, path? }`
+  → `{ revision, pageId? }`。换页是视图状态，不涨 `revision`；其余都是真正的改动（涨 `revision` 并落盘），
+  新建页回新页的 `pageId`（`name` 不给按「页面 N」编号）。
+  `open` 把**本会话**指向一份稿子（`path`，相对会话工作目录或绝对路径，扩展名必须是 `.design`，
+  不存在就新建）。文档按**绝对路径**归口：同一个文件被两个会话打开时用的是同一份内存文档（同一 graph、
+  同一条写队列），谁改都立刻反映到两边——所以没有「归属」这回事，也不存在两份副本互相覆盖。
+  会话只记「当前在改哪份」这条指针（服务端内存，重启即失效；界面打开标签时重新指向）。
+
+文档是 JSON（扩展名 `.design`），**新稿**落在会话工作目录的 `<cwd>/<项目配置目录>/design/<标题>.design`
+（可提交、可分享、git 面板看得见）。文件名取自会话标题（重名加序号），文件里**不含任何会话信息**：
+`meta` 只有 `title` 与 `createdAt`。归属是运行态——服务端按路径持文档、会话持指针，两者都不进文件、不进库。
+文件在**第一次改动**时才出现：读摘要与取画面只碰内存里的种子文档，不给没做设计的会话留下空文件。
+
+- `POST /api/v1/design/files`：`{ sessionId }` → `{ files: [{ path, name, updatedAt, current }], truncated }`。
+  递归列项目里的 `.design`（跳过依赖 / 版本库 / 产物目录，条数与深度都有上限），`current` 标出本会话当前在改的那份。
+工具改动只下发 `design_update` 帧（`{ revision }`，按「正在改这份文件的会话」逐个发），
+drawing 不进事件流：同一份稿可能在多个界面同时打开。
+引用锚点形如 `@design:<会话>/<页>/<节点>`，服务端校验归属——跨会话、跨页与已删节点的引用一律报错
+（`design_anchor_mismatch` / `design_not_found`）。
+
 ## 文件系统（fs）与应用目录
 
 `fs` 域是通用的文件系统浏览入口（会话侧栏的项目目录选择器、输入区的 `@` 检索与工作台的文件预览共用）：

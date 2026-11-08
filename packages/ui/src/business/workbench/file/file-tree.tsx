@@ -274,7 +274,7 @@ function TreeRow({
           {...(isDir ? { "aria-expanded": open } : {})}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
           className={cn(
-            "flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs",
+            "flex h-7 w-full items-center gap-1.5 pr-2 text-left text-xs",
             nameToneOf(mark, active),
             !mark && active ? "bg-muted" : "hover:bg-state-hover",
             // 右键唤出菜单的那一刻也算选中：菜单要作用在哪一行得看得见
@@ -325,7 +325,7 @@ function FlatRow({
           role="treeitem"
           aria-level={1}
           className={cn(
-            "flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs",
+            "flex h-7 w-full items-center gap-1.5 px-2 text-left text-xs",
             nameToneOf(mark, active),
             !mark && active ? "bg-muted" : "hover:bg-state-hover",
             // 右键唤出菜单的那一刻也算选中
