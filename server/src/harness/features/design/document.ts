@@ -21,7 +21,11 @@ import { dirname } from "node:path";
 import type { FigmaAPI } from "@open-pencil/core/figma-api";
 import type { SceneGraph } from "@open-pencil/scene-graph";
 
-import { DESIGN_DOCUMENT_FORMAT, DESIGN_WRITE_DEBOUNCE_MS } from "../../../constants/design";
+import {
+  DESIGN_BOARD_SIZE,
+  DESIGN_DOCUMENT_FORMAT,
+  DESIGN_WRITE_DEBOUNCE_MS,
+} from "../../../constants/design";
 import { designError } from "./errors";
 import { type DesignSdk, loadDesignSdk } from "./sdk";
 
@@ -260,8 +264,9 @@ const readText = async (path: string): Promise<string | undefined> => {
 /**
  * 种子图：默认页 + 一块空白画板。
  *
- * 空图只有文档根，画布没有任何可画的东西；给一页一画板，新会话就有地方落第一个图形，
- * 工具层也不必为「页面还没有画板」单开一条分支。
+ * 空图只有文档根，画布没有任何可画的东西；给一页一画板，新会话就有地方落第一屏的内容，
+ * 工具层也不必为「页面还没有画板」单开一条分支。这块板就是第一屏，不是「装多屏的箱子」——
+ * 同一页的其余屏是并列的新画板（见 `document.ts` 与设计模式的提示词）。
  */
 const seedGraph = (sdk: DesignSdk): DocumentGraph => {
   const graph = sdk.createGraph();
@@ -271,7 +276,7 @@ const seedGraph = (sdk: DesignSdk): DocumentGraph => {
   if (page !== undefined) page.name = "页面 1";
   const board = api.createFrame();
   board.name = "画板";
-  board.resize(375, 812);
+  board.resize(DESIGN_BOARD_SIZE.width, DESIGN_BOARD_SIZE.height);
   board.x = 0;
   board.y = 0;
   return { graph, api };

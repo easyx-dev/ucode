@@ -1,11 +1,12 @@
 /**
- * 「设计」视图的侧栏：**项目里的稿子清单**（不是图层树——节点树在画布标签里）。
+ * 「设计」视图的侧栏：**项目设计稿目录里的稿子清单**（不是图层树——节点树在画布标签里）。
  *
- * 稿子只是文件，所以这里列的是文件：递归扫项目里的 `.design`，按改动时间倒序；
- * 标出「本会话在改的那份」，点一行就打开那一份的画布标签。
+ * 稿子只是文件，但清单只认 `<cwd>/<项目配置目录>/design` 这一层：递归整个项目会把别的会话的工作区
+ * （开发时 `APP_HOME` 就在仓库里）、构建产物与临时目录里的 `.design` 一并列出来。放在别处的稿子
+ * 仍然能开（项目文件树里点它，或 agent `design_open`），只是不进这份清单。
  *
- * 本会话的稿还没落盘时（画布空着、没改动过）它不在文件清单里，于是单独置顶一行——
- * 否则用户第一次进设计模式会看到「一个文件都没有」，无从下手。
+ * 本会话的稿不在清单里时（放在别处，或还没落盘）单独置顶一行——否则用户第一次进设计模式会看到
+ * 「一个文件都没有」，无从下手。
  */
 
 import { cn } from "cn";
@@ -15,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import { IconButton } from "../../../base/button";
 import { Empty } from "../../../base/empty";
 import { Spinner } from "../../../base/spinner";
-import { useDesignCanvas } from "../../../hooks/store/use-design";
+import { useDesignPath } from "../../../hooks/store/use-design";
 import { useWorkbench } from "../../../provider/workbench";
 import { baseName, relativeToCwd } from "../../../utils/path";
 import { useDesignFiles } from "../use-workbench-data";
@@ -24,13 +25,33 @@ export function DesignFilesPanel() {
   const { t } = useTranslation();
   const workbench = useWorkbench();
   const sessionId = workbench?.sessionId ?? null;
-  const canvas = useDesignCanvas(sessionId);
+  /** 已加载的画布状态里的指针（更新更及时），没加载过时为 null */
+  const loadedPath = useDesignPath(sessionId);
   const [token, setToken] = useState(0);
   const files = useDesignFiles(sessionId, token);
-  const currentPath = canvas.state?.path ?? null;
+  /**
+   * 本会话当前在改哪份：清单请求里一并给出（画布没挂过时就用它）。
+   *
+   * 不为此拉整页画面：侧栏要的只是一个路径，而 `design/snapshot` 会把默认落点、
+   * 内存文档一并带出来（进一次设计视图就开始算一份稿）。
+   */
+  const currentPath = loadedPath ?? files.data?.currentPath ?? null;
 
   const openDesign = workbench?.openDesign;
   const cwd = workbench?.cwd ?? null;
+
+  // 当前稿变了（在别处打开了另一份）就重取一次：侧栏的「当前」标记跟着走。
+  // 首次挂载不重取——那一次请求挂载时已经发出去了
+  // `null` 起步：挂载那一刻画布状态往往还没到，用挂载值作起点会让「状态刚到」被当成「当前稿变了」，
+  // 白多发一次 `design/files`
+  const previousPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (previousPath.current === loadedPath) return;
+    const first = previousPath.current === null;
+    previousPath.current = loadedPath;
+    if (first || loadedPath === null) return;
+    setToken((prev) => prev + 1);
+  }, [loadedPath]);
 
   /**
    * 进设计视图时把本会话的稿打开一次（每人一份、只一次）。
@@ -38,19 +59,6 @@ export function DesignFilesPanel() {
    * 用户点了「设计」却看到一片空白会以为模式没生效；之后他手动关掉标签就不再强开。
    * 这一步放在侧栏里而不是模式切换处：侧栏是「设计视图」真正被选中时才挂载的。
    */
-  // 当前稿变了（在别处打开了另一份）就重取一次：侧栏的「当前」标记跟着走。
-  // 首次挂载不重取——那一次请求挂载时已经发出去了
-  // `null` 起步：挂载那一刻画布状态往往还没到，用挂载值作起点会让「状态刚到」被当成「当前稿变了」，
-  // 白多发一次 `design/files`
-  const previousPath = useRef<string | null>(null);
-  useEffect(() => {
-    if (previousPath.current === currentPath) return;
-    const first = previousPath.current === null;
-    previousPath.current = currentPath;
-    if (first || currentPath === null) return;
-    setToken((prev) => prev + 1);
-  }, [currentPath]);
-
   const autoOpened = useRef<string | null>(null);
   useEffect(() => {
     if (currentPath === null || openDesign === undefined) return;
@@ -100,7 +108,7 @@ export function DesignFilesPanel() {
             <li>
               <Row
                 name={baseName(currentPath)}
-                detail={t("本会话的稿（还没落盘）")}
+                detail={cwd === null ? currentPath : relativeToCwd(cwd, currentPath)}
                 current
                 onOpen={() => openDesign?.(currentPath)}
               />
@@ -128,12 +136,6 @@ export function DesignFilesPanel() {
           ) : null}
         </ul>
       )}
-
-      {files.data?.truncated === true ? (
-        <p className="shrink-0 border-t border-border px-3 py-1.5 text-xs text-foreground-subtle">
-          {t("设计稿太多，只列了最近的一部分")}
-        </p>
-      ) : null}
     </div>
   );
 }

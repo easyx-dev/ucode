@@ -15,6 +15,17 @@ export const DESIGN_TREE_ROW_LIMIT = 300;
 /** `design_find_nodes` 一次返回的匹配上限 */
 export const DESIGN_FIND_LIMIT = 50;
 
+/**
+ * 一块画板（一屏）的默认尺寸。
+ *
+ * 画板是「一块屏」，所以新建画板时宽高不该落到通用的 100x100：种子图与 `design_create_shape`
+ * 共用这一份，接口里不出现第二个手写数字。
+ */
+export const DESIGN_BOARD_SIZE = { width: 375, height: 812 } as const;
+
+/** 画板之间的横向留白：新画板排在已有画板右侧时留出它，屏与屏不至于粘在一起 */
+export const DESIGN_BOARD_GAP = 80;
+
 /** 文档文件格式版本：形状不兼容时旧文件留档，不猜着读 */
 export const DESIGN_DOCUMENT_FORMAT = 1;
 
@@ -28,9 +39,3 @@ export const DESIGN_FILE_EXTENSION = ".design";
 
 /** 文件名里标题的截断长度：文件名不是标题，太长在树里挤成省略号 */
 export const DESIGN_FILE_TITLE_MAX_LENGTH = 40;
-
-/** 「设计」视图里列项目稿子的上限：扫到这么多就停，别让一棵大仓库把侧栏拖死 */
-export const DESIGN_FILE_SCAN_MAX = 200;
-
-/** 目录递归深度上限：设计稿通常就在项目里一两层，深挖没有意义 */
-export const DESIGN_FILE_SCAN_MAX_DEPTH = 6;

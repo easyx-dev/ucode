@@ -72,7 +72,10 @@ export function EditorArea({
             ) : doc.kind === "commit" ? (
               <CommitDetail path={doc.path} commit={doc.commit} reloadToken={review.reloadToken} />
             ) : doc.kind === "design" ? (
-              <DesignCanvas path={doc.path} />
+              // 清标签发生在切换会话之后的 effect 里：这一帧旧会话的标签可能还在，先不画它的画布
+              doc.sessionId === workbench.sessionId ? (
+                <DesignCanvas />
+              ) : null
             ) : (
               <TerminalView terminalId={doc.terminalId} />
             )}

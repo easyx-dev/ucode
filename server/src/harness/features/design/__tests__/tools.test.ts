@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
+import { DESIGN_BOARD_GAP } from "../../../../constants/design";
 import type { DesignDocument } from "../document";
 import { openDesignDocument } from "../document";
 import { isDesignError } from "../errors";
@@ -99,6 +100,83 @@ describe("设计工具", () => {
     // #4F46E5 → r=79/255、b=229/255
     assert.equal(Math.round((detail.fills[0]?.color.r ?? 0) * 255), 79);
     assert.equal(Math.round((detail.fills[0]?.color.b ?? 0) * 255), 229);
+    await document.close();
+  });
+
+  it("嵌套节点也用页面坐标：写进去的就是读回来的那个值", async () => {
+    const { document, hooks } = await setup();
+    const frame = await runDesignTool(
+      "design_create_shape",
+      { type: "FRAME", name: "屏", x: 100, y: 100, width: 375, height: 812 },
+      hooks,
+    );
+    const frameId = frame.match(/已创建 (\S+)：/)?.[1] ?? "";
+    const rect = await runDesignTool(
+      "design_create_shape",
+      {
+        type: "RECTANGLE",
+        name: "卡片",
+        x: 120,
+        y: 130,
+        width: 100,
+        height: 50,
+        parentId: frameId,
+      },
+      hooks,
+    );
+    const rectId = rect.match(/已创建 (\S+)：/)?.[1] ?? "";
+    const positionOf = async (): Promise<{ x: number; y: number }> =>
+      JSON.parse(await runDesignTool("design_get_node", { id: rectId }, hooks)) as {
+        x: number;
+        y: number;
+      };
+
+    // 读的是页面坐标（父节点在 100,100）：写进去的 120,130 就是读回来的 120,130
+    const created = await positionOf();
+    assert.deepEqual([created.x, created.y], [120, 130]);
+
+    // 移动与改写也是页面坐标：把读到的坐标原样写回去不会一路往右下漂
+    await runDesignTool("design_node_move", { id: rectId, x: 140, y: 150 }, hooks);
+    const moved = await positionOf();
+    assert.deepEqual([moved.x, moved.y], [140, 150]);
+    await runDesignTool("design_update_node", { id: rectId, x: 160, y: 170 }, hooks);
+    const updated = await positionOf();
+    assert.deepEqual([updated.x, updated.y], [160, 170]);
+
+    // 只给一个轴时另一个轴不动（换算错的话会被拽回父节点顶边）
+    await runDesignTool("design_update_node", { id: rectId, x: 180 }, hooks);
+    const onlyX = await positionOf();
+    assert.deepEqual([onlyX.x, onlyX.y], [180, 170]);
+    await document.close();
+  });
+
+  it("新画板不给坐标就排在已有画板右侧，默认一屏尺寸", async () => {
+    const { document, hooks } = await setup();
+    const pageId = pageIdOf(document);
+    const first = pageNodes(document.graph, pageId).rows.find((row) => row.type === "FRAME");
+    assert.ok(first);
+
+    const second = await runDesignTool(
+      "design_create_shape",
+      { type: "FRAME", name: "第二屏" },
+      hooks,
+    );
+    const secondId = second.match(/已创建 (\S+)：/)?.[1] ?? "";
+    const board = document.graph.getNode(secondId);
+    // 画板在页面顶层：叠进第一块里，屏就不再是独立的一屏
+    assert.equal(board?.parentId, pageId);
+    assert.equal(board?.x, first.x + first.width + DESIGN_BOARD_GAP);
+    assert.equal(board?.y, first.y);
+    assert.equal(board?.width, 375);
+    assert.equal(board?.height, 812);
+
+    const third = await runDesignTool(
+      "design_create_shape",
+      { type: "FRAME", name: "第三屏" },
+      hooks,
+    );
+    const thirdId = third.match(/已创建 (\S+)：/)?.[1] ?? "";
+    assert.equal(document.graph.getNode(thirdId)?.x, (board?.x ?? 0) + 375 + DESIGN_BOARD_GAP);
     await document.close();
   });
 

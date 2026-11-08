@@ -5,6 +5,8 @@
  * 1. 同一份文件被两个会话打开时用的是同一份内存文档（不是两份副本互相覆盖）；
  * 2. 会话只记「当前在改哪份」，换一份不会动旧文件的内容，也不会把它从别的会话手里抢走；
  * 3. 没有指针时工具**不许**回落到默认落点（画布那条链路才可以）。
+ *
+ * 指针本身落在会话上（`pointers`），所以重启后接得上（换一个实例读同一份存）。
  */
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
-import { createDesignService } from "../index";
+import { createDesignService, type DesignPointerStore, type DesignServiceDeps } from "../index";
 
 const dirs: string[] = [];
 
@@ -26,12 +28,27 @@ const tempCwd = (): string => {
   return dir;
 };
 
+/** 内存版指针：与 `session.design_path` 同语义。验「重启接上」时把同一份存给两个实例 */
+const pointerStore = (): DesignPointerStore => {
+  const paths = new Map<string, string>();
+  return {
+    get: (sessionId) => paths.get(sessionId) ?? null,
+    set: (sessionId, path) => {
+      if (path === null) paths.delete(sessionId);
+      else paths.set(sessionId, path);
+    },
+    used: () => [...paths.values()],
+  };
+};
+
+const makeService = (
+  overrides: Partial<Omit<DesignServiceDeps, "pointers">> = {},
+  pointers = pointerStore(),
+) => createDesignService({ emitUpdate: () => undefined, pointers, ...overrides });
+
 describe("文档按文件路径归口", () => {
   it("打开后路径进快照，改动写进那个文件", async () => {
-    const service = createDesignService({
-      emitUpdate: () => undefined,
-      titleOf: () => "音乐 App 首页",
-    });
+    const service = makeService({ titleOf: () => "音乐 App 首页" });
     const cwd = tempCwd();
     const target = { sessionId: "s-1", cwd };
     const hooks = service.toolHooks(target);
@@ -54,8 +71,33 @@ describe("文档按文件路径归口", () => {
     assert.ok(written.nodes.some((node) => node.name === "标题"));
   });
 
+  it("指针落在会话上：换一个服务实例（模拟重启）仍指向同一份", async () => {
+    const cwd = tempCwd();
+    const pointers = pointerStore();
+    const target = { sessionId: "s-1", cwd };
+    const path = join(cwd, "kept.design");
+
+    await makeService({}, pointers).toolHooks(target).open(path);
+
+    const restarted = makeService({}, pointers);
+    assert.equal((await restarted.snapshot(target)).path, path);
+  });
+
+  it("新会话的默认落点避开别的会话已占用的名字", async () => {
+    const cwd = tempCwd();
+    const pointers = pointerStore();
+    const first = { sessionId: "s-1", cwd };
+    const second = { sessionId: "s-2", cwd };
+
+    const firstPath = (await makeService({}, pointers).snapshot(first)).path;
+    const secondPath = (await makeService({}, pointers).snapshot(second)).path;
+
+    assert.notEqual(secondPath, firstPath);
+    assert.ok(secondPath.endsWith("-2.design"), secondPath);
+  });
+
   it("两个会话打开同一份文件：共用一份文档，谁改另一边都看得见", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined, titleOf: () => "共用稿" });
+    const service = makeService({ titleOf: () => "共用稿" });
     const cwd = tempCwd();
     const a = { sessionId: "s-a", cwd };
     const b = { sessionId: "s-b", cwd };
@@ -76,7 +118,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("换一份稿：旧文件不被改写，指针只动自己的", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined });
+    const service = makeService();
     const cwd = tempCwd();
     const first = join(cwd, "a.design");
     const second = join(cwd, "b.design");
@@ -107,7 +149,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("没有指针时工具报错，画布那条链路才回落到默认落点", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined, titleOf: () => "新稿" });
+    const service = makeService({ titleOf: () => "新稿" });
     const cwd = tempCwd();
     const target = { sessionId: "s-1", cwd };
 
@@ -127,7 +169,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("出池只放文档、指针留着：回来还能接着改同一份", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined });
+    const service = makeService();
     const cwd = tempCwd();
     const file = join(cwd, "home.design");
     const target = { sessionId: "s-1", cwd };
@@ -154,7 +196,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("归档才丢指针：之后工具要求重新打开", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined });
+    const service = makeService();
     const cwd = tempCwd();
     const target = { sessionId: "s-1", cwd };
     await service.toolHooks(target).open(join(cwd, "home.design"));
@@ -170,7 +212,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("扩展名不是 .design 时拒掉", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined });
+    const service = makeService();
     const cwd = tempCwd();
     const hooks = service.toolHooks({ sessionId: "s-1", cwd });
 
@@ -178,7 +220,7 @@ describe("文档按文件路径归口", () => {
   });
 
   it("文件读不懂时这一步就报错，不把指针指过去", async () => {
-    const service = createDesignService({ emitUpdate: () => undefined });
+    const service = makeService();
     const cwd = tempCwd();
     const broken = join(cwd, "broken.design");
     writeFileSync(broken, "{ 这显然不是 JSON", "utf8");
@@ -195,7 +237,7 @@ describe("文档按文件路径归口", () => {
 
   it("改动会通知所有正在改这份文件的会话", async () => {
     const emitted: string[] = [];
-    const service = createDesignService({
+    const service = makeService({
       emitUpdate: (sessionId) => emitted.push(sessionId),
       titleOf: () => "共用稿",
     });

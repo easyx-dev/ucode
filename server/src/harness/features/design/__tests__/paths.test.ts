@@ -1,9 +1,9 @@
 /**
- * 设计稿的落点与命名：新稿按标题起名（重名不覆盖），文件里不带会话信息。
- * 全部跑在临时目录上。
+ * 设计稿的落位、命名与项目内的清单口径：新稿按标题起名（重名不覆盖），文件里不带会话信息，
+ * 清单只认项目设计稿目录。全部跑在临时目录上。
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -77,6 +77,20 @@ describe("新稿的落点", () => {
     const cwd = tempCwd();
     assert.equal(await defaultDesignPath({ cwd }), join(designDirOf(cwd), "设计稿.design"));
   });
+
+  it("别的会话已占用的名字也算重名（文件还没落盘）", async () => {
+    const cwd = tempCwd();
+    const occupied = join(designDirOf(cwd), "设计稿.design");
+    assert.equal(
+      await defaultDesignPath({ cwd, used: [occupied] }),
+      join(designDirOf(cwd), "设计稿-2.design"),
+    );
+    // 别的目录占用的同名文件不影响这里
+    assert.equal(
+      await defaultDesignPath({ cwd, used: ["/another/project/.config/design/设计稿.design"] }),
+      occupied,
+    );
+  });
 });
 
 describe("目录", () => {
@@ -89,18 +103,39 @@ describe("目录", () => {
 });
 
 describe("列项目里的稿子", () => {
-  it("找到任意位置的 .design，跳过依赖与版本库目录", async () => {
+  it("只列项目设计稿目录这一层，按改动时间倒序", async () => {
     const cwd = tempCwd();
-    writeDoc(cwd, "a.design");
-    mkdirSync(join(cwd, "designs"), { recursive: true });
-    writeDoc(join(cwd, "designs"), "b.design");
-    // 这些目录里的稿子不算项目里的
+    const older = writeDoc(cwd, "旧稿.design");
+    const newer = writeDoc(cwd, "新稿.design");
+    utimesSync(older, new Date("2020-01-01"), new Date("2020-01-01"));
+    utimesSync(newer, new Date("2021-01-01"), new Date("2021-01-01"));
+
+    const files = await listProjectDesignFiles(cwd);
+    assert.deepEqual(
+      files.map((file) => file.name),
+      ["新稿.design", "旧稿.design"],
+    );
+    assert.equal(files[0]?.path, newer);
+  });
+
+  it("项目其他地方、别的会话工作区与依赖目录里的稿子都不算", async () => {
+    const cwd = tempCwd();
+    const own = writeDoc(cwd, "自家.design");
+    // 随手放在项目另一处的稿子：能打开，但不在本项目的清单里
+    writeDoc(join(cwd, "designs"), "随手放的.design");
+    // 开发形态下 APP_HOME 就在仓库里，别的会话的工作区稿子曾因此串进来
+    writeDoc(join(cwd, ".tmp", PROJECT_CONFIG_DIRNAME, "workspace", "s1"), "别人的.design");
     mkdirSync(join(cwd, "node_modules/pkg"), { recursive: true });
     writeDoc(join(cwd, "node_modules/pkg"), "vendor.design");
-    mkdirSync(join(cwd, ".git"), { recursive: true });
-    writeDoc(join(cwd, ".git"), "ref.design");
 
-    const { files } = await listProjectDesignFiles(cwd);
-    assert.deepEqual(files.map((file) => file.name).sort(), ["a.design", "b.design"]);
+    const files = await listProjectDesignFiles(cwd);
+    assert.deepEqual(
+      files.map((file) => file.path),
+      [own],
+    );
+  });
+
+  it("目录还不存在时算空", async () => {
+    assert.deepEqual(await listProjectDesignFiles(tempCwd()), []);
   });
 });

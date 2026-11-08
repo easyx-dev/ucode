@@ -16,17 +16,16 @@ import { SegmentedControl, type SegmentedOption } from "../../../base/segmented-
 import { Spinner } from "../../../base/spinner";
 import { baseName } from "../../../utils/path";
 import { formatBytes, imageMimeOf, isTextImage, previewKindOf } from "../../../utils/preview";
-import { DesignCanvas } from "../design/design-canvas";
 import { useFileContent } from "../use-workbench-data";
 import { MarkdownPreview } from "./markdown-preview";
 import { TextPreview } from "./text-preview";
 
 type RenderMode = "preview" | "source";
 
-/** 有两种形态的：markdown（文档 / 原文）、SVG（图片 / 源码）与设计稿（画布 / 源码） */
+/** 有两种形态的：markdown（文档 / 原文）与 SVG（图片 / 源码） */
 const supportsRenderModes = (path: string): boolean => {
   const kind = previewKindOf(path);
-  return kind === "markdown" || kind === "design" || isTextImage(path);
+  return kind === "markdown" || isTextImage(path);
 };
 
 /** 顶部工具条：左侧渲染模式切换、右侧文件大小 */
@@ -130,11 +129,6 @@ function Content({
         hint={`${baseName(path)} · ${size}`}
       />
     );
-  }
-
-  // 设计稿：预览就是画布（与设计视图里点开的是同一个组件），源码形态落到下面的文本渲染器
-  if (kind === "design" && mode === "preview") {
-    return <DesignCanvas path={path} />;
   }
 
   if (kind === "pdf" || kind === "document") {

@@ -73,9 +73,10 @@ export type SessionRecord = {
   /** 会话目标的 JSON 状态；为空表示未设置目标 */
   goalState: string | null;
   /**
-   * 设计稿的显式路径；为空表示走默认位置（项目配置目录下、按标题 + `meta.sessionId` 认领）。
-   * 非空表示用户把这个会话的画布指向了某个文件——它可以在项目里的任何位置。
+   * 设计稿的显式路径：本会话当前在改哪一份文件，为空表示还没打开过（画布按默认落点算）。
+   * 稿子可以在项目里的任何位置；文件本身不记任何会话信息。
    */
+  designPath: string | null;
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */
@@ -123,6 +124,7 @@ const SESSION_COLUMNS = [
   "agent",
   "forked_from_session_id",
   "goal_state",
+  "design_path",
   "source_path",
   "preview",
   "created_at",
@@ -152,6 +154,7 @@ const rowSchema = z.object({
   agent: z.string().nullable(),
   forked_from_session_id: z.string().nullable(),
   goal_state: z.string().nullable(),
+  design_path: z.string().nullable(),
   source_path: z.string().nullable(),
   preview: z.string(),
   created_at: z.string(),
@@ -176,6 +179,7 @@ const rowToRecord = (row: SessionRow): SessionRecord => ({
   agent: row.agent,
   forkedFromId: row.forked_from_session_id,
   goalState: row.goal_state,
+  designPath: row.design_path,
   childCount: row.child_count,
   sourcePath: row.source_path,
   preview: row.preview,
@@ -375,6 +379,22 @@ export class SessionRepository {
    */
   setPinned(id: string, at: string | null): void {
     this.db.prepare("UPDATE session SET pinned_at = ? WHERE id = ?").run(at, id);
+  }
+
+  /**
+   * 写会话当前在改的设计稿；`path` 为 null 表示清除（归档后不再需要）。
+   * 不复用 `set`：那里用 COALESCE 合并覆盖值，无法把已有列显式置空。
+   */
+  setDesignPath(id: string, path: string | null): void {
+    this.db.prepare("UPDATE session SET design_path = ? WHERE id = ?").run(path, id);
+  }
+
+  /** 全部会话已占用的设计稿路径（设计画布算默认落点时避重） */
+  listDesignPaths(): string[] {
+    return this.db
+      .prepare("SELECT design_path FROM session WHERE design_path IS NOT NULL")
+      .all()
+      .map((row) => (row as { design_path: string }).design_path);
   }
 
   /** 标记已读：写上次打开时间；不改 `updated_at`，以免未读状态自相矛盾 */

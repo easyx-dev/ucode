@@ -60,8 +60,18 @@ const createParameters = Type.Object({
     { description: "要建哪种图形" },
   ),
   name: Type.Optional(Type.String({ description: "图层名；留空会得到默认名，下一轮就认不出来了" })),
-  x: Type.Optional(Type.Number({ description: "左边缘的页面坐标，默认 0" })),
-  y: Type.Optional(Type.Number({ description: "上边缘的页面坐标，默认 0" })),
+  x: Type.Optional(
+    Type.Number({
+      description:
+        "左边缘的页面坐标（页面左上为原点）；不给就落在父节点左上角，" +
+        "页面顶层新建的 Frame（一块新画板）则自动排在已有画板右侧",
+    }),
+  ),
+  y: Type.Optional(
+    Type.Number({
+      description: "上边缘的页面坐标；单独给 x 或 y 时另一个轴保持原位",
+    }),
+  ),
   width: Type.Optional(Type.Number({ description: "宽（像素），默认 100" })),
   height: Type.Optional(Type.Number({ description: "高（像素），默认 100" })),
   text: Type.Optional(Type.String({ description: "正文；type 为 TEXT 时必填" })),

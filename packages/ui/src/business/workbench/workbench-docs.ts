@@ -4,8 +4,8 @@
  * 一份文档一个标签；同一份内容重复打开只激活已有标签。标签数上限 8 个，超出丢最早的那个
  * （激活项不动，新开的仍在最右）——但终端不参与丢弃，见 `dropEarliest`。id 由内容与来源构成，
  * 因此同一文件的「预览」与「改动 diff」各占一个标签，互不覆盖。
- * 浏览器标签还有一处不同：换工作目录时它留下来（见 `reset`），因为它的载体是宿主的 webview，
- * 卸载即销毁页面。它不豁免「超限丢最早」——被挤掉时那一个页面同样会消失（终端才豁免：进程还在服务端）。
+ * 两类有例外：浏览器标签换工作目录时留下来（它跟目录无关，见 `reset`）；设计画布属于会话，
+ * 一个会话一格且换会话即丢（见 `dropDesign`）——它画的是会话上的指针，不靠标签记住稿子。
  */
 import type { GitCommitSummary, GitDiffSource } from "@ucode/contracts";
 
@@ -36,10 +36,10 @@ export type WorkbenchDoc =
    */
   | { id: string; kind: "browser"; tabId: string }
   /**
-   * 设计画布。一份稿子就是一个文件，所以按**路径**开标签：同一个文件重复打开只激活已有的那个，
-   * 不同文件各占一格（和文本文件同一套习惯）。
+   * 设计画布。**一个会话一格**：画布画的是「本会话当前在改哪份稿」，那是会话上的指针，
+   * 不是标签的身份——所以标签不带路径，稿子在服务端被换掉时同一个标签跟着换内容。
    */
-  | { id: string; kind: "design"; path: string };
+  | { id: string; kind: "design"; sessionId: string | null };
 
 /** 同时打开的标签数上限；超出丢最早的那个 */
 export const MAX_WORKBENCH_DOCS = 8;
@@ -89,13 +89,13 @@ export const terminalDoc = (terminalId: string): WorkbenchDoc => ({
   terminalId,
 });
 
-export const designDocId = (path: string): string => `design:${path}`;
+export const designDocId = (sessionId: string | null): string => `design:${sessionId ?? "draft"}`;
 
-/** 一份稿子一个标签；重复打开只激活已有的那个 */
-export const designDoc = (path: string): WorkbenchDoc => ({
-  id: designDocId(path),
+/** 一个会话一格画布；重复打开只激活已有的那个 */
+export const designDoc = (sessionId: string | null): WorkbenchDoc => ({
+  id: designDocId(sessionId),
   kind: "design",
-  path,
+  sessionId,
 });
 
 export const browserDocId = (tabId: string): string => `browser:${tabId}`;
@@ -144,7 +144,9 @@ export type WorkbenchDocsAction =
   /** 只留右键的那一个（标签右键菜单用） */
   | { type: "closeOthers"; id: string }
   | { type: "closeAll" }
-  | { type: "reset" };
+  | { type: "reset" }
+  /** 只丢掉设计画布：它属于会话，而文件 / diff 标签只绑工作目录 */
+  | { type: "dropDesign" };
 
 export const workbenchDocsReducer = (
   state: WorkbenchDocsState,
@@ -178,14 +180,18 @@ export const workbenchDocsReducer = (
     case "closeAll":
       return isEmpty(state) ? state : emptyWorkbenchDocs;
     case "reset": {
-      // 浏览器标签跟工作目录无关（它连的是外部站点，还可能是 agent 正在驱动的那个页面），
-      // 所以换目录 / 换会话时留着；其余标签都绑在旧目录上，一并清掉
       const kept = state.docs.filter((doc) => doc.kind === "browser");
       if (kept.length === 0) return isEmpty(state) ? state : emptyWorkbenchDocs;
       const active = kept.some((doc) => doc.id === state.activeDocId)
         ? state.activeDocId
         : (kept[kept.length - 1]?.id ?? null);
       return { docs: kept, activeDocId: active };
+    }
+    case "dropDesign": {
+      if (!state.docs.some((doc) => doc.kind === "design")) return state;
+      const docs = state.docs.filter((doc) => doc.kind !== "design");
+      if (docs.some((doc) => doc.id === state.activeDocId)) return { ...state, docs };
+      return { docs, activeDocId: docs[docs.length - 1]?.id ?? null };
     }
   }
 };

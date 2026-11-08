@@ -50,6 +50,7 @@ const makeApp = (options: {
     agent: options.child ? "explore" : null,
     forkedFromId: null,
     goalState: stored,
+    designPath: null,
     childCount: 0,
     sourcePath: null,
     preview: "",

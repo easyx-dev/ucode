@@ -104,16 +104,16 @@ export const createDesignRoute = (services: Services) => {
     }
   });
 
-  // 「设计」视图侧栏的稿子清单：项目里所有的 `.design`，标出本会话当前在改的那份
+  // 「设计」视图侧栏的稿子清单：项目设计稿目录里的 `.design`，标出本会话当前在改的那份
   router.post("/files", jsonBody(designFilesInputSchema), async (c) => {
     const input = c.req.valid("json");
     try {
       const target = requireTarget(services, input.sessionId);
-      const scanned = await listProjectDesignFiles(target.cwd);
+      const files = await listProjectDesignFiles(target.cwd);
       const current = await services.design.currentPath(target);
       const result: DesignFilesResponse = {
-        files: scanned.files.map((file) => ({ ...file, current: file.path === current })),
-        truncated: scanned.truncated,
+        files: files.map((file) => ({ ...file, current: file.path === current })),
+        currentPath: current,
       };
       return c.json(ok(result));
     } catch (error: unknown) {

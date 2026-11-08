@@ -5,8 +5,8 @@
  *
  * 1. **一份文件 = 一份内存文档**。键是绝对路径，所以两个会话打开同一份稿时用的是同一个 graph、
  *    同一条写队列——不会出现两份副本互相覆盖，也就没有「归属」这回事。
- * 2. **会话只记指针**（`focused`）：它是视图状态，随会话活着、随标签消失，不写进文件也不进库。
- *    打开一份稿就是「把指针指过去」（`design_open` / 画布打开标签）。
+ * 2. **会话只记指针**（`pointers`）：它存在会话上、随会话持久化，从不写进稿子文件。
+ *    打开一份稿就是「把指针指过去」（`design_open` / `design/doc open`）。
  * 3. **工具必须知道自己在改哪份**。没有指针时**报错**而不是回落到默认路径——静默落到另一份文件
  *    是这类功能最坏的失败（agent 改了一份，用户看的是另一份）。新稿的默认位置只由画布那条链路
  *    用（`currentPath` + `doc open`）来确立。
@@ -47,14 +47,26 @@ export type DesignServiceDeps = {
    * 起名是异步的、也可能一直为空，所以只在**新建文件**时取一次。
    */
   titleOf?: (sessionId: string) => string | null;
+  /** 会话指针的持久层：服务本身不持有它，重启后靠它接上 */
+  pointers: DesignPointerStore;
+};
+
+/** 会话「当前在改哪份稿」的持久读写；实现落在会话仓储（`session.design_path`） */
+export type DesignPointerStore = {
+  /** 读会话记下的路径；没记过为 null */
+  get: (sessionId: string) => string | null;
+  /** 记下路径；null 表示清除 */
+  set: (sessionId: string, path: string | null) => void;
+  /** 全部会话已占用的路径：算默认落点时避开它们，免得两个会话分到同一份稿 */
+  used: () => string[];
 };
 
 export type DesignService = DesignHooks & {
   /**
    * 本会话正在改的那份稿（没打开过就是默认落点，**不建文件**）。
-   * 画布靠它决定首屏打开哪一份；`null` 表示连默认落点都算不出来（不该发生）。
+   * 画布与侧栏靠它决定「当前」是哪一份；总有一个值（默认落点总能算出来）。
    */
-  currentPath: (target: DesignTarget) => Promise<string | null>;
+  currentPath: (target: DesignTarget) => Promise<string>;
   /** 结构摘要（画布首屏与图层树） */
   snapshot: (input: DesignTarget & { pageId?: string }) => Promise<DesignSnapshot>;
   /** 整页 drawing；`revision` 与文档一致时 `svg` 为 null */
@@ -84,19 +96,44 @@ type ResolveOptions = { allowDefault: boolean };
 export const createDesignService = (deps: DesignServiceDeps): DesignService => {
   /** 键是绝对路径：同一份文件全进程只有一份文档 */
   const documents = new Map<string, DesignDocument>();
-  /** 会话 → 它当前在改的那份文件；纯内存，重启即失效（界面重开标签时会重新聚焦） */
+  /**
+   * 进程内的指针缓存：命中就不必回持久层取。它只是 `deps.pointers` 的副本，
+   * 唯一事实源是会话上那份（重启后按需回填）。
+   */
   const focused = new Map<string, string>();
   /** 画布选中集按会话：同一个文件被两个会话打开时，各自的选中互不干扰 */
   const selections = new Map<string, string[]>();
   const opening = new Map<string, Promise<DesignDocument>>();
   const closing = new Map<string, Promise<void>>();
 
-  const focusOf = (path: string): string[] =>
+  /** 本会话当前在改哪份；缓存未命中回持久层取一次 */
+  const focusedOf = (sessionId: string): string | undefined => {
+    const cached = focused.get(sessionId);
+    if (cached !== undefined) return cached;
+    const stored = deps.pointers.get(sessionId);
+    if (stored === null) return undefined;
+    focused.set(sessionId, stored);
+    return stored;
+  };
+
+  /** 指针换到另一份：缓存与持久层同一笔写入，不留两个真值源 */
+  const remember = (sessionId: string, path: string): void => {
+    focused.set(sessionId, path);
+    deps.pointers.set(sessionId, path);
+  };
+
+  const forgetPath = (sessionId: string): void => {
+    focused.delete(sessionId);
+    deps.pointers.set(sessionId, null);
+  };
+
+  /** 反查「谁在看这份文件」：只看进程内缓存——重启后没载入的会话没有在线画布，不需要通知 */
+  const sessionsFocusedOn = (path: string): string[] =>
     [...focused.entries()].filter(([, value]) => value === path).map(([sessionId]) => sessionId);
 
   /** 没有会话在改这份文件了就回收：先落盘再放引用，之后重新打开不会读到半截 */
   const releaseIfUnused = async (path: string): Promise<void> => {
-    if (focusOf(path).length > 0) return;
+    if (sessionsFocusedOn(path).length > 0) return;
     const document = documents.get(path);
     documents.delete(path);
     if (document === undefined) return;
@@ -131,9 +168,20 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
     return task;
   };
 
+  /** 算本会话的默认落点（只在没有指针时用到），并把它当成正式的指针记下 */
+  const deriveDefault = async (target: DesignTarget): Promise<string> => {
+    const derived = await defaultDesignPath({
+      cwd: target.cwd,
+      title: deps.titleOf?.(target.sessionId) ?? null,
+      used: deps.pointers.used(),
+    });
+    remember(target.sessionId, derived);
+    return derived;
+  };
+
   /** 这次请求该落到哪份文件：会话指针优先；没有指针时只有画布能回落到默认落点 */
   const pathOf = async (target: DesignTarget, options: ResolveOptions): Promise<string> => {
-    const path = focused.get(target.sessionId);
+    const path = focusedOf(target.sessionId);
     if (path !== undefined) return path;
     if (!options.allowDefault) {
       throw designError(
@@ -142,12 +190,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
         "先用 design_open 指定一份（用户在画布上打开标签也会聚焦它），或让用户在设计视图里开一份",
       );
     }
-    const derived = await defaultDesignPath({
-      cwd: target.cwd,
-      title: deps.titleOf?.(target.sessionId) ?? null,
-    });
-    focused.set(target.sessionId, derived);
-    return derived;
+    return deriveDefault(target);
   };
 
   const documentOf = async (
@@ -161,7 +204,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
    * 把本会话的画布指向一份稿子（`design_open` / `design/doc open` / 画布打开标签）。
    *
    * 稿子只是一个文件，可以在项目任何位置。指向之后：
-   * - 本会话的指针换成它，旧的那份若没人再看就落盘回收；
+   * - 本会话的指针换成它（缓存与持久层同一笔写入），旧的那份若没人再看就落盘回收；
    * - 文件已在内存里（别的会话正开着）就直接复用那一份，谁改都看得见；
    * - 文件不存在就在第一次改动时新建；存在但读不懂则这一步就报错，不把会话指过去。
    */
@@ -193,8 +236,8 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
           );
         });
     }
-    const previous = focused.get(target.sessionId);
-    focused.set(target.sessionId, path);
+    const previous = focusedOf(target.sessionId);
+    remember(target.sessionId, path);
     selections.delete(target.sessionId);
     if (previous !== undefined && previous !== path) await releaseIfUnused(previous);
     return openAt(path, target.sessionId);
@@ -202,7 +245,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
 
   /** 文档变了：通知所有正在改这份文件的会话（同一个文件可能被两个会话同时看着） */
   const emit = (document: DesignDocument): void => {
-    for (const sessionId of focusOf(document.path)) {
+    for (const sessionId of sessionsFocusedOn(document.path)) {
       deps.emitUpdate(sessionId, document.revision());
     }
   };
@@ -305,11 +348,13 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
       },
     }),
     currentPath: async (target) => {
-      const path = focused.get(target.sessionId);
+      const path = focusedOf(target.sessionId);
       if (path !== undefined) return path;
+      // 故意不走 `deriveDefault`：清单只是「问一下现在会落在哪」，不该因此把指针写进会话
       return defaultDesignPath({
         cwd: target.cwd,
         title: deps.titleOf?.(target.sessionId) ?? null,
+        used: deps.pointers.used(),
       });
     },
     /**
@@ -320,14 +365,14 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
      * 文档本身没人看就落盘回收，下次访问重开。
      */
     release: (sessionId) => {
-      const path = focused.get(sessionId);
+      const path = focusedOf(sessionId);
       if (path === undefined) return;
       void releaseIfUnused(path);
     },
     /** 会话归档 / 删除：连指针一起丢（归档后它不会再被访问） */
     forget: (sessionId) => {
-      const path = focused.get(sessionId);
-      focused.delete(sessionId);
+      const path = focusedOf(sessionId);
+      forgetPath(sessionId);
       selections.delete(sessionId);
       if (path === undefined) return;
       void releaseIfUnused(path);

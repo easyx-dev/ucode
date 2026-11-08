@@ -87,7 +87,7 @@ export type Services = {
   terminals: TerminalService;
   /** 浏览器：实例注册表与 profile 数据面（数据落在 `$APP_HOME/app/browser`） */
   browsers: BrowserService;
-  /** 设计画布：每会话一份设计稿（落在会话工作目录的项目配置目录下） */
+  /** 设计画布：会话当前在改的设计稿（指针存会话上，稿子落在会话工作目录的项目配置目录下） */
   design: DesignService;
   /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
@@ -207,6 +207,12 @@ export const createServices = async (registration: ServiceRegistration): Promise
     // 文件名取自会话标题（`音乐 App 首页.design` 比一串 uuid 有用）：起名是异步的，
     // 所以只在新建文件那一刻取一次，之后标题再变也不改名
     titleOf: (sessionId) => sessions.find(sessionId)?.name ?? null,
+    // 指针落会话行：重启后 agent 与画布仍指向同一份，不靠界面重开标签去恢复
+    pointers: {
+      get: (sessionId) => sessions.find(sessionId)?.designPath ?? null,
+      set: (sessionId, path) => sessions.setDesignPath(sessionId, path),
+      used: () => sessions.listDesignPaths(),
+    },
   });
   const pool = new SessionPool(
     runtime,

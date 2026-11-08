@@ -45,8 +45,13 @@ export type ChangeTarget = { file: string; staged: boolean };
 export type WorkbenchApi = {
   /** 当前会话 id；设计画布按它取稿（null 表示草稿态，还没有会话） */
   sessionId: string | null;
-  /** 打开某个设计稿文件的画布标签（并切到设计视图、展开面板） */
+  /**
+   * 打开设计画布并把本会话的当前稿指过去（切到设计视图、展开面板）。
+   * 稿子身份在会话指针上，标签只是视图。
+   */
   openDesign: (path: string) => void;
+  /** 本会话当前在改哪份稿（服务端指针）；标签标题用它，未打开过为 null */
+  designPath: string | null;
   /** 侧栏当前视图 */
   view: WorkbenchView;
   selectView: (view: WorkbenchView) => void;

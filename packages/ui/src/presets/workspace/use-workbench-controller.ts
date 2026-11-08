@@ -28,6 +28,8 @@ import {
   terminalDocId,
 } from "../../business/workbench/workbench-docs";
 import { readWorkbenchOpen, writeWorkbenchOpen } from "../../business/workbench/workbench-prefs";
+import { useDesignPath } from "../../hooks/store/use-design";
+import { useClient } from "../../provider";
 import type {
   ChangeTarget,
   WorkbenchApi,
@@ -42,6 +44,7 @@ import {
   WORKBENCH_PANEL,
   workbenchAvailableWidth,
 } from "../../utils/panel-layout";
+import { previewKindOf } from "../../utils/preview";
 
 export type WorkbenchController = {
   /** 宽屏下面板是否展开 */
@@ -80,7 +83,10 @@ export function useWorkbenchController({
   const [view, setView] = useState<WorkbenchView>("changes");
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
-  const docs = useWorkbenchDocs(cwd);
+  const docs = useWorkbenchDocs(cwd, sessionId);
+  const client = useClient();
+  /** 本会话当前在改哪份稿：只订阅已加载的画布状态，不在控制器里触发加载 */
+  const designPath = useDesignPath(sessionId);
   const terminals = useTerminals(cwd);
   const [terminalError, setTerminalError] = useState<string | null>(null);
 
@@ -116,13 +122,37 @@ export function useWorkbenchController({
     if (!isDesktop) setSheetOpen(true);
   }, [applyOpen, isDesktop, setSheetOpen]);
 
+  /**
+   * 打开设计画布：**先把本会话的当前稿指过去，再打开标签**。
+   *
+   * 标签只是视图——它不携带稿子身份、切会话即清掉；「本会话在改哪份」是会话上的指针，
+   * 显式打开（这里 / 文件树点 `.design` / agent `design_open`）改写它，画布首次取值只会在
+   * 还没有指针时确立一个默认落点——所以不会把别的会话开着的那份带过来。
+   */
+  const openDesign = useCallback(
+    (path: string) => {
+      // 已经指向这一份就不必再开一次（服务端会重新读盘探测并广播一次更新）
+      if (sessionId !== null && designPath !== path) void client.design.openFile(sessionId, path);
+      docs.open(designDoc(sessionId));
+      setView("design");
+      setSidebarVisible(true);
+      show();
+    },
+    [client, designPath, docs.open, sessionId, show],
+  );
+
   /** 打开某个文件的预览：面板未展开就展开（侧栏视图不动，标签自己表达打开了什么） */
   const openFile = useCallback(
     (path: string) => {
+      // 设计稿没有文本预览：点开它就是「在本会话里打开这份稿」，直接进画布
+      if (previewKindOf(path) === "design") {
+        openDesign(path);
+        return;
+      }
       docs.open(fileDoc(path));
       show();
     },
-    [docs.open, show],
+    [docs.open, openDesign, show],
   );
 
   /** 打开某个工作区变更的 diff */
@@ -153,21 +183,6 @@ export function useWorkbenchController({
   }, [cwd, docs.open, show]);
 
   const { open: openDoc, close: closeDocOf, closeOthers, closeAll } = docs;
-
-  /**
-   * 打开一份稿子的画布标签：切到设计视图（侧栏是稿子清单）、展开面板。
-   *
-   * 稿子按**文件**开标签，不再是「一个会话一张固定画布」——同一个文件重复打开只激活已有的那个。
-   */
-  const openDesign = useCallback(
-    (path: string) => {
-      docs.open(designDoc(path));
-      setView("design");
-      setSidebarVisible(true);
-      show();
-    },
-    [docs.open, show],
-  );
 
   /** 浏览器标签的编号：宿主只当它是不透明标识；换目录清标签后不回退，避免重复编号 */
   const browserTabSeq = useRef(0);
@@ -282,6 +297,7 @@ export function useWorkbenchController({
     () => ({
       sessionId,
       openDesign,
+      designPath,
       view,
       selectView,
       sidebarVisible,
@@ -320,6 +336,7 @@ export function useWorkbenchController({
       applyOpen,
       browser,
       closeAllDocs,
+      designPath,
       openDesign,
       sessionId,
       closeDoc,

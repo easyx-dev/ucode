@@ -2060,7 +2060,7 @@
 | `nodes` | [DesignNodeSummary](#designnodesummary)[] | 是 | — |
 | `selection` | string[] | 是 | — |
 | `mentionPrefix` | string | 是 | 引用锚点前缀，形如 `@design:<会话 id>`；完整锚点由它 + `/<页>/<节点>` 拼成。 由服务端铸造而不是画布自己拼：锚点写进对话历史后比文档活得久，归属校验靠的就是这一截。 |
-| `path` | string | 是 | 这份稿子落在哪个文件。默认在项目配置目录下、按会话标题命名； 用户把画布指向别处（`design/doc open`）时就是那个路径——画布上标出来，免得改错文件。 |
+| `path` | string | 是 | 这份稿子落在哪个文件。默认在项目配置目录下、按会话标题命名； 用户把本会话的当前稿指向别处（`design/doc open`）时就是那个路径——画布上标出来，免得改错文件。 |
 | `truncated` | boolean | 否 | 图层树是否被截断（超过服务端一次下发的行数上限）。 带上它是为了让人知道「画布里还有没列出来的节点」，而不是以为稿子只有这些。 |
 | `warning` | string | 否 | 文档文件读不懂时给出的说明（已把坏文件留档），画布照实显示 |
 
@@ -2118,8 +2118,8 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `files` | [DesignFileEntry](#designfileentry)[] | 是 | — |
-| `truncated` | boolean | 是 | 扫描是否被上限截断 |
+| `files` | [DesignFileEntry](#designfileentry)[] | 是 | 项目设计稿目录里的稿子，按改动时间倒序 |
+| `currentPath` | string | 是 | 本会话当前在改的那份（可以把稿子放在目录外面，所以它不一定在 `files` 里）。 由服务端给：侧栏与标签要的是这一个路径，不该为此去拉整页画面。 |
 
 ### POST /api/v1/design/node
 
@@ -2173,7 +2173,7 @@
 | `action` | "flush" \| "reset" \| "setPage" \| "createPage" \| "open" | 是 | — | — |
 | `pageId` | string（长度 1–128） | 否 | — | — |
 | `name` | string（长度 1–60） | 否 | — | 新建页的名字；不给就按「页面 N」编号 |
-| `path` | string（长度≥1） | 否 | — | `open` 的目标文件：把本会话的画布指向它（不存在就新建）。 相对路径按会话工作目录解析；扩展名必须是 `.design`（内容仍是 JSON）。 |
+| `path` | string（长度≥1） | 否 | — | `open` 的目标文件：把本会话的当前稿指过去（指针随会话持久化；文件不存在就在第一次改动时新建）。 相对路径按会话工作目录解析；扩展名必须是 `.design`（内容仍是 JSON）。 |
 
 **响应类型**：`DesignDocResponse`
 

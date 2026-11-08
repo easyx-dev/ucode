@@ -57,7 +57,7 @@ export const designDocInputSchema = z.object({
   /** 新建页的名字；不给就按「页面 N」编号 */
   name: z.string().min(1).max(60).optional(),
   /**
-   * `open` 的目标文件：把本会话的画布指向它（不存在就新建）。
+   * `open` 的目标文件：把本会话的当前稿指过去（指针随会话持久化；文件不存在就在第一次改动时新建）。
    * 相对路径按会话工作目录解析；扩展名必须是 `.design`（内容仍是 JSON）。
    */
   path: z.string().min(1).optional(),
@@ -67,10 +67,11 @@ export type DesignDocInput = z.infer<typeof designDocInputSchema>;
 export type DesignDocRequest = z.input<typeof designDocInputSchema>;
 
 /**
- * 列出项目里的设计稿文件（工作台「设计」视图的侧栏）。
+ * 列出项目设计稿目录里的稿子（工作台「设计」视图的侧栏）。
  *
- * 按会话工作目录递归扫描：`.design` 是普通文件，可能散在项目任何位置，
- * 不能只认默认目录。`sessionId` 用来标出「本会话当前在改的那份」。
+ * 只认 `<cwd>/<项目配置目录>/design` 这一层：`.design` 可能在项目任何位置（`design/doc open`
+ * 能指过去），但递归会把别的会话的工作区、构建产物与临时目录里的残片一并算进来。
+ * `sessionId` 用来标出「本会话当前在改的那份」。
  */
 export const designFilesInputSchema = z.object({
   sessionId: sessionIdSchema,

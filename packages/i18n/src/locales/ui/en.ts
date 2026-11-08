@@ -1185,11 +1185,9 @@ export default {
   设计稿: "Design files",
   设计稿列表: "Design file list",
   刷新设计稿列表: "Refresh the design file list",
-  "本会话的稿（还没落盘）": "This session's design (not written yet)",
   项目里还没有设计稿: "No design files in this project yet",
   "让 agent 出一版稿子，它会落在项目的设计稿目录下":
     "Ask the agent for a first draft; it lands in the project's design folder.",
-  "设计稿太多，只列了最近的一部分": "Too many design files; only the most recent ones are listed.",
   图层: "Layers",
   "图层太多，这里只列出前 {{count}} 个":
     "This design has more layers than shown here (first {{count}} listed).",
@@ -1229,15 +1227,10 @@ export default {
   子节点: "Children",
   属性: "Properties",
   "不透明度 {{value}}%": "opacity {{value}}%",
-  "把这份稿子作为本会话的画布，之后的改动会写回这个文件":
-    "Make this design the session canvas; later changes are written back to this file.",
   这份设计稿打不开: "This design cannot be opened",
   没能打开这份设计稿: "Cannot open this design",
-  "重试一次；还不行就重新打开这个标签": "Try again; if it still fails, reopen this tab.",
-  正在打开设计稿: "Opening the design…",
-  用画布打开: "Open in canvas",
-  "把这份稿子作为本会话的画布打开，之后的改动会写回这个文件":
-    "Open this design as the session canvas; later changes are written back to this file.",
+  "重试一次；还不行就换一份稿子再切回来":
+    "Try again; if it still fails, open another design and switch back.",
   这份稿子是空的: "This design is empty",
   它还没有任何图层: "It has no layers yet",
   展开图层: "Expand layer",

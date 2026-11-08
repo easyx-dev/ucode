@@ -125,6 +125,37 @@ export const targetRecord = (graph: SceneGraph, sessionId: string, args: ToolArg
 };
 
 /**
+ * 父节点原点在页面上的位置。
+ *
+ * 场景图里的 `node.x/y` 是**相对父节点**的，而工具口径统一是页面坐标（读与写同一套，见 `query.ts`），
+ * 所以写入前要做一次换算——否则「读回来是 420、按 420 写回去」会一路往右下漂（叠一次父节点偏移）。
+ * 页面本身（`CANVAS`）与文档根的原点就是页面原点。
+ */
+const parentOffsetOf = (graph: SceneGraph, parentId: string | null): { x: number; y: number } => {
+  if (parentId === null) return { x: 0, y: 0 };
+  const parent = graph.getNode(parentId);
+  if (parent === undefined || parent.type === "CANVAS") return { x: 0, y: 0 };
+  return graph.getAbsolutePosition(parentId);
+};
+
+/**
+ * 把页面坐标写到一个节点上；某一个轴没给就保持它现在的页面位置。
+ *
+ * 换算基于**父节点当前的原点**，所以「只改 x」不会把节点拽回父节点的顶边。
+ */
+export const applyPagePosition = (
+  graph: SceneGraph,
+  node: FigmaNodeProxy,
+  pageX: number | undefined,
+  pageY: number | undefined,
+): void => {
+  const offset = parentOffsetOf(graph, graph.getNode(node.id)?.parentId ?? null);
+  const current = graph.getAbsolutePosition(node.id);
+  node.x = (pageX ?? current.x) - offset.x;
+  node.y = (pageY ?? current.y) - offset.y;
+};
+
+/**
  * 不给 `parentId` 时新节点落在哪里。
  *
  * 默认是页面顶层——但那会让「画板 + 一堆同级元素」成为最省事的写法：稿子看着对，其实元素并不在画板里，

@@ -1,4 +1,12 @@
-/** 当前会话设计画布的 React 绑定：切换会话取一次，之后由 `design_update` 帧驱动重取 */
+/**
+ * 当前会话设计画布的两层 React 绑定：
+ *
+ * - `useDesignPath` 只要「本会话当前在改哪份」（标签标题、侧栏的当前标记用），订阅 store 但**不加载**；
+ * - `useDesignCanvas` 要整页画面，挂载时取一次，之后由 `design_update` 帧驱动重取。
+ *
+ * 分开是为了不让「拿一个路径」把整页 drawing 拉下来：工作台控制器在每个会话上都会挂，
+ * 由它触发加载等于任何会话一打开就让服务端开一份文档并按会话标题算一次默认落点。
+ */
 import type { DesignCanvasState } from "@ucode/sdk";
 import { useEffect } from "react";
 
@@ -21,6 +29,13 @@ export type DesignCanvasController = {
   /** 把画布指向一份稿子（来自文件树预览） */
   openFile: (path: string) => void;
 };
+
+/** 只读指针指向的路径：不加载，也就不会因为「看一眼」而让服务端落一份稿 */
+export function useDesignPath(sessionId: string | null): string | null {
+  const client = useClient();
+  const store = useStore(client.design);
+  return sessionId === null ? null : (store.bySession[sessionId]?.path ?? null);
+}
 
 export function useDesignCanvas(sessionId: string | null): DesignCanvasController {
   const client = useClient();

@@ -55,7 +55,7 @@ export type DesignSnapshot = {
   mentionPrefix: string;
   /**
    * 这份稿子落在哪个文件。默认在项目配置目录下、按会话标题命名；
-   * 用户把画布指向别处（`design/doc open`）时就是那个路径——画布上标出来，免得改错文件。
+   * 用户把本会话的当前稿指向别处（`design/doc open`）时就是那个路径——画布上标出来，免得改错文件。
    */
   path: string;
   /**
@@ -93,7 +93,7 @@ export type DesignDocResponse = {
   pageId?: string;
 };
 
-/** 项目里的一份设计稿文件 */
+/** 设计稿目录里的一份文件 */
 export type DesignFileEntry = {
   /** 绝对路径 */
   path: string;
@@ -106,9 +106,13 @@ export type DesignFileEntry = {
 };
 
 export type DesignFilesResponse = {
+  /** 项目设计稿目录里的稿子，按改动时间倒序 */
   files: DesignFileEntry[];
-  /** 扫描是否被上限截断 */
-  truncated: boolean;
+  /**
+   * 本会话当前在改的那份（可以把稿子放在目录外面，所以它不一定在 `files` 里）。
+   * 由服务端给：侧栏与标签要的是这一个路径，不该为此去拉整页画面。
+   */
+  currentPath: string;
 };
 
 /** 一笔着色：通道是 0..1（SDK 的口径），界面自己折成颜色 */

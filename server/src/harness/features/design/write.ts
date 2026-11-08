@@ -9,11 +9,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 
-import type { LayoutMode, SceneGraph } from "@open-pencil/scene-graph";
+import type { LayoutMode, SceneGraph, SceneNode } from "@open-pencil/scene-graph";
 
-import { DESIGN_MAX_NODES } from "../../../constants/design";
+import { DESIGN_BOARD_GAP, DESIGN_BOARD_SIZE, DESIGN_MAX_NODES } from "../../../constants/design";
 import { designError } from "./errors";
 import {
+  applyPagePosition,
   booleanArg,
   defaultParentOf,
   numberArg,
@@ -26,7 +27,14 @@ import {
   targetNode,
   targetRecord,
 } from "./mutations";
-import { describeNode, nodeCountOf, nodePath, renderNodeSvg, renderPage } from "./query";
+import {
+  describeNode,
+  nodeCountOf,
+  nodePath,
+  pageChildIds,
+  renderNodeSvg,
+  renderPage,
+} from "./query";
 import type { DesignToolHooks } from "./types";
 
 export const runWriteTool = async (
@@ -80,6 +88,31 @@ const assertNodeBudget = (graph: SceneGraph): void => {
   );
 };
 
+/**
+ * 新画板落在已有画板右侧（同一行）。
+ *
+ * 一页就是「一屏一行」：不给坐标就让新屏接在右侧，而不是落在页面原点、和第一屏叠在一起
+ * （叠上去既不看不见也点不中，只能靠改坐标找回来）。
+ */
+const nextBoardOrigin = (graph: SceneGraph, pageId: string): { x: number; y: number } => {
+  const boards = pageChildIds(graph, pageId)
+    .map((id) => graph.getNode(id))
+    .filter((node): node is SceneNode => node !== undefined && node.type === "FRAME")
+    .map((board) => ({ position: graph.getAbsolutePosition(board.id), width: board.width }));
+  const rightmost = boards.reduce<(typeof boards)[number] | undefined>(
+    (best, board) =>
+      best === undefined || board.position.x + board.width > best.position.x + best.width
+        ? board
+        : best,
+    undefined,
+  );
+  if (rightmost === undefined) return { x: 0, y: 0 };
+  return {
+    x: rightmost.position.x + rightmost.width + DESIGN_BOARD_GAP,
+    y: rightmost.position.y,
+  };
+};
+
 const createShape = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
   hooks.mutate((api) => {
     const graph = api.graph;
@@ -116,9 +149,18 @@ const createShape = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
     }
     const name = stringArg(args, "name");
     if (name !== undefined) created.name = name;
-    created.resize(numberArg(args, "width") ?? 100, numberArg(args, "height") ?? 100);
-    created.x = numberArg(args, "x") ?? 0;
-    created.y = numberArg(args, "y") ?? 0;
+    // 页面顶层的 Frame 就是一块新画板：一屏的尺寸，不落到通用的 100x100
+    const isBoard = kind === "FRAME" && parent.type === "CANVAS";
+    created.resize(
+      numberArg(args, "width") ?? (isBoard ? DESIGN_BOARD_SIZE.width : 100),
+      numberArg(args, "height") ?? (isBoard ? DESIGN_BOARD_SIZE.height : 100),
+    );
+    const pageX = numberArg(args, "x");
+    const pageY = numberArg(args, "y");
+    const board =
+      isBoard && pageX === undefined && pageY === undefined
+        ? nextBoardOrigin(graph, parent.id)
+        : undefined;
     if (kind === "TEXT") {
       const text = stringArg(args, "text");
       if (text === undefined) {
@@ -130,14 +172,18 @@ const createShape = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
       created.characters = text;
     }
     parent.appendChild(created);
+    // 换算在挂上父节点之后：相对坐标要按「最终的父节点」算
+    applyPagePosition(graph, created, board?.x ?? pageX, board?.y ?? pageY);
     const path = nodePath(graph, created.id);
-    return (
-      `已创建 ${created.id}：${path}（${created.type} ${created.width}x${created.height}）` +
-      // 平铺的稿子看得对、摸不着：元素不在画板里，移动画板也带不动它。建在顶层时提醒一句
-      (parent.type === "FRAME" && parentId === undefined && kind !== "FRAME"
-        ? ""
-        : "\n注意：它建在页面顶层。同一块区域的元素应先建一个容器 Frame 再用 parentId 放进去，层级由嵌套表达。")
-    );
+    const placed = graph.getAbsolutePosition(created.id);
+    const withPosition = board === undefined ? "" : `，排在已有画板右侧（x${placed.x}）`;
+    const notice = isBoard
+      ? `\n它现在是页面里的一块画板${withPosition}。下一屏再建一块新画板，不要把多屏塞进这一块。`
+      : // 平铺的稿子看得对、摸不着：元素落在页面上时移动画板带不动它，提醒一句
+        parent.type === "CANVAS"
+        ? "\n注意：它建在页面顶层。同一块区域的元素应先建一个容器 Frame 再用 parentId 放进去，层级由嵌套表达。"
+        : "";
+    return `已创建 ${created.id}：${path}（${created.type} ${created.width}x${created.height}）${notice}`;
   });
 
 const updateNode = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
@@ -147,8 +193,7 @@ const updateNode = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
     if (name !== undefined) node.name = name;
     const x = numberArg(args, "x");
     const y = numberArg(args, "y");
-    if (x !== undefined) node.x = x;
-    if (y !== undefined) node.y = y;
+    if (x !== undefined || y !== undefined) applyPagePosition(api.graph, node, x, y);
     const width = numberArg(args, "width");
     const height = numberArg(args, "height");
     if (width !== undefined || height !== undefined) {
@@ -261,9 +306,15 @@ const resizeNode = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
 const moveNode = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
   hooks.mutate((api) => {
     const node = targetNode(api.graph, api, hooks.sessionId, args);
-    node.x = numberArg(args, "x") ?? node.x;
-    node.y = numberArg(args, "y") ?? node.y;
-    return `已移动 ${node.id} 到 x${node.x} y${node.y}（页面坐标）`;
+    const current = api.graph.getAbsolutePosition(node.id);
+    applyPagePosition(
+      api.graph,
+      node,
+      numberArg(args, "x") ?? current.x,
+      numberArg(args, "y") ?? current.y,
+    );
+    const moved = api.graph.getAbsolutePosition(node.id);
+    return `已移动 ${node.id} 到 x${moved.x} y${moved.y}（页面坐标）`;
   });
 
 const deleteNode = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>

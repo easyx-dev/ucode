@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -106,6 +106,11 @@ const migrations: Record<number, string> = {
   // 项目级记忆开关的覆盖：NULL 表示未设过（跟随全局开关），0 / 1 为显式关 / 开
   11: `
     ALTER TABLE project ADD COLUMN memory_enabled INTEGER;
+  `,
+  // 会话当前在改的设计稿：指针随会话持久化，重启后 agent 与画布仍指向同一份
+  // 只记路径，稿子文件本身不记任何会话信息
+  12: `
+    ALTER TABLE session ADD COLUMN design_path TEXT;
   `,
 };
 

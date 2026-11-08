@@ -23,6 +23,7 @@ const parentRecord: SessionRecord = {
   agent: null,
   forkedFromId: null,
   goalState: null,
+  designPath: null,
   childCount: 0,
   sourcePath: null,
   preview: "",
