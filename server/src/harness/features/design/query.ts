@@ -233,9 +233,13 @@ const paintOf = (paint: {
   color: { r: number; g: number; b: number; a: number };
   opacity: number;
   visible: boolean;
+  imageHash?: string;
+  imageScaleMode?: string;
 }): DesignPaint => ({
   type: paint.type,
   color: { r: paint.color.r, g: paint.color.g, b: paint.color.b, a: paint.color.a },
   opacity: paint.opacity,
   visible: paint.visible,
+  ...(paint.imageHash === undefined ? {} : { imageHash: paint.imageHash }),
+  ...(paint.imageScaleMode === undefined ? {} : { imageScaleMode: paint.imageScaleMode }),
 });

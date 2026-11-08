@@ -5,7 +5,7 @@
  * 目标已删时按「没有这个节点」报错（而不是改到别人身上）。
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -16,7 +16,7 @@ import { openDesignDocument } from "../document";
 import { isDesignError } from "../errors";
 import { formatAnchor, mentionPrefixOf } from "../mention";
 import { DESIGN_PARAMETERS } from "../parameters";
-import { pageNodes } from "../query";
+import { pageNodes, renderPage } from "../query";
 import { isWriteToolName, runDesignTool } from "../run";
 import { DESIGN_TOOL_NAMES } from "../tools";
 import type { DesignToolHooks } from "../types";
@@ -51,6 +51,10 @@ const setup = async (): Promise<{ document: DesignDocument; hooks: DesignToolHoo
   };
   return { document, hooks };
 };
+
+/** 2x2 PNG：Photon 能解码的最小样本，用来验证图片填充走通了入库 → 渲染 */
+const TINY_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNgYGhgZGhgYGBsYGRsAAAMIgIFOxfAbgAAAABJRU5ErkJggg==";
 
 const pageIdOf = (document: DesignDocument): string => document.graph.getPages()[0]?.id ?? "";
 
@@ -291,5 +295,89 @@ describe("设计工具", () => {
     assert.match(result, /已导出/);
     assert.match(readFileSync(join(hooks.cwd, "out/board.svg"), "utf8"), /<svg/);
     await document.close();
+  });
+
+  it("图片填充：字节进文档，画布与导出都能画出它", async () => {
+    const { document, hooks } = await setup();
+    const created = await runDesignTool(
+      "design_create_shape",
+      { type: "RECTANGLE", name: "封面", width: 64, height: 64 },
+      hooks,
+    );
+    const id = created.match(/已创建 (\S+)：/)?.[1] ?? "";
+    writeFileSync(join(hooks.cwd, "cover.png"), Buffer.from(TINY_PNG, "base64"));
+
+    const result = await runDesignTool("design_set_image", { id, path: "cover.png" }, hooks);
+    assert.match(result, /图片存档/);
+
+    const detail = JSON.parse(await runDesignTool("design_get_node", { id }, hooks)) as {
+      fills: { type: string; imageHash?: string; imageScaleMode?: string }[];
+    };
+    assert.equal(detail.fills[0]?.type, "IMAGE");
+    assert.equal(detail.fills[0]?.imageScaleMode, "FILL");
+    const hash = detail.fills[0]?.imageHash ?? "";
+    assert.ok(hash);
+    assert.ok(document.graph.images.has(hash));
+
+    // 画布与导出走同一个渲染：图片得在 SVG 里（否则用户在画布上看不到）
+    const render = await renderPage(document.graph, pageIdOf(document), 0);
+    assert.match(render.svg ?? "", /data:image\/png;base64/);
+    await document.close();
+  });
+
+  it("图片落盘后能读回：填充的 imageHash 与文件里的字节对得上", async () => {
+    const { document, hooks } = await setup();
+    const created = await runDesignTool(
+      "design_create_shape",
+      { type: "RECTANGLE", name: "封面", width: 64, height: 64 },
+      hooks,
+    );
+    const id = created.match(/已创建 (\S+)：/)?.[1] ?? "";
+    writeFileSync(join(hooks.cwd, "cover.png"), Buffer.from(TINY_PNG, "base64"));
+    await runDesignTool("design_set_image", { id, path: "cover.png" }, hooks);
+    const hash = document.graph.getNode(id)?.fills[0]?.imageHash ?? "";
+    await document.close();
+
+    const reopened = await openDesignDocument(document.path, { writeDebounceMs: 60_000 });
+    try {
+      const bytes = reopened.graph.images.get(hash);
+      assert.ok(bytes, "读回来的文档里要有那张图的字节");
+      assert.equal(reopened.graph.getNode(id)?.fills[0]?.imageHash, hash);
+    } finally {
+      await reopened.close();
+    }
+  });
+
+  it("图片只认会话工作目录里的文件，且换回色块后不留字节", async () => {
+    const { document, hooks } = await setup();
+    const created = await runDesignTool(
+      "design_create_shape",
+      { type: "RECTANGLE", name: "封面", width: 64, height: 64 },
+      hooks,
+    );
+    const id = created.match(/已创建 (\S+)：/)?.[1] ?? "";
+    const outside = mkdtempSync(join(tmpdir(), "design-outside-"));
+    dirs.push(outside);
+    writeFileSync(join(outside, "far.png"), Buffer.from(TINY_PNG, "base64"));
+    await assert.rejects(
+      () => runDesignTool("design_set_image", { id, path: join(outside, "far.png") }, hooks),
+      (error: unknown) => isDesignError(error) && error.code === "invalid_input",
+    );
+    await assert.rejects(
+      () => runDesignTool("design_set_image", { id, path: "nope.png" }, hooks),
+      (error: unknown) => isDesignError(error) && error.code === "not_found",
+    );
+
+    writeFileSync(join(hooks.cwd, "cover.png"), Buffer.from(TINY_PNG, "base64"));
+    await runDesignTool("design_set_image", { id, path: "cover.png" }, hooks);
+    assert.equal(document.graph.images.size, 1);
+    // 换回纯色：图片没人引用，字节不该继续躺在内存里（也不该写进文件）
+    await runDesignTool("design_set_fill", { id, color: "#101010" }, hooks);
+    assert.equal(document.graph.images.size, 0);
+    await document.close();
+    const stored = JSON.parse(readFileSync(document.path, "utf8")) as {
+      images: Record<string, string>;
+    };
+    assert.deepEqual(stored.images, {});
   });
 });

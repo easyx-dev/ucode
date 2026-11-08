@@ -98,6 +98,24 @@ const fillParameters = Type.Object({
   opacity,
 });
 
+const imageParameters = Type.Object({
+  ...nodeTarget,
+  ...pageId,
+  path: Type.String({
+    description:
+      "图片路径：相对会话工作目录（或绝对路径），且必须在这个目录里；png / jpeg / webp / gif",
+  }),
+  scaleMode: Type.Optional(
+    Type.Union(
+      ["FILL", "FIT"].map((value) => Type.Literal(value)),
+      {
+        description: "图片在框里的放法：FILL 铺满并裁切（默认），FIT 整张放进去",
+      },
+    ),
+  ),
+  opacity,
+});
+
 const strokeParameters = Type.Object({
   ...nodeTarget,
   ...pageId,
@@ -209,6 +227,7 @@ export const DESIGN_PARAMETERS: Record<string, TObject> = {
   design_create_shape: createParameters,
   design_update_node: updateParameters,
   design_set_fill: fillParameters,
+  design_set_image: imageParameters,
   design_set_stroke: strokeParameters,
   design_set_text: textParameters,
   design_set_layout: layoutParameters,

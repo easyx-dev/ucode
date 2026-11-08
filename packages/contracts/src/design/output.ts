@@ -117,11 +117,15 @@ export type DesignFilesResponse = {
 
 /** 一笔着色：通道是 0..1（SDK 的口径），界面自己折成颜色 */
 export type DesignPaint = {
-  /** 画法，目前只有 `SOLID` */
+  /** 画法：`SOLID`（纯色）或 `IMAGE`（图片，带 `imageHash`） */
   type: string;
   color: { r: number; g: number; b: number; a: number };
   opacity: number;
   visible: boolean;
+  /** 图片填充的内容哈希（文档 `images` 里的键）；纯色填充没有 */
+  imageHash?: string;
+  /** 图片在框里的放法：`FILL` / `FIT` / `CROP` / `TILE`；纯色填充没有 */
+  imageScaleMode?: string;
   /** 描边粗细（像素）；填充没有这一项 */
   weight?: number;
 };

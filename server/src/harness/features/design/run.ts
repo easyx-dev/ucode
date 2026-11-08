@@ -21,6 +21,7 @@ const WRITE_TOOL_NAMES = new Set<string>([
   "design_create_shape",
   "design_update_node",
   "design_set_fill",
+  "design_set_image",
   "design_set_stroke",
   "design_set_text",
   "design_set_layout",

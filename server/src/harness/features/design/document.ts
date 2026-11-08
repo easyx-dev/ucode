@@ -27,6 +27,7 @@ import {
   DESIGN_WRITE_DEBOUNCE_MS,
 } from "../../../constants/design";
 import { designError } from "./errors";
+import { referencedImageHashes } from "./images";
 import { type DesignSdk, loadDesignSdk } from "./sdk";
 
 /**
@@ -122,6 +123,8 @@ export const openDesignDocument = async (
   const debounceMs = options.writeDebounceMs ?? DESIGN_WRITE_DEBOUNCE_MS;
 
   const serialize = (): string => {
+    // 只留还被填充引用到的图：换回色块的那张不该继续躺在文件里（文件只涨不缩）
+    const used = referencedImageHashes(current.graph);
     const stored: StoredDocument = {
       format: DESIGN_DOCUMENT_FORMAT,
       meta,
@@ -134,10 +137,9 @@ export const openDesignDocument = async (
         ? {}
         : { documentColorSpace: String(current.graph.documentColorSpace) }),
       images: Object.fromEntries(
-        [...current.graph.images.entries()].map(([hash, bytes]) => [
-          hash,
-          Buffer.from(bytes).toString("base64"),
-        ]),
+        [...current.graph.images.entries()]
+          .filter(([hash]) => used.has(hash))
+          .map(([hash, bytes]) => [hash, Buffer.from(bytes).toString("base64")]),
       ),
     };
     return JSON.stringify(stored);

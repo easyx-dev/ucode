@@ -24,6 +24,7 @@ export const DESIGN_TOOL_NAMES = [
   "design_create_shape",
   "design_update_node",
   "design_set_fill",
+  "design_set_image",
   "design_set_stroke",
   "design_set_text",
   "design_set_layout",
@@ -101,6 +102,20 @@ const SPECS: readonly DesignToolSpec[] = [
     name: "design_set_fill",
     description: "把节点填充设成一种纯色。",
     snippet: "设置设计节点的填充色",
+  },
+  {
+    name: "design_set_image",
+    description:
+      "把一张本地图片填进节点，替掉它当前的填充——封面、商品图、截图这类真实素材用它，不要用几何块拼一张假的。" +
+      "path 是相对会话工作目录的图片路径（png / jpeg / webp / gif），必须是项目里已有的文件；" +
+      "网络图先用 bash 下载到项目里再引用。" +
+      "图片按**这个节点当前的显示尺寸**存档（约两倍像素、单张有上限），所以：" +
+      "先用 design_node_resize 把框定好再设图；之后把节点放大很多倍，要重新设一次才清楚。" +
+      "scaleMode 默认 FILL（铺满并裁切），FIT 是整张放进框里。",
+    snippet: "用本地图片设置设计节点的填充（照片 / 封面这类真实素材）",
+    guidelines: [
+      "图片按节点当前尺寸存档：先 design_node_resize 把框定好，再 design_set_image；节点之后放大很多倍就重新设一次。",
+    ],
   },
   {
     name: "design_set_stroke",

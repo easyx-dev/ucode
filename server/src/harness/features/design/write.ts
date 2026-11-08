@@ -9,10 +9,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 
-import type { LayoutMode, SceneGraph, SceneNode } from "@open-pencil/scene-graph";
+import type { ImageScaleMode, LayoutMode, SceneGraph, SceneNode } from "@open-pencil/scene-graph";
 
 import { DESIGN_BOARD_GAP, DESIGN_BOARD_SIZE, DESIGN_MAX_NODES } from "../../../constants/design";
 import { designError } from "./errors";
+import { assertImageBudget, loadDesignImage, pruneUnreferencedImages } from "./images";
 import {
   applyPagePosition,
   booleanArg,
@@ -49,6 +50,8 @@ export const runWriteTool = async (
       return updateNode(args, hooks);
     case "design_set_fill":
       return setFill(args, hooks);
+    case "design_set_image":
+      return setImage(args, hooks);
     case "design_set_stroke":
       return setStroke(args, hooks);
     case "design_set_text":
@@ -221,8 +224,48 @@ const setFill = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
         visible: true,
       },
     ];
+    // 换填充可能让上一张图没人引用：字节留在内存里就还会进文件与每一帧 SVG
+    pruneUnreferencedImages(api.graph);
     return confirm(api.graph, `已设置 ${node.id} 的填充`, node.id);
   });
+
+const setImage = async (args: ToolArgs, hooks: DesignToolHooks): Promise<string> => {
+  // 先读节点尺寸再压图：存档像素跟显示尺寸走，这一步必须在改动之前落定
+  const box = await hooks.read(({ graph }) => {
+    const node = targetRecord(graph, hooks.sessionId, args);
+    return { width: node.width, height: node.height };
+  });
+  const image = await loadDesignImage({
+    path: requiredString(args, "path"),
+    cwd: hooks.cwd,
+    box,
+  });
+  const mode = (stringArg(args, "scaleMode") ?? "FILL") as ImageScaleMode;
+  return hooks.mutate((api) => {
+    const node = targetNode(api.graph, api, hooks.sessionId, args);
+    const graph = api.graph;
+    assertImageBudget(graph, image);
+    graph.images.set(image.hash, image.bytes);
+    node.fills = [
+      {
+        type: "IMAGE",
+        color: { r: 1, g: 1, b: 1, a: 1 },
+        opacity: numberArg(args, "opacity") ?? 1,
+        visible: true,
+        imageHash: image.hash,
+        imageScaleMode: mode,
+      },
+    ];
+    // 换掉旧填充之后可能留下没人引用的字节：不丢就一直进文件与每一帧 SVG
+    pruneUnreferencedImages(graph);
+    const size = `${image.width}x${image.height}`;
+    const compressed = image.resized ? "，已按节点尺寸压过" : "";
+    return (
+      `${confirm(graph, `已把 ${image.source} 填进 ${node.id}`, node.id)}\n` +
+      `图片存档：${size} ${image.mimeType}，${Math.round(image.bytes.byteLength / 1024)}KB${compressed}`
+    );
+  });
+};
 
 const setStroke = (args: ToolArgs, hooks: DesignToolHooks): Promise<string> =>
   hooks.mutate((api) => {

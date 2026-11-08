@@ -29,6 +29,8 @@ export type DesignSdk = {
   ) => string | null;
   /** 内容外接矩形，用于「适应视图」；空集合返回 null */
   computeContentBounds: (graph: SceneGraph, nodeIds: readonly string[]) => VisualBounds | null;
+  /** 图片字节在文档里的名字（十六进制 SHA-1，与 Figma 同一口径） */
+  computeImageHash: (data: Uint8Array) => string;
 };
 
 let loading: Promise<DesignSdk> | undefined;
@@ -52,5 +54,6 @@ const importSdk = async (): Promise<DesignSdk> => {
     createApi: (graph) => new figmaApi.FigmaAPI(graph),
     renderNodesToSvg: (graph, pageId, nodeIds) => svg.renderNodesToSVG(graph, pageId, [...nodeIds]),
     computeContentBounds: (graph, nodeIds) => raster.computeContentBounds(graph, [...nodeIds]),
+    computeImageHash: (data) => sceneGraph.computeImageHash(data),
   };
 };

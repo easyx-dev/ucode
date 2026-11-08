@@ -3048,7 +3048,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | string | 是 | 画法，目前只有 `SOLID` |
+| `type` | string | 是 | 画法：`SOLID`（纯色）或 `IMAGE`（图片，带 `imageHash`） |
 | `color` | object | 是 | — |
 | `color.r` | number | 是 | — |
 | `color.g` | number | 是 | — |
@@ -3056,6 +3056,8 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `color.a` | number | 是 | — |
 | `opacity` | number | 是 | — |
 | `visible` | boolean | 是 | — |
+| `imageHash` | string | 否 | 图片填充的内容哈希（文档 `images` 里的键）；纯色填充没有 |
+| `imageScaleMode` | string | 否 | 图片在框里的放法：`FILL` / `FIT` / `CROP` / `TILE`；纯色填充没有 |
 | `weight` | number | 否 | 描边粗细（像素）；填充没有这一项 |
 
 ### DesignTextProps

@@ -164,7 +164,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-/** 填充 / 描边列表：颜色块 + 十六进制 + 不透明度 */
+/** 填充 / 描边列表：颜色块 + 十六进制 + 不透明度；图片填充没有色相可看，标出画法与放法 */
 function Paints({ paints, empty }: { paints: readonly DesignPaint[]; empty: string }) {
   const { t } = useTranslation();
   const visible = paints.filter((paint) => paint.visible);
@@ -174,12 +174,21 @@ function Paints({ paints, empty }: { paints: readonly DesignPaint[]; empty: stri
       {visible.map((paint, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: 色板按顺序排列，位置即身份
         <div key={`paint-${index}`} className="flex items-center gap-2">
-          <span
-            className="size-icon-sm shrink-0 rounded-xs ring-1 ring-border"
-            style={{ backgroundColor: toHex(paint.color) }}
-            aria-hidden
-          />
-          <span className="font-mono">{toHex(paint.color)}</span>
+          {paint.imageHash === undefined ? (
+            <>
+              <span
+                className="size-icon-sm shrink-0 rounded-xs ring-1 ring-border"
+                style={{ backgroundColor: toHex(paint.color) }}
+                aria-hidden
+              />
+              <span className="font-mono">{toHex(paint.color)}</span>
+            </>
+          ) : (
+            <>
+              <span className="font-mono">{t("图片")}</span>
+              <span className="text-foreground-subtle">{paint.imageScaleMode}</span>
+            </>
+          )}
           {paint.opacity === 1 ? null : (
             <span className="text-foreground-subtle">
               {t("不透明度 {{value}}%", { value: String(Math.round(paint.opacity * 100)) })}
