@@ -24,7 +24,7 @@ import type {
   DesignSnapshot,
 } from "@ucode/contracts";
 import { DESIGN_FILE_EXTENSION, DESIGN_TREE_ROW_LIMIT } from "../../../constants/design";
-import { expandHome } from "../../../platform/paths";
+import { expandHome, isInsidePath } from "../../../platform/paths";
 import { type DesignDocument, openDesignDocument } from "./document";
 import { designError } from "./errors";
 import type { DesignHooks } from "./hooks";
@@ -107,12 +107,23 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
   const closing = new Map<string, Promise<void>>();
 
   /** 本会话当前在改哪份；缓存未命中回持久层取一次 */
-  const focusedOf = (sessionId: string): string | undefined => {
-    const cached = focused.get(sessionId);
+  const focusedOf = (target: DesignTarget): string | undefined => {
+    const cached = focused.get(target.sessionId);
     if (cached !== undefined) return cached;
-    const stored = deps.pointers.get(sessionId);
+    const stored = deps.pointers.get(target.sessionId);
     if (stored === null) return undefined;
-    focused.set(sessionId, stored);
+    /*
+     * 指针只认本会话工作目录之下的稿子。
+     *
+     * 会话切换时前端可能拿着上一个会话的清单发出一次 open，把另一个项目的稿子写进这一行；
+     * 那条指针会让本项目会话的设计视图里出现别人的稿子（画布还会把它当成「当前在改的那份」）。
+     * 指针是派生数据，越界就清掉，回落到本项目默认落点。
+     */
+    if (!isInsidePath(target.cwd, stored)) {
+      deps.pointers.set(target.sessionId, null);
+      return undefined;
+    }
+    focused.set(target.sessionId, stored);
     return stored;
   };
 
@@ -126,6 +137,12 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
     focused.delete(sessionId);
     deps.pointers.set(sessionId, null);
   };
+
+  /**
+   * 只看进程内缓存（出池 / 归档用）：只有校过、落在工作目录里的指针才会进缓存，而这两个动作
+   * 要的只是「有没有要回收的文档」，不必为此回持久层再校一遍。
+   */
+  const cachedPathOf = (sessionId: string): string | undefined => focused.get(sessionId);
 
   /** 反查「谁在看这份文件」：只看进程内缓存——重启后没载入的会话没有在线画布，不需要通知 */
   const sessionsFocusedOn = (path: string): string[] =>
@@ -181,7 +198,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
 
   /** 这次请求该落到哪份文件：会话指针优先；没有指针时只有画布能回落到默认落点 */
   const pathOf = async (target: DesignTarget, options: ResolveOptions): Promise<string> => {
-    const path = focusedOf(target.sessionId);
+    const path = focusedOf(target);
     if (path !== undefined) return path;
     if (!options.allowDefault) {
       throw designError(
@@ -217,6 +234,13 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
     }
     const expanded = expandHome(requested.trim());
     const path = isAbsolute(expanded) ? expanded : resolve(target.cwd, expanded);
+    if (!isInsidePath(target.cwd, path)) {
+      throw designError(
+        "invalid_input",
+        `设计稿要在会话工作目录里：${path}`,
+        `这个会话的工作目录是 ${target.cwd}；放在项目里的任何位置都行，但不能跨项目`,
+      );
+    }
     if (!path.endsWith(DESIGN_FILE_EXTENSION)) {
       throw designError(
         "invalid_input",
@@ -236,7 +260,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
           );
         });
     }
-    const previous = focusedOf(target.sessionId);
+    const previous = focusedOf(target);
     remember(target.sessionId, path);
     selections.delete(target.sessionId);
     if (previous !== undefined && previous !== path) await releaseIfUnused(previous);
@@ -348,7 +372,7 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
       },
     }),
     currentPath: async (target) => {
-      const path = focusedOf(target.sessionId);
+      const path = focusedOf(target);
       if (path !== undefined) return path;
       // 故意不走 `deriveDefault`：清单只是「问一下现在会落在哪」，不该因此把指针写进会话
       return defaultDesignPath({
@@ -365,13 +389,13 @@ export const createDesignService = (deps: DesignServiceDeps): DesignService => {
      * 文档本身没人看就落盘回收，下次访问重开。
      */
     release: (sessionId) => {
-      const path = focusedOf(sessionId);
+      const path = cachedPathOf(sessionId);
       if (path === undefined) return;
       void releaseIfUnused(path);
     },
     /** 会话归档 / 删除：连指针一起丢（归档后它不会再被访问） */
     forget: (sessionId) => {
-      const path = focusedOf(sessionId);
+      const path = cachedPathOf(sessionId);
       forgetPath(sessionId);
       selections.delete(sessionId);
       if (path === undefined) return;

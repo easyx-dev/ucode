@@ -13,7 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-
+import { isInsidePath } from "../../../../platform/paths";
 import { createDesignService, type DesignPointerStore, type DesignServiceDeps } from "../index";
 
 const dirs: string[] = [];
@@ -254,5 +254,42 @@ describe("文档按文件路径归口", () => {
     });
 
     assert.deepEqual([...emitted].sort(), ["s-a", "s-b"]);
+  });
+});
+
+describe("指针不跨项目", () => {
+  it("持久层里的指针落在工作目录之外时不认，回落到本项目的默认落点", async () => {
+    const cwd = tempCwd();
+    const other = tempCwd();
+    const pointers = pointerStore();
+    // 别的项目的稿子（会话切换时被前端写进这一行的那种脏数据）
+    const foreign = join(other, "…", "别人的.design");
+    pointers.set("s-1", foreign);
+    // 进程内缓存里也放一份：缓存同样不该让它漏过去
+    const service = makeService({ titleOf: () => "本项目" }, pointers);
+    const target = { sessionId: "s-1", cwd };
+
+    const current = await service.currentPath(target);
+    assert.equal(isInsidePath(cwd, current), true, current);
+    assert.notEqual(current, foreign);
+    // 脏指针直接清掉，不留着下次再撞上
+    assert.equal(pointers.get("s-1"), null);
+
+    // 工具那条链路同样按「没有指针」处理，而不是对着别人的稿子改
+    await assert.rejects(
+      service.toolHooks(target).read(async ({ graph }) => graph.nodes.size),
+      { message: /还没有打开任何设计稿/ },
+    );
+  });
+
+  it("design_open 指向工作目录之外直接报错", async () => {
+    const cwd = tempCwd();
+    const other = tempCwd();
+    const service = makeService();
+
+    await assert.rejects(
+      service.toolHooks({ sessionId: "s-1", cwd }).open(join(other, "别人的.design")),
+      { message: /工作目录/ },
+    );
   });
 });

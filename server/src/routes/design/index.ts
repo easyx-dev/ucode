@@ -104,7 +104,7 @@ export const createDesignRoute = (services: Services) => {
     }
   });
 
-  // 「设计」视图侧栏的稿子清单：项目设计稿目录里的 `.design`，标出本会话当前在改的那份
+  // 设计视图的稿子清单：项目设计稿目录里的 `.design`，标出本会话当前在改的那份
   router.post("/files", jsonBody(designFilesInputSchema), async (c) => {
     const input = c.req.valid("json");
     try {
