@@ -2,6 +2,8 @@
  * 侧栏：按活动栏选中的视图渲染项目文件树、代码管理（变更树 / 提交历史）或终端列表；
  * 浏览器那一面由宿主提供（仅桌面端，见 `WorkbenchApi.browser`）。
  *
+ * 设计视图没有侧栏——它的稿子清单直接铺在主区（见 `design/design-files-list`）。
+ *
  * 两个代码视图共用同一份仓库状态（`useGitReview` 在面板这一层持有）：文件树的 git 装饰与变更树来自
  * 同一次 status 请求，切视图不会各拉一遍。终端的进程清单由服务端持有（`useTerminals`），这里只管展示。
  * 没有工作目录时三个视图都给同一个占位。
@@ -11,7 +13,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Empty } from "../../base/empty";
 import { useWorkbench } from "../../provider/workbench";
-import { DesignFilesPanel } from "./design/design-files-panel";
 import { FileTree } from "./file/file-tree";
 import { buildGitMarks } from "./git/git-marks";
 import { ReviewTree } from "./git/review-tree";
@@ -32,10 +33,8 @@ export function WorkbenchSidebar({
   const marks = useMemo(() => buildGitMarks(review.status.data ?? null), [review.status.data]);
 
   if (!workbench) return null;
-  // 浏览器与设计画布都不依赖工作目录，所以排在「没有工作目录」的占位之前
+  // 浏览器不依赖工作目录，所以排在「没有工作目录」的占位之前
   if (workbench.view === "browser") return <>{workbench.browser?.sidebar ?? null}</>;
-  // 设计视图的侧栏是「项目里的稿子」，图层树在画布标签里（可隐藏）
-  if (workbench.view === "design") return <DesignFilesPanel />;
   if (!cwd) {
     return (
       <Empty

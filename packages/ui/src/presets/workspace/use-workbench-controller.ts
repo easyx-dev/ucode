@@ -126,8 +126,11 @@ export function useWorkbenchController({
    * 打开设计画布：**先把本会话的当前稿指过去，再打开标签**。
    *
    * 标签只是视图——它不携带稿子身份、切会话即清掉；「本会话在改哪份」是会话上的指针，
-   * 显式打开（这里 / 文件树点 `.design` / agent `design_open`）改写它，画布首次取值只会在
-   * 还没有指针时确立一个默认落点——所以不会把别的会话开着的那份带过来。
+   * 显式打开（这里 / 稿子清单点一份 / 文件树点 `.design` / agent `design_open`）改写它，
+   * 画布首次取值只会在还没有指针时确立一个默认落点——所以不会把别的会话开着的那份带过来。
+   *
+   * 同时把清单收走：设计视图没有侧栏，那一个状态在这里表示「看清单 / 看画布」，
+   * 打开一份稿子就该看到画布占满。
    */
   const openDesign = useCallback(
     (path: string) => {
@@ -135,7 +138,7 @@ export function useWorkbenchController({
       if (sessionId !== null && designPath !== path) void client.design.openFile(sessionId, path);
       docs.open(designDoc(sessionId));
       setView("design");
-      setSidebarVisible(true);
+      setSidebarVisible(false);
       show();
     },
     [client, designPath, docs.open, sessionId, show],
@@ -280,17 +283,22 @@ export function useWorkbenchController({
   }, [applyOpen, isDesktop, open, setSheetOpen, show]);
 
   /**
-   * 活动栏：点当前视图即收起侧栏，点另一个视图即切换并展开。
+   * 活动栏 / 视图条：点当前视图即收起侧栏，点另一个视图即切换并展开。
    *
-   * 设计视图顺带确保画布标签在（不像终端那样「视图只列清单、标签自己开」）：设计视图的侧栏是图层树，
-   * 离开画布就只是一棵点不动的树。
+   * 设计视图没有侧栏：点它一律回到「稿子清单」（清单与画布各占满主区，来回靠标签条的返回箭头），
+   * 所以不走「点自己就收起」那一条——那里收起后没有任何东西可看。
    */
   const selectView = useCallback(
     (next: WorkbenchView) => {
+      if (next === "design") {
+        setView("design");
+        setSidebarVisible(true);
+        return;
+      }
       setSidebarVisible((visible) => (next === view ? !visible : true));
       setView(next);
     },
-    [openDoc, view],
+    [view],
   );
 
   const api = useMemo<WorkbenchApi>(

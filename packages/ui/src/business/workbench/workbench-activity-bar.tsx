@@ -1,7 +1,8 @@
 /**
- * 活动栏：面板最左那条窄图标列，切换侧栏看什么，以及收起整个面板。
+ * 活动栏：面板最左那条窄图标列，切换列表看什么，以及收起整个面板。
  *
  * 点当前视图的图标即收起侧栏——这是 VSCode 的习惯，也让「收起」不必再占一个按钮位。
+ * 设计视图例外：它没有侧栏，点它一律回到稿子清单（见 `use-workbench-controller` 的 `selectView`）。
  * 两个图标都在位，不随目录是不是 git 仓库变化：位置固定比省一个图标重要。
  */
 
@@ -33,7 +34,7 @@ export function WorkbenchActivityBar() {
     >
       {views.map((view) => {
         const Icon = VIEW_ICON[view];
-        const active = workbench.view === view && workbench.sidebarVisible;
+        const active = workbench.view === view && (view === "design" || workbench.sidebarVisible);
         const label = translate(VIEW_LABEL[view]);
         return (
           <IconButton
