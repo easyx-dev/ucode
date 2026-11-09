@@ -76,4 +76,6 @@ export type DialectDocument = {
 export type InvocationCandidates = {
   prompts: readonly { name: string }[];
   skills: readonly { name: string }[];
+  /** 引用锚点的 scheme 表（插件贡献）：表内的 `@scheme:…` 不当文件引用 */
+  mentions?: readonly string[];
 };

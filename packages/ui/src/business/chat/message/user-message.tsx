@@ -16,17 +16,19 @@
 
 import {
   contextMarker,
-  designAnchorLabel,
+  hasMention,
+  mentionLabelOf,
   parseEntryText,
-  splitDesignAnchors,
+  splitMentions,
   userMessageText,
 } from "@ucode/markdown";
 import { cn } from "cn";
-import { LayoutTemplate, Pencil, Sparkles } from "lucide-react";
+import { Link2, Pencil, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "../../../base/button";
 import { CopyAction } from "../../../base/copy-action";
+import { useMentionSchemes } from "../../../hooks/use-mention-schemes";
 import { useWorkbench } from "../../../provider/workbench";
 import type { ChatItem, EditMessagePayload, MessageBlock } from "../../../types";
 import { HOVER_ACTION_CLASS } from "../../../utils/hover-actions";
@@ -89,20 +91,30 @@ function ContextChip({ path }: { path: string }) {
 /**
  * 正文里的设计画布锚点。
  *
- * 锚点（`@design:<会话>/<页>/<节点>`）在方言里是字面文本——它不是文件引用，服务端不会去磁盘上找它，
- * 所以也不会变成引用 chip。这里把它收成一枚 chip：正文里露出一长串 uuid 既难看又没法读。
+ * 引用锚点（`@<scheme>:<payload>`）在方言里是字面文本——它不是文件引用，服务端不会去磁盘上找它，
+ * 所以也不会变成上下文 chip。这里把它收成一枚 chip：正文里露出一长串 uuid 既难看又没法读。
  *
- * 不提供跳转：锚点可能属于别的会话，打开别人的设计稿是另一回事；悬停给原文，需要时自己复制。
+ * 哪些 scheme 算锚点由插件贡献决定（`ui.mentions`）；内核不认识任何一个具体 scheme。
+ * 不提供跳转：锚点可能属于别的会话 / 别的插件，打开它是另一回事；悬停给原文，需要时自己复制。
  */
-function DesignAnchorChip({ anchor, nodeId }: { anchor: string; nodeId: string }) {
+function MentionAnchorChip({
+  anchor,
+  scheme,
+  payload,
+}: {
+  anchor: string;
+  scheme: string;
+  payload: string;
+}) {
   const { t } = useTranslation();
+  const label = mentionLabelOf(payload);
   return (
     <span
       className={`${CHIP_CLASS} mx-0.5 align-baseline font-mono`}
-      title={t("设计节点：{{label}}\n{{anchor}}", { label: designAnchorLabel(nodeId), anchor })}
+      title={t("引用：{{label}}\n{{anchor}}", { label, anchor })}
     >
-      <LayoutTemplate className="size-icon-xs shrink-0" aria-hidden />
-      {t("设计节点")} {designAnchorLabel(nodeId)}
+      <Link2 className="size-icon-xs shrink-0" aria-hidden />
+      {scheme} {label}
     </span>
   );
 }
@@ -156,6 +168,8 @@ export function UserMessage({
   highlight,
 }: UserMessageProps) {
   const { t } = useTranslation();
+  /** 哪些 `@scheme:` 算引用锚点：由插件贡献决定 */
+  const mentionSchemes = useMentionSchemes();
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
@@ -283,16 +297,17 @@ export function UserMessage({
               segment.type === "text" ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: 分段由文本顺序决定，没有自然 id
                 <span key={`${item.id}-seg-${index}`}>
-                  {splitDesignAnchors(segment.text).map((part, partIndex) =>
+                  {splitMentions(segment.text, mentionSchemes).map((part, partIndex) =>
                     part.type === "text" ? (
                       // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
                       <span key={`${item.id}-seg-${index}-${partIndex}`}>{part.text}</span>
                     ) : (
-                      <DesignAnchorChip
+                      <MentionAnchorChip
                         // biome-ignore lint/suspicious/noArrayIndexKey: 同上，位置即身份
                         key={`${item.id}-seg-${index}-${partIndex}`}
                         anchor={part.anchor}
-                        nodeId={part.nodeId}
+                        scheme={part.scheme}
+                        payload={part.payload}
                       />
                     ),
                   )}

@@ -4,8 +4,7 @@
  * 一份文档一个标签；同一份内容重复打开只激活已有标签。标签数上限 8 个，超出丢最早的那个
  * （激活项不动，新开的仍在最右）——但终端不参与丢弃，见 `dropEarliest`。id 由内容与来源构成，
  * 因此同一文件的「预览」与「改动 diff」各占一个标签，互不覆盖。
- * 两类有例外：浏览器标签换工作目录时留下来（它跟目录无关，见 `reset`）；设计画布属于会话，
- * 一个会话一格且换会话即丢（见 `dropDesign`）——它画的是会话上的指针，不靠标签记住稿子。
+ * 例外只有浏览器标签：换工作目录时留下来（它跟目录无关，见 `reset`）。
  */
 import type { GitCommitSummary, GitDiffSource } from "@ucode/contracts";
 
@@ -34,12 +33,7 @@ export type WorkbenchDoc =
    * 浏览器标签（仅桌面端有）。`tabId` 对 `@ucode/ui` 是不透明标识，由宿主拿去对应自己的 webview
    * （见 `WorkbenchBrowserSurface.renderTab`）；web 端不注入浏览器面，开不出这种标签。
    */
-  | { id: string; kind: "browser"; tabId: string }
-  /**
-   * 设计画布。**一个会话一格**：画布画的是「本会话当前在改哪份稿」，那是会话上的指针，
-   * 不是标签的身份——所以标签不带路径，稿子在服务端被换掉时同一个标签跟着换内容。
-   */
-  | { id: string; kind: "design"; sessionId: string | null };
+  | { id: string; kind: "browser"; tabId: string };
 
 /** 同时打开的标签数上限；超出丢最早的那个 */
 export const MAX_WORKBENCH_DOCS = 8;
@@ -89,15 +83,6 @@ export const terminalDoc = (terminalId: string): WorkbenchDoc => ({
   terminalId,
 });
 
-export const designDocId = (sessionId: string | null): string => `design:${sessionId ?? "draft"}`;
-
-/** 一个会话一格画布；重复打开只激活已有的那个 */
-export const designDoc = (sessionId: string | null): WorkbenchDoc => ({
-  id: designDocId(sessionId),
-  kind: "design",
-  sessionId,
-});
-
 export const browserDocId = (tabId: string): string => `browser:${tabId}`;
 
 /** 一个浏览器标签一份文档；重复打开只激活已有的那个 */
@@ -144,9 +129,7 @@ export type WorkbenchDocsAction =
   /** 只留右键的那一个（标签右键菜单用） */
   | { type: "closeOthers"; id: string }
   | { type: "closeAll" }
-  | { type: "reset" }
-  /** 只丢掉设计画布：它属于会话，而文件 / diff 标签只绑工作目录 */
-  | { type: "dropDesign" };
+  | { type: "reset" };
 
 export const workbenchDocsReducer = (
   state: WorkbenchDocsState,
@@ -186,12 +169,6 @@ export const workbenchDocsReducer = (
         ? state.activeDocId
         : (kept[kept.length - 1]?.id ?? null);
       return { docs: kept, activeDocId: active };
-    }
-    case "dropDesign": {
-      if (!state.docs.some((doc) => doc.kind === "design")) return state;
-      const docs = state.docs.filter((doc) => doc.kind !== "design");
-      if (docs.some((doc) => doc.id === state.activeDocId)) return { ...state, docs };
-      return { docs, activeDocId: docs[docs.length - 1]?.id ?? null };
     }
   }
 };

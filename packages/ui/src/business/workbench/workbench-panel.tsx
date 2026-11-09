@@ -13,14 +13,14 @@ import { useEffect } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../base/resizable";
 import { useIsDesktop } from "../../hooks/use-is-desktop";
 import { usePanelLayout } from "../../hooks/use-panel-layout";
-import { useWorkbench } from "../../provider/workbench";
+import { PluginViewSurface, usePluginUi } from "../../provider/plugin-host";
+import { useWorkbench, WORKBENCH_VIEWS } from "../../provider/workbench";
 import {
   HANDLE_IDS,
   PANEL_IDS,
   WORKBENCH_SIDE_PANEL,
   WORKBENCH_SIDE_PANELS,
 } from "../../utils/panel-layout";
-import { DesignFilesList } from "./design/design-files-list";
 import { EditorArea } from "./file/editor-area";
 import { useGitReview } from "./git/use-git-review";
 import { WorkbenchActivityBar } from "./workbench-activity-bar";
@@ -30,12 +30,26 @@ import { WorkbenchViewBar } from "./workbench-view-bar";
 export function WorkbenchPanel() {
   const workbench = useWorkbench();
   const isDesktop = useIsDesktop();
+  const pluginUi = usePluginUi();
   const layout = usePanelLayout("workbench", WORKBENCH_SIDE_PANELS);
   const review = useGitReview(workbench?.cwd ?? null);
   const activeDocId = workbench?.activeDocId ?? null;
   const setSidebarVisible = workbench?.setSidebarVisible;
-  /** 设计视图没有侧栏：`sidebarVisible` 在那里表示「看稿子清单」而不是「看侧栏」 */
-  const isDesign = workbench?.view === "design";
+  /** 插件视图：键是 `<pluginId>:<viewId>`，整块主区交给插件自己画 */
+  const pluginView =
+    pluginUi?.views.find((view) => `${view.pluginId}:${view.id}` === workbench?.view) ?? null;
+  /**
+   * 当前视图没了（插件被停用 / 卸载，或老状态里留着已删的视图键）就退回内置的第一个视图：
+   * 否则 `view` 匹配不到任何面板，界面会停在「侧栏 + 编辑器」的错位形态。
+   */
+  useEffect(() => {
+    if (!workbench) return;
+    const known =
+      (WORKBENCH_VIEWS as readonly string[]).includes(workbench.view) ||
+      workbench.view === "browser" ||
+      pluginView !== null;
+    if (!known) workbench.selectView(WORKBENCH_VIEWS[0]);
+  }, [pluginView, workbench]);
 
   // 窄屏两栏互斥：打开任意文档即切到编辑器，返回箭头与活动栏图标切回侧栏。
   // 这里复用 sidebarVisible 而不是另立一份局部状态：活动栏按它切换，两份状态会看不见对方的效果。
@@ -45,26 +59,33 @@ export function WorkbenchPanel() {
 
   if (!workbench) return null;
 
+  // 插件视图占满整个面板：它自带清单与画布（设计稿就是这种形态），宿主的侧栏与分栏对它不成立
+  if (pluginView) {
+    return (
+      <div className="flex h-full min-h-0 w-full">
+        {isDesktop ? <WorkbenchActivityBar /> : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {isDesktop ? null : <WorkbenchViewBar />}
+          <div className="min-h-0 flex-1">
+            <PluginViewSurface view={pluginView} narrow={!isDesktop} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const activeDoc = workbench.docs.find((doc) => doc.id === workbench.activeDocId) ?? null;
   const activeFile = activeDoc?.kind === "file" ? activeDoc.path : null;
-  const list = isDesign ? (
-    <DesignFilesList />
-  ) : (
-    <WorkbenchSidebar review={review} activeFile={activeFile} />
-  );
+  const list = <WorkbenchSidebar review={review} activeFile={activeFile} />;
   const editor = (
     <EditorArea
       review={review}
-      // 设计视图的清单与画布也靠这颗箭头来回：它没有侧栏，桌面端同样需要这个出口
-      onBack={isDesktop && !isDesign ? undefined : () => workbench.setSidebarVisible(true)}
+      onBack={isDesktop ? undefined : () => workbench.setSidebarVisible(true)}
       onCollapse={isDesktop ? undefined : workbench.collapse}
     />
   );
-  /**
-   * 是否显示清单那一侧。设计视图额外兜一层「一个标签都没有」：关掉画布标签后仍落到清单上，
-   * 而不是一个写着「在左侧项目树里选一个文件」的空编辑器（那里没有项目树）。
-   */
-  const showList = workbench.sidebarVisible || (isDesign && activeDocId === null);
+  /** 是否显示清单那一侧 */
+  const showList = workbench.sidebarVisible;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -72,7 +93,7 @@ export function WorkbenchPanel() {
       {isDesktop || !showList ? null : <WorkbenchViewBar />}
       <div className="flex min-h-0 min-w-0 flex-1">
         {isDesktop ? <WorkbenchActivityBar /> : null}
-        {!isDesktop || isDesign ? (
+        {!isDesktop ? (
           showList ? (
             list
           ) : (

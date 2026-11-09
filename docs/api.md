@@ -315,12 +315,19 @@ agent 用的那组设计工具（`design_*`，17 个）是**会话内的工具�
 `meta` 只有 `title` 与 `createdAt`。归属是运行态——服务端按路径持文档、会话持指针，两者都不进文件、不进库。
 文件在**第一次改动**时才出现：读摘要与取画面只碰内存里的种子文档，不给没做设计的会话留下空文件。
 
-- `POST /api/v1/design/files`：`{ sessionId }` → `{ files: [{ path, name, updatedAt, current }], truncated }`。
-  递归列项目里的 `.design`（跳过依赖 / 版本库 / 产物目录，条数与深度都有上限），`current` 标出本会话当前在改的那份。
-工具改动只下发 `design_update` 帧（`{ revision }`，按「正在改这份文件的会话」逐个发），
-drawing 不进事件流：同一份稿可能在多个界面同时打开。
-引用锚点形如 `@design:<会话>/<页>/<节点>`，服务端校验归属——跨会话、跨页与已删节点的引用一律报错
-（`design_anchor_mismatch` / `design_not_found`）。
+## 设计（插件自有接口）
+
+设计是**随包插件**（`plugins/plugins/design`）提供的，接口挂在插件的命名空间下：
+
+- `POST /api/v1/plugins/design@packaged/api/{snapshot,render,node,select,doc,files}`，
+  入参与响应由插件定义（普通 JSON，不套宿主封套；失败形如 `{ ok: false, status, message, hint? }`）。
+- 会话级状态（本会话当前在改哪份稿）走 `session_plugin_state`，不占会话表的列。
+- 工具改动只下发 `plugin_event`（`{ pluginId: "design@packaged", type: "design_update", payload: { revision } }`），
+  drawing 不进事件流：同一份稿可能在多个界面同时打开。
+- 引用锚点形如 `@design:<会话>/<页>/<节点>`：锚点的**校验**在插件里（`design_*` 工具按它核对归属），
+  而它在消息与输入框里怎么显示仍由内核的锚点芯片负责。
+
+写法与能力面见 [`docs/plugin-ui.md`](./plugin-ui.md)。
 
 ## 文件系统（fs）与应用目录
 

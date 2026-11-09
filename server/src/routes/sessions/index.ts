@@ -324,9 +324,8 @@ const archiveSession = (services: Services, sessionId: string): SessionArchiveRe
     services.permissions.clear(id);
     services.sessions.setGoal(id, null);
     services.pool.forgetServices(id);
-    // 设计稿的「当前在改哪份」记在会话行上（`session.design_path`）：归档后不会再被访问，
-    // 连指针一起清掉（不能只靠 `pool.dispose`——从没进过池的会话在那里会早退）
-    services.design.forget(id);
+    // 插件的会话级状态（设计稿的「当前在改哪份」就在这类键里）：归档后不会再被访问，一并清掉
+    services.sessions.clearPluginState(id);
     services.sessions.archive(id);
     // 先广播归档再清序号：客户端只按 type 处理，seq 不参与列表口径
     services.events.emitSessionArchived(id);

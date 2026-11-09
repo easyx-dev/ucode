@@ -20,7 +20,6 @@ import { createAuthRoute } from "./routes/auth";
 import { createBrowserRoute } from "./routes/browser";
 import { createCommandsRoute } from "./routes/commands";
 import { createConfigRoute } from "./routes/config";
-import { createDesignRoute } from "./routes/design";
 import { createEventsRoute } from "./routes/events";
 import { createFsRoute } from "./routes/fs";
 import { createGitRoute } from "./routes/git";
@@ -43,6 +42,7 @@ import { createStatusRoute } from "./routes/status";
 import { createTerminalRoute } from "./routes/terminal";
 import type { Services } from "./services";
 import { type AuthVariables, createAuthMiddleware } from "./services/auth/middleware";
+import { peekPluginAssetTicket } from "./services/plugins/assets-tickets";
 
 /** web 构建产物的入口；dist 不存在时静态托管直接放行，所以先起服务、后 `pnpm build` 也能生效 */
 const webIndexPath = resolve(env.webDistDir, "index.html");
@@ -99,6 +99,10 @@ export const createApp = (
     createAuthMiddleware({
       credentials: services.auth.credentials,
       sessions: services.auth.sessions,
+      pluginAssets: {
+        peek: peekPluginAssetTicket,
+        message: "未认证：插件资源票无效或已过期",
+      },
       upgradeTickets: {
         [`${API_BASE_PATH}/browser/desktop`]: {
           message: "未认证：浏览器通道握手票无效",
@@ -148,7 +152,6 @@ export const createApp = (
   v1.route("/agents", createAgentsRoute(services));
   v1.route("/assets", createAssetsRoute(services));
   v1.route("/browser", createBrowserRoute(services, upgradeWebSocket));
-  v1.route("/design", createDesignRoute(services));
   v1.route("/terminal", createTerminalRoute(services, upgradeWebSocket));
 
   app.route(API_BASE_PATH, v1);

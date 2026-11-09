@@ -1134,7 +1134,20 @@ export default {
   卸载并清理缓存: "Uninstall and clear cache",
   "组件（{{count}}）": "Components ({{count}})",
   插件: "Plugins",
-  随包官方: "Bundled / official",
+  "随产品发布的插件：随版本更新，只能停用，不能卸载。":
+    "Ships with the product: updated with releases, can be disabled but not uninstalled.",
+  官方市场: "Official marketplace",
+  界面: "UI",
+  服务端: "Server",
+  "引用：{{label}}": "Reference: {{label}}",
+  "引用：{{label}}\n{{anchor}}": "Reference: {{label}}\n{{anchor}}",
+  未命名引用: "Unnamed reference",
+  "插件的界面没有加载成功，去「设置 → 插件」看它的诊断。":
+    "The plugin's UI failed to load. Check its diagnostics under Settings → Plugins.",
+  "这个插件的界面出错了，刷新页面或重拉插件再试。":
+    "This plugin's UI hit an error. Reload the page or refresh the plugin and try again.",
+  "没有插件接管这种文件，或用它的插件没有启用。":
+    "No plugin handles this file type, or the plugin that does is not enabled.",
   本地登记: "Registered locally",
   第三方市场: "Third-party marketplace",
   角色: "Agents",
@@ -1158,8 +1171,8 @@ export default {
   市场目录: "Marketplace folder",
   "含 marketplace.json 的目录": "Folder containing marketplace.json",
   "状态文件：{{path}}": "State file: {{path}}",
-  "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对随包与本地登记的插件开放）。":
-    "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to bundled and locally registered plugins.",
+  "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对官方市场与本地登记的插件开放）。":
+    "{{components}} from a third-party marketplace are not injected. A plugin runs with your permissions, so this is limited to the official marketplace and locally registered plugins.",
   "市场是一份插件清单（marketplace.json），可来自本地目录、url 直链或 git 仓库；刷新后点「查看插件」看目录内容。内置的 Claude 官方市场是 git 源。":
     "A marketplace is a plugin catalog (marketplace.json) served from a local folder, a direct URL or a git repository. Refresh, then browse it with View plugins. The built-in Claude marketplace is a git source.",
   设计画布: "Design canvas",

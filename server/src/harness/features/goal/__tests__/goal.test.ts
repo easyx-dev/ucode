@@ -246,7 +246,6 @@ describe("GoalService 落定处理", () => {
       agent: null,
       forkedFromId: null,
       goalState: stored,
-      designPath: null,
       childCount: 0,
       sourcePath: null,
       preview: "",

@@ -236,6 +236,8 @@ describe("视图映射", () => {
       mcp: 0,
       bin: 1,
       extensions: 1,
+      ui: 0,
+      server: 0,
     });
 
     const view = toPluginView(descriptor, pluginSwitchOf(descriptor, null));

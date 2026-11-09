@@ -9,11 +9,15 @@ import { scanContainers } from "./containers.ts";
 import { scanInline } from "./inline.ts";
 import { nonParsedIntervals, parseMarkdownTree } from "./regions.ts";
 
-export const hasDialectSyntax = (text: string): boolean => {
+export const hasDialectSyntax = (
+  text: string,
+  /** 引用锚点的 scheme 表：表内的 `@scheme:…` 不算「会生效的方言记号」，粘贴时不必转义 */
+  mentions: readonly string[] = [],
+): boolean => {
   const skipped = nonParsedIntervals(parseMarkdownTree(text));
   if (scanContainers(text, skipped).length > 0) return true;
 
-  const inline = scanInline(text, { from: 0, to: text.length }, skipped);
+  const inline = scanInline(text, { from: 0, to: text.length }, skipped, mentions);
   return (
     inline.invalidAttachments.length > 0 || inline.tokens.some((token) => token.kind !== "text")
   );

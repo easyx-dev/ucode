@@ -23,8 +23,8 @@ import type { ProjectListResponse } from "./projects/output";
  * - `interaction_request` / `interaction_resolved`：权限审批与提问
  * - `subagent_start` / `subagent_end`：子智能体与父会话 toolCall 的关联
  * - `goal_update`：`GoalView | null`
- * - `design_update`：`{ revision }`，设计文档被工具改过。画布拿它当「可以重取了」的信号，
- *   自己不携带 drawing：同一份页面在多个画布上打开时，各自按 revision 去重，一份全量只算一次
+ * - `plugin_event`：`{ pluginId, type, payload }`，插件自有通道。宿主不认识 `type` 与 `payload`，
+ *   只按 `pluginId` 转给对应插件的界面；插件自己解释语义
  * - `service_update`：**全量** `BackgroundService[]`（只含当前可连的服务，探不到的已移除）。
  *   清单小、随时可能增删，全量替换比 `start` / `end` 对更省心智，客户端的快照收敛退化成一次赋值
  * - `session_created`：`SessionSummary`，新建 / 分叉 / 子智能体创建
@@ -53,7 +53,7 @@ export const EVENT_NAMES = [
   "subagent_start",
   "subagent_end",
   "goal_update",
-  "design_update",
+  "plugin_event",
   "service_update",
   "session_created",
   "session_updated",

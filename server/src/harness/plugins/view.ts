@@ -15,6 +15,8 @@ export const toPluginComponentCounts = (descriptor: PluginDescriptor): PluginCom
   mcp: countOf(descriptor, "mcp"),
   bin: countOf(descriptor, "bin"),
   extensions: countOf(descriptor, "extensions"),
+  ui: countOf(descriptor, "ui"),
+  server: countOf(descriptor, "server"),
 });
 
 export const toPluginView = (descriptor: PluginDescriptor, toggle: PluginSwitch): PluginView => ({

@@ -9,6 +9,7 @@ import type { PluginComponentGroup, PluginDiagnosticView, PluginSource } from "@
 import type { PluginHookBinding } from "./hooks";
 import type { PluginUserConfigField } from "./manifest";
 import type { PluginMcpServer } from "./mcp";
+import type { PluginUiDeclaration } from "./ui";
 
 /** 清单解析出的一个组件：路径已归一化，且校验过落在插件根内 */
 export type PluginComponentEntry = {
@@ -56,6 +57,11 @@ export type PluginContributions = {
   hooks: (cwd?: string) => PluginHookBinding[];
   /** 插件声明的 MCP 服务器；MCP 不在执行类组件的来源门控名单里 */
   mcpServers: (cwd?: string) => PluginMcpServer[];
+  /**
+   * 插件服务端模块提供的工具（已按本次会话实际可用的工具名过滤）。
+   * 形状是 pi 的 `ToolDefinition`，本层不引 pi 的类型，装配层自己收窄。
+   */
+  tools: (input: { sessionId: string; cwd: string }) => Promise<unknown[]>;
 };
 
 /**
@@ -66,6 +72,10 @@ export type PluginContributions = {
 export type PluginAgentFile = {
   /** 已加插件前缀的 slug（冲突时带哈希后缀） */
   slug: string;
+  /** 主模式（`mode: primary`）还是子角色；缺省子角色 */
+  kind: "primary" | "subagent";
+  /** 主模式在选择器里的图标名（取自插件清单 `ui.modes`）；子角色没有 */
+  icon?: string;
   /** 展示名：清单里的 name，缺省取文件名 */
   label: string;
   description: string;
@@ -77,6 +87,8 @@ export type PluginAgentFile = {
   disallowedTools: string[];
   /** 覆盖模型；缺省继承父会话 */
   model?: string;
+  /** 主模式的推荐思考档位（偏好为 auto 时按它跑）；子角色不适用 */
+  thinking?: string;
 };
 
 /** 注册表里的一个插件：登记信息 + 清单装载结果 + 来源门控结论 */
@@ -112,6 +124,12 @@ export type PluginDescriptor = {
   hooks: PluginHookBinding[];
   /** 插件声明的 MCP 服务器（名字已加插件前缀、变量已解析） */
   mcpServers: PluginMcpServer[];
+  /**
+   * 界面贡献的声明（视图 / 文档渲染器 / 提及 / 设置分区 / 样式）。
+   * **来源门控不在这里做**：不受信任的插件同样带回声明，设置页才能标注「有界面但没生效」
+   * （能不能进渲染层看 `blocked`）。
+   */
+  ui: PluginUiDeclaration | null;
   /** 因来源为第三方市场而不注入运行时的执行类组件分组 */
   blocked: PluginComponentGroup[];
   diagnostics: PluginDiagnosticView[];

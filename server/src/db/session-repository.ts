@@ -76,7 +76,6 @@ export type SessionRecord = {
    * 设计稿的显式路径：本会话当前在改哪一份文件，为空表示还没打开过（画布按默认落点算）。
    * 稿子可以在项目里的任何位置；文件本身不记任何会话信息。
    */
-  designPath: string | null;
   /** 未归档的直接子会话数（派生值，不参与写入） */
   childCount: number;
   /** 会话正文文件；为 null 表示还没落盘 */
@@ -124,7 +123,6 @@ const SESSION_COLUMNS = [
   "agent",
   "forked_from_session_id",
   "goal_state",
-  "design_path",
   "source_path",
   "preview",
   "created_at",
@@ -154,7 +152,6 @@ const rowSchema = z.object({
   agent: z.string().nullable(),
   forked_from_session_id: z.string().nullable(),
   goal_state: z.string().nullable(),
-  design_path: z.string().nullable(),
   source_path: z.string().nullable(),
   preview: z.string(),
   created_at: z.string(),
@@ -179,7 +176,6 @@ const rowToRecord = (row: SessionRow): SessionRecord => ({
   agent: row.agent,
   forkedFromId: row.forked_from_session_id,
   goalState: row.goal_state,
-  designPath: row.design_path,
   childCount: row.child_count,
   sourcePath: row.source_path,
   preview: row.preview,
@@ -382,19 +378,50 @@ export class SessionRepository {
   }
 
   /**
-   * 写会话当前在改的设计稿；`path` 为 null 表示清除（归档后不再需要）。
-   * 不复用 `set`：那里用 COALESCE 合并覆盖值，无法把已有列显式置空。
+   * 读插件在会话上的一个键；没写过返回 null。
+   * `plugin_id` 是查询条件的一部分：插件拿不到别的插件的键。
    */
-  setDesignPath(id: string, path: string | null): void {
-    this.db.prepare("UPDATE session SET design_path = ? WHERE id = ?").run(path, id);
+  getPluginState(sessionId: string, pluginId: string, key: string): string | null {
+    const row = this.db
+      .prepare(
+        "SELECT value FROM session_plugin_state WHERE session_id = ? AND plugin_id = ? AND key = ?",
+      )
+      .get(sessionId, pluginId, key) as { value: string } | undefined;
+    return row?.value ?? null;
   }
 
-  /** 全部会话已占用的设计稿路径（设计画布算默认落点时避重） */
-  listDesignPaths(): string[] {
+  /** 写插件状态；`value` 为 null 表示删除这个键 */
+  setPluginState(sessionId: string, pluginId: string, key: string, value: string | null): void {
+    if (value === null) {
+      this.db
+        .prepare(
+          "DELETE FROM session_plugin_state WHERE session_id = ? AND plugin_id = ? AND key = ?",
+        )
+        .run(sessionId, pluginId, key);
+      return;
+    }
+    this.db
+      .prepare(
+        `INSERT INTO session_plugin_state (session_id, plugin_id, key, value, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(session_id, plugin_id, key)
+         DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      )
+      .run(sessionId, pluginId, key, value, new Date().toISOString());
+  }
+
+  /** 某个插件在全部会话里的某个键（算「默认落点要避开哪些」这类全量口径用） */
+  listPluginState(pluginId: string, key: string): Array<{ sessionId: string; value: string }> {
     return this.db
-      .prepare("SELECT design_path FROM session WHERE design_path IS NOT NULL")
-      .all()
-      .map((row) => (row as { design_path: string }).design_path);
+      .prepare(
+        "SELECT session_id AS sessionId, value FROM session_plugin_state WHERE plugin_id = ? AND key = ?",
+      )
+      .all(pluginId, key) as Array<{ sessionId: string; value: string }>;
+  }
+
+  /** 删掉一个会话的全部插件状态（会话归档 / 删除时调用） */
+  clearPluginState(sessionId: string): void {
+    this.db.prepare("DELETE FROM session_plugin_state WHERE session_id = ?").run(sessionId);
   }
 
   /** 标记已读：写上次打开时间；不改 `updated_at`，以免未读状态自相矛盾 */

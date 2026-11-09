@@ -22,10 +22,10 @@ import type { EditorProps } from "@tiptap/pm/view";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import type { DialectDiagnostic } from "@ucode/markdown";
 import {
-  DESIGN_NODE_NODE,
   escapeDialect,
   hasDialectSyntax,
   type InvocationCandidates,
+  MENTION_NODE,
   PAGE_ELEMENT_NODE,
 } from "@ucode/markdown";
 import type { RefObject } from "react";
@@ -33,10 +33,10 @@ import type { RefObject } from "react";
 import { isTouchInput } from "../../../utils/platform";
 import { ATTACHMENT_NODE, AttachmentChipView } from "./attachment-chip";
 import { findCommandMatch } from "./command-trigger";
-import { DesignNodeChipView } from "./design-node-chip";
 import { createDialectMarks } from "./dialect-marks";
 import { createDialectSuggestion } from "./dialect-suggestion";
 import { composerKeyIntentOf } from "./key-intent";
+import { MentionChipView } from "./mention-chip";
 import { PageElementChipView } from "./page-element-chip";
 import { createSuggestionRenderer, type SuggestionItem } from "./suggestion";
 import { filesOf } from "./use-composer-attachments";
@@ -171,13 +171,14 @@ const PageElementMention = Mention.extend({
 });
 
 /**
- * 设计画布上选出来的节点：与页面元素同形（芯片 + 只在正文里出锚点），
- * 但不从键盘输入来，因此没有触发符、也就没有建议弹层。
+ * 引用锚点：与页面元素同形（芯片 + 只在正文里出锚点），但不从键盘输入来，
+ * 因此没有触发符、也就没有建议弹层。哪几种 scheme 算锚点由插件贡献决定，这里不认具体名字。
  */
-const DesignNodeMention = Mention.extend({
-  name: DESIGN_NODE_NODE,
+const MentionChip = Mention.extend({
+  name: MENTION_NODE,
   addAttributes() {
     return {
+      scheme: { default: null },
       label: { default: null },
       anchor: { default: null },
     };
@@ -189,7 +190,7 @@ const DesignNodeMention = Mention.extend({
     return {};
   },
   addNodeView() {
-    return ReactNodeViewRenderer(DesignNodeChipView);
+    return ReactNodeViewRenderer(MentionChipView);
   },
   /** 正文里的锚点由方言投影生成，序列化到剪贴板时不再夹带一份 */
   renderText: () => "",
@@ -301,7 +302,7 @@ export const createComposerExtensions = (
   }),
   AttachmentMention,
   PageElementMention,
-  DesignNodeMention,
+  MentionChip,
   Placeholder.configure({ placeholder: flags.placeholder }),
 ];
 
@@ -328,7 +329,8 @@ export const createEditorProps = (callbacks: ComposerCallbacks): EditorProps => 
     // 粘进来的文本里若藏着会生效的方言记号，先转义再落进文档：否则一段来路不明的文字
     // 会悄悄把 `~/.ssh/id_rsa` 读进上下文、或让 `:::command[… ]` 变成一条命令
     const text = event.clipboardData?.getData("text/plain") ?? "";
-    if (!text || !hasDialectSyntax(text)) return false;
+    if (!text || !hasDialectSyntax(text, callbacks.dialectCandidates.current?.mentions ?? []))
+      return false;
     event.preventDefault();
     const schema = view.state.schema;
     const paragraph = schema.nodes.paragraph;

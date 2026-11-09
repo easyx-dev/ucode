@@ -25,7 +25,6 @@ import { overrideOf, type SessionRecord } from "../../db/session-repository";
 import { env } from "../../env";
 
 import { type BrowserHooks, createBrowserExtension } from "../features/browser";
-import type { DesignToolHooks } from "../features/design/types";
 import type { MemoryService } from "../features/memory";
 import { createShellExtension } from "../features/shell";
 import type { ServiceWatchHooks } from "../features/shell/services";
@@ -137,11 +136,6 @@ export type SessionAssemblyInput = {
   browser?: BrowserHooks;
   /** 浏览器工具的默认设置（配置里的 mode / endpoint / profile）；调用时读取，改它不必重装会话 */
   browserSettings?: () => BrowserConfig;
-  /**
-   * 设计画布通道。由会话池按 sessionId 闭包注入：装配层只注入，不读进程级状态。
-   * 是否真的注册 `design_*` 由角色能力决定（只有 `design` 模式声明了它们）。
-   */
-  design?: DesignToolHooks;
   /** 系统提示词源；缺省取 `env.promptSource`（评测脚本需要按源对比时显式传入） */
   promptSource?: PromptSource;
   /** 运行时数据目录；缺省取 `env.harnessDir`（评测 / 测试需要隔离时显式传入） */
@@ -159,6 +153,8 @@ export type SessionAssemblyInput = {
   pluginHooks?: PluginHookBinding[];
   /** 启用插件声明的 MCP 服务器；与用户级 mcp.json 合并（同名用户优先），只给默认工具集会话 */
   pluginMcpServers?: readonly PluginMcpServer[];
+  /** 插件服务端模块提供的工具（形状是 pi 的 ToolDefinition）；装配层按本次可用工具名过滤 */
+  pluginTools?: readonly unknown[];
 };
 
 /** 提示词源的资源装载参数：`custom` 整段替换，其余源把自研片段追加到 pi 默认提示词之后 */
@@ -371,7 +367,7 @@ export const assembleSession = async (
   // 回合级重试上限：pi 默认 3 次，这里提到 5（覆盖流式中途断开这类失败）
   settingsManager.applyOverrides({ retry: { enabled: true, maxRetries: RETRY_MAX_ATTEMPTS } });
 
-  // 记忆工具只给「能改机器状态」的主会话（build / design）：子会话与只读模式都不纳入
+  // 记忆工具只给「能改机器状态」的主会话：子会话与只读模式都不纳入
   const memoryTools = canWriteHarnessState(capability, profile)
     ? (input.memory?.tools(input.cwd) ?? [])
     : [];
@@ -395,7 +391,6 @@ export const assembleSession = async (
       ...(registry ? { subagentProfiles: allSubagents(registry) } : {}),
       memoryTools,
       ...(input.goal ? { goal: input.goal } : {}),
-      ...(input.design ? { design: input.design } : {}),
     }),
     resourceLoader: loader,
   };

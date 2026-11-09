@@ -26,22 +26,22 @@ export type PickedPageContext = {
 };
 
 /**
- * 从设计画布上选中的节点。
- *
- * 与页面元素同一分工：芯片上是图层路径（人认得），正文里是那个锚点（模型认得）——
- * 锚点由服务端铸造，带会话、页与节点三段，工具侧据它校验归属。
+ * 插件给的引用锚点（设计节点是它的一种）：`scheme` 是方言里的名字，`anchor` 是完整锚点文本。
+ * 落法是一枚芯片——插件自己决定锚点的语义，宿主只管把它放进草稿。
  */
-export type PickedDesignNode = {
-  /** 芯片上的短名：图层路径，如 `手机屏 / 头部 / 标题` */
+export type PickedMention = {
+  scheme: string;
+  /** 芯片上的短名 */
   label: string;
-  /** 进消息正文的锚点，形如 `@design:<会话>/<页>/<节点>` */
+  /** 进消息正文的锚点文本，如 `@design:<会话>/<页>/<节点>` */
   anchor: string;
 };
 
 /** 一次「落进输入框」的来源 */
 export type ComposerInsert =
   | ({ kind: "pageElement" } & PickedPageContext)
-  | ({ kind: "designNode" } & PickedDesignNode);
+  /** 插件贡献的引用锚点（`api.actions.insertMention`） */
+  | ({ kind: "mention" } & PickedMention);
 
 export type ComposerInsertFn = (item: ComposerInsert) => void;
 

@@ -8,7 +8,7 @@
  * 后者是作者的错，只有后者出诊断。
  */
 import { readdirSync, realpathSync, statSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, extname, join, resolve } from "node:path";
 
 import {
   ERROR_CODES,
@@ -23,6 +23,7 @@ import {
   PLUGIN_COMPONENT_SCAN_MAX_DEPTH,
   PLUGIN_HOOKS_COMPONENT_PATH,
   PLUGIN_MCP_COMPONENT_PATH,
+  PLUGIN_MODULE_EXTENSIONS,
 } from "../../constants/plugins";
 import { isInsidePath, toPosixPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
@@ -305,6 +306,38 @@ const collectFileComponent = (
   entries.push({ group, name: basename(path), path });
 };
 
+/** 服务端模块可接受的后缀集合 */
+const SERVICE_MODULE_EXTENSIONS = new Set<string>(PLUGIN_MODULE_EXTENSIONS);
+
+/**
+ * 服务端模块：只有清单显式声明这一路径，没有默认目录（它是可执行入口，猜一个进来等于凭空作用）。
+ * 后缀必须是预构建 ESM——宿主不做编译。
+ */
+const collectServer = (
+  ctx: ComponentContext,
+  value: string | undefined,
+  entries: PluginComponentEntry[],
+): void => {
+  if (value === undefined) return;
+  const path = resolveComponent(ctx, value, "server");
+  if (!path) return;
+  if (!isFile(path)) {
+    ctx.diagnostics.push(diagnostic("error", "server", `服务端模块不存在：${value}`));
+    return;
+  }
+  if (!SERVICE_MODULE_EXTENSIONS.has(extname(path).toLowerCase())) {
+    ctx.diagnostics.push(
+      diagnostic(
+        "error",
+        "server",
+        `服务端模块只认预构建 ESM（${[...SERVICE_MODULE_EXTENSIONS].join(" / ")}）：${value}`,
+      ),
+    );
+    return;
+  }
+  entries.push({ group: "server", name: basename(path), path });
+};
+
 const collectBin = (ctx: ComponentContext, entries: PluginComponentEntry[]): void => {
   const path = resolveComponent(ctx, PLUGIN_BIN_COMPONENT_PATH, "bin");
   if (!path || !isDirectory(path)) return;
@@ -367,6 +400,7 @@ export const resolvePluginComponents = (input: {
   collectExtensions(ctx, manifest?.extensions, entries);
   collectFileComponent(ctx, "hooks", PLUGIN_HOOKS_COMPONENT_PATH, manifest?.hooks, entries);
   collectFileComponent(ctx, "mcp", PLUGIN_MCP_COMPONENT_PATH, manifest?.mcpServers, entries);
+  collectServer(ctx, manifest?.server, entries);
   collectBin(ctx, entries);
   warnUserConfigInResources(manifest, ctx.diagnostics);
 

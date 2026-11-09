@@ -36,9 +36,9 @@ type PluginListItemProps = {
   onRefresh: (id: string) => Promise<boolean>;
 };
 
-/** 来源 → 界面标签：与信任档位一一对应 */
+/** 来源 → 界面标签：官方市场、本地登记、第三方市场各一档 */
 const sourceLabel = (source: PluginView["source"], t: TFunction): string => {
-  if (source === "official") return t("随包官方");
+  if (source === "official") return t("官方市场");
   if (source === "local") return t("本地登记");
   return t("第三方市场");
 };
@@ -54,6 +54,8 @@ const componentSummary = (plugin: PluginView, t: TFunction): string[] => {
     counts.mcp > 0 ? `MCP ${counts.mcp}` : null,
     counts.bin > 0 ? `${t("命令目录")} ${counts.bin}` : null,
     counts.extensions > 0 ? `${t("扩展")} ${counts.extensions}` : null,
+    counts.ui > 0 ? `${t("界面")} ${counts.ui}` : null,
+    counts.server > 0 ? `${t("服务端")} ${counts.server}` : null,
   ].filter((part): part is string => part !== null);
 };
 
@@ -161,7 +163,7 @@ export function PluginListItem({
       {plugin.blockedComponents.length > 0 ? (
         <p className="rounded-lg border border-dashed px-3 py-2 text-xs leading-relaxed text-foreground-subtle">
           {t(
-            "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对随包与本地登记的插件开放）。",
+            "来自第三方市场的 {{components}} 不会注入运行时（插件跑起来就是你的权限，故只对官方市场与本地登记的插件开放）。",
             { components: plugin.blockedComponents.join(" / ") },
           )}
         </p>

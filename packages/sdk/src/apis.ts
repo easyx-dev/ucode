@@ -30,18 +30,6 @@ import type {
   ConfigSnapshot,
   ConfigTestRequest,
   ConfigTestResponse,
-  DesignDocRequest,
-  DesignDocResponse,
-  DesignFilesRequest,
-  DesignFilesResponse,
-  DesignNodeDetail,
-  DesignNodeRequest,
-  DesignRender,
-  DesignRenderRequest,
-  DesignSelection,
-  DesignSelectRequest,
-  DesignSnapshot,
-  DesignSnapshotRequest,
   FsListRequest,
   FsListResponse,
   FsMkdirRequest,
@@ -104,6 +92,8 @@ import type {
   PluginListRequest,
   PluginRefreshRequest,
   PluginsListResponse,
+  PluginsUiResponse,
+  PluginUiRequest,
   PluginUpdateRequest,
   PluginWriteResponse,
   ProjectListResponse,
@@ -313,22 +303,6 @@ export const createApis = (options: ApisOptions = {}) => {
       reorder: (body: ProjectReorderRequest) =>
         transport.post<ProjectListResponse>("projects/reorder", body),
     },
-    design: {
-      /** 结构摘要：页面表、节点摘要、画布选中集与引用前缀 */
-      snapshot: (body: DesignSnapshotRequest) =>
-        transport.post<DesignSnapshot>("design/snapshot", body),
-      /** 整页 drawing；带上 `revision` 且与文档一致时 `svg` 为 null（画布据此跳过重绘） */
-      render: (body: DesignRenderRequest) => transport.post<DesignRender>("design/render", body),
-      /** 写回画布选中集 */
-      select: (body: DesignSelectRequest) => transport.post<DesignSelection>("design/select", body),
-      /** 文档级动作：flush / reset / setPage / createPage */
-      doc: (body: DesignDocRequest) => transport.post<DesignDocResponse>("design/doc", body),
-      /** 项目里的设计稿文件清单（「设计」视图侧栏） */
-      files: (body: DesignFilesRequest) =>
-        transport.post<DesignFilesResponse>("design/files", body),
-      /** 一个节点的完整属性（属性浮窗），读本会话当前在改的那份 */
-      node: (body: DesignNodeRequest) => transport.post<DesignNodeDetail>("design/node", body),
-    },
     goals: {
       /** 设定 / 替换当前会话目标；由服务端起第一轮 */
       set: (body: GoalSetRequest) => transport.post<GoalResponse>("goals/set", body),
@@ -414,6 +388,14 @@ export const createApis = (options: ApisOptions = {}) => {
     plugins: {
       list: (body: PluginListRequest = {}) =>
         transport.post<PluginsListResponse>("plugins/list", body),
+      /** 界面贡献清单：启用且受信任的插件各一份（插件宿主首次装配时取） */
+      ui: (body: PluginUiRequest = {}) => transport.post<PluginsUiResponse>("plugins/ui", body),
+      /**
+       * 调插件自己的接口：`plugins/<id>/api/<action>`。
+       * 插件的界面只能从这里碰数据面——宿主不给它别的出口。
+       */
+      call: <T>(pluginId: string, action: string, body: unknown = {}) =>
+        transport.postRaw<T>(`plugins/${encodeURIComponent(pluginId)}/api/${action}`, body),
       create: (body: PluginCreateRequest) =>
         transport.post<PluginWriteResponse>("plugins/create", body),
       update: (body: PluginUpdateRequest) =>
@@ -425,6 +407,11 @@ export const createApis = (options: ApisOptions = {}) => {
           id,
         } satisfies PluginRefreshRequest),
     },
+    /**
+     * 插件托管的模块与样式地址：`apis.assetUrl("plugins/<插件的 id>/ui/<路径>")`。
+     * 与接口同一个基址，所以挂在中继的路径前缀下也不用另外配。
+     */
+    assetUrl: (path: string) => transport.resolve(path),
     marketplace: {
       list: () => transport.post<MarketplacesListResponse>("marketplace/list"),
       info: (name: string) =>

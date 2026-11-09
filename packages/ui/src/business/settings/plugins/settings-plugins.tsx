@@ -1,5 +1,8 @@
 /**
- * 插件设置：已安装插件与随包内置插件两段列表，下面是自定义市场的登记。
+ * 插件设置：一段「已安装」列出全部插件（含随产品发布的那几个），下面是自定义市场的登记。
+ *
+ * 只有一段：插件就是插件，来源由卡片上的标签说明（本地登记 / 官方市场 / 第三方市场），
+ * 不按来源再分「内置」之类的段——那会让人以为某些插件不是插件。
  *
  * 安装与市场相关的交互各自成组件（PluginInstallDialog / PluginMarketSection），
  * 这一层只管数据与分段。
@@ -38,9 +41,6 @@ export function SettingsPlugins() {
   } = usePlugins(cwd);
 
   const all = plugins?.plugins ?? [];
-  // 随包内置与用户自己装的分开列：前者随版本升级变，后者是用户的选择
-  const builtin = all.filter((plugin) => plugin.source === "official");
-  const installed = all.filter((plugin) => plugin.source !== "official");
 
   const renderRow = (plugin: (typeof all)[number]) => (
     <PluginListItem
@@ -65,11 +65,11 @@ export function SettingsPlugins() {
       <section className="space-y-3">
         <SettingsSectionHeader
           title={t("已安装")}
-          meta={t("{{count}} 个", { count: installed.length })}
+          meta={t("{{count}} 个", { count: all.length })}
           action={installButton}
         />
 
-        {installed.length === 0 ? (
+        {all.length === 0 ? (
           <Empty
             className="rounded-xl border border-dashed px-6 py-9"
             icon={<Package className="size-icon-lg" />}
@@ -80,19 +80,9 @@ export function SettingsPlugins() {
             action={installButton}
           />
         ) : (
-          <SettingsGroup>{installed.map(renderRow)}</SettingsGroup>
+          <SettingsGroup>{all.map(renderRow)}</SettingsGroup>
         )}
       </section>
-
-      {builtin.length > 0 ? (
-        <section className="space-y-3">
-          <SettingsSectionHeader
-            title={t("内置")}
-            meta={t("{{count}} 个", { count: builtin.length })}
-          />
-          <SettingsGroup>{builtin.map(renderRow)}</SettingsGroup>
-        </section>
-      ) : null}
 
       <PluginMarketSection
         marketplaces={marketplaces}

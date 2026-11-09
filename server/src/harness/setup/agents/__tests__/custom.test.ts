@@ -207,6 +207,7 @@ describe("插件角色", () => {
       model: string;
     }> = {},
   ) => ({
+    kind: "subagent" as const,
     slug: over.slug ?? "my-plugin-reviewer",
     label: "Reviewer",
     description: "审查改动",

@@ -71,14 +71,37 @@ const resolvePrincipal = (
   return session ? { kind: "owner", scopes: ["*"], sessionId: session.id } : null;
 };
 
+/**
+ * 插件界面资源（模块与样式）：浏览器的 `import()` / `<link>` 带不了 `Authorization`，
+ * 所以这批 GET 认查询参数里的短时票（见 `services/plugins/assets-tickets`）。
+ * 只放行这两类路径，别的接口照旧必须带 Bearer。
+ */
+const PLUGIN_ASSET_PATTERN = new RegExp(
+  `^${API_BASE_PATH}/plugins/(?:runtime/[a-z-]+\\.js|[^/]+/ui/)`,
+);
+const isPluginAssetPath = (path: string): boolean => PLUGIN_ASSET_PATTERN.test(path);
+
 export const createAuthMiddleware = (deps: {
   credentials: CredentialStore;
   sessions: SessionService;
   /** 需要一次性握手票的升级路径（完整路径 → 准入判定）；缺省即没有这类端点 */
   upgradeTickets?: Record<string, UpgradeTicketGate>;
+  /** 插件资源的查询票预检；缺省即不认这类请求 */
+  pluginAssets?: { peek: (ticket: string | undefined) => boolean; message: string };
 }): MiddlewareHandler<AuthVariables> => {
   return async (c, next) => {
     if (isAllowed(c.req.method, c.req.path)) {
+      await next();
+      return;
+    }
+
+    // 插件资源：查询票优先（浏览器 import / link 带不了头），没有票就继续走常规 Bearer
+    if (
+      c.req.method === "GET" &&
+      deps.pluginAssets &&
+      isPluginAssetPath(c.req.path) &&
+      deps.pluginAssets.peek(c.req.query("ticket"))
+    ) {
       await next();
       return;
     }

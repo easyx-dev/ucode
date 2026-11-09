@@ -76,18 +76,22 @@ export const pageElementNode = (context: PageElementContext): DocNode => ({
   },
 });
 
-/** 设计节点上下文节点名；编辑器节点视图与载荷生成都按它找（见 `designNodeNode`） */
-export const DESIGN_NODE_NODE = "designNodeMention";
+/** 引用锚点的节点名；编辑器节点视图与载荷生成都按它找（见 `mentionNode`） */
+export const MENTION_NODE = "mentionChip";
 
 /**
- * 设计画布上的节点：与页面元素同一套「芯片给人看、锚点给模型」的分工。
+ * 一枚引用锚点芯片：与页面元素同一套「芯片给人看、锚点给模型」的分工。
  *
- * `anchor` 是 `@design:<会话>/<页>/<节点>`——服务端铸造、校验归属的精确锚点；模型把它原样当 `ref`
- * 传给 `design_*` 工具即可改到用户亲自点选的那颗节点。
+ * `anchor` 形如 `@<scheme>:<payload>`——由插件铸造、插件校验归属；模型把它原样当引用参数传回去。
+ * 内核不认识 scheme 的语义，只负责把它原样留在正文里、在界面上显示成一枚芯片。
  */
-export const designNodeNode = (context: { label: string; anchor: string }): DocNode => ({
-  type: DESIGN_NODE_NODE,
-  attrs: { label: context.label, anchor: context.anchor },
+export const mentionNode = (context: {
+  scheme: string;
+  label: string;
+  anchor: string;
+}): DocNode => ({
+  type: MENTION_NODE,
+  attrs: { scheme: context.scheme, label: context.label, anchor: context.anchor },
 });
 
 /** 附件节点；`tempId` 只在上传中非空，拿到 id 后清掉（见编辑器的 `resolveAttachment`） */

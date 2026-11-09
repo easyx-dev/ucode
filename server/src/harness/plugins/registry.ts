@@ -25,6 +25,7 @@ import {
   pluginSourceOf,
 } from "./state";
 import type { PluginComponentEntry, PluginDescriptor, PluginRegistry } from "./types";
+import { loadPluginUi, uiComponentEntries } from "./ui";
 
 /** 实际存在、且因来源为第三方市场而不注入运行时的执行类组件分组 */
 const blockedGroups = (
@@ -97,6 +98,7 @@ const describePlugin = (
       agents: [],
       hooks: [],
       mcpServers: [],
+      ui: null,
       blocked: [],
       diagnostics: [diagnostic("error", "manifest", `安装目录不存在：${record.path}`)],
     };
@@ -135,7 +137,15 @@ const describePlugin = (
       .filter((entry) => entry.group === "agents" && entry.path)
       .map((entry) => entry.path as string),
     taken: takenAgentSlugs,
+    // 清单声明的自有工具名：角色白名单里写它们才不会被当成「不认识的名字」
+    pluginTools: load.manifest?.tools ?? [],
   });
+  const uiLoad = loadPluginUi({
+    pluginId: record.id,
+    root: record.path,
+    value: load.manifest?.ui,
+  });
+  const components = [...load.components, ...uiComponentEntries(uiLoad.declaration)];
   return {
     ...base,
     // 名称与版本以清单为准：升级换目录后不必回写登记表的快照
@@ -143,20 +153,22 @@ const describePlugin = (
     displayName: load.displayName,
     description: load.description,
     version: load.version,
-    components: load.components,
+    components,
     assets: load.assets,
     userConfig: load.userConfig,
     config: record.config ?? {},
     agents: agentLoad.agents,
     hooks: hooksLoad.bindings,
     mcpServers: mcpLoad.servers,
-    blocked: blockedGroups(load.components, source),
+    ui: uiLoad.declaration,
+    blocked: blockedGroups(components, source),
     diagnostics: [
       ...load.diagnostics,
       ...agentLoad.diagnostics,
       ...hooksSource.diagnostics,
       ...hooksLoad.diagnostics,
       ...mcpLoad.diagnostics,
+      ...uiLoad.diagnostics,
     ],
   };
 };

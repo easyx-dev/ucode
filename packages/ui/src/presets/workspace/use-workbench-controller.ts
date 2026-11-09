@@ -22,13 +22,11 @@ import {
   changeDoc,
   changesDoc,
   commitDoc,
-  designDoc,
   fileDoc,
   terminalDoc,
   terminalDocId,
 } from "../../business/workbench/workbench-docs";
 import { readWorkbenchOpen, writeWorkbenchOpen } from "../../business/workbench/workbench-prefs";
-import { useDesignPath } from "../../hooks/store/use-design";
 import { useClient } from "../../provider";
 import type {
   ChangeTarget,
@@ -57,6 +55,7 @@ export type WorkbenchController = {
 };
 
 export function useWorkbenchController({
+  insertMention,
   cwd,
   sessionId,
   projectId,
@@ -75,6 +74,8 @@ export function useWorkbenchController({
   setSheetOpen: Dispatch<SetStateAction<boolean>>;
   /** 宿主注入的浏览器面（仅桌面端）；不传即没有这个视图 */
   browser?: WorkbenchBrowserSurface | null;
+  /** 往输入框落一枚引用锚点（插件动作 `insertMention` 的落地实现） */
+  insertMention?: (item: { scheme: string; label: string; anchor: string }) => void;
 }): WorkbenchController {
   // 工作台：展开状态刷新后仍保持（宽度另有 usePanelLayout 管）；标签、树列可见性与预览目标一并受控
   const { t } = useTranslation();
@@ -84,9 +85,6 @@ export function useWorkbenchController({
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const docs = useWorkbenchDocs(cwd, sessionId);
-  const client = useClient();
-  /** 本会话当前在改哪份稿：只订阅已加载的画布状态，不在控制器里触发加载 */
-  const designPath = useDesignPath(sessionId);
   const terminals = useTerminals(cwd);
   const [terminalError, setTerminalError] = useState<string | null>(null);
 
@@ -122,40 +120,13 @@ export function useWorkbenchController({
     if (!isDesktop) setSheetOpen(true);
   }, [applyOpen, isDesktop, setSheetOpen]);
 
-  /**
-   * 打开设计画布：**先把本会话的当前稿指过去，再打开标签**。
-   *
-   * 标签只是视图——它不携带稿子身份、切会话即清掉；「本会话在改哪份」是会话上的指针，
-   * 显式打开（这里 / 稿子清单点一份 / 文件树点 `.design` / agent `design_open`）改写它，
-   * 画布首次取值只会在还没有指针时确立一个默认落点——所以不会把别的会话开着的那份带过来。
-   *
-   * 同时把清单收走：设计视图没有侧栏，那一个状态在这里表示「看清单 / 看画布」，
-   * 打开一份稿子就该看到画布占满。
-   */
-  const openDesign = useCallback(
-    (path: string) => {
-      // 已经指向这一份就不必再开一次（服务端会重新读盘探测并广播一次更新）
-      if (sessionId !== null && designPath !== path) void client.design.openFile(sessionId, path);
-      docs.open(designDoc(sessionId));
-      setView("design");
-      setSidebarVisible(false);
-      show();
-    },
-    [client, designPath, docs.open, sessionId, show],
-  );
-
   /** 打开某个文件的预览：面板未展开就展开（侧栏视图不动，标签自己表达打开了什么） */
   const openFile = useCallback(
     (path: string) => {
-      // 设计稿没有文本预览：点开它就是「在本会话里打开这份稿」，直接进画布
-      if (previewKindOf(path) === "design") {
-        openDesign(path);
-        return;
-      }
       docs.open(fileDoc(path));
       show();
     },
-    [docs.open, openDesign, show],
+    [docs.open, show],
   );
 
   /** 打开某个工作区变更的 diff */
@@ -284,17 +255,10 @@ export function useWorkbenchController({
 
   /**
    * 活动栏 / 视图条：点当前视图即收起侧栏，点另一个视图即切换并展开。
-   *
-   * 设计视图没有侧栏：点它一律回到「稿子清单」（清单与画布各占满主区，来回靠标签条的返回箭头），
-   * 所以不走「点自己就收起」那一条——那里收起后没有任何东西可看。
+   * 插件视图没有侧栏，但它们的开关同样走这里——收起面板与切视图互不影响。
    */
   const selectView = useCallback(
     (next: WorkbenchView) => {
-      if (next === "design") {
-        setView("design");
-        setSidebarVisible(true);
-        return;
-      }
       setSidebarVisible((visible) => (next === view ? !visible : true));
       setView(next);
     },
@@ -304,8 +268,7 @@ export function useWorkbenchController({
   const api = useMemo<WorkbenchApi>(
     () => ({
       sessionId,
-      openDesign,
-      designPath,
+      insertMention: (item) => insertMention?.(item),
       view,
       selectView,
       sidebarVisible,
@@ -343,9 +306,8 @@ export function useWorkbenchController({
     [
       applyOpen,
       browser,
+      insertMention,
       closeAllDocs,
-      designPath,
-      openDesign,
       sessionId,
       closeDoc,
       closeOtherDocs,

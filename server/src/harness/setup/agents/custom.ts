@@ -316,9 +316,16 @@ const placeAgent = (
  *   而退回继承等于把「只用这几个」放大成「用父会话的全部工具」，方向最危险的一侧必须挡住
  *   （`frontmatterSchema` 对未知键报错就是为同一件事）。
  */
+/** 插件自有工具名的形态：`snake_case` 且不属于内置清单（插件的工具名不写进内置名字表） */
+const PLUGIN_OWN_TOOL = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+
 const pluginToolSelection = (agent: PluginAgentFile): AgentCapability["toolSelection"] => {
   if (agent.tools.length > 0) {
-    const allowed = agent.tools.filter((tool) => KNOWN_TOOL_NAMES.has(tool));
+    // 插件自有的工具名（`design_*` 这类）在 `loadPluginAgents` 里已按清单 `tools` 放行，
+    // 这里只按宿主已知名过滤一次：两边都不认识的名字在注册那一步自然挂不上
+    const allowed = agent.tools.filter(
+      (tool) => KNOWN_TOOL_NAMES.has(tool) || PLUGIN_OWN_TOOL.test(tool),
+    );
     return { kind: "allowlist", tools: allowed };
   }
   if (agent.disallowedTools.length > 0) {
@@ -331,16 +338,18 @@ const pluginToolSelection = (agent: PluginAgentFile): AgentCapability["toolSelec
   return { kind: "inherit" };
 };
 
-/** 插件角色落位：一律子角色，来源标 `plugin` */
+/**
+ * 插件角色落位：来源标 `plugin`。
+ * `mode: primary` 的进 primary 表（slug 就是会话的 `mode`，比如设计），其余一律子角色。
+ */
 const placePluginAgent = (
   registry: AgentRegistry,
-  seen: { subagent: Set<string> },
+  seen: { primary: Set<string>; subagent: Set<string> },
   agent: PluginAgentFile,
 ): void => {
-  if (seen.subagent.has(agent.slug)) return;
-  registry.subagents[agent.slug] = {
+  const profile: AgentProfile = {
     slug: agent.slug,
-    kind: "subagent",
+    kind: agent.kind,
     label: agent.label,
     description: agent.description,
     promptSection: agent.promptSection,
@@ -350,7 +359,18 @@ const placePluginAgent = (
       ...(agent.model ? { model: agent.model } : {}),
     },
     source: "plugin",
+    ...(agent.kind === "primary" && agent.thinking
+      ? { recommendedThinkingLevel: agent.thinking as AgentProfile["recommendedThinkingLevel"] }
+      : {}),
   };
+  if (agent.kind === "primary") {
+    if (seen.primary.has(agent.slug)) return;
+    registry.primary[agent.slug] = profile;
+    seen.primary.add(agent.slug);
+    return;
+  }
+  if (seen.subagent.has(agent.slug)) return;
+  registry.subagents[agent.slug] = profile;
   seen.subagent.add(agent.slug);
 };
 

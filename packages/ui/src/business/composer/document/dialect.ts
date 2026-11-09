@@ -36,9 +36,14 @@ export type CommandAssets = {
 export const payloadOfDoc = (
   doc: DocNode | null | undefined,
   commands: CommandAssets,
+  /** 引用锚点的 scheme 表（插件贡献）：表内的 `@scheme:…` 不当文件引用 */
+  mentions: readonly string[] = [],
 ): DialectResult => {
-  const dialect = docToDialect(doc, { candidates: commands, reserved: RESERVED_COMMAND_NAMES });
-  const parsed = parseDialect(dialect, commands);
+  const dialect = docToDialect(doc, {
+    candidates: { ...commands, mentions },
+    reserved: RESERVED_COMMAND_NAMES,
+  });
+  const parsed = parseDialect(dialect, { ...commands, mentions });
   const skills = parsed.skills;
   const skillCost = {
     count: skills.length,

@@ -13,7 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { env } from "../env";
 
 /** 当前 schema 版本；新增迁移时递增并补 `migrations` 项 */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 14;
 
 /** 版本号（从 1 开始）-> 该版本要执行的 DDL */
 const migrations: Record<number, string> = {
@@ -111,6 +111,23 @@ const migrations: Record<number, string> = {
   // 只记路径，稿子文件本身不记任何会话信息
   12: `
     ALTER TABLE session ADD COLUMN design_path TEXT;
+  `,
+  // 插件在会话上的键值状态：插件自有数据（设计稿指针、上次打开的页等）不该占会话表的列。
+  // 键按 `plugin_id` 隔离：插件只能读到自己的键，别的插件看不见（服务端按参数限定，调用方拿不到任意跨插件读）
+  13: `
+    CREATE TABLE session_plugin_state (
+      session_id TEXT NOT NULL,
+      plugin_id  TEXT NOT NULL,
+      key        TEXT NOT NULL,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (session_id, plugin_id, key)
+    );
+    CREATE INDEX idx_session_plugin_state_lookup ON session_plugin_state(plugin_id, key);
+  `,
+  // 设计稿指针搬进 `session_plugin_state`（插件自有数据不再占会话表的列）
+  14: `
+    ALTER TABLE session DROP COLUMN design_path;
   `,
 };
 

@@ -14,12 +14,16 @@ import type { WorkbenchDoc } from "../business/workbench/workbench-docs";
 
 /**
  * 侧栏的视图。顺序即活动栏自上而下的排布：代码管理在最上（最常看），终端在文件之后。
- * `browser` 只在宿主注入了浏览器面时出现（见 `WorkbenchApi.browser`）；`design` 始终在列——
- * 入口藏起来等于让人先知道「有个设计模式」才能找到画布，而画布的空态本来就能说清怎么出稿。
+ * `browser` 只在宿主注入了浏览器面时出现（见 `WorkbenchApi.browser`）；设计这类入口由插件贡献，
+ * 排在内置视图之后（见 `provider/plugin-host`）。
+ *
+ * 这里只是**内置**的那几个；插件贡献的视图另有 `<pluginId>:<viewId>` 形式的键（见 `provider/plugin-host`），
+ * 两者在活动栏里排在一起，所以视图键的类型是开放的字符串。
  */
 export const WORKBENCH_VIEWS = ["changes", "files", "terminal"] as const;
 
-export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number] | "browser" | "design";
+/** 视图键：内置视图名，或插件视图的 `<pluginId>:<viewId>` */
+export type WorkbenchView = string;
 
 /**
  * 宿主提供的浏览器面（**仅桌面端**）：web 端没有内置浏览器，不传就没有这个视图、也开不出浏览器标签。
@@ -45,13 +49,6 @@ export type ChangeTarget = { file: string; staged: boolean };
 export type WorkbenchApi = {
   /** 当前会话 id；设计画布按它取稿（null 表示草稿态，还没有会话） */
   sessionId: string | null;
-  /**
-   * 打开设计画布并把本会话的当前稿指过去（切到设计视图、展开面板）。
-   * 稿子身份在会话指针上，标签只是视图。
-   */
-  openDesign: (path: string) => void;
-  /** 本会话当前在改哪份稿（服务端指针）；标签标题用它，未打开过为 null */
-  designPath: string | null;
   /** 侧栏当前视图 */
   view: WorkbenchView;
   selectView: (view: WorkbenchView) => void;
@@ -81,6 +78,11 @@ export type WorkbenchApi = {
   openChanges: () => void;
   /** 收起整个面板 */
   collapse: () => void;
+  /**
+   * 往当前草稿落一枚引用锚点（插件动作 `insertMention`）。
+   * 落成什么芯片由宿主决定：插件只给「短名 + 锚点文本」，不必知道输入框长什么样。
+   */
+  insertMention: (item: { scheme: string; label: string; anchor: string }) => void;
   /** 相对路径的解析基准：当前会话工作目录；null 表示没有工作目录 */
   cwd: string | null;
   /** 当前工作目录下的终端（服务端为唯一事实源，这里只是它的一份拉取结果） */

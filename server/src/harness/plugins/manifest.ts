@@ -70,6 +70,18 @@ const manifestShape = {
     .optional(),
   extensions: pathListSchema.optional(),
   userConfig: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * 界面贡献（本产品专属）：视图、文档渲染器、提及渲染器、设置分区与样式表。
+   * 形状一个字段一个字段地在 `harness/plugins/ui.ts` 里校验，这里只挡「不是对象」。
+   */
+  ui: z.record(z.string(), z.unknown()).optional(),
+  /** 服务端模块（本产品专属）：进程内加载的入口，提供自有路由与工具 */
+  server: z.string().optional(),
+  /**
+   * 服务端模块提供的工具名。角色文件的 `tools` 白名单里可以写它们——
+   * 不列出来的话，白名单只认宿主知道的内置工具名，插件自己的工具会被判成「不认识」而丢掉。
+   */
+  tools: z.array(z.string()).optional(),
 };
 
 export const pluginManifestSchema = z.object(manifestShape);

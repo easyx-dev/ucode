@@ -32,6 +32,7 @@ describe("loadPluginAgents", () => {
     assert.deepEqual(load.agents, [
       {
         slug: "my-plugin-reviewer",
+        kind: "subagent",
         label: "Reviewer",
         description: "审查改动",
         promptSection: "正文",
@@ -60,8 +61,9 @@ describe("loadPluginAgents", () => {
     assert.deepEqual(load.agents[0]?.tools, ["read"]);
     assert.equal(load.agents[0]?.model, undefined, "模型别名回落会话默认");
     assert.equal(load.agents[0]?.slug, "p-audit", "没有 name 就用文件名");
+    assert.equal(load.agents[0]?.kind, "primary", "mode: primary 落成主模式");
+    // mode: primary 现在真的落成主模式，不再出「不做主模式」那条 info
     assert.deepEqual(load.diagnostics.map((item) => item.level).sort(), [
-      "info",
       "info",
       "info",
       "info",
@@ -69,7 +71,6 @@ describe("loadPluginAgents", () => {
     ]);
     const messages = load.diagnostics.map((item) => item.message).join("\n");
     assert.match(messages, /工具名 Mystery 不认识/);
-    assert.match(messages, /不做主模式/);
     assert.match(messages, /模型别名 sonnet/);
     assert.match(messages, /字段 effort/);
     assert.match(messages, /字段 color/);

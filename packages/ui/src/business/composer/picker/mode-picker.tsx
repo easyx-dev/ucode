@@ -14,7 +14,9 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "../../../base/dropdown-menu";
+import { usePluginUi } from "../../../provider/plugin-host";
 import { SESSION_MODES } from "../../../types";
+import { pluginIconOf } from "../../../utils/plugin-icon";
 import { modeDescription, modeLabel } from "./mode";
 import {
   PICKER_TRIGGER_CLASS,
@@ -34,13 +36,15 @@ type ModePickerProps = {
   onSelect: (mode: string) => void;
 };
 
-/** 模式图标：编码动手、计划列清单、问答只答疑、设计出稿 */
+/** 内置模式的图标：编码动手、计划列清单、问答只答疑；插件模式按插件给的图标名 */
 const ICONS: Record<string, LucideIcon> = {
   build: Hammer,
   plan: ClipboardList,
   ask: MessageSquare,
-  design: LayoutTemplate,
 };
+
+/** 一条模式选项：内置的文案走 i18n，插件的文案由插件给 */
+type ModeOption = { slug: string; label: string; description: string; icon: LucideIcon };
 
 export function ModePicker({
   value,
@@ -51,9 +55,32 @@ export function ModePicker({
   onRefocus,
 }: ModePickerProps) {
   const { t } = useTranslation();
+  const pluginUi = usePluginUi();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const closeFocus = usePickerCloseFocus(onRefocus);
+
+  /**
+   * 模式列表 = 内置三个 + 插件贡献的主模式（设计就是后者）。
+   * 插件模式排在内置之后：内置位置稳定，插件装了什么只影响尾部。
+   */
+  const modes: ModeOption[] = [
+    ...SESSION_MODES.map((mode) => ({
+      slug: mode,
+      label: modeLabel(mode, t),
+      description: modeDescription(mode, t),
+      icon: ICONS[mode] ?? Compass,
+    })),
+    ...(pluginUi?.plugins ?? []).flatMap((bundle) =>
+      bundle.modes.map((mode) => ({
+        slug: mode.slug,
+        label: mode.label,
+        description: mode.description,
+        icon: pluginIconOf(mode.icon, ICONS[mode.slug] ?? Compass),
+      })),
+    ),
+  ];
+  const labelOf = (mode: string): string => modes.find((item) => item.slug === mode)?.label ?? mode;
 
   return (
     <DropdownMenu
@@ -65,16 +92,16 @@ export function ModePicker({
     >
       {/* 模式是工具栏里唯一的全局状态：不带图标与下拉箭头，文案在任何容器宽度下都留着 */}
       <DropdownMenuTrigger className={PICKER_TRIGGER_CLASS} title={t("模式")} disabled={disabled}>
-        <span>{modeLabel(value, t)}</span>
+        <span>{labelOf(value)}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-72" {...closeFocus}>
         <PickerOptions
-          options={SESSION_MODES.map(
+          options={modes.map(
             (mode): PickerOption => ({
-              value: mode,
-              label: modeLabel(mode, t),
-              description: modeDescription(mode, t),
-              icon: ICONS[mode] ?? Compass,
+              value: mode.slug,
+              label: mode.label,
+              description: mode.description,
+              icon: mode.icon,
             }),
           )}
           value={value}

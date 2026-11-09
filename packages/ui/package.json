@@ -12,6 +12,7 @@
     "./hooks/*": "./src/hooks/*.ts",
     "./utils/*": "./src/utils/*.ts",
     "./provider": "./src/provider/index.tsx",
+    "./plugin": "./src/plugin.ts",
     "./presets/workspace": "./src/presets/workspace/workspace-layout.tsx",
     "./theme.css": "./src/styles/theme.css"
   },

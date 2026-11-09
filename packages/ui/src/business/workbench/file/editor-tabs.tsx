@@ -43,8 +43,6 @@ const titleOf = (
   t: TFunction,
   /** 终端的创建序号（服务端下发，关掉别的终端也不会变）；不是终端文档时为 null */
   terminalSequence: number | null,
-  /** 本会话当前在改的设计稿；设计标签把它当标题（标签本身不记路径） */
-  designPath: string | null,
 ): string => {
   if (doc.kind === "file") return baseName(doc.path) || doc.path;
   if (doc.kind === "diff") {
@@ -56,9 +54,6 @@ const titleOf = (
     return t("终端 {{index}}", { index: String(terminalSequence ?? 1) });
   }
   if (doc.kind === "browser") return t("浏览器 {{index}}", { index: doc.tabId.replace(/^t/, "") });
-  if (doc.kind === "design") {
-    return designPath === null ? t("设计画布") : baseName(designPath) || designPath;
-  }
   return `${doc.commit.shortHash} ${doc.commit.subject}`.trim();
 };
 
@@ -68,7 +63,6 @@ const iconOf = (doc: WorkbenchDoc) => {
   if (doc.kind === "changes") return Layers;
   if (doc.kind === "terminal") return SquareTerminal;
   if (doc.kind === "browser") return AppWindow;
-  if (doc.kind === "design") return LayoutTemplate;
   return doc.kind === "diff" ? FileDiff : GitCommitHorizontal;
 };
 
@@ -113,7 +107,6 @@ export function EditorTabs({
             doc,
             t,
             doc.kind === "terminal" ? (terminalSequences.get(doc.terminalId) ?? null) : null,
-            workbench.designPath,
           );
           return (
             <ContextMenu key={doc.id}>

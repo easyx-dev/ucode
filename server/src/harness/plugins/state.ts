@@ -115,7 +115,7 @@ const marketplaceRecordSchema = z.object({
 });
 
 const installedPluginRecordSchema = z.object({
-  /** `<name>@<marketplace>`；直接登记的本地目录用 `<name>@local` */
+  /** `<name>@<marketplace>`；直接登记的本地目录用 `<name>@local`，随包插件用 `<name>@packaged` */
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().default("0.0.0"),

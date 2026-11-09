@@ -296,21 +296,6 @@ describe("SessionRepository", () => {
     assert.equal(after?.updatedAt, before?.updatedAt, "标记已读不应把会话顶到列表最前");
   });
 
-  it("设计稿指针可写入 / 清除，不被覆盖值写入冲掉", () => {
-    repo.create("design-1", { mode: "design" });
-    repo.setDesignPath("design-1", "/tmp/a.design");
-    assert.equal(repo.find("design-1")?.designPath, "/tmp/a.design");
-    assert.deepEqual(repo.listDesignPaths(), ["/tmp/a.design"]);
-
-    // 指针不在覆盖值里：改名 / 换模型不该把它冲掉
-    repo.set("design-1", { name: "改个名" });
-    assert.equal(repo.find("design-1")?.designPath, "/tmp/a.design");
-
-    repo.setDesignPath("design-1", null);
-    assert.equal(repo.find("design-1")?.designPath, null);
-    assert.deepEqual(repo.listDesignPaths(), []);
-  });
-
   // 对账放在最后：它会删掉「文件已消失」的行，等于清掉前面用例造的行
   it("对账时认领有文件的行，删掉文件已消失的行", async () => {
     const sessionsDir = mkdtempSync(join(tmpdir(), "session-files-"));

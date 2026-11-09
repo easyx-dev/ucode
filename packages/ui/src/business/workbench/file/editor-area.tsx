@@ -10,8 +10,10 @@
 import { FilePlus2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Empty } from "../../../base/empty";
+import { useIsDesktop } from "../../../hooks/use-is-desktop";
+import { PluginDocSurface, usePluginUi } from "../../../provider/plugin-host";
 import { useWorkbench } from "../../../provider/workbench";
-import { DesignCanvas } from "../design/design-canvas";
+import { extensionOf } from "../../../utils/preview";
 import { ChangesStack } from "../git/changes-stack";
 import { GitFileDiff } from "../git/git-file-diff";
 import { CommitDetail } from "../git/git-history";
@@ -33,9 +35,18 @@ export function EditorArea({
 }) {
   const { t } = useTranslation();
   const workbench = useWorkbench();
+  const pluginUi = usePluginUi();
+  const isDesktop = useIsDesktop();
   if (!workbench) return null;
 
   const doc = workbench.docs.find((item) => item.id === workbench.activeDocId) ?? null;
+  /** 插件接管的文件类型（`.design` 这类）：由插件画内容，宿主的预览工具条与预览器都不参与 */
+  const pluginDoc =
+    doc?.kind === "file" &&
+    (pluginUi?.docRenderers.some((renderer) =>
+      renderer.extensions.includes(extensionOf(doc.path)),
+    ) ??
+      false);
   /** 浏览器面由宿主注入（桌面端才有 webview；web 端为 null，也就不会有这类标签） */
   const browser = workbench.browser;
   const browserDocs =
@@ -56,7 +67,11 @@ export function EditorArea({
         null : (
           <div key={doc.id} className="flex min-h-0 flex-1 flex-col">
             {doc.kind === "file" ? (
-              <FileContent path={doc.path} />
+              pluginDoc ? (
+                <PluginDocSurface path={doc.path} narrow={!isDesktop} />
+              ) : (
+                <FileContent path={doc.path} />
+              )
             ) : doc.kind === "diff" ? (
               <GitFileDiff
                 target={{
@@ -71,11 +86,6 @@ export function EditorArea({
               <ChangesStack path={doc.path} reloadToken={review.reloadToken} />
             ) : doc.kind === "commit" ? (
               <CommitDetail path={doc.path} commit={doc.commit} reloadToken={review.reloadToken} />
-            ) : doc.kind === "design" ? (
-              // 清标签发生在切换会话之后的 effect 里：这一帧旧会话的标签可能还在，先不画它的画布
-              doc.sessionId === workbench.sessionId ? (
-                <DesignCanvas />
-              ) : null
             ) : (
               <TerminalView terminalId={doc.terminalId} />
             )}

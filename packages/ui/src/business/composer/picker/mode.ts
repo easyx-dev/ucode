@@ -10,8 +10,6 @@ export const modeLabel = (mode: string, t: TFunction): string => {
       return t("计划");
     case "ask":
       return t("问答");
-    case "design":
-      return t("设计");
     default:
       return mode;
   }
@@ -26,8 +24,6 @@ export const modeDescription = (mode: string, t: TFunction): string => {
       return t("先出方案，只读调研不改代码。");
     case "ask":
       return t("只读分析，不改文件不跑命令。");
-    case "design":
-      return t("在画布上出稿，改稿走对话。");
     default:
       return "";
   }

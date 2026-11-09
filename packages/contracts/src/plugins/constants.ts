@@ -13,7 +13,13 @@ export const PLUGIN_DIAGNOSTIC_LEVELS = ["error", "warning", "info"] as const;
 
 export type PluginDiagnosticLevel = (typeof PLUGIN_DIAGNOSTIC_LEVELS)[number];
 
-/** 组件分组：诊断归类、设置页分节与「未注入运行时」的标注都按它分 */
+/**
+ * 组件分组：诊断归类、设置页分节与「未注入运行时」的标注都按它分。
+ *
+ * `ui` 与 `server` 是本产品专属的两类代码组件：前者由渲染层动态加载（视图、文档渲染器、
+ * 提及渲染器、设置分区），后者在本机服务进程内加载（自有路由、工具）。Claude / ZCode 不认识
+ * 这两个键，忽略即可。
+ */
 export const PLUGIN_COMPONENT_GROUPS = [
   "manifest",
   "skills",
@@ -23,16 +29,24 @@ export const PLUGIN_COMPONENT_GROUPS = [
   "mcp",
   "bin",
   "extensions",
+  "ui",
+  "server",
   "userConfig",
 ] as const;
 
 export type PluginComponentGroup = (typeof PLUGIN_COMPONENT_GROUPS)[number];
 
-/** 执行类组件：来源门控只对这几组生效，来自第三方市场时只出诊断、不注入 */
+/**
+ * 执行类组件：来源门控只对这几组生效，来自第三方市场时只出诊断、不注入。
+ * `ui` 与 `server` 同样是「在你的会话里跑代码」——界面代码拿的是渲染层的全部能力
+ * （能读会话、能调白名单动作），所以与扩展同档，不因为「只是界面」放宽。
+ */
 export const PLUGIN_EXECUTABLE_GROUPS: readonly PluginComponentGroup[] = [
   "hooks",
   "extensions",
   "bin",
+  "ui",
+  "server",
 ];
 
 /**

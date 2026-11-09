@@ -12,12 +12,6 @@
 
 export type { ContainerFence } from "./containers.ts";
 export { scanContainers } from "./containers.ts";
-export type { DesignAnchorPart } from "./design-anchor.ts";
-export {
-  designAnchorLabel,
-  hasDesignAnchor,
-  splitDesignAnchors,
-} from "./design-anchor.ts";
 export type { MentionKind, PageElementContext } from "./doc-nodes.ts";
 export {
   appendNodesToDoc,
@@ -26,9 +20,9 @@ export {
   attachmentOrdinalInDoc,
   commandNode,
   contextNode,
-  DESIGN_NODE_NODE,
-  designNodeNode,
   isDocEmpty,
+  MENTION_NODE,
+  mentionNode,
   PAGE_ELEMENT_NODE,
   pageElementNode,
   textToDoc,
@@ -57,6 +51,13 @@ export {
 } from "./entry.ts";
 export { entryToDoc } from "./entry-to-doc.ts";
 export { escapeDialect } from "./escape.ts";
+export type { MentionPart } from "./mention-anchor.ts";
+export {
+  hasMention,
+  mentionLabelOf,
+  mentionSchemeOf,
+  splitMentions,
+} from "./mention-anchor.ts";
 export { parseDialect } from "./parse.ts";
 export { baseName, toRelativePath } from "./path.ts";
 export { renderDialect } from "./render.ts";

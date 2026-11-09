@@ -8,8 +8,8 @@
 import {
   appendNodesToDoc,
   type DocNode,
-  designNodeNode,
   docToDialect,
+  mentionNode,
   pageElementNode,
   textToDoc,
 } from "@ucode/markdown";
@@ -49,6 +49,7 @@ import { useStatus } from "../../hooks/store/use-status";
 import { useActiveSession } from "../../hooks/use-active-session";
 import { usePanelLayout } from "../../hooks/use-panel-layout";
 import { type ComposerInsert, ComposerInsertProvider } from "../../provider/composer-insert";
+import { PluginUiProvider } from "../../provider/plugin-host";
 import type { WorkbenchBrowserSurface } from "../../provider/workbench";
 import { WorkbenchProvider } from "../../provider/workbench";
 import type { ChatItem, EditMessagePayload } from "../../types";
@@ -166,9 +167,9 @@ export function WorkspaceLayout({
         (current?.doc as DocNode | undefined) ??
         (current?.text ? textToDoc(current.text) : undefined);
       const chip =
-        item.kind === "designNode"
-          ? designNodeNode({ label: item.label, anchor: item.anchor })
-          : pageElementNode({ label: item.label, summary: item.text, ...(item.meta ?? {}) });
+        item.kind === "pageElement"
+          ? pageElementNode({ label: item.label, summary: item.text, ...(item.meta ?? {}) })
+          : mentionNode({ scheme: item.scheme, label: item.label, anchor: item.anchor });
       // 芯片是行内节点，得自己裹一个段落：直接落进 doc 顶层会被 schema 拒掉
       const doc = appendNodesToDoc(base, [{ type: "paragraph", content: [chip] }]);
       composer.update(key, { doc, text: docToDialect(doc, {}) });
@@ -176,8 +177,14 @@ export function WorkspaceLayout({
     [activeId, composer],
   );
 
-  const designMode = activeSession?.mode === "design";
+  /** 插件要往输入框落一枚引用锚点：与设计节点的落法完全相同（同一个草稿、同一枚芯片） */
+  const insertMention = useCallback(
+    (item: { scheme: string; label: string; anchor: string }) =>
+      insertPickedContext({ kind: "mention", ...item }),
+    [insertPickedContext],
+  );
   const workbench = useWorkbenchController({
+    insertMention,
     cwd: workbenchCwd,
     sessionId: activeId,
     projectId: workbenchProjectId,
@@ -292,213 +299,216 @@ export function WorkspaceLayout({
   return (
     <TooltipProvider>
       <ComposerInsertProvider insert={insertPickedContext}>
+        {/* 插件界面宿主要读工作台的会话与目录，所以必须挂在 WorkbenchProvider 之内 */}
         <WorkbenchProvider value={workbench.api}>
-          {/* 四周留白见 DESIGN.md「间距与尺寸」：外壳容器统一留，内容卡不再自己留 margin */}
-          {/* 外壳是最底层，用玻璃面 + 模糊：窗口透明或加了背景图之后它会透出后面那层 */}
-          <div className="flex h-dvh w-full overflow-hidden bg-glass text-foreground backdrop-blur-sm md:p-shell-inset">
-            {/* 桌面端三栏分栏；窄屏只有对话区，侧栏与工作台走下方抽屉 */}
-            <ResizablePanelGroup
-              id={`${PANEL_IDS.sidebar}-group`}
-              orientation="horizontal"
-              onLayoutChanged={panels.onLayoutChanged}
-            >
-              {chrome.isDesktop && !chrome.sidebarCollapsed ? (
-                <>
-                  <ResizablePanel
-                    id={SIDEBAR_PANEL.id}
-                    defaultSize={panels.defaultSizeOf(SIDEBAR_PANEL)}
-                    minSize={SIDEBAR_PANEL.min}
-                    maxSize={SIDEBAR_PANEL.max}
-                    className="min-w-0"
-                  >
-                    <div
-                      className="relative flex h-full w-full"
-                      style={{ paddingTop: titleBarInset }}
+          <PluginUiProvider>
+            {/* 四周留白见 DESIGN.md「间距与尺寸」：外壳容器统一留，内容卡不再自己留 margin */}
+            {/* 外壳是最底层，用玻璃面 + 模糊：窗口透明或加了背景图之后它会透出后面那层 */}
+            <div className="flex h-dvh w-full overflow-hidden bg-glass text-foreground backdrop-blur-sm md:p-shell-inset">
+              {/* 桌面端三栏分栏；窄屏只有对话区，侧栏与工作台走下方抽屉 */}
+              <ResizablePanelGroup
+                id={`${PANEL_IDS.sidebar}-group`}
+                orientation="horizontal"
+                onLayoutChanged={panels.onLayoutChanged}
+              >
+                {chrome.isDesktop && !chrome.sidebarCollapsed ? (
+                  <>
+                    <ResizablePanel
+                      id={SIDEBAR_PANEL.id}
+                      defaultSize={panels.defaultSizeOf(SIDEBAR_PANEL)}
+                      minSize={SIDEBAR_PANEL.min}
+                      maxSize={SIDEBAR_PANEL.max}
+                      className="min-w-0"
                     >
-                      <SessionSidebar {...sidebarProps} />
-                      {/*
+                      <div
+                        className="relative flex h-full w-full"
+                        style={{ paddingTop: titleBarInset }}
+                      >
+                        <SessionSidebar {...sidebarProps} />
+                        {/*
                       侧栏顶部那条既是拖拽区也是窗口控件的宿主：控件挂在它里面（而不是另起一个覆盖层），
                       `-webkit-app-region` 的 `no-drag` 只对同一子树生效，挂成兄弟子树会被这条拖拽区吃掉点击。
                       不加 `aria-hidden`：里面的窗口控件带 aria-label，是这条里唯一可读的内容
                     */}
-                      {titleBarInset > 0 ? (
-                        <div
-                          className="window-drag absolute inset-x-0 top-0"
-                          style={{ height: titleBarInset }}
-                        >
-                          {windowControls}
-                        </div>
-                      ) : null}
-                    </div>
-                  </ResizablePanel>
-                  <ResizableHandle id={HANDLE_IDS.sidebar} className="-ml-3" />
-                </>
-              ) : null}
+                        {titleBarInset > 0 ? (
+                          <div
+                            className="window-drag absolute inset-x-0 top-0"
+                            style={{ height: titleBarInset }}
+                          >
+                            {windowControls}
+                          </div>
+                        ) : null}
+                      </div>
+                    </ResizablePanel>
+                    <ResizableHandle id={HANDLE_IDS.sidebar} className="-ml-3" />
+                  </>
+                ) : null}
 
-              <ResizablePanel id={PANEL_IDS.chat} minSize={CHAT_MIN_WIDTH} className="min-w-0">
-                <div className="flex h-full w-full">
-                  <ChatPanel
-                    session={activeSession}
-                    models={models.data}
-                    workspacesDir={workspacesDir}
-                    chat={chat}
-                    composer={composer}
-                    configured={configured}
-                    onReloadModels={() => void models.refresh()}
-                    onSelectModel={actions.selectModel}
-                    onSelectThinkingLevel={actions.selectThinkingLevel}
-                    onSelectMode={actions.selectMode}
-                    onSelectPermissionMode={actions.selectPermissionMode}
-                    onOpenSettings={openSettings}
-                    onOpenSession={setActiveId}
-                    onToggleSidebar={() => {
-                      // 桌面端切换收起，窄屏开关抽屉（与按钮上显示的图标保持一致）
-                      if (chrome.isDesktop) chrome.toggleSidebar();
-                      else chrome.setSidebarOpen((prev) => !prev);
-                    }}
-                    sidebarCollapsed={chrome.headerOwnsLeftEdge}
-                    titleBarInset={titleBarInset}
-                    /*
+                <ResizablePanel id={PANEL_IDS.chat} minSize={CHAT_MIN_WIDTH} className="min-w-0">
+                  <div className="flex h-full w-full">
+                    <ChatPanel
+                      session={activeSession}
+                      models={models.data}
+                      workspacesDir={workspacesDir}
+                      chat={chat}
+                      composer={composer}
+                      configured={configured}
+                      onReloadModels={() => void models.refresh()}
+                      onSelectModel={actions.selectModel}
+                      onSelectThinkingLevel={actions.selectThinkingLevel}
+                      onSelectMode={actions.selectMode}
+                      onSelectPermissionMode={actions.selectPermissionMode}
+                      onOpenSettings={openSettings}
+                      onOpenSession={setActiveId}
+                      onToggleSidebar={() => {
+                        // 桌面端切换收起，窄屏开关抽屉（与按钮上显示的图标保持一致）
+                        if (chrome.isDesktop) chrome.toggleSidebar();
+                        else chrome.setSidebarOpen((prev) => !prev);
+                      }}
+                      sidebarCollapsed={chrome.headerOwnsLeftEdge}
+                      titleBarInset={titleBarInset}
+                      /*
                     判据是「无标题栏」而不是桌面断点：非 macOS 传进来的 titleBarInset 为 0，
                     这三颗点一次都不该渲染（那是系统控件的地盘）；窄屏侧栏不常驻，让位区也跟着不在了
                   */
-                    windowControlsWidth={
-                      titleBarInset > 0 && chrome.headerOwnsLeftEdge ? windowControlsWidth : 0
-                    }
-                    windowControls={
-                      titleBarInset > 0 && chrome.headerOwnsLeftEdge ? windowControls : undefined
-                    }
-                    onToggleWorkbench={workbench.toggle}
-                    workbenchOpen={chrome.isDesktop ? workbench.open : chrome.workbenchSheetOpen}
-                    onRenameSession={
-                      activeSession ? () => actions.requestRename(activeSession) : undefined
-                    }
-                    onFork={actions.forkFrom}
-                    onEdit={editMessage}
-                    forkedFromName={forkSourceName}
-                    goal={goal.goal}
-                    onGoalCommand={plan.runGoalCommand}
-                    onGoalBudget={plan.setGoalBudget}
-                    usage={sessionUsage.usage}
-                    context={sessionUsage.context}
-                    onOpenUsage={() => setUsageOpen(true)}
-                    onBackToParent={() => {
-                      const parentId = activeSession?.parentSessionId;
-                      if (parentId) setActiveId(parentId);
-                    }}
-                    planReady={plan.planReady}
-                    onApprovePlan={plan.approvePlan}
-                    onIgnorePlan={plan.ignorePlan}
-                    onFeedbackPlan={(text) => void chat.send(textPayload(text))}
-                    interaction={interaction}
-                    onRespondInteraction={(input) => void interactions.respond(input)}
-                    onBuiltin={runBuiltin}
-                  />
-                </div>
-              </ResizablePanel>
+                      windowControlsWidth={
+                        titleBarInset > 0 && chrome.headerOwnsLeftEdge ? windowControlsWidth : 0
+                      }
+                      windowControls={
+                        titleBarInset > 0 && chrome.headerOwnsLeftEdge ? windowControls : undefined
+                      }
+                      onToggleWorkbench={workbench.toggle}
+                      workbenchOpen={chrome.isDesktop ? workbench.open : chrome.workbenchSheetOpen}
+                      onRenameSession={
+                        activeSession ? () => actions.requestRename(activeSession) : undefined
+                      }
+                      onFork={actions.forkFrom}
+                      onEdit={editMessage}
+                      forkedFromName={forkSourceName}
+                      goal={goal.goal}
+                      onGoalCommand={plan.runGoalCommand}
+                      onGoalBudget={plan.setGoalBudget}
+                      usage={sessionUsage.usage}
+                      context={sessionUsage.context}
+                      onOpenUsage={() => setUsageOpen(true)}
+                      onBackToParent={() => {
+                        const parentId = activeSession?.parentSessionId;
+                        if (parentId) setActiveId(parentId);
+                      }}
+                      planReady={plan.planReady}
+                      onApprovePlan={plan.approvePlan}
+                      onIgnorePlan={plan.ignorePlan}
+                      onFeedbackPlan={(text) => void chat.send(textPayload(text))}
+                      interaction={interaction}
+                      onRespondInteraction={(input) => void interactions.respond(input)}
+                      onBuiltin={runBuiltin}
+                    />
+                  </div>
+                </ResizablePanel>
 
-              {chrome.isDesktop && workbench.open ? (
-                <>
-                  {/* 两栏之间只留 `--shell-inset`（与外壳四周同宽）：命中区仍占 8px，靠 `-ml-1` 叠进对话区右边缘 */}
-                  <ResizableHandle id={HANDLE_IDS.workbench} className="-ml-1 w-2" />
-                  <ResizablePanel
-                    id={WORKBENCH_PANEL.id}
-                    defaultSize={panels.defaultSizeOf(workbench.panelSpec)}
-                    minSize={WORKBENCH_PANEL.min}
-                    className="min-w-0"
-                  >
-                    <div className="flex h-full w-full">
-                      <div className="flex h-full w-full overflow-hidden bg-surface md:rounded-md md:border md:border-border">
-                        <WorkbenchPanel />
+                {chrome.isDesktop && workbench.open ? (
+                  <>
+                    {/* 两栏之间只留 `--shell-inset`（与外壳四周同宽）：命中区仍占 8px，靠 `-ml-1` 叠进对话区右边缘 */}
+                    <ResizableHandle id={HANDLE_IDS.workbench} className="-ml-1 w-2" />
+                    <ResizablePanel
+                      id={WORKBENCH_PANEL.id}
+                      defaultSize={panels.defaultSizeOf(workbench.panelSpec)}
+                      minSize={WORKBENCH_PANEL.min}
+                      className="min-w-0"
+                    >
+                      <div className="flex h-full w-full">
+                        <div className="flex h-full w-full overflow-hidden bg-surface md:rounded-md md:border md:border-border">
+                          <WorkbenchPanel />
+                        </div>
                       </div>
-                    </div>
-                  </ResizablePanel>
-                </>
-              ) : null}
-            </ResizablePanelGroup>
+                    </ResizablePanel>
+                  </>
+                ) : null}
+              </ResizablePanelGroup>
 
-            <Sheet open={chrome.sidebarOpen} onOpenChange={chrome.setSidebarOpen}>
-              <SheetContent title={t("会话列表")} className="md:hidden">
-                <SessionSidebar
-                  {...sidebarProps}
-                  onSelect={(id) => {
-                    setActiveId(id);
-                    chrome.setSidebarOpen(false);
-                  }}
-                  onCreate={() => {
-                    actions.startNewSession();
-                    chrome.setSidebarOpen(false);
-                  }}
-                  onCreateAssistant={() => {
-                    actions.startAssistantSession();
-                    chrome.setSidebarOpen(false);
-                  }}
-                  onCreateInDirectory={(path) => {
-                    actions.startInDirectory(path);
-                    chrome.setSidebarOpen(false);
-                  }}
-                  onOpenService={() => {
-                    chrome.setSidebarOpen(false);
-                    setServiceOpen(true);
-                  }}
-                  onOpenSettings={() => {
-                    chrome.setSidebarOpen(false);
-                    openSettings();
+              <Sheet open={chrome.sidebarOpen} onOpenChange={chrome.setSidebarOpen}>
+                <SheetContent title={t("会话列表")} className="md:hidden">
+                  <SessionSidebar
+                    {...sidebarProps}
+                    onSelect={(id) => {
+                      setActiveId(id);
+                      chrome.setSidebarOpen(false);
+                    }}
+                    onCreate={() => {
+                      actions.startNewSession();
+                      chrome.setSidebarOpen(false);
+                    }}
+                    onCreateAssistant={() => {
+                      actions.startAssistantSession();
+                      chrome.setSidebarOpen(false);
+                    }}
+                    onCreateInDirectory={(path) => {
+                      actions.startInDirectory(path);
+                      chrome.setSidebarOpen(false);
+                    }}
+                    onOpenService={() => {
+                      chrome.setSidebarOpen(false);
+                      setServiceOpen(true);
+                    }}
+                    onOpenSettings={() => {
+                      chrome.setSidebarOpen(false);
+                      openSettings();
+                    }}
+                  />
+                </SheetContent>
+              </Sheet>
+
+              <Sheet open={chrome.workbenchSheetOpen} onOpenChange={chrome.setWorkbenchSheetOpen}>
+                {/* 工作台是铺满屏幕的主面板，不是浮在对话上的抽屉：用实色底，玻璃面会透出下层的对话 */}
+                <SheetContent side="right" title={t("工作台")} className="md:hidden" surface>
+                  <WorkbenchPanel />
+                </SheetContent>
+              </Sheet>
+
+              <UsagePanel
+                open={usageOpen}
+                onOpenChange={setUsageOpen}
+                onOpenSession={setActiveId}
+                context={sessionUsage.context}
+                titleBarInset={titleBarInset}
+              />
+
+              <ServiceDialog open={serviceOpen} onOpenChange={setServiceOpen} />
+
+              {settingsSection ? (
+                <SettingsPanel
+                  section={settingsSection}
+                  onSectionChange={setSettingsSection}
+                  onClose={() => setSettingsSection(null)}
+                  titleBarInset={titleBarInset}
+                  onSaved={() => {
+                    void models.reload();
                   }}
                 />
-              </SheetContent>
-            </Sheet>
+              ) : null}
 
-            <Sheet open={chrome.workbenchSheetOpen} onOpenChange={chrome.setWorkbenchSheetOpen}>
-              {/* 工作台是铺满屏幕的主面板，不是浮在对话上的抽屉：用实色底，玻璃面会透出下层的对话 */}
-              <SheetContent side="right" title={t("工作台")} className="md:hidden" surface>
-                <WorkbenchPanel />
-              </SheetContent>
-            </Sheet>
-
-            <UsagePanel
-              open={usageOpen}
-              onOpenChange={setUsageOpen}
-              onOpenSession={setActiveId}
-              context={sessionUsage.context}
-              titleBarInset={titleBarInset}
-            />
-
-            <ServiceDialog open={serviceOpen} onOpenChange={setServiceOpen} />
-
-            {settingsSection ? (
-              <SettingsPanel
-                section={settingsSection}
-                onSectionChange={setSettingsSection}
-                onClose={() => setSettingsSection(null)}
-                titleBarInset={titleBarInset}
-                onSaved={() => {
-                  void models.reload();
-                }}
+              <CommandPalette
+                open={paletteOpen}
+                onOpenChange={setPaletteOpen}
+                sessions={sessionsView}
+                fileRoot={workbenchCwd}
+                hasSession={activeId !== null}
+                onSelectSession={setActiveId}
+                onRunBuiltin={runBuiltin}
+                onNewTask={actions.startNewSession}
+                onNewAssistant={actions.startAssistantSession}
+                onOpenWorkspace={actions.pickDirectory}
+                onOpenSettings={openSettings}
+                onToggleSidebar={chrome.toggleSidebar}
+                onToggleWorkbench={workbench.toggle}
+                onOpenFile={workbench.openFile}
               />
-            ) : null}
 
-            <CommandPalette
-              open={paletteOpen}
-              onOpenChange={setPaletteOpen}
-              sessions={sessionsView}
-              fileRoot={workbenchCwd}
-              hasSession={activeId !== null}
-              onSelectSession={setActiveId}
-              onRunBuiltin={runBuiltin}
-              onNewTask={actions.startNewSession}
-              onNewAssistant={actions.startAssistantSession}
-              onOpenWorkspace={actions.pickDirectory}
-              onOpenSettings={openSettings}
-              onToggleSidebar={chrome.toggleSidebar}
-              onToggleWorkbench={workbench.toggle}
-              onOpenFile={workbench.openFile}
-            />
-
-            <Toaster position="top-center" />
-            <DialogHost />
-            <ErrorToaster />
-          </div>
+              <Toaster position="top-center" />
+              <DialogHost />
+              <ErrorToaster />
+            </div>
+          </PluginUiProvider>
         </WorkbenchProvider>
       </ComposerInsertProvider>
     </TooltipProvider>

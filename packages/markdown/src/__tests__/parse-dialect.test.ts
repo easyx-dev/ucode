@@ -166,16 +166,20 @@ describe("parseDialect 与文档投影同口径", () => {
   });
 });
 
-describe("设计锚点", () => {
-  it("`@design:<会话>/<页>/<节点>` 不是文件引用：原样留在正文里", () => {
+describe("引用锚点", () => {
+  it("scheme 在表里的 `@scheme:…` 不是文件引用：原样留在正文里", () => {
     const anchor = "@design:s-1/1:2/1:3";
-    const doc = parseDialect(`把 ${anchor} 改成深色`, { prompts: [], skills: [] });
+    const doc = parseDialect(`把 ${anchor} 改成深色`, {
+      prompts: [],
+      skills: [],
+      mentions: ["design"],
+    });
     // 当成引用就会去磁盘上找这个「文件」，发送时必然报路径不存在
     assert.deepEqual(doc.contexts, []);
     assert.equal(doc.text, `把 ${anchor} 改成深色`);
   });
 
-  it("长得像但不是三段锚点的仍按文件引用处理", () => {
+  it("scheme 不在表里时仍按文件引用处理（内核对 scheme 一无所知）", () => {
     const doc = parseDialect("@design:s-1/1:2", { prompts: [], skills: [] });
     assert.deepEqual(doc.contexts, [{ path: "design:s-1/1:2" }]);
   });

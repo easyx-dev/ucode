@@ -45,6 +45,12 @@ export const resourceRoot =
   findResourceRoot(import.meta.dirname) ?? resolve(import.meta.dirname, "..");
 
 /**
+ * 随包插件仓的根（资源根下的 `plugins/`）：内含官方插件目录与它们的构建产物。
+ * 具体哪些是「随包插件」写在 `constants/plugins` 的 `PACKAGED_PLUGINS`，不靠扫目录判定。
+ */
+export const packagedPluginsRoot = resolve(resourceRoot, "plugins");
+
+/**
  * 是否跑在源码树里（资源根带 pnpm workspace 清单）。
  * 安装包内没有这个文件，`env` 据此决定要不要用随包默认配置兜底——源码树里漏写环境文件时
  * 静默落到默认主目录（本机往往就是生产目录）比直接报错危险得多。

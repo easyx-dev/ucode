@@ -9,12 +9,15 @@ import { basename, dirname, resolve } from "node:path";
 
 import {
   ERROR_CODES,
+  PLUGIN_UI_API_VERSION,
   type PluginCreateInput,
   type PluginDeleteInput,
   type PluginDeleteResponse,
   type PluginListInput,
   type PluginRefreshInput,
   type PluginsListResponse,
+  type PluginsUiResponse,
+  type PluginUiInput,
   type PluginUpdateInput,
   type PluginView,
   type PluginWriteResponse,
@@ -22,6 +25,8 @@ import {
 
 import { PLUGIN_CACHE_DIRNAME, PLUGIN_DATA_DIRNAME } from "../../constants/dirs";
 import type { SessionEventBus } from "../../core/event-bus";
+import { resolveSessionCwd } from "../../core/session-paths";
+import type { SessionRepository } from "../../db/session-repository";
 import { env } from "../../env";
 import type { PluginHookBinding } from "../../harness/plugins/hooks";
 import type { PluginUserConfigField } from "../../harness/plugins/manifest";
@@ -50,11 +55,14 @@ import type {
   PluginDescriptor,
   PluginRegistry,
 } from "../../harness/plugins/types";
+import { toPluginUiBundle } from "../../harness/plugins/ui";
 import { toPluginView } from "../../harness/plugins/view";
 import { logger } from "../../platform/logger";
 import { type PublicFetchResult, publicFetch } from "../../platform/net";
 import { resolveExistingPath } from "../../platform/paths";
 import { AppError } from "../../platform/response";
+import { issuePluginAssetTicket } from "./assets-tickets";
+import { createPluginRuntime, PI_HELPERS } from "./runtime";
 import { defaultSourceRunner, type SourceRunner, stagePluginSource } from "./sources";
 import type { PluginStateStore } from "./state";
 import { createPluginStorage } from "./storage";
@@ -63,6 +71,11 @@ import { checkSourceUpdate } from "./updates";
 export type PluginServiceDeps = {
   state: PluginStateStore;
   events: SessionEventBus;
+  /**
+   * 会话仓储：插件服务端模块要读「会话在哪、叫什么」，也要读写自己的会话级状态。
+   * 只给这几件事——插件拿不到数据库句柄。
+   */
+  sessions: SessionRepository;
   /** 登记表变更后调用：让内存会话按新代次在空闲后重装（由会话池提供） */
   onRegistryChange?: (revision: number) => void;
   /** 插件根（`purge` 只删它里面的内容）；缺省取 `env.pluginsDir`，测试可覆盖 */
@@ -90,6 +103,17 @@ export type PluginService = {
   hooks(cwd?: string): PluginHookBinding[];
   /** 启用插件声明的 MCP 服务器：任何来源都生效，能否挂上由会话能力决定 */
   mcpServers(cwd?: string): PluginMcpServer[];
+  /**
+   * 界面贡献：启用的、且受信任的插件各出一份；第三方市场与未启用的不在其中。
+   * 未受信任 / 未启用的插件在设置页仍有声明（见 `PluginView`），这里只管「能不能进渲染层」。
+   */
+  ui(input?: PluginUiInput): PluginsUiResponse;
+  /** 按 id 取插件的托管根（模块与样式托管路由用）：不在登记表或不受信任时返回 null */
+  uiRootOf(cwd: string | undefined, pluginId: string): string | null;
+  /** 插件自有接口：`/api/v1/plugins/<id>/api/*` 原样转给它；没有接口或不受信任时返回 null */
+  handleRoute(pluginId: string, request: Request): Promise<Response | null>;
+  /** 会话装配用的插件工具：可信来源 + 已启用 + 声明了服务端模块，按插件逐个取，装配层再按名字过滤 */
+  sessionTools(input: { sessionId: string; cwd: string }): Promise<unknown[]>;
   /**
    * 重算已装插件的「来源是否已变」：本地目录来源按内容哈希比对，写回 `updateAvailable` 与检查时间。
    * 只在显式动作（刷新市场 / 重拉）里跑——列表接口不做这类扫描。返回结果变化的插件数。
@@ -185,6 +209,64 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
     }
     return cache;
   };
+
+  /**
+   * 插件服务端模块的运行上下文：只给「会话在哪 / 我叫什么 / 我的数据放哪 / 我怎么发事件」。
+   * `sessionState` 按插件 id 隔离——插件读不到别的插件的键。
+   */
+  const runtime = createPluginRuntime({
+    contextOf: (descriptor) => ({
+      pluginId: descriptor.id,
+      dataDir: resolve(pluginsDir, PLUGIN_DATA_DIRNAME, toDataDirName(descriptor.id)),
+      config: descriptor.config,
+      logger: {
+        info: (message, meta) =>
+          logger.info({ module: "plugins.plugin", plugin: descriptor.id, meta }, message),
+        warn: (message, meta) =>
+          logger.warn({ module: "plugins.plugin", plugin: descriptor.id, meta }, message),
+        error: (message, meta) =>
+          logger.error({ module: "plugins.plugin", plugin: descriptor.id, meta }, message),
+      },
+      sessions: {
+        find: (sessionId) => {
+          const record = deps.sessions.find(sessionId);
+          // cwd 用会话工作目录口径：未绑定项目的会话回落到按会话 id 派生的 workspace。
+          // 给空串会让插件拼出的相对路径落到服务进程的工作目录上
+          return record
+            ? { id: record.id, cwd: resolveSessionCwd(record), name: record.name }
+            : null;
+        },
+        agents: descriptor.agents,
+      },
+      sessionState: {
+        get: (sessionId, key) => deps.sessions.getPluginState(sessionId, descriptor.id, key),
+        set: (sessionId, key, value) =>
+          deps.sessions.setPluginState(sessionId, descriptor.id, key, value),
+        list: (key) =>
+          deps.sessions
+            .listPluginState(descriptor.id, key)
+            .filter((item) => item.value !== null) as Array<{ sessionId: string; value: string }>,
+      },
+      events: {
+        emit: (sessionId, type, payload) =>
+          events.emitFrame(sessionId, "plugin_event", {
+            pluginId: descriptor.id,
+            type,
+            ...(payload === undefined ? {} : { payload }),
+          }),
+      },
+      pi: PI_HELPERS,
+    }),
+  });
+
+  /** 可信 + 已启用 + 声明了服务端模块的插件：接口与工具都只在这批里找 */
+  const serverPlugins = (cwd?: string): PluginDescriptor[] =>
+    registry().plugins.filter(
+      (item) =>
+        isOn(item, cwd) &&
+        item.source !== "market" &&
+        item.components.some((entry) => entry.group === "server"),
+    );
 
   /** 变更收口：推进代次 → 丢缓存 → 让会话按新代次重装 → 广播 */
   const commit = (mutate: (current: PluginState) => PluginState): void => {
@@ -293,6 +375,59 @@ export const createPluginService = (deps: PluginServiceDeps): PluginService => {
       registry()
         .plugins.filter((item) => isOn(item, cwd))
         .flatMap((item) => item.mcpServers),
+    // 界面贡献与其它执行类组件同一道门：第三方市场的不进渲染层
+    ui(input) {
+      const plugins = registry().plugins.flatMap((item) => {
+        if (!isOn(item, input?.cwd) || item.source === "market") return [];
+        const bundle = toPluginUiBundle({
+          id: item.id,
+          name: item.name,
+          displayName: item.displayName,
+          version: item.version,
+          revision: state.get().revision,
+          declaration: item.ui,
+        });
+        if (!bundle) return [];
+        // 清单里的模式 slug 是插件写的「本地名」，会话的 `mode` 用的是登记后的 slug（带插件前缀 →
+        // 冲突时还可能带哈希后缀）。这里换成最终的 slug，界面据此写回会话的 mode 才对得上
+        return [
+          {
+            ...bundle,
+            modes: bundle.modes.map((mode) => {
+              const agent = item.agents.find(
+                (candidate) => candidate.kind === "primary" && candidate.label === mode.slug,
+              );
+              return agent ? { ...mode, slug: agent.slug } : mode;
+            }),
+          },
+        ];
+      });
+      const asset = issuePluginAssetTicket();
+      return {
+        apiVersion: PLUGIN_UI_API_VERSION,
+        plugins,
+        assetTicket: asset.ticket,
+        assetTicketExpiresAt: asset.expiresAt,
+      };
+    },
+    uiRootOf(cwd, pluginId) {
+      const descriptor = registry().plugins.find((item) => item.id === pluginId);
+      if (!descriptor || !isOn(descriptor, cwd) || descriptor.source === "market") return null;
+      return descriptor.root;
+    },
+    async handleRoute(pluginId, request) {
+      // 接口调用没有 cwd 上下文：只按用户级开关与来源判定（与资源托管同一口径）
+      const descriptor = serverPlugins().find((item) => item.id === pluginId);
+      if (!descriptor) return null;
+      return runtime.handle(descriptor, request);
+    },
+    async sessionTools(input) {
+      const tools: unknown[] = [];
+      for (const descriptor of serverPlugins(input.cwd)) {
+        tools.push(...(await runtime.toolsOf(descriptor, input)));
+      }
+      return tools;
+    },
     binDirs: (cwd) =>
       trustedAssets(
         (item) =>

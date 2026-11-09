@@ -90,3 +90,20 @@ export const PLUGIN_HASH_SKIP_DIRNAMES = [".git", "node_modules"] as const;
 
 /** 旧版本副本的保留期：14 天（与 Claude Code 同）——够覆盖「会话还握着旧路径」的窗口 */
 export const PLUGIN_ORPHAN_TTL_DAYS = 14;
+
+/**
+ * 插件代码组件的产物后缀：界面模块与服务端模块都只认预构建 ESM。
+ * 宿主不做 TS 编译——插件仓自带构建，产物进包。
+ */
+export const PLUGIN_MODULE_EXTENSIONS = [".mjs", ".js"] as const;
+
+/** 插件样式表后缀（界面贡献的 `styles`）：普通 CSS，由渲染层按需注入 `<link>` */
+export const PLUGIN_STYLE_EXTENSIONS = [".css"] as const;
+
+/**
+ * 随包插件：随产品发布、首次启动自动登记为 `official` 来源的插件包（路径相对资源根）。
+ *
+ * **只列这一份名单，不扫目录**：插件仓（submodule）里的 `plugins/` 是官方插件目录，
+ * 里面的插件是给市场安装用的，并不都是产品自带的界面能力——扫目录等于把十几个技能包
+ * 全变成随包插件。新增随包插件只改这里一行。
+ */

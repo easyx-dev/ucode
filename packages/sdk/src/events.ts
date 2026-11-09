@@ -24,6 +24,14 @@ export type EventStream = {
   restart: () => void;
   /** 订阅所有帧（不含 `server.connected`），返回退订函数 */
   onEvent: (listener: (frame: ServerEvent) => void) => () => void;
+  /**
+   * 订阅某个插件的自有事件（`plugin_event` 帧里 `pluginId` 为自己的那些）。
+   * 宿主不认识事件语义，只做转发；插件自己解释 `type` 与 `payload`。
+   */
+  onPluginEvent: (
+    pluginId: string,
+    listener: (event: { type: string; payload: unknown }) => void,
+  ) => () => void;
   /** 订阅错误帧，返回退订函数 */
   onError: (listener: (error: ApiError) => void) => () => void;
   /** 订阅连接建立，返回退订函数 */
@@ -62,6 +70,15 @@ export const createEventStream = (connect: EventConnect): EventStream => {
     start: stream.start,
     stop: stream.stop,
     restart: stream.restart,
+    onPluginEvent(pluginId, listener) {
+      const wrapped = (frame: ServerEvent): void => {
+        if (frame.type !== "plugin_event") return;
+        const data = frame.data as { pluginId?: string; type?: string; payload?: unknown };
+        if (data.pluginId !== pluginId) return;
+        listener({ type: typeof data.type === "string" ? data.type : "", payload: data.payload });
+      };
+      return this.onEvent(wrapped);
+    },
     onEvent(listener) {
       eventListeners.add(listener);
       return () => {

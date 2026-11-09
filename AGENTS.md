@@ -130,6 +130,8 @@
 | `pnpm -F @ucode/desktop browser:smoke` | 桌面端浏览器面板的端到端冒烟。**需要先 `pnpm -F @ucode/desktop build`**，因此不进 `pnpm test`；脚本与覆盖面见 [`docs/browser.md`](./docs/browser.md) |
 | `pnpm -F @ucode/server browser:parity` | 与真 agent-browser 的对拍（`server/scripts/browser-parity.ts`）：同一批本地页面比元素覆盖与动作语义，报告写 `.tmp/browser-parity-report.md`。**依赖本机装了 agent-browser**，差异是信息不是失败 |
 | `pnpm -F @ucode/server browser:smoke` | 浏览器工具集端到端冒烟（`server/scripts/browser-smoke.ts`）：本地起静态页跑 open / snapshot / act（含 eval）/ 截图 / 遮挡失败 / 导航失效 / close。**需要本机有浏览器**，因此不进 `pnpm test` |
+| `pnpm plugins:build` | 构建插件产物（`plugins/` 子模块里的 `ui/` 与 `server/`，esbuild）。子模块未初始化时只告警不失败；产物要随插件仓提交 |
+| `pnpm plugins:dev` | 插件仓的构建监听（改插件界面时与 `pnpm dev` 同时跑） |
 | `pnpm dev:hub` | 中继（hub）的开发服务器（vite dev `:3009`；库是 SQLite 单文件，首次启动自动建，不需要数据库服务；只监听 `[::1]`，用 `http://localhost:3009`）。hub 是独立仓库（submodule），见「hub（中继服务）」 |
 | `pnpm build:hub` / `pnpm start:hub` | 中继的生产构建与跑产物（产物在 `hub/app/.output`） |
 | `cd hub && docker build -t hub .` | 构建中继的生产镜像（**上下文是 hub 仓库根**，Dockerfile 在 hub 仓库根下） |
@@ -310,6 +312,25 @@ server 侧分五层，依赖方向单一：`routes → services → core → har
   `services/plugins/`。
 - 环境变量统一 `APP_` 前缀，主目录只有 `APP_HOME` 一个，其余路径由它派生。
 - 日志统一走 `platform/logger` 的 pino 实例，不直接 `console.*`；请求日志由 `requestLogger` 中间件统一输出。
+
+### plugins（官方插件仓）
+
+`plugins/` 是官方插件目录的独立仓库（`https://github.com/easyx-dev/ucode-plugins-official`），以 **git submodule**
+挂在本仓，结构是「市场清单 + 每插件一个目录」：`.ucode-plugin/marketplace.json` 登记全部条目，
+`plugins/<name>/` 是官方自研插件，`external_plugins/<name>/` 是社区插件。它自带 `package.json` 与
+`scripts/build.mjs`（esbuild），**不在本仓的安装与检查范围内**：改插件要 `cd plugins && pnpm install`。
+
+- **插件一律经市场安装**：产品不随包自带插件（设计也一样，从官方市场按需安装）。插件仓里的
+  `.ucode-plugin/marketplace.json` 是官方市场的清单，`plugins/<name>/` 与 `external_plugins/<name>/` 是条目指向的目录。
+- **带代码的插件把产物提交进仓**：市场按 git 快照安装，宿主不做编译（只认预构建 ESM），
+  所以 `dist/` 对这类插件**不能 gitignore**；改完插件要 `pnpm plugins:build` 并连同产物一起提交。
+- **插件代码一律预构建**：界面模块与服务端模块都是 ESM 产物（`ui/*.tsx → dist/ui/*.mjs`、
+  `server/index.ts → dist/server.mjs`），宿主不做编译。`pnpm plugins:build` 从根侧转发构建；
+  子模块未初始化时它只告警不失败——**发版前必须 `git submodule update --init` 并构建**，否则产物里没有设计界面。
+- 界面协议与作者向说明见 [`docs/plugin-ui.md`](./docs/plugin-ui.md)，方案与里程碑见
+  [`plans/plugin-ui.md`](./plans/plugin-ui.md)。
+- `biome.json` 与 `pnpm-workspace.yaml` 都不覆盖 `plugins/`（与 `hub/` 同一处理：`files.includes` 排除 +
+  `experimentalScannerIgnores` 让扫描器不进目录，否则它自带的 `biome.json` 会被判成 nested root）。
 
 ### hub（中继服务）
 

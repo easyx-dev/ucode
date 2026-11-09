@@ -37,7 +37,15 @@ const TOOL_NAME_MAP: Record<string, string> = {
 const MODEL_ALIASES = ["sonnet", "opus", "haiku", "inherit"];
 
 /** 认识的字段；其余一律只出诊断 */
-const KNOWN_FIELDS = new Set(["name", "description", "tools", "disallowedTools", "model", "mode"]);
+const KNOWN_FIELDS = new Set([
+  "name",
+  "description",
+  "tools",
+  "disallowedTools",
+  "model",
+  "mode",
+  "thinking",
+]);
 
 const toText = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -57,10 +65,12 @@ const mapToolNames = (
   names: readonly string[],
   file: string,
   diagnostics: PluginDiagnosticView[],
+  ownTools: ReadonlySet<string> = new Set(),
 ): string[] => {
   const mapped: string[] = [];
   for (const name of names) {
-    const tool = TOOL_NAME_MAP[name] ?? (name === name.toLowerCase() ? name : undefined);
+    const tool =
+      TOOL_NAME_MAP[name] ?? (ownTools.has(name) || name === name.toLowerCase() ? name : undefined);
     if (!tool) {
       diagnostics.push(diagnostic("warning", "agents", `${file}：工具名 ${name} 不认识，已忽略`));
       continue;
@@ -83,7 +93,10 @@ export const loadPluginAgents = (input: {
   pluginName: string;
   files: readonly string[];
   taken: Set<string>;
+  /** 本插件服务端模块提供的工具名：角色白名单里写它们时按原样保留 */
+  pluginTools?: readonly string[];
 }): PluginAgentLoad => {
+  const ownTools = new Set(input.pluginTools ?? []);
   const agents: PluginAgentFile[] = [];
   const diagnostics: PluginDiagnosticView[] = [];
 
@@ -123,13 +136,12 @@ export const loadPluginAgents = (input: {
         diagnostic("info", "agents", `${name}：字段 ${key} 不是本产品认识的，已忽略`),
       );
     }
-    if (frontmatter.mode !== undefined) {
+    // `mode: primary` 让插件贡献一个主模式（设计就是这种）：它的 slug 会成为会话的 `mode`
+    const declaredMode = toText(frontmatter.mode) || undefined;
+    const kind = declaredMode === "primary" ? "primary" : "subagent";
+    if (declaredMode !== undefined && declaredMode !== "primary" && declaredMode !== "subagent") {
       diagnostics.push(
-        diagnostic(
-          "info",
-          "agents",
-          `${name}：插件角色不做主模式，mode 已忽略（一律按子角色落位）`,
-        ),
+        diagnostic("warning", "agents", `${name}：mode 只认 primary / subagent，已按子角色落位`),
       );
     }
 
@@ -153,16 +165,21 @@ export const loadPluginAgents = (input: {
     const slug = toComponentToken(input.pluginName, localName, input.taken);
     // 认领这个 slug：跨插件的同名 token 靠这个集合发现冲突并加哈希后缀
     input.taken.add(slug);
+    // 推荐思考档位：只对主模式有意义（偏好为 auto 时按它跑）
+    const thinking = toText(frontmatter.thinking);
     agents.push({
       slug,
+      kind,
+      ...(kind === "primary" && thinking ? { thinking } : {}),
       label: localName,
       description,
       promptSection,
-      tools: mapToolNames(toNameList(frontmatter.tools) ?? [], name, diagnostics),
+      tools: mapToolNames(toNameList(frontmatter.tools) ?? [], name, diagnostics, ownTools),
       disallowedTools: mapToolNames(
         toNameList(frontmatter.disallowedTools) ?? [],
         name,
         diagnostics,
+        ownTools,
       ),
       ...(model ? { model } : {}),
     });

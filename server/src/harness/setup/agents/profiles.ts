@@ -10,7 +10,6 @@ import {
   isBrowserTool,
   isObservingBrowserTool,
 } from "../../features/browser/tools";
-import { DESIGN_TOOL_NAMES } from "../../features/design/tools";
 import { DEFAULT_PERMISSION_RULES, type PermissionRule } from "../permissions";
 import {
   DEFAULT_BUILTIN_TOOLS,
@@ -102,11 +101,6 @@ const PLAN_TOOLS: ToolSelection = {
  * 设计稿落在会话工作目录的项目配置目录里，出稿之后常常要顺手把它落成前端代码，
  * 所以不按只读收窄——只读的是「画布」，不是「会话」。
  */
-const DESIGN_TOOLS: ToolSelection = {
-  kind: "defaultTools",
-  defaultTools: [...DEFAULT_TOOL_NAMES, ...DESIGN_TOOL_NAMES],
-};
-
 const readOnlySelection = (extra: readonly string[] = []): ToolSelection => ({
   kind: "allowlist",
   tools: [...READ_ONLY_TOOLS, ...extra],
@@ -137,8 +131,6 @@ export const PRIMARY_PROFILES: Record<SessionMode, AgentProfile> = {
   // （连同子会话与 codemode 的嵌套调用）
   plan: primary("plan", "计划", PLAN_TOOLS, READ_ONLY_PERMISSIONS, "max"),
   ask: primary("ask", "问答", BUILD_TOOLS, READ_ONLY_PERMISSIONS, "medium"),
-  // 设计出的是一张要反复推敲的稿子，思考档位与编码同档：再往上抬只是把成本加上去
-  design: primary("design", "设计", DESIGN_TOOLS, [], "xhigh"),
 };
 
 export const SUBAGENT_PROFILES: Record<SubagentSlug, AgentProfile> = {

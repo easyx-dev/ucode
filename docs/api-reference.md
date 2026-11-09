@@ -80,6 +80,9 @@
 | POST | `/api/v1/plugins/update` | 启停插件或写入 userConfig 的值 |
 | POST | `/api/v1/plugins/delete` | 移除插件登记（purge 时一并清理缓存与插件数据） |
 | POST | `/api/v1/plugins/refresh` | 按来源重读插件清单并推进代次 |
+| POST | `/api/v1/plugins/ui` | 界面贡献清单：启用且受信任插件的视图 / 文档渲染器 / 提及 / 设置分区与模块地址 |
+| GET | `/api/v1/plugins/runtime/:name` | 宿主运行时 shim（plugin-api / react / jsx-runtime 源码，非 JSON，不走封套） |
+| GET | `/api/v1/plugins/:id/ui/:rest{.+}` | 托管插件的界面模块与样式表（非 JSON，不走封套；裸模块名改写成运行时 shim） |
 | POST | `/api/v1/marketplace/list` | 列出已登记的市场与刷新状态 |
 | POST | `/api/v1/marketplace/info` | 市场内插件列表（读上一次刷新的缓存，不触发网络） |
 | POST | `/api/v1/marketplace/create` | 登记市场来源 |
@@ -100,12 +103,6 @@
 | POST | `/api/v1/goals/resume` | 恢复目标自动续跑 |
 | POST | `/api/v1/goals/clear` | 清除当前会话目标 |
 | POST | `/api/v1/stats/summary` | 全局 token 用量统计（按模型 / 会话聚合） |
-| POST | `/api/v1/design/snapshot` | 读设计稿的结构摘要（页面表、节点摘要、画布选中集、引用前缀） |
-| POST | `/api/v1/design/render` | 取整页 drawing（`revision` 与文档一致时 `svg` 为 null，画布据此跳过重绘） |
-| POST | `/api/v1/design/select` | 写回画布选中集（不存在的 id 会被过滤） |
-| POST | `/api/v1/design/files` | 列出项目里的设计稿文件（标出本会话当前在改的那份） |
-| POST | `/api/v1/design/node` | 读一个设计节点的完整属性（属性浮窗） |
-| POST | `/api/v1/design/doc` | 文档级动作：立刻落盘 / 清空重来 / 换一页 |
 | POST | `/api/v1/browser/list` | 列出浏览器 profile（占用、最后使用时间、是否使用中） |
 | POST | `/api/v1/browser/delete` | 删除浏览器 profile（使用中的跳过，传全集即清空） |
 | POST | `/api/v1/browser/desktop` | 桌面端浏览器通道的当前状态（有哪些标签、当前在看哪一个） |
@@ -1598,6 +1595,49 @@
 | `plugin` | [PluginView](#pluginview) | 是 | — |
 | `revision` | number | 是 | — |
 
+### POST /api/v1/plugins/ui
+
+界面贡献清单：启用且受信任插件的视图 / 文档渲染器 / 提及 / 设置分区与模块地址
+
+**请求参数**
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `cwd` | string（长度≥1） | 否 | — | 当前工作目录：给了就按它算项目级覆盖后的生效开关 |
+
+**响应类型**：`PluginsUiResponse`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `apiVersion` | number | 是 | 宿主实现的运行时版本；插件按 `apiVersion` 对不上会被跳过并出诊断 |
+| `plugins` | [PluginUiBundle](#pluginuibundle)[] | 是 | — |
+| `assetTicket` | string | 是 | 读取插件资源（模块与样式）的短时票。浏览器的 `import()` 与 `<link>` 带不了 `Authorization`， 所以资源地址要带上它；过期后重新取一次本清单即可。 |
+| `assetTicketExpiresAt` | string | 是 | 票的过期时间（ISO），客户端不必用，留给排障 |
+
+### GET /api/v1/plugins/runtime/:name
+
+宿主运行时 shim（plugin-api / react / jsx-runtime 源码，非 JSON，不走封套）
+
+**请求参数**
+
+无参数
+
+**响应**
+
+原始字节（非 JSON，不走封套）；`Content-Type` 取自附件自身的 mimeType，带 `Cache-Control: immutable` 与 `ETag`。
+
+### GET /api/v1/plugins/:id/ui/:rest{.+}
+
+托管插件的界面模块与样式表（非 JSON，不走封套；裸模块名改写成运行时 shim）
+
+**请求参数**
+
+无参数
+
+**响应**
+
+原始字节（非 JSON，不走封套）；`Content-Type` 取自附件自身的 mimeType，带 `Cache-Control: immutable` 与 `ETag`。
+
 ## 插件市场（`marketplace`）
 
 ### POST /api/v1/marketplace/list
@@ -2037,151 +2077,6 @@
 | `longestSessionMs` | number | 是 | 区间内「单会话最长聊天时长」（毫秒）：会话内相邻调用间隔不超过 30 分钟算同一段， 各段时长累加即该会话的聊天时长，再取会话间的最大值；单点会话为 0。 |
 | `steps` | [StatsStepSummary](#statsstepsummary) | 是 | 区间内的步级耗时画像；区间内没有任何步记录时各指标为空 |
 
-## design（`design`）
-
-### POST /api/v1/design/snapshot
-
-读设计稿的结构摘要（页面表、节点摘要、画布选中集、引用前缀）
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `pageId` | string（长度 1–128） | 否 | — | — |
-
-**响应类型**：`DesignSnapshot`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `revision` | number | 是 | — |
-| `pageId` | string | 是 | — |
-| `pages` | [DesignPage](#designpage)[] | 是 | — |
-| `nodes` | [DesignNodeSummary](#designnodesummary)[] | 是 | — |
-| `selection` | string[] | 是 | — |
-| `mentionPrefix` | string | 是 | 引用锚点前缀，形如 `@design:<会话 id>`；完整锚点由它 + `/<页>/<节点>` 拼成。 由服务端铸造而不是画布自己拼：锚点写进对话历史后比文档活得久，归属校验靠的就是这一截。 |
-| `path` | string | 是 | 这份稿子落在哪个文件。默认在项目配置目录下、按会话标题命名； 用户把本会话的当前稿指向别处（`design/doc open`）时就是那个路径——画布上标出来，免得改错文件。 |
-| `truncated` | boolean | 否 | 图层树是否被截断（超过服务端一次下发的行数上限）。 带上它是为了让人知道「画布里还有没列出来的节点」，而不是以为稿子只有这些。 |
-| `warning` | string | 否 | 文档文件读不懂时给出的说明（已把坏文件留档），画布照实显示 |
-
-### POST /api/v1/design/render
-
-取整页 drawing（`revision` 与文档一致时 `svg` 为 null，画布据此跳过重绘）
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `pageId` | string（长度 1–128） | 否 | — | — |
-| `revision` | integer（≥0） | 否 | — | — |
-
-**响应类型**：`DesignRender`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `revision` | number | 是 | — |
-| `pageId` | string | 是 | — |
-| `svg` | string \| null | 是 | 整页 SVG 原文；空画布为空串，陈旧为 null |
-| `boxes` | Record<string, DesignBox> | 是 | — |
-| `bounds` | [DesignBox](#designbox) \| null | 是 | 内容外接矩形；空画布为 null（画布据此收起「适应视图」） |
-
-### POST /api/v1/design/select
-
-写回画布选中集（不存在的 id 会被过滤）
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `ids` | string（长度 1–128）[]（≤256 项） | 是 | — | — |
-
-**响应类型**：`DesignSelection`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `sessionId` | string | 是 | — |
-| `selection` | string[] | 是 | — |
-
-### POST /api/v1/design/files
-
-列出项目里的设计稿文件（标出本会话当前在改的那份）
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-
-**响应类型**：`DesignFilesResponse`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `files` | [DesignFileEntry](#designfileentry)[] | 是 | 项目设计稿目录里的稿子，按改动时间倒序 |
-| `currentPath` | string | 是 | 本会话当前在改的那份（可以把稿子放在目录外面，所以它不一定在 `files` 里）。 由服务端给：侧栏与标签要的是这一个路径，不该为此去拉整页画面。 |
-
-### POST /api/v1/design/node
-
-读一个设计节点的完整属性（属性浮窗）
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `id` | string（长度 1–128） | 是 | — | — |
-
-**响应类型**：`DesignNodeDetail`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `id` | string | 是 | — |
-| `name` | string | 是 | — |
-| `type` | string | 是 | 节点类型：`FRAME` / `TEXT` / `RECTANGLE` 等 |
-| `path` | string | 是 | 图层路径，如 `我的 / 资料卡 / 标题` |
-| `x` | number | 是 | — |
-| `y` | number | 是 | — |
-| `width` | number | 是 | — |
-| `height` | number | 是 | — |
-| `rotation` | number | 是 | — |
-| `opacity` | number | 是 | — |
-| `visible` | boolean | 是 | — |
-| `cornerRadius` | number | 是 | — |
-| `fills` | [DesignPaint](#designpaint)[] | 是 | — |
-| `strokes` | [DesignPaint](#designpaint)[] | 是 | — |
-| `strokeWeight` | number | 是 | — |
-| `layoutMode` | string | 是 | 自动布局方向：`NONE` / `HORIZONTAL` / `VERTICAL` |
-| `itemSpacing` | number | 是 | — |
-| `padding` | object | 是 | — |
-| `padding.top` | number | 是 | — |
-| `padding.right` | number | 是 | — |
-| `padding.bottom` | number | 是 | — |
-| `padding.left` | number | 是 | — |
-| `childCount` | number | 是 | — |
-| `text` | [DesignTextProps](#designtextprops) | 否 | 文本属性；非文本节点没有 |
-
-### POST /api/v1/design/doc
-
-文档级动作：立刻落盘 / 清空重来 / 换一页
-
-**请求参数**
-
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-| --- | --- | --- | --- | --- |
-| `sessionId` | string（格式 `^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$`） | 是 | — | — |
-| `action` | "flush" \| "reset" \| "setPage" \| "createPage" \| "open" | 是 | — | — |
-| `pageId` | string（长度 1–128） | 否 | — | — |
-| `name` | string（长度 1–60） | 否 | — | 新建页的名字；不给就按「页面 N」编号 |
-| `path` | string（长度≥1） | 否 | — | `open` 的目标文件：把本会话的当前稿指过去（指针随会话持久化；文件不存在就在第一次改动时新建）。 相对路径按会话工作目录解析；扩展名必须是 `.design`（内容仍是 JSON）。 |
-
-**响应类型**：`DesignDocResponse`
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `revision` | number | 是 | — |
-| `pageId` | string | 否 | — |
-
 ## browser（`browser`）
 
 ### POST /api/v1/browser/list
@@ -2389,7 +2284,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | "agent_settled" \| "compaction_end" \| "compaction_start" \| "design_update" \| "goal_update" \| "interaction_request" \| "interaction_resolved" \| "message_end" \| "message_start" \| "queue_update" \| "service_update" \| "session_archived" \| "session_created" \| "session_updated" \| "step_start" \| "subagent_end" \| "subagent_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_end" \| "tool_start" \| "tool_update" \| "transcript_reset" | 是 | — |
+| `type` | "agent_settled" \| "compaction_end" \| "compaction_start" \| "goal_update" \| "interaction_request" \| "interaction_resolved" \| "message_end" \| "message_start" \| "plugin_event" \| "queue_update" \| "service_update" \| "session_archived" \| "session_created" \| "session_updated" \| "step_start" \| "subagent_end" \| "subagent_start" \| "text_delta" \| "thinking_delta" \| "tool_call" \| "tool_end" \| "tool_start" \| "tool_update" \| "transcript_reset" | 是 | — |
 | `sessionId` | string | 是 | — |
 | `seq` | number | 是 | — |
 | `data` | unknown | 是 | — |
@@ -2469,7 +2364,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 - `subagent_start`
 - `subagent_end`
 - `goal_update`
-- `design_update`
+- `plugin_event`
 - `service_update`
 - `session_created`
 - `session_updated`
@@ -2808,7 +2703,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `componentRefs` | [PluginComponentRefView](#plugincomponentrefview)[] | 是 | 组件逐个列出：列表只给计数，详情页要名字 |
 | `userConfig` | [PluginUserConfigFieldView](#pluginuserconfigfieldview)[] | 是 | userConfig 的声明；没有配置项时为空数组 |
 | `config` | Record<string, string \| number \| boolean> | 是 | userConfig 的已存值；敏感项不在其中（只体现 `configured` 语义） |
-| `blockedComponents` | ("agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
+| `blockedComponents` | ("agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "server" \| "skills" \| "ui" \| "userConfig")[] | 是 | 按来源判定为「不注入运行时」的组件分组：界面据此直说为什么 hook 不跑 |
 | `updateAvailable` | boolean | 是 | 来源内容是否已变（目录来源按内容哈希、git 按 ls-remote 的 commit、npm 按 registry 版本、 url 按条件请求判定）。由「刷新市场」这类显式动作重算，列表接口本身不打网络、不扫盘， 只回显上次结论。 |
 | `latestVersion` | string | 否 | 远端最新版本：只有能判定出版本号的来源（npm / 清单声明）才有 |
 | `checkedAt` | string | 否 | 上次检查更新的时间（ISO 8601）；从没检查过则缺省 |
@@ -2821,6 +2716,21 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `projectPath` | string | 是 | `<cwd>/.<slug>/plugins.json`：提交进仓库的那份 |
 | `localPath` | string | 是 | `<cwd>/.<slug>/plugins.local.json`：个人覆盖（建议 gitignore） |
 | `diagnostics` | string[] | 是 | — |
+
+### PluginUiBundle
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 插件 id（`<name>@<marketplace>`） |
+| `name` | string | 是 | — |
+| `displayName` | string | 是 | — |
+| `revision` | string | 是 | 模块缓存键：版本与来源内容摘要的组合，变了就重新 import |
+| `styles` | string[] | 是 | 插件自带的样式表（相对接口基址），宿主按需注入 `<link>` |
+| `views` | [PluginUiView](#pluginuiview)[] | 是 | — |
+| `docRenderers` | [PluginUiDocRenderer](#pluginuidocrenderer)[] | 是 | — |
+| `modes` | [PluginUiMode](#pluginuimode)[] | 是 | — |
+| `mentions` | [PluginUiMention](#pluginuimention)[] | 是 | — |
+| `settingsSections` | [PluginUiSettingsSection](#pluginuisettingssection)[] | 是 | — |
 
 ### MarketplaceView
 
@@ -2890,7 +2800,7 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `level` | "error" \| "info" \| "warning" | 是 | — |
-| `component` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
+| `component` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "server" \| "skills" \| "ui" \| "userConfig" | 是 | 归属组件；清单本身的问题记 `manifest` |
 | `message` | string | 是 | 面向用户的中文说明；服务端不本地化，与失败封套同一口径 |
 
 ### AgentView
@@ -3004,73 +2914,6 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `byModel` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按 `provider/model` 分桶，按步数降序 |
 | `byThinking` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按思考档位分桶；取不到档位的步归 `unknown` |
 | `daily` | [StepUsageBucket](#stepusagebucket)[] | 是 | 按服务端本地日期分桶（`YYYY-MM-DD`，只出有步的日） |
-
-### DesignPage
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `id` | string | 是 | — |
-| `name` | string | 是 | — |
-
-### DesignNodeSummary
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `id` | string | 是 | — |
-| `name` | string | 是 | 图层名；模型与用户都按它认节点，所以工具会要求起有意义的名字 |
-| `type` | string | 是 | 节点类型：`FRAME` / `TEXT` / `RECTANGLE` / `ELLIPSE` / `LINE` / `GROUP` / `COMPONENT` 等 |
-| `x` | number | 是 | — |
-| `y` | number | 是 | — |
-| `width` | number | 是 | — |
-| `height` | number | 是 | — |
-| `parentId` | string \| null | 是 | 父节点 id；页面直属节点为空 |
-| `depth` | number | 是 | 嵌套层级，页面直属节点为 0 |
-
-### DesignBox
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `x` | number | 是 | — |
-| `y` | number | 是 | — |
-| `width` | number | 是 | — |
-| `height` | number | 是 | — |
-
-### DesignFileEntry
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `path` | string | 是 | 绝对路径 |
-| `name` | string | 是 | 文件名 |
-| `updatedAt` | string | 是 | 最后改动时间（ISO） |
-| `current` | boolean | 是 | 是否为本会话当前在改的那份 |
-
-### DesignPaint
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `type` | string | 是 | 画法：`SOLID`（纯色）或 `IMAGE`（图片，带 `imageHash`） |
-| `color` | object | 是 | — |
-| `color.r` | number | 是 | — |
-| `color.g` | number | 是 | — |
-| `color.b` | number | 是 | — |
-| `color.a` | number | 是 | — |
-| `opacity` | number | 是 | — |
-| `visible` | boolean | 是 | — |
-| `imageHash` | string | 否 | 图片填充的内容哈希（文档 `images` 里的键）；纯色填充没有 |
-| `imageScaleMode` | string | 否 | 图片在框里的放法：`FILL` / `FIT` / `CROP` / `TILE`；纯色填充没有 |
-| `weight` | number | 否 | 描边粗细（像素）；填充没有这一项 |
-
-### DesignTextProps
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `characters` | string | 是 | — |
-| `fontSize` | number | 是 | — |
-| `fontFamily` | string | 是 | — |
-| `fontWeight` | number | 是 | — |
-| `textAlignHorizontal` | string | 是 | `LEFT` / `CENTER` / `RIGHT` / `JUSTIFIED` |
-| `lineHeight` | number \| null | 是 | 行高（像素）；未设置时为空 |
-| `letterSpacing` | number | 是 | — |
 
 ### BrowserProfileView
 
@@ -3344,12 +3187,14 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `mcp` | number | 是 | — |
 | `bin` | number | 是 | — |
 | `extensions` | number | 是 | — |
+| `ui` | number | 是 | 界面贡献的块数（视图 + 文档渲染器 + 提及 + 设置分区） |
+| `server` | number | 是 | — |
 
 ### PluginComponentRefView
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `group` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "skills" \| "userConfig" | 是 | — |
+| `group` | "agents" \| "bin" \| "commands" \| "extensions" \| "hooks" \| "manifest" \| "mcp" \| "server" \| "skills" \| "ui" \| "userConfig" | 是 | — |
 | `name` | string | 是 | — |
 
 ### PluginUserConfigFieldView
@@ -3365,6 +3210,57 @@ WebSocket：上行文本帧 = 用户输入原文，下行二进制帧 = PTY 输�
 | `options` | string[] | 否 | `select` 的候选值 |
 | `multiple` | boolean | 否 | 允许多选（`select`） |
 | `sensitive` | boolean | 否 | 敏感值：不回显（服务端只回传是否已设置） |
+
+### PluginUiView
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `url` | string | 是 | 模块路径（相对接口基址，不带前导 `/`） |
+| `export` | string | 否 | 导出名；缺省表示 `default` |
+| `pluginId` | string | 是 | — |
+| `id` | string | 是 | 视图 id，插件内唯一；宿主用 `<pluginId>:<id>` 作为稳定键 |
+| `label` | string | 是 | 展示名（插件自带文案，宿主不再本地化——插件提供自己的 i18n 目录） |
+| `icon` | string | 是 | 图标名，取宿主约定的 lucide 名单；认不出时回落默认图标 |
+| `layout` | "full" \| "sidebar" | 是 | — |
+| `order` | number | 是 | 活动栏内的次序，小的靠上；同值时按插件 id 排 |
+
+### PluginUiDocRenderer
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `url` | string | 是 | 模块路径（相对接口基址，不带前导 `/`） |
+| `export` | string | 否 | 导出名；缺省表示 `default` |
+| `pluginId` | string | 是 | — |
+| `extensions` | string[] | 是 | 接管的扩展名：小写、不带点 |
+
+### PluginUiMode
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `pluginId` | string | 是 | — |
+| `slug` | string | 是 | — |
+| `label` | string | 是 | — |
+| `description` | string | 是 | — |
+| `icon` | string | 是 | — |
+
+### PluginUiMention
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `pluginId` | string | 是 | — |
+| `scheme` | string | 是 | 方言里的 scheme 名（`@design:…` 的 `design`） |
+| `url` | string | 否 | 自定义芯片组件（相对接口基址的模块路径）；缺省用宿主通用芯片 |
+| `export` | string | 否 | 芯片组件的导出名；缺省 `default` |
+
+### PluginUiSettingsSection
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `url` | string | 是 | 模块路径（相对接口基址，不带前导 `/`） |
+| `export` | string | 否 | 导出名；缺省表示 `default` |
+| `pluginId` | string | 是 | — |
+| `id` | string | 是 | — |
+| `label` | string | 是 | — |
 
 ### StepUsageTotals
 

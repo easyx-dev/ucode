@@ -14,7 +14,6 @@ import { ProjectRepository } from "../db/project-repository";
 import { SessionRepository } from "../db/session-repository";
 import { env } from "../env";
 import { materializeAttachment } from "../harness/features/attachment";
-import { createDesignService, type DesignService } from "../harness/features/design";
 import { GoalService } from "../harness/features/goal";
 import { MemoryService } from "../harness/features/memory";
 import { TitleService } from "../harness/features/title";
@@ -87,11 +86,9 @@ export type Services = {
   terminals: TerminalService;
   /** 浏览器：实例注册表与 profile 数据面（数据落在 `$APP_HOME/app/browser`） */
   browsers: BrowserService;
-  /** 设计画布：会话当前在改的设计稿（指针存会话上，稿子落在会话工作目录的项目配置目录下） */
-  design: DesignService;
   /** 用当前配置重建运行时（手动刷新模型目录） */
   reload(): Promise<void>;
-  /** 收尾：设计稿落盘、终端与浏览器清理，最后关闭共享的 SQLite 连接 */
+  /** 收尾：终端与浏览器清理，最后关闭共享的 SQLite 连接 */
   close(): Promise<void>;
 };
 
@@ -192,6 +189,7 @@ export const createServices = async (registration: ServiceRegistration): Promise
   const pluginDeps = {
     state: pluginState,
     events,
+    sessions,
     onRegistryChange: (revision: number) => pool.recycleForPluginChange(revision),
   };
   const plugins = createPluginService(pluginDeps);
@@ -201,19 +199,6 @@ export const createServices = async (registration: ServiceRegistration): Promise
     pluginList: () => plugins.list(),
   });
   const browsers = createBrowserService();
-  // 设计画布：文档变更只下发 revision，画布按它自己去重取 drawing
-  const design = createDesignService({
-    emitUpdate: (sessionId, revision) => events.emitFrame(sessionId, "design_update", { revision }),
-    // 文件名取自会话标题（`音乐 App 首页.design` 比一串 uuid 有用）：起名是异步的，
-    // 所以只在新建文件那一刻取一次，之后标题再变也不改名
-    titleOf: (sessionId) => sessions.find(sessionId)?.name ?? null,
-    // 指针落会话行：重启后 agent 与画布仍指向同一份，不靠界面重开标签去恢复
-    pointers: {
-      get: (sessionId) => sessions.find(sessionId)?.designPath ?? null,
-      set: (sessionId, path) => sessions.setDesignPath(sessionId, path),
-      used: () => sessions.listDesignPaths(),
-    },
-  });
   const pool = new SessionPool(
     runtime,
     sessions,
@@ -235,8 +220,8 @@ export const createServices = async (registration: ServiceRegistration): Promise
       binDirs: (cwd) => plugins.binDirs(cwd),
       hooks: (cwd) => plugins.hooks(cwd),
       mcpServers: (cwd) => plugins.mcpServers(cwd),
+      tools: (input) => plugins.sessionTools(input),
     },
-    design,
   );
   // 标题在池之后装配：它订阅总线的 `agent_settled`，并借池拿到池内会话
   const titles = new TitleService({
@@ -287,7 +272,6 @@ export const createServices = async (registration: ServiceRegistration): Promise
     marketplaces,
     terminals,
     browsers,
-    design,
     hub,
     auth: {
       credentials,
@@ -303,8 +287,6 @@ export const createServices = async (registration: ServiceRegistration): Promise
       hub.stop();
       terminals.disposeAll();
       browsers.disposeAll();
-      // 设计稿的落盘是防抖的：要等它写完再停库、再让进程退，最后那一次改动才留得下来
-      await design.disposeAll();
       lifecycle.stop();
     },
   };

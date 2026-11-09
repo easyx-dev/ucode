@@ -1,6 +1,5 @@
 /** 工作台取数：文件内容与 git 的五个只读接口，统一走 `useAsyncData` 的 key + reloadToken 形态 */
 import type {
-  DesignFilesResponse,
   FsReadResponse,
   GitContentsResponse,
   GitDiffResponse,
@@ -22,23 +21,6 @@ export function useFileContent(path: string | null, reloadToken = 0): AsyncData<
       // i18n-ignore: 组件已保证传参非空，这里只是防御，不会渲染给用户
       if (!path) return Promise.reject(new Error("没有选中文件"));
       return client.apis.fs.read({ path });
-    },
-    reloadToken,
-  );
-}
-
-/** 项目里的设计稿清单；`sessionId` 为 null 时不发请求 */
-export function useDesignFiles(
-  sessionId: string | null,
-  reloadToken = 0,
-): AsyncData<DesignFilesResponse> {
-  const client = useClient();
-  return useAsyncData(
-    sessionId ?? "",
-    () => {
-      // i18n-ignore: 组件已保证传参非空，这里只是防御，不会渲染给用户
-      if (!sessionId) return Promise.reject(new Error("没有选中会话"));
-      return client.apis.design.files({ sessionId });
     },
     reloadToken,
   );

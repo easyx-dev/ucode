@@ -11,8 +11,6 @@ import {
   changesDoc,
   changesDocId,
   commitDoc,
-  designDoc,
-  designDocId,
   diffDocId,
   emptyWorkbenchDocs,
   fileDoc,
@@ -195,43 +193,6 @@ describe("终端标签", () => {
     }
     assert.equal(state.docs.length, MAX_WORKBENCH_DOCS);
     assert.ok(!state.docs.some((doc) => doc.id === terminalDocId("t0")));
-  });
-});
-
-describe("设计画布标签", () => {
-  it("按会话一格：同一会话重复打开只激活，换会话另开一格", () => {
-    const first = workbenchDocsReducer(emptyWorkbenchDocs, {
-      type: "open",
-      doc: designDoc("s-1"),
-    });
-    const second = workbenchDocsReducer(first, { type: "open", doc: designDoc("s-2") });
-    const third = workbenchDocsReducer(second, { type: "open", doc: designDoc("s-1") });
-
-    assert.deepEqual(
-      third.docs.map((doc) => doc.id),
-      [designDocId("s-1"), designDocId("s-2")],
-    );
-    assert.equal(third.activeDocId, designDocId("s-1"));
-  });
-
-  it("reset 清掉设计标签（它属于会话，不跨会话留存）", () => {
-    const opened = workbenchDocsReducer(emptyWorkbenchDocs, {
-      type: "open",
-      doc: designDoc("s-1"),
-    });
-    assert.deepEqual(workbenchDocsReducer(opened, { type: "reset" }), emptyWorkbenchDocs);
-  });
-
-  it("换会话只丢设计画布，文件标签留着", () => {
-    let state = workbenchDocsReducer(emptyWorkbenchDocs, { type: "open", doc: fileDoc("/a.ts") });
-    state = workbenchDocsReducer(state, { type: "open", doc: designDoc("s-1") });
-    state = workbenchDocsReducer(state, { type: "dropDesign" });
-
-    assert.deepEqual(
-      state.docs.map((doc) => doc.id),
-      [fileDocId("/a.ts")],
-    );
-    assert.equal(state.activeDocId, fileDocId("/a.ts"), "激活项被丢时回退到剩下的最后一个");
   });
 });
 

@@ -27,6 +27,9 @@ export type PluginComponentCounts = {
   mcp: number;
   bin: number;
   extensions: number;
+  /** 界面贡献的块数（视图 + 文档渲染器 + 提及 + 设置分区） */
+  ui: number;
+  server: number;
 };
 
 /** 插件声明的 userConfig 项：宿主按它渲染配置表单，类型由清单给出 */

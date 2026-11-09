@@ -48,6 +48,16 @@ export type Transport = {
   get: <T>(action: string, request?: RequestOptions) => Promise<T>;
   /** GET 原始字节（附件读取）；响应非 JSON，不走封套 */
   getBlob: (action: string, request?: RequestOptions) => Promise<Blob>;
+  /**
+   * POST JSON 并原样返回响应体，**不拆封套**。
+   * 只给插件自有接口用：那套协议由插件定义，宿主不替它规定封套。
+   */
+  postRaw: <T>(action: string, body?: unknown, request?: RequestOptions) => Promise<T>;
+  /**
+   * 把「相对接口基址的路径」拼成可直接请求的绝对路径（插件托管的模块与样式用它）。
+   * 不拆封套、不带鉴权头：结果只用于 `import()` / `<link>`，凭证由浏览器的同源规则带上。
+   */
+  resolve: (path: string) => string;
 };
 
 /**
@@ -215,6 +225,27 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
       );
       return unwrap<T>(response);
     },
+    async postRaw<T>(action: string, body?: unknown, request?: RequestOptions): Promise<T> {
+      const response = await send(
+        `${base}/${action}`,
+        {
+          method: "POST",
+          headers: await requestHeaders("application/json"),
+          body: JSON.stringify(body ?? {}),
+        },
+        request?.timeoutMs,
+      );
+      if (!response.ok) {
+        if (response.status === 401) options.onUnauthorized?.();
+        const detail = await response.text().catch(() => "");
+        throw new ApiError(
+          "plugin_request_failed",
+          message("插件接口返回 HTTP {{status}}", { status: String(response.status) }),
+          { httpStatus: response.status, details: detail.slice(0, 500) },
+        );
+      }
+      return (await response.json()) as T;
+    },
     async getBlob(action: string, request?: RequestOptions): Promise<Blob> {
       const response = await send(
         `${base}/${action}`,
@@ -232,5 +263,6 @@ export const createTransport = (options: TransportOptions = {}): Transport => {
       }
       return response.blob();
     },
+    resolve: (path: string) => `${base}/${path.replace(/^\/+/, "")}`,
   };
 };

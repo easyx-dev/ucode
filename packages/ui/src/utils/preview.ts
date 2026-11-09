@@ -7,7 +7,7 @@
  */
 
 /** 预览类别；`text` 是兜底桶（含未知扩展名与二进制内容），由文本渲染器自己再分岔 */
-export const PREVIEW_KINDS = ["text", "markdown", "image", "pdf", "document", "design"] as const;
+export const PREVIEW_KINDS = ["text", "markdown", "image", "pdf", "document"] as const;
 
 export type PreviewKind = (typeof PREVIEW_KINDS)[number];
 
@@ -28,12 +28,6 @@ const MARKDOWN_EXTENSIONS = new Set(["md", "markdown"]);
 
 const PDF_EXTENSIONS = new Set(["pdf"]);
 
-/**
- * 设计稿：内容仍是 JSON，但扩展名单独一支——文件树据此认图标，点开直接出画布预览，
- * 而不是把一大坨 JSON 铺在源码视图里（见 `server/constants/design`）。
- */
-const DESIGN_EXTENSIONS = new Set(["design"]);
-
 /** 需要专门渲染器的办公文档；渲染器尚未接入，先占位提示 */
 const DOCUMENT_EXTENSIONS = new Set(["doc", "docx", "odt", "rtf", "xls", "xlsx", "ppt", "pptx"]);
 
@@ -51,7 +45,6 @@ export const previewKindOf = (path: string): PreviewKind => {
   if (MARKDOWN_EXTENSIONS.has(extension)) return "markdown";
   if (PDF_EXTENSIONS.has(extension)) return "pdf";
   if (DOCUMENT_EXTENSIONS.has(extension)) return "document";
-  if (DESIGN_EXTENSIONS.has(extension)) return "design";
   return "text";
 };
 

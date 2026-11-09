@@ -11,6 +11,7 @@ import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "../../../base/button";
+import { useMentionSchemes } from "../../../hooks/use-mention-schemes";
 import { useWorkbench } from "../../../provider/workbench";
 import type { ChatItem } from "../../../types";
 import { isPayloadEmpty } from "../../composer/document/composer-payload";
@@ -45,11 +46,17 @@ const useEditComposer = ({ item, parsed, images, onEdit, onCancel }: FormProps) 
   const contextItems = useContextItems(cwd);
   // 手打的命令要在编辑态同样定形（与首次发送同一条口径），清单按工作目录取
   const commands = useCommands(null, cwd ?? undefined);
+  /** 哪些 `@scheme:` 算引用锚点：由插件贡献决定 */
+  const mentionSchemes = useMentionSchemes();
 
   const submit = useCallback(() => {
     // 附件还在上传时不发：没拿到 id 的占位节点会被方言投影跳过
     if (saving || hasPendingUploads()) return;
-    const { payload: next, blocking, warnings } = payloadOfDoc(docRef.current, commands);
+    const {
+      payload: next,
+      blocking,
+      warnings,
+    } = payloadOfDoc(docRef.current, commands, mentionSchemes);
     if (blocking.length > 0) {
       toast.error(diagnosticMessage(t, blocking[0] as (typeof blocking)[number]));
       return;
@@ -64,7 +71,7 @@ const useEditComposer = ({ item, parsed, images, onEdit, onCancel }: FormProps) 
       setSaving(false);
       if (accepted) onCancel();
     });
-  }, [commands, cwd, hasPendingUploads, item, onCancel, onEdit, saving, t]);
+  }, [commands, cwd, hasPendingUploads, item, mentionSchemes, onCancel, onEdit, saving, t]);
 
   const onChange = useCallback((doc: DocNode) => {
     docRef.current = doc;

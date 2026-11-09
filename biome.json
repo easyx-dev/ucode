@@ -7,8 +7,8 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/routeTree.gen.ts", "!hub"],
-    "experimentalScannerIgnores": ["hub"]
+    "includes": ["**", "!**/routeTree.gen.ts", "!hub", "!plugins"],
+    "experimentalScannerIgnores": ["hub", "plugins"]
   },
   "formatter": {
     "enabled": true,

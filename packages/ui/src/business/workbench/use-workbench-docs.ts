@@ -26,9 +26,8 @@ export function useWorkbenchDocs(cwd: string | null, sessionId: string | null): 
 
   useEffect(() => {
     const previous = previousRef.current;
-    // 目录换了：文件 / diff 标签都绑旧目录，全清；只是换了会话：设计画布属于会话，单独丢
+    // 目录换了：文件 / diff 标签都绑旧目录，全清
     if (previous.cwd !== cwd) dispatch({ type: "reset" });
-    else if (previous.sessionId !== sessionId) dispatch({ type: "dropDesign" });
     previousRef.current = { cwd, sessionId };
   }, [cwd, sessionId]);
 

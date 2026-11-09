@@ -5,7 +5,6 @@
  */
 
 import { BROWSER_TOOL_NAMES } from "../../features/browser/tools";
-import { DESIGN_TOOL_NAMES } from "../../features/design/tools";
 import { MEMORY_TOOL_NAMES } from "../../features/memory/tools";
 import { GOAL_BLOCKED_TOOL, GOAL_COMPLETE_TOOL } from "./goal";
 
@@ -73,8 +72,8 @@ export const isExecTool = (name: string): boolean =>
 export const WRITE_TOOLS = ["edit", "write", ...EXEC_TOOL_NAMES, ...BROWSER_TOOL_NAMES] as const;
 
 /**
- * 子会话永远拿不到的工具：递归、计划提交、记忆写入、目标结算（子会话不该结算父目标）与设计画布
- * （设计稿是这次对话的产物，子会话替父画图只会让两处同时改一份文档）。
+ * 子会话永远拿不到的工具：递归、计划提交、记忆写入与目标结算（子会话不该结算父目标）。
+ * 插件贡献的工具（`design_*` 这类）不在此列：它们由插件自己的角色声明决定谁能用。
  */
 export const SUBAGENT_EXCLUDED_TOOLS = [
   SUBAGENT_TOOL_NAME,
@@ -82,7 +81,6 @@ export const SUBAGENT_EXCLUDED_TOOLS = [
   "remember",
   "forget",
   ...GOAL_TOOL_NAMES,
-  ...DESIGN_TOOL_NAMES,
 ] as const;
 
 /**
@@ -99,5 +97,4 @@ export const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...BROWSER_TOOL_NAMES,
   ...MEMORY_TOOL_NAMES,
   ...GOAL_TOOL_NAMES,
-  ...DESIGN_TOOL_NAMES,
 ]);

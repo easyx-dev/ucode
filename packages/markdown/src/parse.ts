@@ -63,7 +63,7 @@ export const parseDialect = (
   let fileCount = 0;
 
   for (const target of targetsOf(markdown, fences)) {
-    const scan = scanInline(markdown, target, skipped);
+    const scan = scanInline(markdown, target, skipped, candidates.mentions ?? []);
     let text = "";
     for (const token of scan.tokens) {
       if (token.kind === "text") {

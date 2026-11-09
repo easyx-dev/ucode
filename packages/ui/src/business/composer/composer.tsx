@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../base/dropdown-menu";
+import { useMentionSchemes } from "../../hooks/use-mention-schemes";
 import type {
   CatalogProvider,
   PermissionMode,
@@ -113,6 +114,8 @@ export function Composer({
 }: ComposerProps) {
   const { t } = useTranslation();
   const commands = useCommands(sessionId, cwdPath);
+  /** 哪些 `@scheme:` 算引用锚点：由插件贡献决定 */
+  const mentionSchemes = useMentionSchemes();
   const contextItems = useContextItems(cwdPath);
   /** 焦点收回输入区的入口：发送之后、选择器关掉之后 */
   const editorHandle = useRef<ComposerEditorHandle | null>(null);
@@ -219,7 +222,7 @@ export function Composer({
     if (isDocEmpty(doc)) return;
 
     // 文档 → 方言 → 载荷：发送路径与服务端都只认结构化字段（命令名不再进正文）
-    const { payload, blocking, warnings, skillCost } = payloadOfDoc(doc, commands);
+    const { payload, blocking, warnings, skillCost } = payloadOfDoc(doc, commands, mentionSchemes);
     // 阻断项（名字不在清单、多条命令、容器未闭合）宁可拦住发送，也不把用户写的字当普通消息发出去
     const firstBlocking = blocking[0];
     if (firstBlocking) {
@@ -256,7 +259,16 @@ export function Composer({
     }
     onSend(payload, doc);
     focusEditor();
-  }, [commands, focusEditor, handleBuiltin, hasPendingUploads, onSend, resetEditor, t]);
+  }, [
+    commands,
+    focusEditor,
+    handleBuiltin,
+    hasPendingUploads,
+    mentionSchemes,
+    onSend,
+    resetEditor,
+    t,
+  ]);
 
   const handleFiles = useCallback(
     (files: File[]) => {

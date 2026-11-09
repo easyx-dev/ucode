@@ -38,8 +38,6 @@ export default {
   "目录不在 git 仓库内：{{path}}": "Directory is not inside a git repository: {{path}}",
   "未找到 git 可执行文件": "No git executable found",
   "git 执行失败": "git command failed",
-  "设计稿里没有这个页面或节点：{{ref}}": "The design has no such page or node: {{ref}}",
-  "设计引用不匹配：{{ref}}": "Design reference does not match: {{ref}}",
   终端不存在或已结束: "The terminal does not exist or has already exited",
   终端数量已达上限: "Terminal limit reached for this directory",
   "图片无效：{{reason}}": "Invalid image: {{reason}}",
@@ -48,6 +46,7 @@ export default {
   "插件清单无效：{{path}}": "Invalid plugin manifest: {{path}}",
   "插件组件路径无效：{{path}}": "Invalid plugin component path: {{path}}",
   "插件来源不受支持：{{source}}": "Unsupported plugin source: {{source}}",
+  "插件界面不可用：{{id}}": "Plugin UI unavailable: {{id}}",
   "市场配置无效：{{reason}}": "Invalid marketplace: {{reason}}",
   "浏览器 profile 名不合法：{{reason}}": "Invalid browser profile name: {{reason}}",
   "该 profile 正在使用中，请先关掉对应实例":

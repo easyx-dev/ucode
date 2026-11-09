@@ -4,6 +4,7 @@
  * 输入是原文的一个区间与它的非解析区；输出按出现顺序的记号，认不出的字符原样留在文本记号里。
  * 这里不查附件库、也不查引用是否存在——scheme 自带类型，路径是否存在由服务端在读文件时报错。
  */
+import { mentionSchemeOf } from "./mention-anchor.ts";
 import { type Interval, isSkipped } from "./regions.ts";
 import { DIALECT_ATTACHMENT_KINDS, type DialectAttachmentKind } from "./types.ts";
 
@@ -76,14 +77,12 @@ const matchAttachment = (
   return { token: { kind: "attachment", id, schemeKind, name: label || null }, to: end + 1 };
 };
 
-/** 设计画布锚点的形状：`design:<会话>/<页>/<节点>`，三段都不含斜杠 */
-const DESIGN_ANCHOR = /^design:[^/\s]+\/[^/\s]+\/[^/\s]+$/;
-
 /** `@path#L1-L2` 或 `@[显示名](path#L1-L2)`：返回记号与消耗到的偏移，不成形返回 null */
 const matchContext = (
   source: string,
   from: number,
   to: number,
+  mentionSchemes: readonly string[],
 ): { token: InlineToken; to: number } | null => {
   if (source[from] !== "@") return null;
   if (from > 0 && ASCII_WORD.test(source[from - 1] ?? "")) return null;
@@ -108,10 +107,9 @@ const matchContext = (
   const raw = source.slice(pathFrom, pathTo).replaceAll(/\\(.)/g, "$1");
   if (!raw) return null;
 
-  // 设计锚点（`@design:<会话>/<页>/<节点>`）长得像路径，但它不是文件引用：
-  // 它的归属校验在工具侧做（跨会话 / 跨页 / 已删都要报错），服务端不该去磁盘上找这个「文件」。
-  // 原样留在文本里——模型要拿到的就是这一串字面。
-  if (DESIGN_ANCHOR.test(raw)) return null;
+  // 引用锚点（`@<scheme>:<payload>`）长得像路径，但它不是文件引用：归属校验在插件侧做，
+  // 宿主不该去磁盘上找这个「文件」。原样留在文本里——模型要拿到的就是这一串字面。
+  if (mentionSchemeOf(raw, mentionSchemes) !== null) return null;
 
   const range = LINE_RANGE_PATTERN.exec(raw);
   const path = range ? raw.slice(0, raw.length - range[0].length) : raw;
@@ -130,6 +128,8 @@ export const scanInline = (
   source: string,
   range: Interval,
   skipped: readonly Interval[],
+  /** 引用锚点的 scheme 表（插件贡献）：表内的 `@scheme:…` 不当文件引用 */
+  mentionSchemes: readonly string[] = [],
 ): InlineScan => {
   const tokens: InlineToken[] = [];
   const invalidAttachments: { raw: string; offset: number }[] = [];
@@ -169,7 +169,7 @@ export const scanInline = (
       }
     }
     if (char === "@") {
-      const context = matchContext(source, index, range.to);
+      const context = matchContext(source, index, range.to, mentionSchemes);
       if (context) {
         flush();
         tokens.push(context.token);

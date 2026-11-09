@@ -24,7 +24,7 @@ import {
   PROJECT_CONFIG_DIRNAME,
 } from "../../../constants/dirs";
 import type { SessionEventBus } from "../../../core/event-bus";
-import { createPluginService } from "..";
+import { createPluginService, type PluginServiceDeps } from "..";
 import { defaultSourceRunner, type SourceRunner } from "../sources";
 import { PluginStateStore } from "../state";
 
@@ -68,6 +68,13 @@ const setup = (input: { pluginsDir?: string; run?: SourceRunner } = {}) => {
   const service = createPluginService({
     state,
     events,
+    // 插件服务端模块要的会话仓储：这组用例不碰插件接口与工具，给一个空实现即可
+    sessions: {
+      find: () => undefined,
+      getPluginState: () => null,
+      setPluginState: () => undefined,
+      listPluginState: () => [],
+    } as unknown as PluginServiceDeps["sessions"],
     pluginsDir,
     onRegistryChange: (revision) => revisions.push(revision),
     // 默认不给进程调用：检查更新要么注入替身，要么走「判定不出来」的分支（测试不出网）
@@ -105,6 +112,8 @@ describe("安装与登记", () => {
       mcp: 0,
       bin: 0,
       extensions: 0,
+      ui: 0,
+      server: 0,
     });
     assert.deepEqual(revisions, [1]);
     assert.equal(frames.length, 1);
@@ -879,6 +888,12 @@ describe("按来源的版本判定", () => {
     const service = createPluginService({
       state,
       events: { emitControl: () => undefined } as unknown as SessionEventBus,
+      sessions: {
+        find: () => undefined,
+        getPluginState: () => null,
+        setPluginState: () => undefined,
+        listPluginState: () => [],
+      } as unknown as PluginServiceDeps["sessions"],
       pluginsDir: makeDir(),
       run: async () => {
         throw new Error("不该走到进程调用");

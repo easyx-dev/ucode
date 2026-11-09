@@ -21,6 +21,30 @@ import {
 import { hardenOwnerOnly, OWNER_ONLY_MODE } from "../../platform/file-permissions";
 import { AppError } from "../../platform/response";
 
+/**
+ * 清掉「来源已经不存在」的登记。
+ *
+ * 随包插件机制已移除（设计改成从官方市场按需安装）：老状态文件里那条 `source: "packaged"`
+ * 会让整份状态解析失败、把别的插件一起搞丢，所以读之前把它摘掉——它不是用户装的插件，
+ * 重新从市场装一次即可。
+ */
+const dropRemovedSources = (raw: unknown): unknown => {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const state = raw as { installed?: unknown };
+  if (!Array.isArray(state.installed)) return raw;
+  return {
+    ...state,
+    installed: state.installed.filter(
+      (item) =>
+        !(
+          typeof item === "object" &&
+          item !== null &&
+          (item as { source?: { source?: unknown } }).source?.source === "packaged"
+        ),
+    ),
+  };
+};
+
 export class PluginStateStore {
   private state: PluginState = emptyPluginState();
 
@@ -29,7 +53,9 @@ export class PluginStateStore {
   load(): PluginState {
     if (!existsSync(this.path)) return this.set(emptyPluginState());
     try {
-      const parsed = pluginStateSchema.parse(JSON.parse(readFileSync(this.path, "utf8")));
+      const parsed = pluginStateSchema.parse(
+        dropRemovedSources(JSON.parse(readFileSync(this.path, "utf8"))),
+      );
       // 版本升级可能带来新的内置市场：并进状态并立刻落盘，否则老用户永远看不到它
       const merged = withBuiltinMarketplaces(parsed);
       this.state = merged === parsed ? parsed : this.set(merged);

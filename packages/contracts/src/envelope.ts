@@ -104,11 +104,6 @@ export const ERROR_CODES = {
   /** git 命令执行失败 */
   gitFailed: "git_failed",
 
-  /** 设计稿里没有这一页或这个节点 */
-  designNotFound: "design_not_found",
-  /** 设计引用锚点指向别的会话、别的页，或指向已删节点 */
-  designAnchorMismatch: "design_anchor_mismatch",
-
   /** 终端不存在或已结束 */
   terminalNotFound: "terminal_not_found",
   /** 该工作目录下的终端数已达上限 */
@@ -127,6 +122,8 @@ export const ERROR_CODES = {
   pluginComponentInvalid: "plugin_component_invalid",
   /** 安装来源不受支持（尚未实现的来源，或来源本身不可用） */
   pluginSourceInvalid: "plugin_source_invalid",
+  /** 插件的界面 / 服务端无法提供：模块缺失、未启用或来源不受信任 */
+  pluginUiUnavailable: "plugin_ui_unavailable",
   /** 市场未登记、来源不受支持或清单读不出来 */
   marketplaceInvalid: "marketplace_invalid",
 

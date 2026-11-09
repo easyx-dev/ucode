@@ -10,13 +10,13 @@ import { createAssetsStore } from "./stores/assets";
 import { createAuthStore } from "./stores/auth";
 import { createCommandsStore } from "./stores/commands";
 import { createConfigStore } from "./stores/config";
-import { createDesignStore } from "./stores/design";
 import { createGoalStore } from "./stores/goal";
 import { createHubStore } from "./stores/hub";
 import { createInteractionsStore } from "./stores/interactions";
 import { createMcpStore } from "./stores/mcp";
 import { createMessagesStore } from "./stores/messages";
 import { createModelsStore } from "./stores/models";
+import { createPluginUiStore } from "./stores/plugin-ui";
 import { createPluginsStore } from "./stores/plugins";
 import { createProjectsStore } from "./stores/projects";
 import { createSessionsStore } from "./stores/sessions";
@@ -39,7 +39,6 @@ export const createClient = (options: ClientOptions = {}) => {
   const messages = createMessagesStore({ apis, events });
   const interactions = createInteractionsStore({ apis, events });
   const goal = createGoalStore({ apis, events });
-  const design = createDesignStore({ apis, events });
   const models = createModelsStore({ apis, events });
   const status = createStatusStore({ apis, events });
   const hub = createHubStore({ apis });
@@ -49,6 +48,7 @@ export const createClient = (options: ClientOptions = {}) => {
   const mcp = createMcpStore({ apis, events });
   const projects = createProjectsStore({ apis, events });
   const plugins = createPluginsStore({ apis, events });
+  const pluginUi = createPluginUiStore({ apis, events });
 
   return {
     apis,
@@ -59,7 +59,6 @@ export const createClient = (options: ClientOptions = {}) => {
     messages,
     interactions,
     goal,
-    design,
     models,
     status,
     hub,
@@ -69,6 +68,7 @@ export const createClient = (options: ClientOptions = {}) => {
     mcp,
     projects,
     plugins,
+    pluginUi,
   };
 };
 
